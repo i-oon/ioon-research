@@ -1,0 +1,273 @@
+\documentclass[border=15pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{array}
+
+%% ── Colour palette ───────────────────────────────────────────────────────────
+\definecolor{coldata}  {RGB}{219,234,254}   % light blue    – data nodes
+\definecolor{colmodel} {RGB}{254,243,199}   % light amber   – model / module nodes
+\definecolor{colloss}  {RGB}{254,226,226}   % light red     – loss / objective nodes
+\definecolor{colpolicy}{RGB}{220,252,231}   % light green   – RL policy nodes
+\definecolor{colrobot} {RGB}{237,233,254}   % light purple  – robot-interface nodes
+\definecolor{colp1bg}  {RGB}{239,246,255}   % phase 1 background
+\definecolor{colp2abg} {RGB}{240,253,244}   % phase 2a background
+\definecolor{colp2bbg} {RGB}{255,247,237}   % phase 2b background
+\definecolor{colp3bg}  {RGB}{245,243,255}   % phase 3 background
+
+%% ── TikZ styles ─────────────────────────────────────────────────────────────
+\tikzset{
+  basebox/.style = {
+    rounded corners = 3pt,
+    minimum width   = 2.0cm,
+    minimum height  = 0.68cm,
+    align           = center,
+    font            = \small,
+    inner sep       = 4pt,
+    draw
+  },
+  databox  /.style = {basebox, fill=coldata,   draw=blue!45},
+  modelbox /.style = {basebox, fill=colmodel,  draw=orange!55},
+  lossbox  /.style = {basebox, fill=colloss,   draw=red!45},
+  policybox/.style = {basebox, fill=colpolicy, draw=green!55},
+  robotbox /.style = {basebox, fill=colrobot,  draw=purple!45},
+  backbonebox/.style = {
+    basebox,
+    fill           = gray!15,
+    draw           = gray!65,
+    minimum width  = 11.5cm,
+    minimum height = 0.75cm,
+    font           = \small\bfseries
+  },
+  arr/.style      = {-Stealth, semithick, draw=gray!75},
+  thickarr/.style = {-Stealth, thick,     draw=gray!55},
+  phaseborder/.style = {
+    draw           = gray!55,
+    dashed,
+    rounded corners = 7pt,
+    inner sep       = 10pt
+  },
+  notelabel/.style  = {font=\footnotesize\itshape, align=center, text width=2.8cm},
+  phaselabel/.style = {font=\bfseries\small, align=center},
+  claimbox/.style   = {
+    draw=gray!35, fill=yellow!12, rounded corners=3pt,
+    inner sep=5pt, font=\footnotesize, align=center, text width=3.8cm
+  },
+  legendbox/.style  = {
+    draw=gray!40, fill=white, rounded corners=4pt,
+    inner sep=7pt, font=\footnotesize, align=left
+  },
+}
+
+\begin{document}
+\begin{tikzpicture}[node distance=0.7cm and 1.4cm]
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  PHASE 1 – PRETRAINING (label-free)
+%% ══════════════════════════════════════════════════════════════════════════════
+
+%% — raw frames ————————————————————————————————————————————
+\node[databox]                         (ft)   {$\mathrm{frame}_t$};
+\node[databox, below=0.35cm of ft]     (ft1)  {$\mathrm{frame}_{t+1}$};
+
+%% — shared visual encoder ————————————————————————————————
+\node[modelbox, right=1.5cm of ft, yshift=-0.35cm] (enc)
+    {\textbf{Visual Enc.}\\[-3pt]\scriptsize e.g.\ V-JEPA2};
+
+%% — visual embeddings ————————————————————————————————————
+\node[databox, right=1.4cm of enc, yshift=+0.4cm]  (et)
+    {$e_t$\\[-3pt]\scriptsize embedding};
+\node[databox, right=1.4cm of enc, yshift=-0.4cm]  (et1)
+    {$e_{t+1}$\\[-3pt]\scriptsize embedding};
+
+%% — IDM (receives e_t and e_{t+1}) ——————————————————————
+\node[modelbox, right=1.5cm of et, yshift=-0.4cm] (idm)
+    {\textbf{IDM}\\[-3pt]\scriptsize Inverse Dynamics};
+
+%% — latent action ————————————————————————————————————————
+\node[modelbox, right=1.5cm of idm] (zt1)
+    {$z_t$\\[-3pt]\scriptsize latent action};
+
+%% — FDM (receives e_t and z_t) ———————————————————————————
+\node[modelbox, below=1.5cm of idm] (fdm)
+    {\textbf{FDM}\\[-3pt]\scriptsize Forward Dynamics};
+
+%% — predicted embedding & loss ———————————————————————————
+\node[lossbox, right=1.5cm of fdm]                  (ehat) {$\hat{e}_{t+1}$\\[-3pt]\scriptsize predicted};
+\node[lossbox, right=1.5cm of ehat, yshift=-0.45cm] (lrecon)
+    {$\mathcal{L}_{\mathrm{recon}}$\\[-3pt]\scriptsize $\|\hat{e}_{t+1} - e_{t+1}\|^2$};
+
+%% — anti-shortcut annotation —————————————————————————————
+\node[notelabel, below=0.55cm of fdm, xshift=1.5cm] (antishort)
+    {Anti-shortcut:\\[1pt]
+     VQ-VAE \emph{or}\\
+     DeepLabCut $\Delta$kpt};
+
+%% — Phase 1 arrows ———————————————————————————————————————
+\draw[arr] (ft)   -- (enc);
+\draw[arr] (ft1)  -- (enc);
+\draw[arr] (enc)  -- (et);
+\draw[arr] (enc)  -- (et1);
+\draw[arr] (et)   -- (idm);
+\draw[arr] (et1)  -- (idm);
+\draw[arr] (idm)  -- (zt1);
+\draw[arr] (zt1)  |- (fdm);
+\draw[arr] (et)   |- (fdm);                   % e_t also feeds FDM
+\draw[arr] (fdm)  -- (ehat);
+\draw[arr] (ehat) -- (lrecon);
+\draw[arr] (et1)  -| node[pos=0, right] {} (lrecon);   % e_{t+1} as reconstruction target
+
+%% — Phase 1 border ———————————————————————————————————————
+\begin{scope}[on background layer]
+  \node[phaseborder, fill=colp1bg,
+        fit=(ft)(ft1)(enc)(et)(et1)(idm)(zt1)(fdm)(ehat)(lrecon)(antishort),
+        label={[phaselabel]above:
+          \textbf{Phase 1 — Pretraining (label-free)}\quad
+          \normalfont\small Animal Kingdom Dataset (850$+$ species, raw video only)}
+  ] (p1) {};
+\end{scope}
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  PRETRAINED BACKBONE  (separator)
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\node[backbonebox, below=1.3cm of p1.south] (backbone)
+    {Pretrained Backbone: Visual Enc.\ + IDM + FDM \quad (frozen or LoRA)};
+
+\draw[thickarr] (p1.south) -- (backbone.north);
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  PHASE 2a – IMAGINATION LOOP  (left branch, label-free)
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\node[policybox, below=1.5cm of backbone.south, xshift=-5.5cm] (st_a)   {$s_t$};
+\node[policybox, right=1.0cm of st_a]                           (act_a)  {\textbf{Actor}};
+\node[policybox, right=1.0cm of act_a]                          (zt_a)   {$z_t$};
+\node[policybox, below=0.8cm of zt_a]                           (fdm_a)
+    {\textbf{FDM}\\[-3pt]\scriptsize \textit{(backbone)}};
+\node[policybox, left=1.0cm of fdm_a]                           (sh_a)
+    {$\hat{s}_{t+1}$\\[-3pt]\scriptsize imagined};
+\node[policybox, left=1.0cm of sh_a]                            (crit_a) {\textbf{Critic}};
+\node[notelabel, below=0.45cm of crit_a]                        (upd_a)
+    {update Actor\\+ Critic\\(no real env)};
+
+\draw[arr] (st_a)  -- (act_a);
+\draw[arr] (act_a) -- (zt_a);
+\draw[arr] (zt_a)  -- (fdm_a);
+\draw[arr] (st_a)  |- (fdm_a);
+\draw[arr] (fdm_a) -- (sh_a);
+\draw[arr] (sh_a)  -- (crit_a);
+\draw[arr] (crit_a)-- (upd_a);
+
+\begin{scope}[on background layer]
+  \node[phaseborder, fill=colp2abg,
+        fit=(st_a)(act_a)(zt_a)(fdm_a)(sh_a)(crit_a)(upd_a),
+        label={[phaselabel]above:\textbf{Phase 2a — Imagination Loop (label-free)}}
+  ] (p2a) {};
+\end{scope}
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  PHASE 2b – ACTION PROJECTOR FINE-TUNE  (right branch, labels needed here)
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\node[modelbox, below=1.5cm of backbone.south, xshift=4.2cm]  (zt_b)   {$z_t$};
+\node[modelbox, below=0.8cm of zt_b]                           (proj_b)
+    {\textbf{Action Projector}\\[-3pt]\scriptsize $z_t \to \hat{a}_t$};
+\node[lossbox,  below=0.8cm of proj_b]                         (loss_b)
+    {$\mathcal{L} = \|\hat{a}_t - a_t\|^2$};
+
+%% — source of a_t  (moved to the right of the loss node) ——
+\node[databox, right=1.2cm of loss_b] (rdat_b)
+    {$a_t$ labels\\[-3pt]\scriptsize existing dataset\\[-2pt]\scriptsize or teleoperation};
+
+%% — research claim —————————————————————————————————————————
+\node[claimbox, below=0.5cm of loss_b] (claim_b)
+    {Key ablation: pretrained backbone requires $N \ll$ scratch baseline to converge};
+
+\draw[arr] (zt_b)   -- (proj_b);
+\draw[arr] (proj_b) -- (loss_b);
+\draw[arr] (rdat_b) -- (loss_b);
+
+\begin{scope}[on background layer]
+  \node[phaseborder, fill=colp2bbg,
+        fit=(zt_b)(proj_b)(loss_b)(rdat_b)(claim_b),
+        label={[phaselabel]above:\textbf{Phase 2b — Action Projector Fine-tune}
+               \normalfont\small\textit{(only step requiring labels)}}
+  ] (p2b) {};
+\end{scope}
+
+%% — arrows: backbone → phase 2 branches —————————————————
+\draw[thickarr] (backbone.south) -| (p2a.north);
+\draw[thickarr] (backbone.south) -| (p2b.north);
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  PHASE 3 – DEPLOYMENT
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\coordinate (p3anchor) at ($(p2a.south)!0.5!(p2b.south) + (0,-1.8cm)$);
+
+\node[robotbox,  at=(p3anchor)]            (robobs)  {\textbf{Robot Obs}};
+\node[modelbox,  right=0.9cm of robobs]    (enc_d)   {\textbf{Enc.}};
+\node[databox,   right=0.9cm of enc_d]     (et_d)    {$e_t$};
+\node[policybox, right=0.9cm of et_d]      (act_d)   {\textbf{Actor}};
+\node[policybox, right=0.9cm of act_d]     (zt_d)    {$z_t$};
+\node[modelbox,  right=0.9cm of zt_d]      (proj_d)  {\textbf{Projector}};
+\node[robotbox,  right=0.9cm of proj_d]    (jcmd)    {joint cmd};
+\node[robotbox,  below=0.8cm of jcmd]      (rrobot)  {\textbf{Real Robot}};
+\node[notelabel, left=0.9cm of rrobot]     (sparse)
+    {sparse feedback\\$\to$ update WM};
+
+\draw[arr] (robobs) -- (enc_d);
+\draw[arr] (enc_d)  -- (et_d);
+\draw[arr] (et_d)   -- (act_d);
+\draw[arr] (act_d)  -- (zt_d);
+\draw[arr] (zt_d)   -- (proj_d);
+\draw[arr] (proj_d) -- (jcmd);
+\draw[arr] (jcmd)   -- (rrobot);
+\draw[arr] (rrobot) -- (sparse);
+
+\begin{scope}[on background layer]
+  \node[phaseborder, fill=colp3bg,
+        fit=(robobs)(enc_d)(et_d)(act_d)(zt_d)(proj_d)(jcmd)(rrobot)(sparse),
+        label={[phaselabel]above:\textbf{Phase 3 — Deployment (label-free at runtime)}}
+  ] (p3) {};
+\end{scope}
+
+\draw[thickarr] (p2a.south) -- ++(0,-0.6cm) -| (p3.north);
+\draw[thickarr] (p2b.south) -- ++(0,-0.6cm) -| (p3.north);
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  LABEL AUDIT
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\node[draw=gray!45, fill=gray!6, rounded corners=5pt, inner sep=10pt,
+      below=1.3cm of p3.south, align=left, font=\small] (audit)
+{%
+  \textbf{Label Audit} \\[5pt]
+  \begin{tabular}{@{}lll@{}}
+    \textbf{Phase} & \textbf{Component}                 & \textbf{Labels required?} \\[2pt]
+    \hline\\[-6pt]
+    1              & Visual Enc.\ + IDM + FDM           & \textcolor{green!55!black}{$\checkmark$ label-free (raw video)} \\[2pt]
+    2a             & Actor + Critic (imagination)       & \textcolor{green!55!black}{$\checkmark$ label-free (imagined rollouts)} \\[2pt]
+    2b             & Action Projector fine-tune         & \textcolor{red!65!black}{$\times$\ $a_t$ needed — existing dataset or teleoperation ($N$ demos)} \\[2pt]
+    3              & Deployment / inference             & \textcolor{green!55!black}{$\checkmark$ label-free at runtime} \\
+  \end{tabular}%
+};
+
+%% ══════════════════════════════════════════════════════════════════════════════
+%%  COLOUR LEGEND
+%% ══════════════════════════════════════════════════════════════════════════════
+
+\node[legendbox, right=1.5cm of p1.east, yshift=0cm] (legend)
+{%
+  \textbf{Legend}\\[4pt]
+  \tikz \node[databox,   minimum width=1.2cm, minimum height=0.4cm, font=\footnotesize] {Data};   \quad data / embedding \\[3pt]
+  \tikz \node[modelbox,  minimum width=1.2cm, minimum height=0.4cm, font=\footnotesize] {Module}; \quad model / module \\[3pt]
+  \tikz \node[lossbox,   minimum width=1.2cm, minimum height=0.4cm, font=\footnotesize] {Loss};   \quad loss / objective \\[3pt]
+  \tikz \node[policybox, minimum width=1.2cm, minimum height=0.4cm, font=\footnotesize] {Policy}; \quad RL policy component \\[3pt]
+  \tikz \node[robotbox,  minimum width=1.2cm, minimum height=0.4cm, font=\footnotesize] {Robot};  \quad robot interface \\
+};
+
+\end{tikzpicture}
+\end{document}

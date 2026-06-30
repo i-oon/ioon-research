@@ -106,7 +106,9 @@ LAPA ใช้ VQ-VAE เพื่อ discover discrete latent actions จาก
 
 **CLAM: Continuous Latent Action Models**
 พัฒนาโดยทีมจาก University of Southern California และ Google ปี 2025
-ปรับปรุงจาก Genie และ LAPA โดยเปลี่ยนจาก discrete เป็น continuous latent actions เพราะ locomotion ต้องการ continuous joint control สอน latent IDM + latent FDM พร้อมกับ action decoder เพื่อให้ ground ได้ง่าย ข้อสำคัญคือ CLAM แสดงว่า continuous latent action ทำงานได้ดีกว่า discrete สำหรับ continuous control tasks ซึ่ง locomotion เป็น case ที่ตรงที่สุด
+ปรับปรุงจาก Genie และ LAPA โดยเปลี่ยนจาก discrete เป็น continuous latent actions สอน latent IDM + latent FDM พร้อมกับ action decoder เพื่อให้ ground ได้ง่าย
+
+**หมายเหตุสำคัญ:** CLAM ไม่ได้ทำ locomotion โดยตรง งานนี้ evaluate บน continuous control tasks ทั่วไป (น่าจะ manipulation เป็นหลัก) สิ่งที่ borrow มาจาก CLAM ในงานเราคือ **แนวคิด architecture** ว่า continuous latent action space เหมาะกับ locomotion มากกว่า discrete เพราะ joint torque ของ robot เป็น continuous ไม่ใช่ว่า CLAM พิสูจน์เรื่อง locomotion แล้ว
 
 ### 3.5 ทำไม z ถึง morphology-agnostic
 
