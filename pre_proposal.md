@@ -33,7 +33,7 @@
 
 ## 5. วัตถุประสงค์
 
-1. เพื่อออกแบบและเทรน Pipeline การสร้าง Latent Action Space แบบ Self-Supervised โดยใช้ Inverse State-Transition Model (ITM) และ Forward State-Transition Model (FTM) บนข้อมูลวิดีโอจาก Simulation ของหุ่นยนต์แมลง (Stick Insect) 3 Morphology โดยไม่นำ Label มาใช้ในขั้นตอน Pretraining
+1. เพื่อออกแบบและเทรน Pipeline การสร้าง Latent Action Space โดยใช้ Inverse State-Transition Model (ITM), Forward State-Transition Model (FTM) และ Motion Decoder บนข้อมูลวิดีโอและ Action Labels ที่ Simulation บันทึกไว้โดยอัตโนมัติ จากหุ่นยนต์แมลง (Stick Insect) 3 Morphology
 2. เพื่อพิสูจน์เชิงประจักษ์ว่า Latent Action $z_t$ ที่ได้มีคุณสมบัติ Morphology-Agnostic โดยใช้ Principal Component Analysis (PCA) วิเคราะห์ว่า $z_t$ จากหุ่นยนต์ต่าง Morphology ที่ทำพฤติกรรมเดียวกันเกาะกลุ่มร่วมกันหรือไม่
 3. เพื่อทดสอบการถ่ายทอดความรู้ไปยัง Morphology ที่ไม่เคยเห็นในขั้นตอน Pretraining (Medium Leg) และวัดผลว่า World Model ที่ได้ช่วยลดปริมาณข้อมูลที่จำเป็นสำหรับ Morphology ใหม่ได้จริงหรือไม่
 
@@ -42,7 +42,7 @@
 ## 6. ขอบเขตการศึกษา
 
 1. **ขอบเขตด้าน Platform:** ทำการทดลองใน Simulation เท่านั้น โดยสร้างหุ่นยนต์แมลง (Stick Insect) 3 แบบที่มีความยาวขาต่างกัน ได้แก่ ขาสั้น / ขากลาง / ขายาว ใน Environment จำลอง (เช่น MuJoCo หรือ IsaacGym) ยังไม่ครอบคลุมการทดลองกับหุ่นยนต์จริง
-2. **ขอบเขตด้านเฟส:** ครอบคลุมเฉพาะ Phase 1 (Pretraining: ITM + FTM) และการตรวจสอบด้วย PCA เท่านั้น ยังไม่ครอบคลุม Phase 2 (Imagination RL หรือ Policy Training บน FDM) และ Phase 3 (Deployment)
+2. **ขอบเขตด้านเฟส:** ครอบคลุมเฉพาะ Phase 1 (Pretraining: ITM + FTM) และการตรวจสอบด้วย PCA เท่านั้น ยังไม่ครอบคลุม Phase 2 (Imagination RL หรือ Policy Training บน FTM) และ Phase 3 (Deployment)
 3. **ขอบเขตด้านงาน (Task):** งานที่ศึกษาคือการเดินไปข้างหน้า (Forward Locomotion) เท่านั้น ไม่ครอบคลุม Manipulation, Climbing หรือ Terrain ที่ซับซ้อน
 4. **ขอบเขตด้านข้อมูล:** ใช้วิดีโอจาก Simulation Camera (Third-Person View) ที่เห็นภาพรวมทั้ง Agent และ Environment ยังไม่ใช้วิดีโอสัตว์จริงจาก Dataset ภายนอก
 5. **ขอบเขตการพิสูจน์:** การทดสอบ Morphology ใหม่ (Medium Leg) เป็นการพิสูจน์แบบ Interpolation (ค่าอยู่ในช่วงระหว่าง Short และ Long) ยังไม่ใช่ Extrapolation ไปยัง Morphology ที่อยู่นอกขอบเขต
@@ -51,7 +51,7 @@
 
 ## 7. ประโยชน์ที่คาดว่าจะได้รับ
 
-1. ได้ Framework สำหรับการสร้าง Latent Action Space แบบ Self-Supervised สำหรับ Locomotion ที่ไม่ต้องการ Action Labels ซึ่งสามารถขยายไปใช้กับวิดีโอสัตว์จริง (เช่น Animal Kingdom Dataset) ในอนาคตได้โดยตรง
+1. ได้ Framework สำหรับการสร้าง Latent Action Space สำหรับ Locomotion ที่ใช้ Action Labels จาก Simulation (ซึ่ง Auto-Log ได้โดยไม่ต้องมี Human Annotation) เป็น Supervision Signal ผ่าน Motion Decoder ซึ่งสามารถพิสูจน์คอนเซปต์และขยายทิศทางไปสู่การใช้วิดีโอสัตว์จริง (เช่น Animal Kingdom Dataset) ในอนาคตได้
 2. ได้แนวทางการถ่ายทอดทักษะการเดินไปยังหุ่นยนต์ที่มี Morphology ใหม่โดยลดปริมาณ Labeled Data ที่จำเป็นลงอย่างมีนัยสำคัญ เมื่อเปรียบเทียบกับการเทรน Policy ตั้งแต่ต้น
 3. ได้วิธีการวัดและพิสูจน์คุณสมบัติ Morphology-Agnostic ของ Latent Space ด้วย PCA ซึ่งสามารถนำไปใช้เป็น Benchmark สำหรับงานวิจัยด้าน Cross-Morphology Transfer ในอนาคต
 
