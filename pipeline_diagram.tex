@@ -72,16 +72,16 @@
 
 %% ── Embeddings ───────────────────────────────────────────────────────────────
 \node[embbox, right=1.4cm of enc, yshift=+0.56cm] (et)
-  {$e_t \in \mathbb{R}^{768}$\\[3pt]\scriptsize feature $t$};
+  {$e_t$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t$};
 
 \node[embbox, right=1.4cm of enc, yshift=-0.56cm] (et1)
-  {$e_{t+1} \in \mathbb{R}^{768}$\\[3pt]\scriptsize feature $t{+}1$};
+  {$e_{t+1}$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t{+}1$};
 
 %% ── ITM ──────────────────────────────────────────────────────────────────────
 \node[modelbox, right=1.6cm of et, yshift=-0.56cm] (itm)
   {\textbf{Inverse State-Transition}\\[-2pt]\textbf{Model (ITM)}\\[4pt]
-   \scriptsize causal-attn + cross-attn + query $q_t$\\[1pt]
-   \scriptsize in:\;$[e_t,\,e_{t+1}]$\quad out:\;$z_t \in \mathbb{R}^{k}$};
+   \scriptsize 4 causal-attn blocks + query $q_t$, 16 heads\\[1pt]
+   \scriptsize in:\;$[e_t,\,e_{t+1}]$\quad out:\;$z_t \in \mathbb{R}^{512}$};
 
 \node[redannot, above=0.4cm of itm] (annotitm)
   {What transition happened\\between these two states?};
@@ -89,13 +89,13 @@
 %% ── Latent action z_t ────────────────────────────────────────────────────────
 \node[ztbox, right=1.6cm of itm] (zt)
   {\textbf{Latent Action}\;$z_t$\\[4pt]
-   \scriptsize $\mathbb{R}^{k}$,\quad $k = 32$};
+   \scriptsize $\mathbb{R}^{512}$,\quad $k = 512$};
 
 %% ── Motion Decoder (top-right branch) ────────────────────────────────────────
 \node[modelbox, right=1.6cm of zt, minimum width=4.0cm] (motdec)
   {\textbf{Motion Decoder}\\[4pt]
-   \scriptsize cross-attn$(z_t, x_t)$ + MLP $\to \mathbb{R}^{18}$\\[1pt]
-   \scriptsize in:\;$z_t$ (query),\;$x_t$ (context)};
+   \scriptsize cross-attn$(z_t,\,e_t)$ + MLP $\to \mathbb{R}^{18}$\\[1pt]
+   \scriptsize in:\;$z_t$ (query),\;$e_t$ (context)};
 
 \node[grayannot, below=0.15cm of motdec] (discard)
   {\textit{discarded after pretraining}};
@@ -122,13 +122,13 @@
 %% ── FTM ──────────────────────────────────────────────────────────────────────
 \node[modelbox, below=2.4cm of itm] (ftm)
   {\textbf{Forward State-Transition}\\[-2pt]\textbf{Model (FTM)}\\[4pt]
-   \scriptsize self-attn($x_t$) + self-attn($z_t$) + cross-attn\\[1pt]
-   \scriptsize in:\;$[e_t,\,z_t]$\quad out:\;$\hat{e}_{t+1} \in \mathbb{R}^{768}$};
+   \scriptsize 8 blocks: self-attn($e_t$) + self-attn($z_t$) + cross-attn, 16 heads\\[1pt]
+   \scriptsize in:\;$[e_t,\,z_t]$\quad out:\;$\hat{e}_{t+1} \in \mathbb{R}^{1408}$};
 
 %% ── Predicted next embedding ê_{t+1} ─────────────────────────────────────────
 \node[predbox, right=1.6cm of ftm] (ehat)
   {$\hat{e}_{t+1}$\\[3pt]
-   \scriptsize $\mathbb{R}^{768}$\\[-1pt]
+   \scriptsize $\mathbb{R}^{1408}$\\[-1pt]
    \scriptsize predicted next emb.};
 
 %% ── L_recon ──────────────────────────────────────────────────────────────────
