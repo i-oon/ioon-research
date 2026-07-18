@@ -6,226 +6,286 @@
 
 ### ปัญหาพื้นฐาน
 
-ในงานด้าน robot locomotion ปัจจุบัน เวลาเราจะสอน robot ให้เดินได้ เราต้องเทรน policy ซึ่งก็คือ neural network ที่รับ state ของ robot เป็น input แล้ว output ออกมาเป็น action เช่น จะหมุน joint ไหน เท่าไหร่ ปัญหาคือ policy นี้มัน specific กับ body ของ robot ตัวนั้นมากๆ เพราะมันเรียนรู้ว่า "ถ้าขา 4 ขาของฉันอยู่ในท่านี้ ให้ทำแบบนี้" ซึ่งถ้า body เปลี่ยนไป เช่น
+ในงานด้าน robot locomotion ปัจจุบัน เวลาจะสอน robot ให้เดินได้ เราต้องเทรน policy ซึ่งเป็น neural network ที่รับ state ของ robot เป็น input แล้ว output ออกมาเป็น action เช่น จะหมุน joint ไหน เท่าไหร่ ปัญหาคือ policy นี้ specific กับ body ของ robot ตัวนั้นมากๆ ถ้า body เปลี่ยนไป เช่น
 
-- เปลี่ยนจาก 4 ขา เป็น 6 ขา
-- เปลี่ยนสัดส่วนขาให้ยาวขึ้นหรือสั้นลง
+- ขาสั้นลงหรือยาวขึ้น
 - เปลี่ยน mass distribution
+- robot ได้รับความเสียหาย ขาหัก
 
-policy เดิมใช้ไม่ได้เลย ต้องเริ่มเทรนใหม่ตั้งแต่ต้น ซึ่งแต่ละครั้งใช้เวลาหลายชั่วโมงถึงหลายวัน และต้องใช้ computational resource จำนวนมาก
+policy เดิมใช้ไม่ได้เลย ต้องเริ่มเทรนใหม่ตั้งแต่ต้น ซึ่งแต่ละครั้งใช้เวลาหลายชั่วโมงถึงหลายวัน
 
-### ทำไมมันถึงเป็นปัญหาใหญ่
+### สโคปที่เราทำ (หลังพูดคุยกับ Ajan Go — Week 4, Week 5)
 
-ในโลกจริง robot ไม่ได้มีแบบเดียว บริษัทต่างๆ ผลิต robot หลายรุ่น หลาย body configuration ถ้าทุก configuration ต้องเทรนใหม่ตั้งแต่ต้น มันไม่ scale ในทางปฏิบัติ นอกจากนี้ robot ที่ใช้งานจริงอาจเกิดความเสียหาย เช่น ขาหัก ซึ่งทำให้ morphology เปลี่ยนโดยกะทันหัน robot ต้องการ adapt ได้เร็ว ไม่ใช่รอ retrain ใหม่
+เราไม่ได้ทำ biological video แล้ว เปลี่ยนมาทำใน **simulation ทั้งหมด** โดยใช้ **stick insect 3 morphologies** คือขาสั้น (0.5×), ขากลาง (0.75×), และขายาว (1.0× = base model) ใน **CoppeliaSim v4.10**
+(เดิมเขียนว่า IsaacSim 5.0 — **ผิด** โมเดล Medauroidea ของแล็บรันบน CoppeliaSim ไม่ใช่ IsaacSim ติดตั้งและ verify แล้ว ดู `sim/SOURCES.md`)
 
-### ชื่อเรียกของปัญหานี้ในวรรณกรรม
-
-ปัญหานี้เรียกว่า **cross-morphology locomotion transfer** หรือบางครั้งเรียก **cross-embodiment generalization** คือการที่ความรู้เรื่องการเดินถ่ายทอดข้าม body ที่ต่างกันได้
+เป้าหมายหลัก: เทรน World Model บนขาสั้น + ขายาว แล้วพิสูจน์ว่า World Model ช่วยให้ขากลาง (ที่ไม่เคยเห็นมาก่อน) เรียนรู้ได้เร็วขึ้น โดยใช้ข้อมูลน้อยกว่า
 
 ---
 
-## 2. Intuition — ทำไมถึงใช้ video สัตว์
+## 2. Intuition — ทำไมถึงทำแบบนี้
 
-### สัตว์แก้ปัญหานี้ได้แล้ว
+### ทำไมต้องการ morphology-agnostic representation
 
-ลองคิดดูว่าในธรรมชาติมีสัตว์ที่มี body แตกต่างกันอย่างสุดขั้ว
+ถ้าเราสั่งขาสั้น "ยกขาสูง 20 องศา" แล้วมันเดินได้ แต่ถ้าเอา command เดียวกันไปใส่ขายาว ขาอาจลากพื้นเพราะยกสูงไม่พอ Ajan Go ยกตัวอย่างนี้เพื่อแสดงว่า **morphology gap มีอยู่จริง** และนั่นคือ Step -1 ที่เราต้องเช็คก่อนเลยว่าขาสั้น/ยาวทำให้ behavior ต่างกันจริงๆ
 
-- แมลง มี 6 ขา ขาเล็กมาก น้ำหนักเบา
-- สุนัข มี 4 ขา สัดส่วนกลางๆ
-- ม้า มี 4 ขา ขายาว มวลมาก
-- ตะขาบ มีขาหลายสิบขา
+สิ่งที่เราต้องการคือ latent variable **z_t** ที่ encode "พฤติกรรม" (เช่น เดินตรง, เลี้ยว, หยุด) โดยไม่ encode "รูปร่างร่างกาย" ถ้า z_t เป็นแบบนั้น มันก็ transfer ข้าม morphology ได้
 
-แต่ทุกตัวเดินได้ ทั้งหมดเรียนรู้หลักการเดียวกัน ได้แก่ การทรงตัวเมื่อยกขา การส่งน้ำหนักระหว่างขา การ recover เมื่อสะดุด และการ coordinate ขาหลายๆ ข้างพร้อมกัน ความรู้เหล่านี้ไม่ได้ขึ้นกับว่ามีขากี่ข้าง หรือขายาวแค่ไหน มันเป็น universal principle ของการเดินภายใต้ gravity และ physics จริงๆ
+### ทำไมถึงใช้ video + visual encoder แทน joint state โดยตรง
 
-### ทำไม video ของสัตว์ถึงดีกว่า simulation
+แรงบันดาลใจมาจาก **LAC-WM** (ICML 2026) ที่แสดงว่าการ extract latent action จาก visual observation ทำได้และ scale ได้ข้าม embodiments หลายตัว นอกจากนี้ visual encoder ที่ pretrain บน internet video จำนวนมาก เช่น V-JEPA2 มี feature ที่ rich และ generalizable กว่าการใช้ joint state ดิบๆ
 
-ปัจจุบัน robot learning ส่วนใหญ่ใช้ simulation เช่น MuJoCo หรือ Isaac Gym ในการเทรน แต่ simulation มีปัญหา เรียกว่า **sim-to-real gap** คือ physics ใน simulation มันเป็นแค่ approximation ของ physics จริง เช่น การสัมผัสระหว่างขากับพื้น การ deform ของวัสดุ และ friction จริงๆ ล้วน model ได้ไม่สมบูรณ์ใน simulation
-
-ส่วน video ของสัตว์จากธรรมชาติ เช่น สารคดีธรรมชาติ หรือ YouTube เป็น physics จริงๆ 100% evolution optimize การเดินมาหลายร้อยล้านปีกับ physics จริง ไม่ใช่ simulation และ video เหล่านี้มีอยู่เยอะมากและฟรี
-
-### Dataset ที่จะใช้
-
-**Animal Kingdom** — พัฒนาโดย Singapore University of Technology and Design (SUTD) ปี 2022 เป็น dataset ที่รวบรวม video สัตว์กว่า 50 ชั่วโมง ครอบคลุม 850 species ใน 6 class หลัก ได้แก่ สัตว์เลี้ยงลูกด้วยนม นก สัตว์เลื้อยคลาน สัตว์สะเทินน้ำสะเทินบก ปลา และแมลง มี annotation สำหรับ action recognition และ pose estimation ซึ่งทำให้เป็น data source ที่เหมาะที่สุดสำหรับงานนี้
+เราเป็นงานแรกที่นำ LAC-WM pipeline มาประยุกต์ใช้กับ **locomotion domain** ซึ่งยังไม่มีใครทำมาก่อน
 
 ---
 
 ## 3. Stack ทางเทคนิค
 
-### 3.1 World Model คืออะไร
+### 3.1 Visual Encoder — V-JEPA2
 
-**World Model** คือ neural network ที่เรียนรู้ว่า "ถ้า agent อยู่ใน state S แล้วทำ action A สภาพแวดล้อมจะเปลี่ยนไปเป็น S′ อย่างไร" พูดง่ายๆ คือมันเป็น internal model ของ physics ในหัว agent
+**V-JEPA2** พัฒนาโดย Meta AI (2025) เป็น ViT-g/16 ขนาด 1B parameters ที่ pretrain บน internet video กว่า 1 ล้านชั่วโมง (VM22M, 22 ล้านวิดีโอ) ด้วย mask-denoising objective ใน representation space
 
-ในแนวทางปกติที่ไม่มี world model agent ต้องลองทำจริงทุกครั้งเพื่อรู้ว่าเกิดอะไรขึ้น ซึ่งใช้ time และ interaction เยอะมาก แต่ถ้ามี world model agent สามารถ "จินตนาการ" ใน latent space ก่อนได้เลย คิดว่าถ้าทำแบบนี้จะเกิดอะไรขึ้น โดยไม่ต้องลองจริง ทำให้เรียนรู้ได้เร็วขึ้นมากและใช้ data น้อยลง
+- **Frozen** ตลอด Phase 1 — ไม่มี gradient ไหลผ่าน
+- Input: frame ∈ ℝ^{256×256×3}
+- Output: 256 patch tokens ∈ ℝ^{1408} ต่อ frame
+- ใช้ 3D-RoPE positional embedding
 
-งานที่เป็นรากฐานสำคัญของ world model คือ **DreamerV3** พัฒนาโดย Danijar Hafner จาก Google DeepMind ปี 2023 ใช้ architecture ชื่อ **RSSM (Recurrent State Space Model)** ซึ่งเรียนรู้ latent space ของ environment แล้วให้ policy เรียนรู้จาก imagined rollouts ใน latent space นั้น DreamerV3 แสดงให้เห็นว่า world model เดียวสามารถ generalize ได้ใน 150+ tasks โดยไม่ต้องปรับ hyperparameter เลย รวมถึง locomotion tasks ใน MuJoCo ด้วย
+เหตุผลที่ใช้แม้ pretrain บน general video ไม่ใช่ locomotion โดยตรง: V-JEPA2 เรียนรู้ motion-relevant features จาก video ทั่วไป feature เหล่านี้ (เช่น การเคลื่อนไหว, spatial structure, temporal change) transferable ไปยัง locomotion ใน simulation ได้ Step 0 จะ verify ก่อนว่า feature จาก V-JEPA2 มี locomotion signal หรือเปล่า
 
-### 3.2 ปัญหาเมื่อต้องการใช้ video สัตว์
+### 3.2 Cross-Augmentation
 
-World model แบบดั้งเดิมต้องการ action label คู่กับ observation เสมอ เช่น "ขณะนี้ขา joint 3 หมุน 15 องศาด้วย torque 20 Nm" แต่ใน video สัตว์ เราเห็นแค่ภาพที่สัตว์เคลื่อนที่ เราไม่รู้เลยว่า
+ก่อน encode เราทำ augmentation กับ frame pair (O_t, O_{t+1}) สองครั้งด้วย independent random parameters A1, A2 ได้ embedding pair สองชุด:
 
-- muscle ไหนออกแรงเท่าไหร่
-- joint torque จริงๆ คืออะไร
-- neural signal ที่ส่งไปยังกล้ามเนื้อมีค่าเท่าไหร่
-
-action ซ่อนอยู่ใน movement ที่เห็น ทำให้ใช้ world model แบบ standard ไม่ได้
-
-### 3.3 Latent Action Model คือทางออก
-
-แนวคิดคือ แทนที่จะ require action label เราให้ model **อนุมาน** latent variable ขึ้นมาเองจาก observation สอง frame ติดกัน
-
-มีสองส่วนหลัก
-
-**IDM — Inverse Dynamics Model**
-รับ observation สอง frame แล้ว encode ออกมาเป็น latent action z
 ```
-IDM(pose_t, pose_t+1) → z_t
-```
-z_t คือ "สิ่งที่ทำให้เกิด transition นี้" โดยไม่ต้องรู้ว่ามันคือ torque หรือ muscle activation
-
-**FDM — Forward Dynamics Model (World Model ตัวจริง)**
-รับ state ปัจจุบันและ latent action แล้ว predict state ถัดไป
-```
-FDM(pose_t, z_t) → predicted pose_t+1
+(x_t¹, x_{t+1}¹) = encode(A1(O_t), A1(O_{t+1}))   → ส่งเข้า ITM
+(x_t², x_{t+1}²) = encode(A2(O_t), A2(O_{t+1}))   → ส่งเข้า FTM
 ```
 
-ทั้งสองส่วนเทรนพร้อมกันด้วย reconstruction loss คือ predicted pose_t+1 ต้องใกล้เคียงกับ pose_t+1 จริงๆ ให้มากที่สุด
+- ITM ใช้ pair 1: z_t¹ = ITM(x_t¹, x_{t+1}¹)
+- FTM ใช้ pair 2 + z_t¹: ê_{t+1}² = FTM(x_t², z_t¹) แล้วเทียบกับ x_{t+1}² จริง (L_recon)
 
-วิธีนี้ทำงานได้เพราะ IDM ถูก "บังคับ" ให้ encode ข้อมูลที่จำเป็นและเพียงพอสำหรับ FDM ในการ predict state ถัดไปเท่านั้น ข้อมูลที่ไม่เกี่ยวกับ transition เช่น texture ของขน หรือสีพื้นหลัง จะไม่ถูก encode เข้าไปใน z เพราะมันไม่ช่วยให้ predict ได้ดีขึ้น
+จุดประสงค์ (ตามที่ LAC-WM paper ระบุตรงๆ ใน section "Cross-Augmentation Inputs"): เพราะ z_t ถูก supervise บางส่วนด้วย L_recon ITM มี incentive จะ **cheat โดยยัด x_{t+1} เข้าไปใน z_t ตรงๆ** แทนที่จะเรียนรู้ action จริง เพราะแบบนั้นก็ทำให้ predict แม่นได้เหมือนกัน (ผิดจุดประสงค์) cross-augmentation ตัด shortcut นี้ทิ้งเพราะ x_{t+1}¹ ที่ ITM เห็น (จาก aug1) ไม่ตรงกับ x_{t+1}² ที่ FTM ต้อง predict (จาก aug2) — ถ้า z_t แค่ copy x_{t+1}¹ มาตรงๆ จะ predict x_{t+1}² ผิด
 
-งานที่แสดงว่าแนวทางนี้ได้ผลในทางทฤษฎีคือ **"What Do Latent Action Models Actually Learn?"** โดย Zhang et al. จาก Microsoft Research ปี 2025 ตีพิมพ์ที่ NeurIPS 2025 งานนี้วิเคราะห์ด้วย linear model และแสดงให้เห็นว่า IDM objective บังคับให้ z encode เฉพาะ controllable changes เท่านั้น นอกจากนี้ยังแสดงว่า data augmentation และ data cleaning ช่วย enforce ให้ z capture การเปลี่ยนแปลงที่ควบคุมได้ ไม่ใช่ noise
+**หมายเหตุสำคัญ**: cross-augmentation ป้องกัน shortcut แบบ "copy future frame ตรงๆ" ได้ แต่**ไม่ได้การันตีว่า z_t จะไม่ encode morphology** เพราะรูปร่างร่างกาย (body shape) เป็น content จริงที่ยังอยู่ไม่ว่าจะ crop/color-jitter/flip ยังไง (ต่างจาก texture/color ที่เป็น nuisance ที่ augmentation ทำลายได้) นี่คือเหตุผลที่ **Step 1.5 ต้องมี empirical check** (UMAP + K-means) และมี **UniSkill** เป็น fallback ถ้า z_t ดัน cluster ตาม morphology จริงๆ (แก้จากเดิมที่เขียนว่า HiLAM — ดูข้อ 5 Fallback)
 
-### 3.4 งานที่ใช้ Latent Action Model ที่ผ่านมา
+### 3.3 Inverse State-Transition Model (ITM)
 
-**Genie: Generative Interactive Environments**
-พัฒนาโดย Google DeepMind ปี 2024 ตีพิมพ์ที่ ICML 2024
-เป็นงานชิ้นแรกที่แสดงว่า latent action model สามารถเรียนรู้จาก Internet video ที่ไม่มี action label ได้ Genie train บน video เกม 2D platformer และเรียนรู้ discrete latent actions ที่ทำให้ user ควบคุม virtual environment ได้ โดยไม่เคยเห็น ground-truth action เลย ข้อจำกัดคือใช้ video เกม ซึ่ง clean และ controlled กว่า video สัตว์มากและ discrete action ไม่เหมาะกับ locomotion ที่ต้องการ continuous control
+- **4 causal self-attention blocks, 16 heads**
+- Input: [e_t, e_{t+1}] รวม 512 tokens (256 + 256 — ตัวเลขนี้ถูกแล้ว)
+- Learned query token q_t (trained parameter ไม่ใช่ input)
+- Output: **z_t ∈ ℝ^{64}**
 
-**LAPA: Latent Action Pretraining from Videos**
-พัฒนาโดยทีมจาก University of Washington, Microsoft Research, และ NVIDIA ปี 2024 ตีพิมพ์ที่ ICLR 2025 ได้รับ Best Paper ที่ CoRL LangRob Workshop
-LAPA ใช้ VQ-VAE เพื่อ discover discrete latent actions จาก Internet video แล้ว pretrain VLA (Vision-Language-Action) model โดยไม่ต้องมี robot action label เลย จากนั้น fine-tune บน robot data เพียงเล็กน้อย ผลลัพธ์คือ outperform state-of-the-art VLA ที่ train ด้วย labeled data ด้วยประสิทธิภาพ pretraining ที่ดีกว่า 30 เท่า ข้อจำกัดคือเน้น manipulation ไม่ใช่ locomotion
+> **แก้ไขสำคัญ**: เดิมเขียนว่า z_t ∈ ℝ^{512} — อ่าน LAC-WM Table 4 ผิด
+> ตัวเลข "Latent Dimension = 512" ใน Table 4 คือ **hidden width ภายใน** ของ ITM/FTM ไม่ใช่ขนาดของ latent action
+> LAC-WM §4.2 เขียนแยกไว้ว่า: *"Both models employ an action embedding dimension of 64"* → **z_t ∈ ℝ^{64}**
+> (ข้อดี: latent เล็กลง 8 เท่า ช่วยเรื่อง compute บน RTX 2080 Ti ด้วย)
 
-**CLAM: Continuous Latent Action Models**
-พัฒนาโดยทีมจาก University of Southern California และ Google ปี 2025
-ปรับปรุงจาก Genie และ LAPA โดยเปลี่ยนจาก discrete เป็น continuous latent actions สอน latent IDM + latent FDM พร้อมกับ action decoder เพื่อให้ ground ได้ง่าย
+Causal mask: e_t เห็นแค่ตัวเอง, e_{t+1} เห็น e_t และตัวเอง ทำให้ ITM ถามว่า "มีอะไรเกิดขึ้นระหว่าง t กับ t+1?"
 
-**หมายเหตุสำคัญ:** CLAM ไม่ได้ทำ locomotion โดยตรง งานนี้ evaluate บน continuous control tasks ทั่วไป (น่าจะ manipulation เป็นหลัก) สิ่งที่ borrow มาจาก CLAM ในงานเราคือ **แนวคิด architecture** ว่า continuous latent action space เหมาะกับ locomotion มากกว่า discrete เพราะ joint torque ของ robot เป็น continuous ไม่ใช่ว่า CLAM พิสูจน์เรื่อง locomotion แล้ว
+### 3.4 Forward State-Transition Model (FTM)
 
-### 3.5 ทำไม z ถึง morphology-agnostic
+- **8 transformer blocks, 16 heads**
+- แต่ละ block: self-attn(e_t) + self-attn(z_t) + cross-attn(e_t queries z_t)
+- Input: [e_t, z_t] → Output: ê_{t+1} ∈ ℝ^{1408}
 
-นี่คือ core hypothesis ของงานเรา เมื่อ train บน biological video จาก 850+ species ที่มี body configuration แตกต่างกันอย่างสุดขั้ว model ถูกบังคับให้หา z ที่ explain transition ได้สำหรับทุก species พร้อมกัน
+FTM ถาม "ถ้า state ตอนนี้เป็น e_t และ latent action เป็น z_t สถานะถัดไปจะเป็นยังไง?"
 
-สิ่งที่ share ข้าม species ทั้งหมด ได้แก่ physics ของ locomotion เช่น การ shift center of mass ก่อนยกขา การ coordinate การก้าวขาเพื่อรักษา balance และการ recover เมื่อเสียหลัก สิ่งเหล่านี้จะถูก encode เข้าไปใน z เพราะมันอธิบาย transition ได้สำหรับทุก species
+### 3.5 Motion Decoder
 
-ส่วนสิ่งที่ body-specific เช่น ขนาดขา จำนวนข้อต่อ หรือ texture ของร่างกาย ไม่ได้ช่วยให้ predict transition ได้ดีขึ้นสำหรับ species อื่น z จึง pressure ให้ตัดสิ่งเหล่านี้ออก
+- cross-attn(z_t queries e_t) + MLP → â_t ∈ ℝ^{18}
+- z_t เป็น query, e_t เป็น visual context (keys/values)
+- Output: joint position targets 18 มิติ (6 ขา × 3 joints)
+- **ทิ้งหลัง pretraining** — ใช้แค่เพื่อ anchor z_t ให้ ground กับ actual action
 
-**Embodiment Scaling Laws** — งานของ Ai et al. จาก National University of Singapore ปี 2025 ตีพิมพ์ที่ CoRL 2025 แสดงให้เห็นว่า diversity ของ morphology ใน training data มี scaling law คือยิ่งเทรนกับ morphology หลากหลาย ยิ่ง generalize ได้กว้างขึ้น และ embodiment diversity ให้ผลดีกว่าการเพิ่มปริมาณ data บน morphology เดิม งานนี้ทำบน simulation แต่ถ้า principle นี้ hold biological video ที่มี 850+ species น่าจะให้ diversity ที่ดีกว่า simulation dataset ใดๆ ที่มีอยู่
+### 3.6 Loss Functions
+
+```
+L_recon  = ||ê_{t+1} − e_{t+1}||²     ← self-supervised (embedding space)
+L_motion = ||â_t − a_t||²              ← supervised (sim auto-logs a_t)
+L_total  = λ_recon · L_recon + λ_motion · L_motion
+```
+
+L_recon คำนวณใน **embedding space** ไม่ใช่ pixel space ดังนั้นไม่ต้องการ pixel decoder
 
 ---
 
-## 4. Pipeline ทั้งหมด
+## 4. Data Setup
 
-### Step 1 — เก็บ data
+| รายการ | ค่า |
+|---|---|
+| Simulator | **CoppeliaSim v4.10** (แก้จาก IsaacSim 5.0 ที่เขียนผิด) |
+| Robot | Stick Insect *Medauroidea extradentata* — 3 morphologies: **short 0.5× / medium 0.75× / long 1.0× (base)** — สร้างและ verify แล้ว (`sim/env/*.ttt`) |
+| Action type | Joint position targets ℝ^{18} (6 legs × 3 joints) |
+| Episode length | ~1,000 steps (~16s at 60Hz) |
+| Episodes | ~100 per morphology per behavior |
+| Behaviors | Walk / Turn / Stop |
+| Camera | Fixed, side view, ~30° elevated — **ยังไม่มีใน scene ต้องสร้างเอง** (ดูข้อ 6) |
+| Train morphologies | Short + Long leg |
+| Transfer test | Medium leg (interpolation) |
+| Data collection policy | **IK retargeting** — นิยาม behavior เป็น Cartesian foot trajectory แล้วใช้ `simIK` แก้ per morphology (ดูข้อ 4.1) |
 
-ใช้ Animal Kingdom dataset (850 species, 50 ชั่วโมง) เน้น clip ที่เห็นการเดินชัดเจน กรอง clip ที่มี occlusion หนักหรือ camera เคลื่อนไหวมากออก
+Model stick insect ที่ใช้: ✅ ได้แล้วจาก repo `airl-insect-walking` ของ Ajan YuChen — migrate มาที่ `sim/` (ดู `sim/SOURCES.md`)
 
-### Step 2 — Pose Extraction
+### 4.1 Data Collection Policy — ทำไมถึงเลือก IK Retargeting
 
-แปลง raw video เป็น keypoint sequence ด้วย **DeepLabCut** พัฒนาโดย Alexander Mathis จาก Harvard และ Tübingen University ปี 2018 ตีพิมพ์ใน Nature Neuroscience เป็น tool สำหรับ markerless pose estimation ของสัตว์ ใช้ transfer learning จาก ResNet ที่ pretrain บน ImageNet สามารถ estimate keypoints ได้แม่นยำระดับ human annotator ด้วย training data เพียง 200 frames
+**ปัญหา**: เราต้องการ walk/turn/stop × 3 morphologies แต่ของที่มีอยู่ทำไม่ได้:
+- `ds_loopsm.csv` มีแค่ **67 rows = 1 gait cycle เดินหน้าอย่างเดียว** (loop rows 2–64)
+- AIRL reward = `discriminator_logit + vx*100` → **forward velocity อย่างเดียว** ไม่มี turn/stop
+- Expert data = **สัตว์ตัวเดียว, gait เดียว, trial เดียว** (Animal06) — 30 ไฟล์ใน `expert/trails/` คือ replay อันเดิม 30 รอบ ไม่ใช่ 30 recording
 
-ผลที่ได้คือ sequence ของ pose แทนแต่ละ frame เช่น ตำแหน่ง (x, y) ของ joints แต่ละข้อในพิกัด body-centric
+**ทำไมไม่ retrain AIRL ต่อ morphology**: normalization bounds ใน `normalized_env*.py` เป็น **ค่า literal ที่วัดมือมาจากร่างเดิม** ไม่มีอะไร parameterize ตามความยาวขา ถ้าขาสั้นลง 50% ทุก bound ผิดหมด (joint range, foot z, force, body height, standing pose) และ **ไม่มีการ clip** → ผิดแบบเงียบๆ + ต้องเทรน ~1 วัน/run + expert data ใช้ไม่ได้กับร่างที่ scale แล้ว
 
-### Step 3 — Train Latent Action World Model
+**วิธีที่เลือก — IK Retargeting**:
+1. นิยาม behavior เป็น **Cartesian foot trajectory** (walk = เดินหน้า, turn = ซ้าย/ขวาไม่เท่ากัน, stop = ยืนนิ่ง)
+2. ใช้ `simIK` (มีใน CoppeliaSim อยู่แล้ว) แก้ IK → ได้ joint angles ต่อ morphology
+3. ได้ **a_t ต่างกันต่อ morphology** แต่ behavior เทียบกันได้ ไม่ต้องเทรนเลย
 
-```
-สำหรับแต่ละ consecutive frame pair (pose_t, pose_t+1):
-   z_t = IDM(pose_t, pose_t+1)        ← อนุมาน latent action
-   pose_pred = FDM(pose_t, z_t)       ← predict next state
-   loss = ||pose_pred - pose_t+1||²   ← reconstruction loss
-```
-
-เทรนด้วย data จาก 850+ species พร้อมกัน model จะค่อยๆ เรียนรู้ latent space z ที่ capture locomotion structure ที่ share ข้าม species
-
-### Step 4 — วิเคราะห์ Latent Space
-
-ก่อน transfer ให้ visualize และวิเคราะห์ว่า z encode อะไรจริงๆ ด้วย t-SNE หรือ UMAP ดูว่า z organize ตาม gait type (walk, trot, gallop), morphology class (insect, quadruped), หรือ species หาก z cluster ตาม gait มากกว่า species แสดงว่า morphology-agnostic จริง
-
-### Step 5 — Transfer ไปยัง Robot
-
-เอา pretrained world model z ไป initialize policy learning ของ robot morphology ใหม่ใน simulation เช่น MuJoCo เปรียบเทียบ sample efficiency (ใช้ data น้อยกว่าเดิมแค่ไหน) และ asymptotic performance กับ baseline ที่ไม่ได้ pretrain บน biological video
+**ทำไม a_t ต้องต่างกันต่อ morphology (สำคัญมาก)**: Motion Decoder คือ `MD(x_t, z_t) → â_t` — มันดู visual context `x_t` ด้วย
+- ถ้าส่ง **command เดียวกัน** ให้ทุกร่าง → `a_t` เหมือนกันหมด → `L_motion` บังคับให้ `z_t` morphology-agnostic **แบบ trivial** และ MD ไม่ต้องใช้ `x_t` เลย → reviewer บอกได้ทันทีว่า "ก็แน่ล่ะ คุณส่ง action เดียวกันให้ทุกร่าง" → **circular**
+- ถ้า `a_t` ต่างกันต่อร่าง → MD **ต้อง** ใช้ `x_t` เพื่อรู้ว่า "นี่ร่างไหน" → `z_t` ที่เก็บแต่ behavior จึงเป็นผลลัพธ์ที่ **ได้มาจริง** ไม่ใช่ของแถม
 
 ---
 
-## 5. งานที่มีอยู่และช่องว่าง
+## 5. Execution Plan (Milestone-based)
 
-### กลุ่มที่ 1 — มี Latent Action WM แต่ใช้ Simulation
+### Step -1 — Morphology Gap Check
+ส่ง joint command เดียวกันไปให้ขาสั้นและขายาว ถ้าได้ behavior ต่างกันจริง (เช่น ขายาวลาก) → morphology gap มีอยู่จริง → ดำเนินการต่อ
 
-**LAC-WM (Latent Action Robot Foundation World Models)**
-พัฒนาโดยทีมจาก Stanford University, Meta AI Research, และ FAIR ปี 2026 ตีพิมพ์ที่ ICLR 2026
-ใช้ unified latent action space ข้าม robot embodiments หลายตัวใน simulation ไม่มี per-embodiment action label แต่ train บน simulation data ทั้งหมด แสดงว่า latent action space scale ได้กับจำนวน embodiment แต่ข้อจำกัดหลักคือ physics ยังมาจาก simulation อยู่
+### Step 0 — Visual Encoder Sanity Check
+รัน V-JEPA2 บน frame จากทั้ง 3 morphologies × 3 behaviors → ดู UMAP ว่า e_t มี structure ที่ดีหรือเปล่า behavior ต้องแยกได้บ้าง morphology ต้องไม่ dominate
 
-### กลุ่มที่ 2 — ใช้ Biological Video แต่ไม่มี Latent Action WM
+### Step 1 — Train Phase 1 Pipeline
+เทรน ITM + FTM + Motion Decoder บน short + long leg ดู L_recon และ L_motion converge ทั้งคู่
 
-**RLWAV (Reinforcement Learning from Wild Animal Videos)**
-พัฒนาโดย Chane-Sane et al. จาก LAAS-CNRS, France ปี 2024
-train video classifier บน animal video แล้วใช้ classification score เป็น reward signal ให้ robot เรียนรู้ใน simulation ไม่ต้องมี reference trajectory เลย แต่ classifier ยังต้องการ class label บน video และทดสอบแค่บน Solo quadruped ตัวเดียว ไม่ได้ cross morphology
+### Step 1.5 — Latent Space Validation
+เก็บ z_t จากทุก morphology × behavior → UMAP ดูว่า cluster ตาม behavior (ผ่าน) ไม่ใช่ morphology (ล้มเหลว)
 
-**SLoMo (A General System for Legged Robot Motion Imitation from Casual Videos)**
-พัฒนาโดยทีมจาก Carnegie Mellon University ปี 2023 ตีพิมพ์ใน IEEE Robotics and Automation Letters
-แปลง casual video ของสัตว์และมนุษย์เป็น reference trajectory ผ่าน keypoint reconstruction และ trajectory optimization แล้ว track ด้วย MPC บน hardware ได้สำเร็จ แต่ต้องการ explicit trajectory ทุก video ไม่ได้เรียน shared representation
+**Evaluation metrics:**
+- UMAP colored by behavior → 3 clusters ชัดเจน (primary visualization)
+- UMAP colored by morphology → ไม่มี separation
+- K-means (K=3) → cluster labels match behavior labels (quantitative check)
 
-### ช่องว่างที่เห็น
+### Step 2 — Transfer to Unseen Morphology
+Fine-tune ITM + FTM บน N medium leg episodes ด้วย **LoRA rank 2**
 
-| | Latent Action WM | Biological Video | Cross-Morphology |
+| Condition | ความหมาย |
+|---|---|
+| Pretrained FTM + N episodes | ใช้ World Model ที่เทรนแล้ว |
+| Scratch FTM + N episodes | baseline — เทรนใหม่ตั้งแต่ต้น |
+
+Vary N = 5 / 10 / 20 / 50 / 100 episodes
+
+**Metric หลัก:** training time reduction — pretrained ต้องถึง L_recon เดิมด้วย episodes น้อยกว่า scratch อย่างชัดเจน (Ajan Go: "นี่คือตัววัดผลหลัก")
+
+### Fallback (ถ้า Step 1.5 ล้มเหลว) — **แก้แล้ว: UniSkill ไม่ใช่ HiLAM**
+
+~~เดิม: ใช้ HiLAM ทำ dynamic chunking → z^h~~ ❌ **HiLAM เป็น fallback ที่ผิด**
+
+อ่าน paper จริงแล้ว (`doc/2603.05815v1`) พบว่า HiLAM แก้ปัญหา **temporal abstraction** (z_t มองแค่ช่วงสั้นๆ ไม่เห็น structure ระยะยาว) — **ไม่ใช่ปัญหา embodiment invariance**:
+- chunking mechanism ของมันดู feature dissimilarity **ระหว่าง token ที่ติดกันใน video เดียว** เท่านั้น
+- **ไม่มี objective ใดๆ ที่ align ข้าม embodiment เลย** ไม่มีการแยก nuisance (รูปร่าง) ออกจาก behavior
+- ถ้า z_t encode morphology อยู่แล้ว → chunking แค่ **pool feature เดิม** → จะได้ skill hierarchy แยกต่อร่าง = **ยิ่งตอกย้ำ morphology clustering** ไม่ได้แก้
+- การทดลองเป็น LIBERO manipulation 100% ไม่มี locomotion เลย และไม่มี code ปล่อย
+
+✅ **ตัวที่ถูกคือ UniSkill** (Kim et al. 2025, CoRL) — *"Imitating Human Videos via Cross-Embodiment Skill Representations"* — แก้ **cross-embodiment** โดยตรง ซึ่งคือ failure mode ที่เรากลัวจริงๆ
+
+> จุดสังเกตสำคัญ: **HiLAM เอา IDM/FDM ของ UniSkill มาใช้เป็น frozen submodule** — คุณสมบัติ cross-embodiment ที่ HiLAM มี จริงๆ มาจาก UniSkill ส่วน contribution ของ HiLAM เอง (hierarchical chunking) เป็นคนละเรื่องกัน
+> → ถ้า z_t cluster ตาม morphology ต้องไปที่ paper ที่แก้เรื่องนั้นโดยตรง ไม่ใช่ paper ที่สร้างทับมันอีกที
+
+ตัวสำรองอีกตัวที่น่าสนใจ: **DiLA** (Zhang et al. 2026) — disentangle content/structure เพื่อกันไม่ให้ feature รูปร่างเข้าไปปนใน behavior latent
+
+---
+
+## 5.5 🔴 Confound ที่อันตรายที่สุด — Render Style ครอบงำ e_t
+
+**สิ่งที่เจอ** (`scripts/umap_domain_check.py`, บันทึกใน `PROGRESS.md §5`): วิดีโอ 3 อันที่ **behavior เหมือนกัน** (เดินหน้าเหมือนกันหมด) แต่ render คนละแบบ (พื้นขาว / IsaacSim grid / MuJoCo checkerboard) → whole-frame `e_t` แยกเป็น **3 cluster ที่ไม่ทับกันเลย**
+
+**แปลว่า**: raw frozen V-JEPA2 `e_t` ตอนนี้ sensitive กับ **สไตล์การ render** (พื้นหลัง/แสง/engine) มากกว่า **behavior**
+(V-JEPA2 paper ช่วยอะไรไม่ได้ตรงนี้ — VideoMix22M **ไม่มี simulated data เลยสักนิด** และ paper ไม่เคยศึกษาเรื่อง rendering domain gap → ผลของเราไม่ขัดกับ paper แต่ paper ก็อธิบายมันไม่ได้)
+
+**ทำไมอันตราย**: ถ้ากล้อง/แสง/พื้นหลัง ต่างกันแม้แต่นิดเดียวระหว่าง session ที่ถ่ายแต่ละ morphology → **Step 1.5 จะวัด "คลิปนี้ถ่ายจาก session ไหน" ไม่ใช่ morphology vs behavior** ผลจะออกมาสวยงามและ**ไม่มีความหมาย** — และมองไม่เห็นเลยถ้าไม่ได้คุมไว้ตั้งแต่แรก
+
+**วิธีป้องกัน — บังคับ ทำตอนเก็บข้อมูล:**
+1. **ล็อค render environment**: กล้อง (ตำแหน่ง/มุม), แสง, พื้นหลัง ต้อง**เหมือนกันเป๊ะ**ทุก morphology และทุก behavior เปลี่ยนแค่ **ขาหุ่น** กับ **การเคลื่อนไหว** เท่านั้น ห้ามเปลี่ยนอย่างอื่น
+2. **เลือกพื้นหลังให้ถูก** — เลี่ยงทั้ง 2 สุดขั้วที่ทดลองแล้วพัง: **ห้าม checkerboard** (aliasing → motion ปลอม) และ **ห้ามพื้นเรียบ/ว่างเปล่า** (ViT register-token noise — patch ว่างแกว่งมากที่สุด) → ใช้พื้นผิว **matte, texture อ่อนๆ, ไม่ซ้ำลาย**
+3. **Gate ก่อนเข้า Step 1.5**: encode frame จากแต่ละ morphology session แล้วรัน domain-UMAP → cluster **ต้องทับกันแล้ว** ถ้ายังแยกตาม session = ยังคุมไม่ได้ = ข้อมูลใช้ไม่ได้
+4. cross-augmentation ออกแบบมาลด nuisance แบบนี้อยู่แล้ว — **แต่ไม่ใช่ตัวแทนของการคุม environment** เพราะ body shape เป็น real content ที่ crop/color/flip ทำลายไม่ได้
+
+> ยืนยันซ้ำจาก `deep_research.md` (เอกสารเก่า): *"Latent space analysis must show locomotion-relevant structure, not visual artifacts"* — เขียนไว้ตอนยังทำ direction เก่า แต่ยังใช้กับตอนนี้ได้เป๊ะ
+
+---
+
+## 6. งานที่เกี่ยวข้องและช่องว่าง
+
+| | Latent Action WM | Locomotion | Cross-Morphology |
 |---|---|---|---|
-| LAC-WM — Stanford, Meta, FAIR (ICLR 2026) | ✓ | ✗ simulation | ✓ |
-| RLWAV — LAAS-CNRS France (2024) | ✗ classifier reward | ✓ | ✗ robot เดียว |
-| SLoMo — CMU (RA-L 2023) | ✗ explicit trajectory | ✓ | ✗ robot เดียว |
-| **งานที่เราจะทำ** | **✓** | **✓** | **✓** |
+| LAC-WM — Stanford/Meta (ICML 2026) | ✓ | ✗ manipulation | ✓ |
+| RLWAV — LAAS-CNRS (2024) | ✗ classifier reward | ✓ | ✗ single robot |
+| SLoMo — CMU (RA-L 2023) | ✗ explicit trajectory | ✓ | ✗ single robot |
+| **งานเรา** | **✓** | **✓** | **✓** |
 
-ยังไม่มีใครเอา latent action world model มา train บน biological video และ evaluate cross-morphology transfer โดยเฉพาะ นี่คือ design point ที่ว่างอยู่
+LAC-WM คืองานหลักที่เรา adapt มา แต่ LAC-WM ทำ manipulation เราเป็น**รายแรก**ที่นำ pipeline นี้มาใช้กับ locomotion
 
----
-
-## 6. ประโยคสรุปสำหรับบอกอาจารย์
-
-> "เราจะ train latent action world model บน biological locomotion video จากสัตว์หลากหลาย species โดยไม่ต้องมี action label เลย โดย model จะอนุมาน latent variable z จาก observation สอง frame ติดกัน ซึ่ง z นี้จะ encode locomotion strategy ที่ share ข้าม morphology เช่น การทรงตัวและ gait rhythm โดยตัดสิ่งที่ body-specific ออกไป สมมติฐานคือ z นี้จะเป็น prior ที่ดีสำหรับ policy learning บน robot morphology ใหม่ ทำให้ transfer ข้าม body configuration ได้โดยไม่ต้อง retrain ใหม่ตั้งแต่ต้น"
+หมายเหตุ: LAC-WM ถูก ICLR 2026 reject (weak evaluation: 1 task, 1 baseline) แต่ได้รับ ICML 2026 ข้อวิจารณ์นี้บอกว่าเราต้องการ **≥2 baselines และ ≥3 behaviors** เพื่อ evaluation ที่แข็งแกร่งกว่า
 
 ---
 
-## 7. คำถามที่อาจารย์น่าจะถาม
+## 7. สรุปประโยคเดียวสำหรับบอกอาจารย์
 
-**"ทำไมการเดินของแมวถึงช่วย robot 6 ขาได้?"**
-
-สิ่งที่ transfer ไม่ใช่ body plan แต่เป็น control strategy ว่าจะ shift weight ยังไงก่อนยกขา จะ sequence ขายังไงเพื่อรักษา balance และจะ recover จาก disturbance ยังไง สิ่งเหล่านี้เป็น physics-constrained ไม่ใช่ body-constrained เพราะ gravity ทำงานเหมือนกันกับทุก body plan หลักการ "ต้องมี center of mass อยู่เหนือ support polygon" ใช้ได้กับแมวและ robot 6 ขาเหมือนกัน
-
-เรามีหลักฐาน empirical จาก SLoMo (CMU, 2023) และ RLWAV (LAAS-CNRS, 2024) ที่แสดงว่า biological locomotion signal ข้าม domain gap ไปถึง robot hardware ได้จริงแล้ว แม้จะยังไม่ใช่ latent action approach
-
-**"Latent space จะไม่ learn visual artifact จาก video เหรอ?"**
-
-นี่เป็น concern ที่ถูกต้อง และได้รับการตอบโดย Zhang et al. จาก Microsoft Research (NeurIPS 2025) ซึ่งวิเคราะห์ทางทฤษฎีว่า IDM objective บังคับให้ z encode เฉพาะ controllable changes เท่านั้น เพราะถ้า z encode สิ่งที่ไม่เกี่ยวกับ locomotion เช่น texture หรือ lighting ก็จะไม่ช่วยให้ FDM predict pose ถัดไปได้ดีขึ้น และ loss ก็จะไม่ลด นอกจากนี้ technique เช่น data augmentation และ data cleaning ช่วย enforce สิ่งนี้ได้ เราจะใช้ทั้งสองอย่างในงานนี้
-
-นอกจากนี้ DiLA (2026) จาก Tsinghua University เสนอ content-structure disentanglement ที่แยก visual details ออกจาก locomotion structure อย่างชัดเจน ซึ่งเป็น architecture ที่น่าพิจารณาสำหรับงานเรา
-
-**"Simulation ไม่พอเหรอ?"**
-
-นั่นคือ null hypothesis ของงานเรา และเราไม่ได้อ้างว่า biological video ดีกว่าแน่นอน แต่มีเหตุผลที่ดีที่จะคิดว่ามันน่าจะให้ prior ที่ดีกว่าสำหรับ locomotion โดยเฉพาะ
-
-Simulation ใช้ rigid-body physics ซึ่งเป็น approximation ในขณะที่สัตว์เดินบน real physics จริงๆ อีกทั้ง diversity ของ biological locomotion (850+ species) น่าจะให้ morphological diversity ที่กว้างกว่า simulation dataset ใดๆ ซึ่งสอดคล้องกับ embodiment scaling law ที่ Ai et al. จาก NUS พบว่า diversity matters มากกว่า quantity
-
-คำตอบสุดท้ายจะมาจาก experiment ที่เปรียบเทียบ biological video pretraining กับ simulation pretraining บน benchmark เดียวกัน
-
-**"Robot ที่ muscle-driven กับ joint-torque-driven มัน transfer กันได้จริงเหรอ?"**
-
-นี่คือ counter-argument ที่แข็งที่สุด biological locomotion ใช้ muscle ที่ compliant และ elastic ในขณะที่ robot ส่วนใหญ่ใช้ rigid joint torque อาจเป็นไปได้ว่า z ที่ learn จาก biological video encode soft-body dynamics มากกว่า rigid-body strategy
-
-อย่างไรก็ตาม RLWAV และ SLoMo แสดงให้เห็น empirically ว่า biological-to-robot transfer ไม่ได้ produce negative transfer ในทางปฏิบัติ เหตุผลที่น่าจะเป็นไปได้คือ high-level locomotion strategy เช่น gait sequence และ weight shift นั้น robust ต่อความแตกต่างของ actuator ส่วน low-level dynamics เช่น spring stiffness อาจ fine-tune ได้ในขั้นตอน adaptation บน robot morphology ใหม่
+> "เราจะเทรน Latent Action World Model บน simulation ของ stick insect 3 รูปแบบ (ขาสั้น/กลาง/ยาว) โดยใช้ V-JEPA2 เป็น visual encoder แบบ frozen และ LAC-WM pipeline (ITM + FTM + Motion Decoder) เพื่อสกัด z_t ที่ cluster ตาม behavior ไม่ใช่ morphology และพิสูจน์ว่า World Model ที่เทรนจากขาสั้น+ยาวช่วยให้ขากลางเรียนรู้ได้เร็วขึ้นอย่างชัดเจน"
 
 ---
 
-## 8. สิ่งที่ยังไม่รู้ (open questions สำหรับงานวิจัย)
+## 8. คำถามที่อาจารย์น่าจะถาม
 
-1. Latent space z ที่ได้จาก biological video จะ organize ตาม gait type, species, หรือ morphology class อย่างไร
-2. Multi-species biological diversity ให้ cross-morphology generalization ที่ดีกว่า simulation diversity จริงหรือไม่
-3. Continuous latent action (CLAM-style) หรือ discrete (Genie-style) เหมาะกับ locomotion มากกว่ากัน
-4. Species ไหนบ้างที่ให้ pose extraction ที่เชื่อถือได้ใน DeepLabCut และ species ไหนที่มี noise มากเกินไป
-5. World model ที่ train บน biological video จะ generalize ไปยัง robot morphology ที่ไม่มีใน training data ได้ไกลแค่ไหน
+**"ทำไม V-JEPA2 ที่ pretrain บน internet video ถึงใช้กับ simulation locomotion ได้?"**
+
+V-JEPA2 เรียนรู้ motion-relevant features จาก video ทั่วไป เช่น object movement, temporal change, spatial structure สิ่งเหล่านี้ไม่ specific กับ domain ใดๆ และ locomotion ก็ต้องการ feature เหล่านี้ — ขาเคลื่อนไหวยังไง body เอียงยังไง Step 0 จะเป็น empirical check ว่า feature จาก frozen V-JEPA2 มี locomotion signal จริงหรือเปล่าก่อนเดินหน้าต่อ
+
+**"ทำไม z_t ถึงไม่ encode morphology?"**
+
+เหตุผลตรงจาก LAC-WM paper: cross-augmentation บังคับให้ ITM cheat ไม่ได้ด้วยการยัด x_{t+1} (raw future embedding) เข้าไปใน z_t ตรงๆ เพราะ ITM เห็น x_{t+1} จาก aug1 แต่ FTM ต้อง predict x_{t+1} จาก aug2 (คนละ augmentation) ถ้า z_t แค่ copy ข้อมูลดิบมาจะ predict ผิด — z_t จึงถูกบีบให้ capture เฉพาะสิ่งที่ generalize ข้าม augmentation ได้ ซึ่งควรเป็น motion/action มากกว่า raw appearance
+
+**แต่ต้องระวัง**: นี่ไม่ได้การันตี 100% ว่า z_t จะไม่ encode morphology เพราะ body shape เป็น real content ที่ crop/color/flip ทำลายไม่ได้ (ต่างจาก texture/color ที่เป็นแค่ nuisance) ดังนั้นต้องพิสูจน์ด้วย empirical evidence ใน **Step 1.5** (UMAP + K-means บน z_t ข้าม morphology) จริงๆ ถ้าล้มเหลว → fallback ไปใช้ **UniSkill**
+
+**"ทำไมต้อง LoRA ใน Step 2?"**
+
+LoRA rank 2 ให้เพิ่มน้อย parameters มากสำหรับ fine-tune บน medium leg (~0.1% ของ total params) ทำให้โมเดล adapt ได้โดยไม่ทำลาย latent structure ที่เรียนรู้มาจาก short+long leg ถ้า fine-tune แบบ full model เสี่ยงที่จะ overwrite knowledge ที่ pretrain ไว้
+
+**"Baseline คืออะไร?"**
+
+เทรน FTM จาก scratch บน medium leg N episodes เดียวกัน เปรียบเทียบว่าต้องการกี่ episodes ถึงจะได้ L_recon เท่ากัน ถ้า pretrained ใช้ episodes น้อยกว่าอย่างชัดเจน → World Model มีประโยชน์จริง
+
+**"ถ้า z_t cluster ตาม morphology ทำยังไง?"**
+
+ใช้ **UniSkill** (Kim et al. 2025, CoRL) เป็น fallback — เป็น paper ที่แก้ **cross-embodiment skill representation** โดยตรง ตรงกับ failure mode ที่เจอพอดี
+
+(เดิมเคยตอบว่าใช้ HiLAM — **ผิด** HiLAM แก้ปัญหา temporal abstraction ไม่ใช่ embodiment invariance ถ้า z_t encode morphology อยู่แล้ว การ chunk มันเป็น skill จะยิ่งตอกย้ำ cluster เดิม ไม่ได้แก้ — ดูข้อ 5 Fallback)
+
+**"ทำไมต้องมี latent action? ในเมื่อทุก morphology ใช้ joint command 18 มิติเหมือนกันหมด?"** ⚠️ **คำถามที่อันตรายที่สุด — Ajan Blink ถามตั้งแต่ Week 4 ยังไม่เคยตอบ**
+
+คำถามเต็มของ Ajan Blink: *"ถ้าสุดท้าย policy กับหุ่นก็ต้องใช้ joint command อยู่ดี แล้วจะแปลงเป็น latent/frame space ทำไม แถมต้องมี converter แปลงกลับอีก?"*
+
+ทำไมมันแรง: LAC-WM มี embodiment ที่ **action space ต่างกันจริงๆ** (Franka EE 10 มิติ / humanoid 2 แขน 20 มิติ / มือคน **138 มิติ** / BFA 25 มิติ) — latent action ของเขาจำเป็นเพราะต้องรวม action space ที่คนละขนาดกันให้เป็นภาษาเดียว **แต่ของเรา 3 ร่างใช้ 18 มิติเหมือนกันเป๊ะ** เหตุผลนั้นหายไปเลย
+
+**คำตอบที่ควรใช้ — เปลี่ยน framing**: เหตุผลของเราไม่ใช่ *action-space heterogeneity* (เราไม่มี) แต่เป็น **dynamics heterogeneity** — command เดียวกันให้ผลการเคลื่อนที่ต่างกันชัดเจนตามความยาวขา **ซึ่ง Step -1 พิสูจน์ไปแล้ว** (3.49 m vs 4.77 m, swing clearance 0.13–0.16 สม่ำเสมอ vs 0.05–0.38 กระจาย)
+
+→ หน้าที่ของ latent action ที่นี่คือรวม **effective dynamics mapping** จาก command เดียวกัน → การเคลื่อนที่/ภาพที่ต่างกันข้ามความยาวขา โดยมี motion-decoding loss คอย ground ไม่ให้มัน degenerate เป็น identity function
+
+**การทดลองที่ต้องทำเพื่อตอบให้ได้จริง**: **latent-conditioned FDM vs raw-joint-conditioned FDM (shared encoder)** — ถ้า latent ชนะ = ตอบ Ajan Blink ได้ด้วยหลักฐาน ถ้าแพ้ = thesis กลวง **ต้องรู้ตั้งแต่เดือนแรก ไม่ใช่เดือนที่ 3**
+
+---
+
+## 9. สิ่งที่ยังต้องทำ / open questions
+
+| รายการ | สถานะ |
+|---|---|
+| ~~Stick insect model~~ | ✅ **เสร็จแล้ว** — ได้จาก repo `airl-insect-walking` ของ Ajan YuChen, migrate มาที่ `sim/` แล้ว |
+| ~~Data collection policy~~ | ✅ **ตัดสินใจแล้ว: IK retargeting** (ดูข้อ 4.1) |
+| 🔴 **Camera ใน CoppeliaSim scene** | **ยังไม่มี** — scene เป็น state-only ทั้งหมด ไม่มี vision sensor เลย **นี่คือ blocker อันดับ 1** ทุกอย่างตั้งแต่ Step 0 เป็นต้นไปติดตรงนี้ |
+| 🔴 **Turn / Stop behavior** | **ยังไม่มี** — gait CSV มีแค่ walk (67 rows), AIRL reward เป็น forward-velocity อย่างเดียว → ต้องสร้างด้วย IK retargeting |
+| 🔴 **Motivation: ทำไมต้องมี latent action?** | **ยังไม่ตอบ** — Ajan Blink ถามตั้งแต่ Week 4 ยังไม่มีคำตอบ (ดูข้อ 10) |
+| λ_recon, λ_motion weights | เริ่มจาก equal แล้ว ablate — **หมายเหตุ: paper ไม่ได้บอกค่า λ ไว้เลย** (รวมถึง learning rate / optimizer ด้วย) |
+| k = 64 (LAC-WM §4.2) หรือ ablate | แก้จากเดิมที่เขียนว่า 512 (อ่าน Table 4 ผิด — 512 คือ hidden width ไม่ใช่ latent action) |
+| LAC-WM source code | ยังไม่มี public code (accepted ICML 2026) |
+| GPU สำหรับ training | ใช้เครื่องแล็บ (RTX 2080 Ti 11GB) — **ต้องระวัง**: LAC-WM ใช้ 64× H200 นาน 4 วัน (≈256 H200-GPU-days), batch 512 ต้องลด scale ลงมากและใช้ gradient accumulation + fp16 |

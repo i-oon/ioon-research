@@ -1,0 +1,10 @@
+# Python environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# CoppeliaSim / sim run artifacts
+sim/env/experttemp.csv
+
+# Scratch outputs
+*.log

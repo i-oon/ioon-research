@@ -1,0 +1,228 @@
+\documentclass[border=18pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{amsmath}
+\usepackage{xcolor}
+
+%% ── Colours ──────────────────────────────────────────────────────────────────
+\definecolor{cBlue}  {RGB}{219,234,254}
+\definecolor{cAmber} {RGB}{254,243,199}
+\definecolor{cRed}   {RGB}{254,226,226}
+\definecolor{cGreen} {RGB}{220,252,231}
+\definecolor{cGray}  {RGB}{230,230,230}
+\definecolor{cOrange}{RGB}{255,214,170}
+\definecolor{cBg}    {RGB}{239,246,255}
+\definecolor{cSrc}   {RGB}{255,251,235}
+\definecolor{cPurple}{RGB}{237,233,254}
+
+%% ── Styles ───────────────────────────────────────────────────────────────────
+\tikzset{
+  mybox/.style  = {rounded corners=7pt, draw, align=center, inner sep=9pt, font=\small},
+  framebox/.style = {mybox, fill=cBlue,   draw=blue!40,   minimum width=3.2cm},
+  encbox  /.style = {mybox, fill=cGray,   draw=gray!50,   minimum width=3.4cm},
+  embbox  /.style = {mybox, fill=cBlue,   draw=blue!40,   minimum width=2.8cm},
+  modelbox/.style = {mybox, fill=cAmber,  draw=orange!50, minimum width=4.4cm},
+  ztbox   /.style = {mybox, fill=cOrange, draw=orange!65, minimum width=3.2cm},
+  predbox /.style = {mybox, fill=cRed,    draw=red!40,    minimum width=3.0cm},
+  lossbox /.style = {mybox, fill=cRed,    draw=red!45,    minimum width=5.0cm},
+  simbox  /.style = {mybox, fill=cPurple, draw=purple!45, minimum width=3.2cm},
+  validbox/.style = {mybox, fill=cGreen,  draw=green!50,  minimum width=14cm},
+  srcbox  /.style = {mybox, fill=cSrc,    draw=gray!40,   minimum width=12cm,
+                     font=\footnotesize},
+  combbox /.style = {mybox, fill=cSrc,    draw=gray!40,   text width=6.4cm,
+                     align=center},
+  %% arrows
+  arr    /.style = {-Stealth, semithick, draw=gray!65},
+  mainarr/.style = {-Stealth, line width=1.4pt, draw=orange!75},
+  simarr /.style = {-Stealth, semithick, draw=purple!60, dashed},
+  thkarr /.style = {-Stealth, thick, draw=gray!55},
+  %% labels
+  phaseborder/.style = {draw=gray!55, dashed, rounded corners=10pt, inner sep=16pt},
+  phaselabel /.style = {font=\bfseries\normalsize},
+  redannot   /.style = {font=\small\itshape, text=red!65!black, align=center,
+                        text width=3.8cm},
+  grayannot  /.style = {font=\footnotesize\itshape, text=gray!55, align=center,
+                        text width=3.6cm},
+}
+
+\begin{document}
+\begin{tikzpicture}[node distance=1.0cm and 1.8cm]
+
+%% ── Data source banner ───────────────────────────────────────────────────────
+\node[srcbox] (src)
+  {\textbf{Data:}\enspace Stick Insect Simulation \enspace|\enspace
+   3 morphologies: short\,/\,medium\,/\,long leg\\[2pt]
+   Video: third-person view RGB $224{\times}224{\times}3$\qquad
+   Action $a_t$: joint commands \textbf{auto-logged} by simulator};
+
+%% ── Frames ───────────────────────────────────────────────────────────────────
+\node[framebox, below=1.1cm of src, xshift=-5.2cm] (ft)
+  {$\boldsymbol{s_t}$ / $\mathrm{frame}_t$\\[4pt]
+   \scriptsize RGB $224{\times}224{\times}3$};
+
+\node[framebox, below=1.0cm of ft] (ft1)
+  {$\boldsymbol{s_{t+1}}$ / $\mathrm{frame}_{t+1}$\\[4pt]
+   \scriptsize RGB $224{\times}224{\times}3$};
+
+%% ── Shared encoder (frozen) ──────────────────────────────────────────────────
+\node[encbox, right=1.4cm of ft, yshift=-0.5cm] (enc)
+  {\textbf{Visual Encoder}\\[3pt]
+   \scriptsize V-JEPA2 RGB tokenizer\\[1pt]
+   {\color{gray!60}\scriptsize\textit{weights frozen, per-frame}}};
+
+%% ── Embeddings ───────────────────────────────────────────────────────────────
+\node[embbox, right=1.4cm of enc, yshift=+0.56cm] (et)
+  {$e_t$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t$};
+
+\node[embbox, right=1.4cm of enc, yshift=-0.56cm] (et1)
+  {$e_{t+1}$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t{+}1$};
+
+%% ── ITM ──────────────────────────────────────────────────────────────────────
+\node[modelbox, right=1.6cm of et, yshift=-0.56cm] (itm)
+  {\textbf{Inverse State-Transition}\\[-2pt]\textbf{Model (ITM)}\\[4pt]
+   \scriptsize 4 causal-attn blocks + query $q_t$, 16 heads\\[1pt]
+   \scriptsize in:\;$[e_t,\,e_{t+1}]$\quad out:\;$z_t \in \mathbb{R}^{512}$};
+
+\node[redannot, above=0.4cm of itm] (annotitm)
+  {What transition happened\\between these two states?};
+
+%% ── Latent action z_t ────────────────────────────────────────────────────────
+\node[ztbox, right=1.6cm of itm] (zt)
+  {\textbf{Latent Action}\;$z_t$\\[4pt]
+   \scriptsize $\mathbb{R}^{512}$,\quad $k = 512$};
+
+%% ── Motion Decoder (top-right branch) ────────────────────────────────────────
+\node[modelbox, right=1.6cm of zt, minimum width=4.0cm] (motdec)
+  {\textbf{Motion Decoder}\\[4pt]
+   \scriptsize cross-attn$(z_t,\,e_t)$ + MLP $\to \mathbb{R}^{18}$\\[1pt]
+   \scriptsize in:\;$z_t$ (query),\;$e_t$ (context)};
+
+\node[grayannot, below=0.15cm of motdec] (discard)
+  {\textit{discarded after pretraining}};
+
+%% ── Predicted action â_t ─────────────────────────────────────────────────────
+\node[predbox, right=1.3cm of motdec] (ahat)
+  {$\hat{a}_t$\\[3pt]
+   \scriptsize $\mathbb{R}^{18}$\\[-1pt]
+   \scriptsize predicted action};
+
+%% ── Simulation action labels a_t (purple) ────────────────────────────────────
+\node[simbox, above=1.0cm of ahat] (at)
+  {$a_t$\;(sim labels)\\[3pt]
+   \scriptsize joint cmd\;$\mathbb{R}^{18}$\\[-1pt]
+   \scriptsize auto-logged by sim.};
+
+%% ── L_motion ─────────────────────────────────────────────────────────────────
+\node[lossbox, below=1.0cm of ahat,
+      minimum width=5.0cm, text width=4.8cm, align=center] (lmotion)
+  {$\mathcal{L}_{\mathrm{motion}} = \|\hat{a}_t - a_t\|^2$\\[4pt]
+   {\scriptsize\textcolor{orange!70!black}%
+     {\textbf{supervised}\;---\;sim action labels}}};
+
+%% ── FTM ──────────────────────────────────────────────────────────────────────
+\node[modelbox, below=2.4cm of itm] (ftm)
+  {\textbf{Forward State-Transition}\\[-2pt]\textbf{Model (FTM)}\\[4pt]
+   \scriptsize 8 blocks: self-attn($e_t$) + self-attn($z_t$) + cross-attn, 16 heads\\[1pt]
+   \scriptsize in:\;$[e_t,\,z_t]$\quad out:\;$\hat{e}_{t+1} \in \mathbb{R}^{1408}$};
+
+%% ── Predicted next embedding ê_{t+1} ─────────────────────────────────────────
+\node[predbox, right=1.6cm of ftm] (ehat)
+  {$\hat{e}_{t+1}$\\[3pt]
+   \scriptsize $\mathbb{R}^{1408}$\\[-1pt]
+   \scriptsize predicted next emb.};
+
+%% ── L_recon ──────────────────────────────────────────────────────────────────
+\node[lossbox, below=1.0cm of ehat,
+      minimum width=5.0cm, text width=4.8cm, align=center] (lrecon)
+  {$\mathcal{L}_{\mathrm{recon}} = \|\hat{e}_{t+1} - e_{t+1}\|^2$\\[4pt]
+   {\scriptsize\textcolor{green!50!black}{\textbf{self-supervised}}}};
+
+%% ── Combined loss ────────────────────────────────────────────────────────────
+\node[combbox, below=1.3cm of lrecon] (totloss)
+  {$\mathcal{L} = \mathcal{L}_{\mathrm{recon}}
+      + \lambda\,\mathcal{L}_{\mathrm{motion}}$};
+
+%% ── Arrows ───────────────────────────────────────────────────────────────────
+
+%% frames → encoder → embeddings
+\draw[arr] (ft)  -- (enc);
+\draw[arr] (ft1) -- (enc);
+\draw[arr] (enc) -- (et);
+\draw[arr] (enc) -- (et1);
+
+%% embeddings → ITM
+\draw[arr] (et)  -- (itm);
+\draw[arr] (et1) -- (itm);
+
+%% ITM → z_t
+\draw[mainarr] (itm) -- (zt);
+
+%% z_t → Motion Decoder → â_t → L_motion
+\draw[mainarr] (zt)     -- (motdec);
+\draw[mainarr] (motdec) -- (ahat);
+\draw[mainarr] (ahat)   -- (lmotion);
+%% x_t (e_t) → Motion Decoder as visual context
+\draw[arr] (et.north) -- ++(0,0.5cm) -| (motdec.north);
+
+%% a_t (sim labels) → loss  (dashed purple; goes around ahat to avoid crossing)
+\draw[simarr] (at.east) -- ++(0.7,0) |- (lmotion.east);
+
+%% z_t → FTM  and  e_t → FTM
+\draw[mainarr] (zt)  |- (ftm);
+\draw[arr]     (et)  |- (ftm);
+
+%% FTM → ê_{t+1} → L_recon
+\draw[mainarr] (ftm)  -- (ehat);
+\draw[mainarr] (ehat) -- (lrecon);
+
+%% e_{t+1} → L_recon  (reconstruction target)
+\draw[arr] (et1) -| (lrecon);
+
+%% both losses → combined loss
+\draw[arr] (lrecon.south) -- (totloss.north);
+\draw[arr] (lmotion.south) -- ++(0,-0.5cm) -| (totloss.north);
+
+%% ── Phase 1 border ───────────────────────────────────────────────────────────
+\begin{scope}[on background layer]
+  \node[phaseborder, fill=cBg,
+        fit=(src)(ft)(ft1)(enc)(et)(et1)(itm)(zt)(motdec)(ahat)(at)
+            (lmotion)(ftm)(ehat)(lrecon)(totloss)(annotitm)(discard),
+        label={[phaselabel]above:\textbf{Phase 1 \;---\; Pretraining}}
+  ] (p1) {};
+\end{scope}
+
+%% ── PCA Validation ───────────────────────────────────────────────────────────
+\node[validbox, below=1.4cm of p1.south, inner sep=13pt, align=center] (pca)
+{%
+  \textbf{Phase 1 Validation --- PCA of $z_t$}\\[7pt]
+  Collect $z_t$ from \textbf{short leg} (train) $+$ \textbf{long leg} (train)
+  $+$ \textbf{medium leg} (unseen)\quad|\quad
+  Behaviours: walk\,/\,turn\,/\,stop\\[5pt]
+  Plot 2-D PCA coloured by \textbf{\{behaviour\}} and by \textbf{\{morphology\}}\\[6pt]
+  \textcolor{green!50!black}{\textbf{Pass:}\enspace
+    $z_t$ clusters by behaviour, not by body shape}\\[3pt]
+  \textcolor{red!60!black}{\textbf{Fail:}\enspace
+    clusters split by morphology $\;\Rightarrow\;$ revisit Motion Decoder supervision}%
+};
+
+\draw[thkarr] (p1.south) -- (pca.north);
+
+%% ── Hierarchical Extension (HiLAM-style fallback) ───────────────────────────
+\node[mybox, fill=cAmber!60, draw=orange!40,
+      below=1.2cm of pca, minimum width=14cm,
+      inner sep=13pt, align=center,
+      text width=13.5cm] (hilam)
+{%
+  \textbf{Fallback: Hierarchical Latent Actions (if PCA fails)}\\[6pt]
+  Freeze ITM \enspace$\Rightarrow$\enspace collect $z_t$ sequences from all training clips\\[4pt]
+  $z_t$ sequence $\;\xrightarrow{\text{dynamic chunking (H-Net)}}\;$
+  $z^h$ (skill-level latent)\quad|\quad
+  $z^h$ should cluster \textbf{walk\,/\,turn\,/\,stop} more cleanly than flat $z_t$\\[4pt]
+  {\scriptsize V-JEPA2 encoding unchanged --- hierarchy is a second pass on $z_t$, not on frames}%
+};
+
+\draw[thkarr, dashed] (pca.south) -- (hilam.north)
+  node[midway, right=4pt, font=\footnotesize\itshape, text=red!60!black] {if fail};
+
+\end{tikzpicture}
+\end{document}
