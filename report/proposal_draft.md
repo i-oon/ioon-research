@@ -55,10 +55,11 @@ objectives are (i) to demonstrate that z_t organizes by *behaviour* (e.g. walkin
 and (ii) to show that a pretrained world model enables an unseen morphology to be learned with substantially
 fewer episodes than training from scratch.
 
-The key distinction from prior work is that the model perceives the robot **only through vision** and is
-**never given its leg length** (spec-free / implicit morphology), in contrast to methods that read structural
-parameters from CAD files. Training uses joint-command labels that the simulator logs automatically to ground
-z_t through a motion-decoding loss; this supervision is discarded at inference.
+The distinction from prior work lies in what the model is allowed to know about the body. Perception is
+visual, and the model is **never told its leg length**, in contrast to methods that read structural parameters
+out of CAD files and condition on them explicitly. Training does use joint-command labels, which the simulator
+logs automatically at no annotation cost, to ground z_t through a motion-decoding loss. That supervision is
+removed once pretraining ends, so the deployed model reads only images and its own latent action.
 
 *(Experimental results to be added upon completion.)*
 
@@ -95,9 +96,9 @@ versus a long leg. We ground this study in a simulated stick insect (*Medauroide
 well-studied model organism for insect walking, instantiated at three leg lengths.
 
 The significance is twofold. Scientifically, it tests whether a morphology-invariant notion of behaviour can
-**emerge from vision alone**, without the model ever being told the body's dimensions. Practically, if such a
-representation transfers, it would reduce the cost of deploying new robot morphologies by reusing accumulated
-locomotion "skill" rather than retraining from zero.
+be learned from visual observation without the model ever being told the body's dimensions. Practically, if
+such a representation transfers, it would cut the cost of deploying a new robot morphology by reusing
+locomotion skill already acquired instead of retraining from zero.
 
 ## 1.2  Objectives
 
@@ -355,6 +356,47 @@ reference). (2) A **raw-joint-conditioned** forward model with a shared encoder 
 if the latent action does not beat raw joint conditioning, the latent bottleneck adds no value, which makes
 this the decisive ablation. (3) Where applicable, an explicit morphology-conditioned model in the spirit of QWM, as
 a contrast between explicit and implicit morphology handling.
+
+## 3.7  Validation of the Method to Date
+
+The first two milestones of Section 1.5 have been executed, and their outcomes justify the design choices above.
+Full results belong in Chapter 4; they are summarised here only as evidence that the methodology is sound before
+the main training begins.
+
+**3.7.1  The morphology gap is measurable.** Driving all three variants with a bit-identical command sequence
+produced non-overlapping travel distances (1.0x: 4.125 m, 0.75x: 3.562 m, 0.5x: 2.646 m, over five episodes each).
+The slowest long-leg episode still exceeded the fastest short-leg episode. This confirms that identical commands
+yield genuinely different motion, which is the premise of the whole study and the basis for the dynamics-
+heterogeneity framing in Section 2.5.
+
+**3.7.2  The frozen encoder carries the required signal.** A linear probe recovers foot-contact state from e_t at
+85 to 93 percent against a 12.5 percent chance baseline, with a shuffled-label control at chance, so the Inverse
+Transition Model has a usable signal to extract. Morphology is separately decodable at 99 percent, which is the
+expected and desirable outcome: the encoder should see that the bodies differ, and removing that difference is the
+job of the latent action model rather than of the encoder.
+
+**3.7.3  Two methodological findings that shaped the protocol.** First, silhouette score and probe accuracy
+disagreed on the same data (silhouette -0.02 against probe accuracy above 85 percent), because one measures
+whether a signal dominates the representation and the other whether it is present at all. Section 3.6.1 therefore
+requires both. Second, an initial time-based behaviour label (step index modulo the gait period) understated
+cross-morphology transfer, because identical commands do not place different bodies in the same pose. Replacing it
+with foot-contact state raised measured transfer from 38 to 55 percent. The pose-based label is used from this
+point forward, and Section 3.5 records the residual limitation.
+
+## 3.8  Work Plan
+
+| Phase | Activity | Aug | Sep | Oct | Nov |
+|---|---|---|---|---|---|
+| 1 | Simulation setup, morphology variants, vision capture | done | | | |
+| 2 | Milestone 1 and 2 validation (Sections 3.7.1 to 3.7.3) | done | | | |
+| 3 | Dataset collection across morphologies and behaviours | | x | | |
+| 4 | Train ITM, FTM, and Motion Decoder | | x | x | |
+| 5 | Latent-space validation (behaviour against morphology) | | | x | |
+| 6 | Transfer experiment and baseline comparison | | | x | x |
+| 7 | Analysis and thesis writing | | | x | x |
+
+`[[DECIDE]]` Confirm the calendar with both advisors. The dates above follow the schedule in the earlier
+pre-proposal, adjusted so that the decisive ablation in Section 3.6.3 runs early rather than last.
 
 ---
 

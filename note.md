@@ -17,7 +17,6 @@ policy เดิมใช้ไม่ได้เลย ต้องเริ่
 ### สโคปที่เราทำ (หลังพูดคุยกับ Ajan Go — Week 4, Week 5)
 
 เราไม่ได้ทำ biological video แล้ว เปลี่ยนมาทำใน **simulation ทั้งหมด** โดยใช้ **stick insect 3 morphologies** คือขาสั้น (0.5×), ขากลาง (0.75×), และขายาว (1.0× = base model) ใน **CoppeliaSim v4.10**
-(เดิมเขียนว่า IsaacSim 5.0 — **ผิด** โมเดล Medauroidea ของแล็บรันบน CoppeliaSim ไม่ใช่ IsaacSim ติดตั้งและ verify แล้ว ดู `sim/SOURCES.md`)
 
 เป้าหมายหลัก: เทรน World Model บนขาสั้น + ขายาว แล้วพิสูจน์ว่า World Model ช่วยให้ขากลาง (ที่ไม่เคยเห็นมาก่อน) เรียนรู้ได้เร็วขึ้น โดยใช้ข้อมูลน้อยกว่า
 
@@ -29,13 +28,14 @@ policy เดิมใช้ไม่ได้เลย ต้องเริ่
 
 ถ้าเราสั่งขาสั้น "ยกขาสูง 20 องศา" แล้วมันเดินได้ แต่ถ้าเอา command เดียวกันไปใส่ขายาว ขาอาจลากพื้นเพราะยกสูงไม่พอ Ajan Go ยกตัวอย่างนี้เพื่อแสดงว่า **morphology gap มีอยู่จริง** และนั่นคือ Step -1 ที่เราต้องเช็คก่อนเลยว่าขาสั้น/ยาวทำให้ behavior ต่างกันจริงๆ
 
+(need close up/ slow down video to prove this)
+
 สิ่งที่เราต้องการคือ latent variable **z_t** ที่ encode "พฤติกรรม" (เช่น เดินตรง, เลี้ยว, หยุด) โดยไม่ encode "รูปร่างร่างกาย" ถ้า z_t เป็นแบบนั้น มันก็ transfer ข้าม morphology ได้
 
 ### ทำไมถึงใช้ video + visual encoder แทน joint state โดยตรง
 
 แรงบันดาลใจมาจาก **LAC-WM** (ICML 2026) ที่แสดงว่าการ extract latent action จาก visual observation ทำได้และ scale ได้ข้าม embodiments หลายตัว นอกจากนี้ visual encoder ที่ pretrain บน internet video จำนวนมาก เช่น V-JEPA2 มี feature ที่ rich และ generalizable กว่าการใช้ joint state ดิบๆ
 
-เราเป็นงานแรกที่นำ LAC-WM pipeline มาประยุกต์ใช้กับ **locomotion domain** ซึ่งยังไม่มีใครทำมาก่อน
 
 ---
 
