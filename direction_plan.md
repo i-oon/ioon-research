@@ -77,7 +77,15 @@ Prove it transfers to an unseen morphology without retraining.
 - **Motion Decoder**: cross-attn(z_t, x_t) + MLP ✓ (confirmed from LAC-WM)
   - z_t = query, x_t = visual context (keys/values)
   - out: â_t ; L_motion = ||â_t − a_t||²
-  - discarded after pretraining
+  - **not used when measuring Phase 1, but KEEP THE WEIGHTS** (corrected 2026-07-19; previously
+    written as "discarded after pretraining", which is right for the representation claim and wrong
+    for anything downstream). The MD is the only bridge from a latent action back to executable joint
+    commands. A Phase 2 policy would emit `z_t` and need exactly this module to run it on a body:
+    `policy → z_t → MD → 18 joint targets → robot`. Discarding it would leave the latent unexecutable.
+  - This is also the answer to Ajan Blink's week-4 objection ("if the robot needs joint commands
+    anyway, why convert to a latent and back?"): the policy learns in the latent space *because that
+    part transfers across bodies*, while the MD does the body-specific decoding. The conversion is
+    what separates the transferable part from the non-transferable part.
 
 - **Cross-augmentation**: YES ✓ (following LAC-WM)
   - two independent augmentations A1, A2 applied to the frame pair (O_t, O_{t+1}) before encoding
@@ -215,9 +223,19 @@ Shuffle control lands exactly on chance → **signal is real, not overfitting**.
 ### 📊 Check 2 (BASELINE, not a gate) — morphology dominates, exactly as predicted
 - **morphology probe = 99.9% ± 0.1** (chance 33.3%); shuffle control 34.2% ≈ chance
 - **silhouette(`e_t` | morphology) = +0.0835**, between-class var **22.4%** ← Step 1.5 must LOWER
-- silhouette(`e_t` | phase) = **−0.0222**, between-class var 7.6% ← Step 1.5 must RAISE
+- ~~silhouette(`e_t` | phase) = **−0.0222**, between-class var 7.6% ← Step 1.5 must RAISE~~
+  **⚠️ RETRACTED 2026-07-19.** `phase` is `(step % 64) // 8`, an artefact of the hand-chosen 64-step trim,
+  not an expert gait annotation (`scripts/step0_encode.py:65`). The number regenerates exactly but measures
+  an artificial variable, so it cannot serve as a Step 1.5 target. **Restate this target against
+  `contact_8`** (6-bit which-feet-planted) before Step 1.5 is evaluated. See `report/NUMBERS.md` §3.0.
 
 ### 🔑 THE KEY FINDING — the phase code is **morphology-entangled**
+
+> ⚠️ **The numbers in this section use the retracted `phase` artefact label.** The *conclusion* survives,
+> because the same within/across collapse was later reproduced with the `contact_8` label
+> (83.7% within → 41.3% across, `report/NUMBERS.md` §3). But every figure in the table below must be
+> regenerated against `contact_8` before it is quoted. Do not present these values.
+
 | | phase accuracy |
 |---|---|
 | **within** one morphology | long **97.3%** · medium **96.3%** · short **93.8%** |
@@ -292,7 +310,8 @@ separate robot (High Relation) from background (Low Relation) — not that it be
 ```
 Step 0    silhouette(e_t | morphology)  = HIGH   <- encoder plainly sees leg length      [baseline]
 Step 1.5  silhouette(z_t | morphology)  = LOW    <- ITM abstracted it away               [the result]
-          silhouette(z_t | phase/behav) = HIGH   <- ...while keeping behavior
+          silhouette(z_t | contact_8)   = HIGH   <- ...while keeping behavior
+                                                    (was "phase"; retracted, see Check 2)
 ```
 **The delta between these is the contribution.** Same metric QWM uses (App. F-E: silhouette + between/within
 class variance decomposition) — they only ever measured the morphology-negative side; measuring **both** sides
@@ -472,6 +491,60 @@ answers him with one command. Cheap, high-value.
 **Goal**: test morphology outside training range
 
 > Out of pre-proposal scope. Good future direction if Steps 1-2 succeed.
+
+---
+
+## Phase 2 Design Sketch (out of thesis scope, but it constrains Phase 1)
+
+Phase 2 is the eventual use: a policy that makes a new body walk. It is not part of this thesis, but
+several Phase 1 decisions are only correct or incorrect relative to it, so the target is recorded here.
+
+### What the execution loop requires
+
+```
+policy --> z_t --> Motion Decoder --> 18 joint targets --> robot
+                   ^ the module Phase 1 was going to throw away
+```
+
+### What transfers and what does not (settled empirically, not assumed)
+
+| Component | Role | Transfers across bodies? | Evidence |
+|---|---|---|---|
+| `z_t` + ITM | "what is being done" (behaviour) | **the thesis bets yes** | to be tested in Step 1.5 |
+| FTM | dynamics in embedding space | partially, fine-tune | Step 2 |
+| **Motion Decoder** | `z_t` to joint commands, body-specific | **no** | needs `a_t`, which the new body may not supply |
+| **reward / physics heads** | latent to reward | **no** | force→velocity is R²=+0.926 within a body but −0.33 to −5.23 across bodies (PROGRESS.md 10.14) |
+
+The shape that falls out: **a shared behaviour latent, with body-specific encoder and decoder heads.**
+This is close to what L3P arrived at from a different direction (frozen backbone, per-robot heads),
+which is mild evidence the decomposition is the right one. Our version differs in having a world model
+and a latent action inferred by an inverse model, neither of which L3P has.
+
+### Three candidate Phase 2 architectures
+
+| | Method | Needs a reward model? | Main risk |
+|---|---|---|---|
+| **A** | Dreamer-style imagination RL: policy trained purely inside FTM | **yes** | reward is not readable from our latent (PROGRESS.md 10.14), and the tracking camera hides world-frame progress |
+| **B** | Planning in embedding space, V-JEPA2-AC style: sample candidate `z`, roll out with FTM, pick the one minimising distance to a goal embedding | **no** | locomotion is cyclic, so "goal state" is awkward to define |
+| **C** | Use `z_t` or `e_t` as a pretrained feature space for ordinary RL on the real environment | no, reward comes from the environment | least novel, but most robust |
+
+Current preference: **B is the most interesting and sidesteps the reward problem** (and V-JEPA 2-AC
+already demonstrated this exact architecture on real hardware). **C is the safe fallback.** A is the
+riskiest given what we now know about reward readability.
+
+### Phase 1 decisions that follow from this
+
+1. **Keep the Motion Decoder weights.** Corrected above.
+2. **Keep logging `a_t` for the held-out morphology.** Already done. Needed to test whether the MD
+   generalises rather than assuming it does.
+3. **Keep logging world-frame head position.** Already done. It is the only reward label available,
+   since the tracking camera removes world-frame progress from the image.
+4. **New experiment worth adding to Step 2** (cheap, data already collected):
+   *does the Motion Decoder generalise across bodies?* Train MD on short + long, then ask it to decode
+   `z_t` into joint commands for the medium body.
+   - If it generalises, the "new body needs only video" claim survives into Phase 2.
+   - If it does not, we learn exactly how much action data a new body requires, which is a useful
+     number in its own right.
 
 ---
 

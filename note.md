@@ -95,7 +95,10 @@ FTM ถาม "ถ้า state ตอนนี้เป็น e_t และ late
 - cross-attn(z_t queries e_t) + MLP → â_t ∈ ℝ^{18}
 - z_t เป็น query, e_t เป็น visual context (keys/values)
 - Output: joint position targets 18 มิติ (6 ขา × 3 joints)
-- **ทิ้งหลัง pretraining** — ใช้แค่เพื่อ anchor z_t ให้ ground กับ actual action
+- **ไม่ใช้ตอนวัดผล Phase 1 แต่ต้องเก็บ weight ไว้** (แก้ 2026-07-19 จากเดิมที่เขียนว่า "ทิ้ง")
+  - หน้าที่ใน Phase 1: anchor z_t ให้ ground กับ action จริง
+  - หน้าที่ใน Phase 2: **มันคือสะพานเดียวจาก z_t กลับไปเป็นคำสั่งข้อต่อ** `policy → z_t → MD → 18 joint → หุ่น` ถ้าทิ้ง policy สั่งหุ่นไม่ได้เลย
+  - **และนี่คือคำตอบคำถาม Ajan Blink** (*"แปลงเป็น latent แล้วแปลงกลับทำไม"*): policy เรียนใน latent เพราะ**ส่วนนั้น transfer ข้ามร่างได้** ส่วน MD ทำหน้าที่ถอดรหัส**เฉพาะร่าง** — การแปลงคือการ**แยกส่วนที่ transfer ได้ออกจากส่วนที่ transfer ไม่ได้**
 
 ### 3.6 Loss Functions
 

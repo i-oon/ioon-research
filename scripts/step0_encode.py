@@ -19,7 +19,9 @@ import torch
 
 from vjepa2_encoder import VJEPA2FrameEncoder
 
-PERIOD = 64          # gait loop length (see PROGRESS.md 10.12 -- this is the CSV trim length, not a natural period)
+GAIT_LOOP_LEN = 64   # length of the replayed CSV segment. Recorded for reference only; it is a
+                     # trim length chosen by hand, not a natural gait period, and is no longer
+                     # used to label behaviour. See PROGRESS.md 10.12.
 CONTACT_THRESH = 3.0  # N; foot force above this = planted (stance). See PROGRESS.md 10.12
 
 
@@ -59,10 +61,11 @@ def main():
     step_idx = np.concatenate(step_idx)
     F = np.concatenate(forces, axis=0)            # (N, 6) raw foot forces
 
-    # --- label 1: time-phase (the OLD, weak label -- kept for comparison) ---
-    phase_bin = (step_idx % PERIOD) // 8          # 8 time bins
-
-    # --- label 2: 6-bit foot contact (the NEW label; threshold chosen at 3 N) ---
+    # --- 6-bit foot contact: the behaviour label (threshold at 3 N) ---
+    # The old alternative, phase = (step % 64) // 8, is not produced any more. 64 is the length
+    # of the segment trimmed out of the animal recording rather than a natural gait period, the
+    # loop seam jumps 14.75 degrees, and identical commands do not put different bodies in the
+    # same pose. It measured the clock, not the body. See PROGRESS.md 10.12 and 10.13.
     contact = (F > CONTACT_THRESH).astype(int)    # (N, 6): which feet are planted
     contact_code = contact.dot(1 << np.arange(6)) # 0..63, one integer per pattern
     n_support = contact.sum(axis=1)               # 0..6, how many feet planted
@@ -70,12 +73,11 @@ def main():
     np.savez_compressed(
         args.out,
         e=E, morph=np.array(morph), episode=np.array(episode),
-        step_idx=step_idx, phase_bin=phase_bin,
+        step_idx=step_idx,
         forces=F, contact=contact, contact_code=contact_code, n_support=n_support,
     )
     print(f"\ne_t: {E.shape}  (dim={E.shape[1]})")
     print(f"morphologies: {sorted(set(morph))}")
-    print(f"phase bins: {sorted(set(phase_bin.tolist()))}")
     print(f"saved -> {args.out}")
 
 

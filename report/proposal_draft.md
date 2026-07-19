@@ -31,7 +31,7 @@
 
 ความแตกต่างสำคัญจากงานก่อนหน้าคือ แบบจำลองรับรู้สภาพหุ่นยนต์ผ่าน "ภาพ" เท่านั้น และ **ไม่เคยถูกบอกข้อมูล
 ความยาวขา** (spec-free / implicit) ต่างจากงานที่ต้องอ่านข้อมูลโครงสร้างจากไฟล์ CAD ทั้งนี้การฝึกใช้ป้ายกำกับการกระทำ
-(joint command) ที่บันทึกอัตโนมัติจากตัวจำลองเพื่อยึดโยงความหมายของ z_t และป้ายกำกับดังกล่าวจะถูกละทิ้งในขั้นใช้งานจริง
+(joint command) ที่บันทึกอัตโนมัติจากตัวจำลองเพื่อยึดโยงความหมายของ z_t โดยไม่ใช้ป้ายกำกับดังกล่าวในขั้นใช้งาน
 
 *(ผลการทดลองจะเพิ่มเติมเมื่อดำเนินการเสร็จ)*
 
@@ -55,11 +55,15 @@ objectives are (i) to demonstrate that z_t organizes by *behaviour* (e.g. walkin
 and (ii) to show that a pretrained world model enables an unseen morphology to be learned with substantially
 fewer episodes than training from scratch.
 
-The distinction from prior work lies in what the model is allowed to know about the body. Perception is
-visual, and the model is **never told its leg length**, in contrast to methods that read structural parameters
-out of CAD files and condition on them explicitly. Training does use joint-command labels, which the simulator
-logs automatically at no annotation cost, to ground z_t through a motion-decoding loss. That supervision is
-removed once pretraining ends, so the deployed model reads only images and its own latent action.
+The distinction from prior work lies in what the model is allowed to know about the body. The model is **never
+told its leg length**, in contrast to methods that read structural parameters out of CAD files and condition on
+them explicitly. This is a condition of the experiment rather than an implementation preference: supplying the
+morphology would answer a different question, namely whether a world model can compensate for a body it has
+already been described, instead of whether that abstraction can be learned at all. Visual observation is also
+the more demanding setting, since morphology is decodable from the raw visual features at 99.9 percent while
+the joint commands used here are identical across all three bodies. Training does use joint-command labels,
+which the simulator logs automatically at no annotation cost, to ground z_t through a motion-decoding loss.
+That supervision is removed once pretraining ends.
 
 *(Experimental results to be added upon completion.)*
 
@@ -243,7 +247,69 @@ single morphological axis (leg length) on that latent. This project addresses ex
 implicit/spec-free, vision-based latent-action world model for locomotion, evaluated with a controlled
 single-axis leg-length sweep and an explicit behaviour-vs-morphology latent probe. We are careful **not** to
 claim vision-only learning: the latent is grounded during training on auto-logged joint commands (a by-product
-of simulation, discarded at inference), following LAC-WM.
+of simulation, not used at inference), following LAC-WM.
+
+## 2.6  Why the Observation Modality Is Part of the Research Question
+
+Using vision instead of proprioception or CAD parameters is not presented here as a technological preference.
+The modality determines whether the research question can be asked at all, and it changes what the eventual
+answer would mean.
+
+**2.6.1  Explicit morphology answers a different question.** QWM supplies limb lengths, mass, and torque
+limits to the world model and shows that generalization follows. That establishes something worth knowing:
+*given* an accurate description of the body, a world model can compensate for it. It cannot establish whether
+a body-independent notion of behaviour is *learnable*, because the answer has already been provided in the
+input. Our question is the second one, and it is only well posed if the model is never told what body it is
+looking at. Spec-free observation is therefore a requirement of the experiment rather than a design choice,
+and vision is the natural spec-free channel.
+
+**2.6.2  Vision is the adversarial modality, not the convenient one.** A reasonable objection is that vision is
+chosen because it is fashionable. Our own measurements argue the opposite. Morphology is decodable from the raw
+visual features at 99.9 percent, with a silhouette of +0.0835 against -0.0222 for behaviour, so body shape is
+the dominant axis of the visual representation. In this study's control setup the joint commands are
+bit-identical across the three bodies, so proprioception carries almost no morphology signature at all. Vision
+therefore maximises the confound that the latent action is supposed to remove. Demonstrating behaviour-level
+invariance under maximal visible morphological difference is a stronger result than demonstrating it where the
+confound is weak.
+
+**2.6.3  The requirements differ in where they land, not in whether they exist.** It would be inaccurate to say
+that specification-based and proprioception-based methods have requirements and the present method does not.
+The present method requires an external camera with a view of the body, and it requires logged joint commands
+from the bodies used during pretraining. The relevant difference is that these requirements fall on the
+observer, whereas the alternatives place their requirements on the observed body itself.
+
+A CAD or USD file describes the design, not the individual robot: wear, payload, manufacturing tolerance, and
+damage are absent from it, and these are exactly the conditions under which morphology adaptation is most
+needed. QWM implicitly concedes this by routing "unmodeled real-world residuals" through its dynamic latent.
+Proprioception, as used by L3P, requires the target body to carry joint and force sensing and requires its
+joint ordering and conventions to be known, so the per-robot encoder and decoder can be fitted. Both
+preconditions can be satisfied only by a party with access to the interior of the body or to its design
+record. A camera can be positioned by anyone who can see the subject.
+
+This matters because the bodies for which morphology adaptation is most valuable are frequently ones where
+interior access is unavailable in principle rather than by oversight: animals, which cannot be fitted with
+joint encoders; robots whose configuration has diverged from their documentation through repair, payload, or
+wear; hardware acquired from another party without published kinematics; and, in the limiting case, extinct
+animals reconstructed from skeletal remains and trackways, for which no specification exists and none can be
+produced. For these, an external view is not a preferred channel but the only remaining one.
+
+**2.6.4  Only visual data scales beyond bodies one already owns.** Recordings of legged locomotion exist in
+very large quantity for animals and for robots built by other groups. Proprioceptive logs and CAD files do not
+exist for bodies one did not build and instrument. A latent action grounded in vision is the only version of
+this idea that could later ingest observations of embodiments outside the laboratory, which is the long-horizon
+reason the cross-embodiment literature cares about the problem.
+
+**2.6.5  Consistency with the biological framing.** Animals do not exchange kinematic specifications. Insects
+and vertebrates infer what another body is doing by observing it. If the claim under test is that behaviour is
+an abstraction separable from body shape, evidence gathered through the channel that biological imitation
+actually uses is more consistent with that claim than evidence gathered from privileged design parameters.
+
+**2.6.6  Costs accepted.** Vision is noisier and more fragile than proprioception. Raw visual features are
+dominated by rendering style rather than behaviour, which forces strict control of camera, lighting, and
+background (Section 3.2.3), and two plausible background choices were found empirically to corrupt the signal
+in opposite ways. Pixels also widen the eventual sim-to-real gap relative to joint-space observation, and the
+frozen encoder is computationally heavy. These costs are accepted because Sections 2.6.1 and 2.6.2 make vision
+the setting in which the result, if obtained, actually means what the thesis claims it means.
 
 ---
 
@@ -271,7 +337,7 @@ Input/output specification of each block (units stated, per the advisors' requir
 | V-JEPA2 encoder | RGB frame, 256×256×3 (uint8) | e_t ∈ ℝ^{256×1408} patch tokens | No (frozen) |
 | Inverse Transition Model | [e_t, e_{t+1}] (512 tokens) | z_t ∈ ℝ^{64} (latent action) | Yes |
 | Forward Transition Model | [e_t, z_t] | ê_{t+1} ∈ ℝ^{1408} | Yes |
-| Motion Decoder | (e_t as context, z_t as query) | â_t ∈ ℝ^{18} (joint targets, rad) | Yes (discarded at inference) |
+| Motion Decoder | (e_t as context, z_t as query) | â_t ∈ ℝ^{18} (joint targets, rad) | Yes (not used in Phase 1 evaluation; weights retained for downstream use) |
 
 Losses: **L = λ_recon · L_recon + λ_motion · L_motion**, where L_recon = ‖ê_{t+1} − e_{t+1}‖² is computed in
 embedding space (no pixel decoder required) and L_motion = ‖â_t − a_t‖². **Cross-augmentation** is applied:
@@ -315,8 +381,13 @@ token) mapping the pair [e_t, e_{t+1}] to the latent action z_t ∈ ℝ^{64}. Th
 
 **3.4.3  Motion Decoder (MD).** Cross-attention with z_t as query over the current visual context, producing
 â_t; supervised by L_motion against the auto-logged joint command a_t. This is the only place ground-truth
-action is used, and the decoder is **discarded after pretraining**. Its role is to anchor z_t to real motion so
-the latent cannot collapse into a trivial identity.
+action is used, and the decoder is **not part of the Phase 1 evaluation**, though its weights are retained. Its
+role during pretraining is to anchor z_t to real motion so the latent cannot collapse into a trivial identity.
+Beyond this thesis it has a second role: it is the only module that maps a latent action back into executable
+joint commands, so any downstream policy emitting z_t would require it. This also answers a standing question
+about the design, namely why a latent is introduced at all when the robot ultimately needs joint commands: the
+policy operates in the latent space because that is the part expected to transfer across bodies, while the
+decoder performs the body-specific conversion. The conversion separates what transfers from what does not.
 
 **3.4.4  Dimensions and hyperparameters.** z_t is 64-dimensional (per LAC-WM §4.2). λ weights, learning rate,
 and optimizer are to be determined by ablation (the base paper does not report them). Training uses mixed

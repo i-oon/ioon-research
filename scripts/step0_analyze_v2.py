@@ -78,10 +78,14 @@ def main():
     Z = StandardScaler().fit_transform(E)
     print(f"e_t: {E.shape}   morphologies={sorted(set(morph.tolist()))}")
 
+    # NOTE: the old "step mod 64" time label is deliberately NOT evaluated here.
+    # That period is the length of the segment trimmed out of the animal recording, not a
+    # natural gait period, and the loop seam jumps 14.75 degrees. It was compared once
+    # (PROGRESS.md 10.13: 38.4% cross-body transfer against 55.2% for foot contact) and that
+    # settled it. Re-running a known-broken instrument only clutters the comparison.
     labels = {
-        "time_phase": d["phase_bin"],                       # OLD weak label
-        "contact_8":  top_k_labels(d["contact_code"], k=8),  # 6-bit contact, top-8 patterns
-        "n_support":  d["n_support"],                        # #feet planted
+        "contact_8":  top_k_labels(d["contact_code"], k=8),  # 6-bit foot contact, top-8 patterns
+        "n_support":  d["n_support"],                        # number of feet planted
     }
 
     print("\n=== phase/behaviour signal: WITHIN vs ACROSS morphology ===")
