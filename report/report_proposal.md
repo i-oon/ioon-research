@@ -144,6 +144,15 @@ locomotion skill already acquired instead of retraining from zero.
 4. The visual encoder (V-JEPA2) is used **frozen**; training it is out of scope except for a possible
    fine-tuning of its final blocks if a domain gap is found.
 
+**Explicitly not claimed.** To set expectations precisely, the following are outside the claims of this thesis:
+real-robot or animal transfer (the study is entirely in simulation); extrapolation beyond the trained
+leg-length range (the held-out body is an interpolation, between the trained ones); invariance to camera
+viewpoint (a single fixed viewpoint is used throughout); generalization to manipulation or complex terrain; and
+fully autonomous closed-loop control through the latent action. A further honest caveat: the inverse-kinematics
+data redesign (Section 3.5.3) creates comparable task-space objectives across bodies, but it does not guarantee
+identical contact dynamics or identical behaviour across morphologies, and the preliminary numbers of Section
+3.7 are diagnostic and will be regenerated on the redesigned dataset.
+
 ## 1.5  Research Procedure
 
 The project follows a staged, milestone-gated procedure in which each stage must pass before the next begins
