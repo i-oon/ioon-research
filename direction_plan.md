@@ -146,9 +146,9 @@ Prove it transfers to an unseen morphology without retraining.
 | z_t dimension k | **64 (LAC-WM §4.2: "action embedding dimension of 64")** | previously recorded as 512 — that was Table 4's ITM/FTM *hidden width*, not the latent action. Ablate smaller/larger k for locomotion. Bonus: 8× smaller latent eases the 2080 Ti compute problem |
 | λ_recon, λ_motion | **undecided — and NOT in the paper** | LAC-WM never reports numeric λ values anywhere (nor LR/optimizer/schedule). Start equal, ablate. |
 | Stick insect DoF | ✅ **confirmed + in hand** — from Ajan YuChen's `airl-insect-walking` (Medauroidea extradentata, CoppeliaSim) | migrated to `sim/env/`. **All 3 leg-length variants now built and numerically verified** (0.5× / 0.75× / 1.0×) via `sim/make_leg_morphology.py` |
-| Data collection policy | ✅ **RESOLVED: IK retargeting** (supersedes the earlier "two-phase / AIRL-per-morphology" plan, which does not survive contact with the repo) | Behaviors = Cartesian foot trajectories → `simIK` per morphology → per-body-different `a_t`, zero training. **Why the old plan died**: (1) the mature `66k_aug3c` checkpoints every script points at **are not in this copy** — only logs proving they once existed; (2) the checkpoints that *do* exist are **34-dim obs** and **no `normalized_env*.py` in the repo produces 34 dims** (base = 36; the module that did was deleted) — they likely won't load without reverse-engineering; (3) normalization bounds are hand-measured literals per body with no tooling to recompute, and normalization is **not clipped**, so a 0.5× leg breaks them *silently*; (4) expert data is **one animal / one gait cycle / one trial** — invalid for a rescaled body; (5) ~1 day GPU per run; (6) **no leg-length precedent exists** in that repo — every variant is leg *removal* or terrain. |
+| Data collection policy | ✅ **RESOLVED: IK retargeting** — and **promoted to a Step 1 precondition, see Step 0.5** | ⚠️ Not a data-collection detail. All collected `a_t` are currently **bit-identical across bodies** (verified 2026-07-21, variance 7.2e-16), which is correct for Step -1 but makes the latent action vacuous in Step 1: with a shared command there is nothing to retarget and MD has no reason to condition on the body. Behaviors = Cartesian foot trajectories → `simIK` per morphology → per-body-different `a_t`, zero training. **Why the old plan died**: (1) the mature `66k_aug3c` checkpoints every script points at **are not in this copy** — only logs proving they once existed; (2) the checkpoints that *do* exist are **34-dim obs** and **no `normalized_env*.py` in the repo produces 34 dims** (base = 36; the module that did was deleted) — they likely won't load without reverse-engineering; (3) normalization bounds are hand-measured literals per body with no tooling to recompute, and normalization is **not clipped**, so a 0.5× leg breaks them *silently*; (4) expert data is **one animal / one gait cycle / one trial** — invalid for a rescaled body; (5) ~1 day GPU per run; (6) **no leg-length precedent exists** in that repo — every variant is leg *removal* or terrain. |
 | 🔴 **Camera / RGB capture** | **MISSING — blocker #1** | The CoppeliaSim scene has **no vision sensor**; no code anywhere captures RGB from it (zero `getVisionSensorImg` calls; `.ttt` binaries contain no vision-sensor objects; the lab repo has none either). All V-JEPA2 work to date ran on pre-recorded **B1 quadruped** `.mp4`s from *other* renderers — i.e. **Step 0 has never touched the stick insect.** Everything from Step 0 onward is gated on building this. |
-| 🔴 **Turn / Stop behaviors** | **MISSING** | Nothing produces them: `ds_loopsm.csv` = 67 rows of one forward gait cycle; AIRL reward = `discriminator_logit + vx*100` (forward velocity only). Must be built via IK retargeting. Load-bearing — K-means(K=3) in Step 1.5 and the "≥3 behaviors" answer to the ICLR critique both depend on it. |
+| 🔴 **Turn / Stop behaviors** | **MISSING — but resolved BY Step 0.5, not separately** | Nothing produces them yet: `ds_loopsm.csv` = 67 rows of one forward gait cycle; AIRL reward = `discriminator_logit + vx*100` (forward velocity only). **IK delivers these as extra foot trajectories in the same step that produces per-body `a_t` — see Step 0.5 "IK also delivers walk/turn/stop".** Load-bearing: K-means(K=3) in Step 1.5 and the "≥3 behaviors" answer to the ICLR critique both depend on it. |
 | Step 2 evaluation metric | **training time reduction** (confirmed Ajan Go) | pretrained FTM reaches same L_recon with fewer medium leg episodes than scratch |
 | Baseline exact setup | undecided | separate pipeline per morphology vs. scratch RL |
 | LAC-WM source code | not found yet | rejected ICLR 2026, accepted ICML 2026 — no public code yet |
@@ -442,8 +442,95 @@ answers him with one command. Cheap, high-value.
 
 ---
 
+### 🔴 Step 0.5 — PRECONDITION: per-body actions (blocks Step 1)
+
+**Verified 2026-07-21**: `a_t` is **bit-identical across all three bodies** in every collected episode.
+`np.array_equal` is True for each pair; variance across bodies at fixed `t` is 7.2e-16, i.e. machine
+epsilon. Confirmed on `data/step0_v2/{long,medium,short}_ep0.npz`.
+
+**This is correct and intentional for Step -1.** Holding the command constant is exactly what makes the
+morphology-gap test valid: identical input, different outcome. The problem is that the Step 0 dataset
+inherited it, and **Step 1 cannot run on data with this property.**
+
+#### Why identical `a_t` makes the latent action vacuous
+
+`L_motion = ‖MD(z_t) − a_t‖²` is the only loss that grounds `z_t` to actions. With `a_t` shared:
+
+- MD sees the same target regardless of which body produced the frame, so **nothing pushes it to
+  condition on the body at all**. It can satisfy the loss as a function of timestep alone, ignoring `z_t`.
+- There is **no retargeting to learn**, because the command was already body-independent before training.
+
+Note what this does *not* break: training still converges, and the factorisation stays self-consistent
+(`e_t` carries morphology at 99.9%, `z_t` shared, `a_t` shared). **What breaks is the claim.** Asserting
+"`z_t` is a body-independent action representation" invites the immediate reply: *the action was already
+body-independent, so what did the model contribute?* There is no good answer.
+
+#### What is actually being represented (the question this resolves)
+
+There is **no joint→joint and no foot→foot correspondence anywhere in the architecture**. `z_t ∈ ℝ^64` is
+unconstrained; only the two losses shape it. `contact_8` is the **evaluation label, never a training
+signal** — it is the ruler, not the target. The intended factorisation is:
+
+```
+e_t  = which body this is        (measured: 99.9% decodable)
+z_t  = what movement happened    (hoped to be body-independent; nothing enforces it)
+MD   = re-expresses z_t as THIS body's joint command
+```
+
+That last line is only meaningful once `a_t` differs per body. **Then** `z_t` means something like
+"swing the left-middle leg forward" and MD means "for long legs that is this joint vector, for short legs
+another." That is the thesis claim, and it is untestable on the current data.
+
+#### Requirement
+
+Each morphology needs its **own** command sequence for the same locomotion task, so that identical
+*behaviour* maps to different *joint values*.
+
+| Route | Cost | Behaviour correspondence | Verdict |
+|---|---|---|---|
+| **IK retargeting** (Cartesian foot trajectory → `simIK` per body) | zero training | correspondence holds by construction | **preferred** |
+| RL policy per body | ~1 GPU-day per body; AIRL checkpoints in the borrowed repo are broken (see line 149) | emergent, may not align across bodies | fallback only |
+
+IK is not merely the cheaper option, it is the cleaner experiment: it fixes the behaviour and varies only
+the joint values, which is precisely the retargeting the Motion Decoder is supposed to discover. A
+per-body RL policy would give different `a_t` but no guarantee the behaviours correspond, which
+reintroduces a confound.
+
+**Anticipated objection**: if `a_t` is generated as `IK(trajectory, body)`, is learning MD just learning
+IK? Yes, and that is the point worth stating plainly — the claim is that **the model recovers body-specific
+retargeting from observation alone, without being given the kinematics**. State it that way rather than
+letting a reviewer frame it as circular.
+
+#### IK also delivers walk / turn / stop — same task, not a separate one
+
+The Turn/Stop-behaviours gap (see "Decisions Still Needed") is **not a separate work item; IK resolves it
+in the same step.** IK defines a behaviour as a Cartesian foot trajectory, so adding behaviours is adding
+trajectories, not building a new system:
+- walk = feet cycle forward
+- turn = left/right feet cycle at different rates
+- stop = feet held stationary
+
+Each is solved per body: `IK(behaviour, body) → a_t`. So a single successful IK pipeline unblocks three
+things at once: per-body `a_t` (this section), the K-means(K=3) test in Step 1.5, and the "≥3 behaviours"
+answer to the ICLR critique.
+
+Sequencing: **get IK working on walk first** (proves retargeting), then add turn/stop as extra
+trajectories. Two cautions when adding them:
+- **turn vs drift**: `turn` is *commanded* heading change, but the open-loop gait also *drifts*. The metric
+  must separate commanded turning from uncommanded drift (reuse the path-length / net-displacement split
+  from Step -1), or `turn` and `walk-that-drifted` will be conflated.
+- **stop may be too easy**: a stationary body gives near-static frames the encoder can separate trivially,
+  inflating behaviour-decode. Check whether `stop` makes the result look better than it is.
+
+**Gate**: verify `a_t` differs across bodies before any Step 1 training run. Re-run the check above and
+require variance well above machine epsilon.
+
+---
+
 ### Step 1 — Train Phase 1 Pipeline
 **Goal**: train ITM + FTM + Motion Decoder on short + long leg
+
+⚠️ **Blocked on Step 0.5.** Training on bit-identical `a_t` produces a result that cannot be defended.
 
 | Task | Train on short + long leg data, cross-augmentation on, LoRA off |
 |---|---|

@@ -8,3 +8,16 @@ sim/env/experttemp.csv
 
 # Scratch outputs
 *.log
+
+# Large expert dataset (132 MB, exceeds GitHub's 100 MB limit) — keep on disk, not in git
+sim/env/expert_66k_aug3c_fcontact.csv
+
+# Data artifacts (regenerable: encoded embeddings, episode npz, rendered videos, frames)
+data/
+*.npz
+
+airl-insect-walking/
+
+# Generated figures are kept (report/*.png); scripts regenerate them.
+# If you want the reference PDFs out of git too, uncomment:
+# doc/*.pdf

@@ -45,9 +45,45 @@ Still present in the deck and still wrong: the distance table and the bimodality
 | v1 agreement (3 episodes) | long 4.498 / 4.567 / 4.536 | `data/step0/` — rules out a v1-vs-v2 artefact |
 | mean speeds | 0.440 / 0.357 / 0.273 m/s | distance ÷ 10 s (200 steps @ 20 Hz) |
 | leg-length scaling exponent | 0.689 | log-log fit over the three bodies |
+| Mann-Whitney U, all three pairs | U=25.0, p=0.0079 | `scipy.stats.mannwhitneyu`, two-sided, n=5 vs 5 |
+| Cliff's δ, all three pairs | +1.00 | complete separation; p=0.0079 is the floor at n=5 |
 
-Metric definition, from `sim/step_minus1_morphology_gap.py:54`: net straight-line displacement of `/head`
-in the xy plane, `norm(p_end - p_start)`. Not path length, not centre of mass, unsigned.
+### 2.1 Metric: report path length **and** net displacement
+
+The script currently computes only net straight-line displacement of `/head` in the xy plane,
+`norm(p_end - p_start)` (`sim/step_minus1_morphology_gap.py:54`). That measure is reduced by curvature,
+and every episode curves because the open-loop gait has no heading correction.
+
+Reporting both, plus their ratio, separates locomotion from steering:
+
+| Body | Path length | Net displacement | Straightness (net/path) | Net drift, mean abs (max) |
+|---|---|---|---|---|
+| long | 5.217 ± 0.069 (cv 1.3%) | 4.404 ± 0.187 (cv 4.2%) | 0.845 ± 0.046 | 4.5° (14.2°) |
+| medium | 4.149 ± 0.019 (cv 0.4%) | 3.569 ± 0.010 (cv 0.3%) | 0.860 ± 0.004 | 5.1° (9.6°) |
+| short | 3.228 ± 0.011 (cv 0.3%) | 2.729 ± 0.011 (cv 0.4%) | 0.845 ± 0.002 | 3.4° (6.0°) |
+
+**Path length separates by morphology; straightness does not.** Straightness is 0.845 / 0.860 / 0.845,
+essentially constant. Since drift is small, that 15% gap between path and net is mostly the gait's own
+side-to-side body oscillation, which is set by the command sequence and so is shared across bodies.
+That is what lets the locomotion result be stated without steering contaminating it.
+
+Path length is also lower-variance (cv 1.3% vs 4.2% on the long body). Scaling exponent is 0.688 on
+path length against 0.689 on net displacement, so the headline conclusion does not depend on the choice.
+
+**The apparent outlier was a metric artefact.** `long_ep2` records the lowest net displacement (4.032 m)
+and the *highest* path length (5.341 m) of its group. It veered 14.2° off heading against 0.3–5.6° for
+the other four. It is a steering event, not a slow episode, and must not be dropped.
+
+### 2.2 Corrected: how heading drift is measured
+
+An earlier version of this table reported drift of 39.8° / 12.7° / 19.3° and described every episode as
+curving. **Those figures were wrong**, produced by comparing the *instantaneous* heading over the first
+10 steps against the last 10 steps. Both estimates sit inside the gait's side-to-side wobble, which
+inflated the result by roughly 3–5x (`long_ep2` read 74.9° against a true 14.2°).
+
+Drift is now the angle of the end point relative to the initial heading, in `drift_deg()` of
+`scripts/plot_step_minus1.py`. The walks are close to straight; plotting the trajectory panel at equal
+aspect makes this visible, and a stretched y-axis makes near-straight walks look like violent swerving.
 
 ```
 python3 -c "
@@ -116,17 +152,26 @@ Consequences:
 
 Reproducibility and validity are separate audits. Section 2 and section 3 checked reproducibility only.
 
-### 3.1 `n_support` cannot distinguish the two halves of a tripod gait
+### 3.1 `n_support` throws away which-foot information
 
-`n_support` counts how many feet are planted (0..6). It does not record which feet. In a tripod gait the
-two alternating stances, (LF, RM, LH) and (RF, ML, HR), are opposite poses that both yield
-`n_support = 3`, so the label collapses exactly the distinction the study exists to measure.
+`n_support` counts how many feet are planted (0..6) without recording *which* feet. Different foot
+configurations that happen to share a count collapse to the same label, so it cannot distinguish poses
+that differ in which legs bear load, which is exactly the behavioural distinction the study needs.
 
 The observed distribution confirms it is degenerate: 5 classes with sizes from 3 to 1204, meaning nearly
 every frame carries the same value. Drop it from the label set.
 
-`contact_8` does not have this problem. It is a 6-bit code over which feet are planted, so it separates
-the two tripod stances. It is the only behaviour label currently worth reporting.
+`contact_8` keeps the which-foot information (6-bit code over which feet are planted), so it is the
+behaviour label currently worth reporting.
+
+**Gait note (corrected 2026-07-21):** an earlier version of this section described the gait as a tripod
+with "two alternating stances." That is wrong. Measured on both the pilot (@0.5N) and the mature expert
+`expert_66k_aug3c_fcontact.csv` (using the sim's own binary contact), the canonical tripod grouping
+A=FL,HL,MR / B=FR,HR,ML shows within-set correlation ~-0.05 (a tripod needs strongly positive: legs in
+one tripod must move together) and clean-tripod frames only ~4%. The gait is a phase-staggered / wave-like
+pattern, not a tripod. The expert shows the same structure (front-left duty 29% vs pilot 24%), so this is
+a property of this Medauroidea model, not an artefact of our replay or leg scaling. Avoid the word
+"tripod" anywhere in the write-up.
 
 ### 3.2 Two problems the re-run surfaced that are not stale-number problems
 
@@ -141,6 +186,31 @@ the pass/fail thresholds in `direction_plan.md` need restating to match.
 against different-phase 44.93 ± 14.44, a ratio of 1.12x, and concludes "NO clear phase signal." Check 3 is
 recorded as ABANDONED in `direction_plan.md`, but the script still runs it and still prints a null finding.
 Either remove it or address why it disagrees with the probe results on the same embeddings.
+
+## 3.3 Morphology signal: proven decodable, NOT proven to be leg length
+
+Figure `report/fig_morphology_evidence.png`, from `scripts/plot_morphology_evidence.py`. Numbers
+regenerated 2026-07-21 on `data/step0_v2/embeddings.npz`.
+
+| Claim | Value | Status |
+|---|---|---|
+| morphology probe, 5-fold CV | 100.0% (chance 33.3%) | `OK` — supersedes the old 99.9% (that was v1, 3 episodes) |
+| morphology probe, grouped by episode | 100.0% | `OK` — rules out frame memorisation |
+| PC1 orders short < medium < long | monotonic, unsupervised | `OK` — PCA never sees labels |
+
+**The confound that no analysis on this data can remove.** Each of the three morphologies is a single
+recording session, so morphology and session (lighting, background) are perfectly correlated. The 100%
+probe and the PC1 ordering are consistent with leg length, but a per-session rendering difference would
+produce the same result. Do not claim "the encoder sees leg length" without the experiment below.
+
+**Required experiment (needs new data, cannot run now):** record each body across **several sessions**
+with varied lighting and background. If morphology stays decodable across sessions — i.e. a probe trained
+on session A of each body still classifies session B — the signal is leg length, not session. This is
+the multi-environment control and it belongs in the re-run.
+
+Retired framing: an earlier version of panel (b) trained a regressor on long+short and "predicted" the
+held-out medium at 0.75. Dropped, because a constant predictor of the training mean also lands at 0.75
+(the mean of 1.0 and 0.5). The unsupervised PCA ordering replaces it as the honest strong result.
 
 ## 4. What the clean re-run must produce
 

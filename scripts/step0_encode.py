@@ -22,7 +22,13 @@ from vjepa2_encoder import VJEPA2FrameEncoder
 GAIT_LOOP_LEN = 64   # length of the replayed CSV segment. Recorded for reference only; it is a
                      # trim length chosen by hand, not a natural gait period, and is no longer
                      # used to label behaviour. See PROGRESS.md 10.12.
-CONTACT_THRESH = 3.0  # N; foot force above this = planted (stance). See PROGRESS.md 10.12
+CONTACT_THRESH = 0.5  # N; foot force above this = planted (stance). Lowered from 3.0 on 2026-07-21 so the
+                      # planted-leg count (~3) is physically sane: at 3.0 N only ~2.3 legs register because
+                      # front legs load lightly (~0.2-0.4 N median). This ONLY sets how many legs count as
+                      # planted; it does NOT and cannot change the gait's timing. The gait is a wave /
+                      # phase-staggered pattern, not a tripod, on both our replay and the mature expert
+                      # (66k) -- that is the real Medauroidea gait and is not something to "fix". Contact
+                      # decodability is flat (~0.85 macro-F1) across 0.5-3.0 N. See report/NUMBERS.md 3.1.
 
 
 def main():

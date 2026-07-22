@@ -330,13 +330,13 @@ silhouette(phase) = **−0.0222** บอกว่า *"ไม่มีสัญ�
 - ✅ "phase decode ได้ 85%" — ยังจริง (label เทียมก็ correlate กับท่าจริงพอควร)
 - ⚠️ **"cross-morphology 27-39%" เชื่อไม่ได้เต็มร้อย** — อาจต่ำเพราะ label หยาบ ไม่ใช่ encoder แย่ → **ต้องเก็บใหม่เพื่อแยกให้ออก**
 
-**สิ่งที่ยืนยันจากข้อมูล**: การเดินเป็น **tripod gait** — 6 ขาแบ่ง 2 ชุดไขว้ (A=LF,RM,LH / B=RF,ML,HR) สลับ stance/swing (corr ข้ามชุด −0.31 ถึง −0.42) แต่ **Medauroidea เดินช้า tripod ไม่เป๊ะ (tetrapod-ish)** ตามที่ paper แล็บ (Larsen/Grabowska) บอก — gait diagram รกกว่าแมลงวิ่งเร็ว
+**สิ่งที่ยืนยันจากข้อมูล (แก้ไข 2026-07-21)**: การเดิน **ไม่ใช่ tripod สะอาด** — เคยเขียนว่าเป็น tripod โดยอ้าง cross-set corr −0.31 ถึง −0.42 แต่นั่นคือการหยิบ **คู่ขาที่ลบสุด** มารายงาน ไม่ใช่ค่าเฉลี่ย วัดใหม่ด้วยวิธีเดียวกันทั้ง pilot (@0.5N) และ **expert 66k (binary contact ของ sim เอง)**: ชุด tripod A=FL,HL,MR / B=FR,HR,ML ให้ within-set corr เฉลี่ย ~**−0.05** (tripod ต้องเป็น +แรง เพราะขาในทีมต้องขึ้นลงพร้อมกัน) และ clean-tripod frame แค่ **~4%** → **ไม่ใช่ tripod** เป็น gait แบบคลื่น/สลับเฟส (staggered/metachronal-ish) ที่ขาทยอยลงไล่กัน (lag ~7-9 step/ขา) สอดคล้องกับ **Medauroidea เดินช้า** ที่ paper แล็บ (Larsen/Grabowska) บอกว่า tetrapod-ish. **สำคัญ: expert 66k ที่เทรนเต็มก็เป็นแบบเดียวกัน (FL duty 29% เทียบ pilot 24%)** → ไม่ใช่ bug จากการ replay/scale ของเรา แต่เป็นลักษณะ gait ของโมเดลตัวนี้เอง
 
 **force sensor ใช้ได้**: ทุกขาแกว่ง ~0.05N (ยกขา) ↔ 7-21N (แตะพื้น) — สัญญาณ stance/swing ชัด
 
 **ตัดสินใจ (2026-07-18)**: เก็บ Step 0 ใหม่ + บันทึก **force ดิบทั้ง 6 ขา** → label ด้วย **6-bit contact** (ขาไหนแตะพื้นบ้าง — ตรงที่สุด ไม่ตีความ)
 > 🔴 **LIMITATION ที่ต้องกลับมาแก้**: 6-bit contact มาจาก **gait replay ของสัตว์ตัวเดียว (Animal06) ที่ loop ไม่เนียน** — ไม่ใช่ท่าเดินที่ optimize สำหรับแต่ละร่าง **เมื่อมี proper expert (เช่น CPG ของแล็บ Larsen et al. ที่ปรับ α ต่อร่าง หรือ AIRL retrain ต่อร่าง) ต้องเก็บใหม่และ label ใหม่** — 6-bit ตอนนี้คือ pilot ให้ pipeline เดินได้ ไม่ใช่ผลสุดท้าย
-> เก็บ force ดิบไว้ → ลอง label แบบอื่น (2-phase tripod, จำนวนขาที่แตะ) ตอนวิเคราะห์ได้โดยไม่ต้องเก็บใหม่
+> เก็บ force ดิบไว้ → ลอง label แบบอื่น (contact pattern, จำนวนขาที่แตะ) ตอนวิเคราะห์ได้โดยไม่ต้องเก็บใหม่ — **หมายเหตุ: "2-phase tripod" ใช้ไม่ได้ เพราะ gait ไม่ใช่ tripod (ดูด้านบน)**
 
 ### 10.13 ✅ Step 0 v2 — 6-bit contact label ดีกว่าจริง (2026-07-18)
 
