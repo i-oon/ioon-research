@@ -195,7 +195,7 @@ controlled.
 
 The central difficulty this thesis addresses follows directly from this definition. A policy is a function
 learned for one specific body: it maps *that body's* states to *that body's* motor commands, and in the process
-it silently absorbs that body's geometry and dynamics. When the body changes — a leg is lengthened — the same
+it silently absorbs that body's geometry and dynamics. When the body changes (a leg is lengthened), the same
 policy applied to the new body produces the wrong motion, because the state-to-action mapping it learned no
 longer matches the physics. This is why a policy is said to be "tied to its morphology," and why a change of body
 normally forces retraining from scratch.
@@ -222,15 +222,15 @@ visual encoder used here (V-JEPA 2, Section 2.2.2) is trained this way on about 
 video, which is why it can be reused without any task-specific labels.
 
 **2.1.4  The Transformer and the attention mechanism.**
-The learned models in this work — the encoder and the transition models — are built on the **Transformer**
+The learned models in this work (the encoder and the transition models) are built on the **Transformer**
 architecture, whose core is the **attention mechanism**. Attention is worth understanding because it explains how
 these models decide *what part of the input to look at*.
 
 The intuition is as follows. Split the input into small pieces called **tokens** (for an image, each token is a
 small square patch of pixels; for a pair of frames, the tokens are all the patches of both frames). On its own, a
 single patch of a leg knows nothing about the rest of the scene. Attention lets every token **look at every other
-token and take a weighted summary of them**, so that each token's representation becomes aware of its context —
-the patch of a foot can incorporate information from the patch of ground beneath it, or from where the same foot
+token and take a weighted summary of them**, so that each token's representation becomes aware of its context.
+The patch of a foot can incorporate information from the patch of ground beneath it, or from where the same foot
 was in the previous frame.
 
 Mechanically, each token emits three vectors: a **query** ("what am I looking for?"), a **key** ("what do I
@@ -275,8 +275,8 @@ decodable. Section 3.6.1 explains why both are needed.
 **2.2.1  What a world model is, and why it is used here.**
 In reinforcement learning an agent must decide which action to take in each state. A *model-free* agent learns this
 mapping by trial and error directly in the environment, which is data-hungry and, for a physical robot, slow and
-risky. A *world model* takes a different route: it first learns to **predict the consequences of actions** — given
-the current state and an action, it predicts the next state — and thereby builds an internal, learned simulator of
+risky. A *world model* takes a different route: it first learns to **predict the consequences of actions** (given
+the current state and an action, it predicts the next state) and thereby builds an internal, learned simulator of
 the environment's dynamics. Once such a model exists, the agent can train its policy by "imagining" long sequences
 of hypothetical actions inside the model, without touching the real environment. This is the sense in which world
 models let an agent "learn in imagination."
@@ -290,12 +290,12 @@ tool. Two properties of this design matter for the present work. First, because 
 model's predictions, the *representation* the model learns is the object the policy actually consumes; if that
 representation can be made body-independent, everything built on top of it inherits that property. Second, and
 central to this thesis, a world model must answer the question "given this state and this action, what happens
-next?" — and that predictive objective is an operational *test* of whether a proposed action representation
+next?", and that predictive objective is an operational *test* of whether a proposed action representation
 captures meaningful change, independent of any downstream control task. This project uses a world model less to
 imagine rollouts than to use its transition-prediction objective as such a test.
 
 A limitation of the standard formulation, which motivates Section 2.3, is that DreamerV3 and its relatives learn a
-separate model per domain and condition their predictions on the agent's **native action** — the robot's own
+separate model per domain and condition their predictions on the agent's **native action**, the robot's own
 motor command. Nothing is shared across different bodies, and the native command is assumed to be the meaningful
 conditioning signal. When the same command has a different physical meaning on a different body, that assumption
 breaks.
@@ -304,8 +304,8 @@ breaks.
 To apply a world model to visual observations, one first needs to turn images into useful features. A *video
 foundation model* is a large network pretrained on massive unlabeled video so that its features transfer to many
 downstream tasks. This work uses V-JEPA 2 (Assran et al., 2025). Its training objective is the distinguishing
-feature: instead of reconstructing masked pixels (as in masked autoencoders), a JEPA — Joint-Embedding Predictive
-Architecture — masks part of the input and predicts the **representation** of the masked part rather than its
+feature: instead of reconstructing masked pixels (as in masked autoencoders), a JEPA (Joint-Embedding Predictive
+Architecture) masks part of the input and predicts the **representation** of the masked part rather than its
 pixels. Predicting in representation space frees the model from modelling unpredictable low-level detail (exact
 textures, lighting noise) and pushes it toward features that capture *how things move and change*. Trained by this
 objective on roughly one million hours of internet video, V-JEPA 2 learns motion-relevant features that transfer
@@ -325,10 +325,10 @@ the frozen features carry the required locomotion signal on simulated stick-inse
 **2.3.1  Inverse and forward dynamics models: the general building block.**
 Two complementary models recur throughout control, world modelling, and representation learning, and both the
 latent-action idea and this project's architecture are built from them. A **forward dynamics model** answers "given
-the current state and an action, what is the next state?" — it maps (s_t, a_t) to ŝ_{t+1}. A world model's
+the current state and an action, what is the next state?" and maps (s_t, a_t) to ŝ_{t+1}. A world model's
 transition predictor is exactly a forward dynamics model, and it is the component an agent rolls forward to imagine
 the future (Section 2.2.1). An **inverse dynamics model** answers the opposite question, "given two consecutive
-states, what action caused the transition?" — it maps (s_t, s_{t+1}) to â_t.
+states, what action caused the transition?" and maps (s_t, s_{t+1}) to â_t.
 
 Both are established, general-purpose techniques rather than the invention of any single paper. Inverse dynamics
 models have long been used to recover actions from observation alone: the Intrinsic Curiosity Module (Pathak et
@@ -341,7 +341,7 @@ without action annotations. Forward dynamics models are the core of the world-mo
 The two models are naturally combined. If the "action" recovered by the inverse model is not the robot's native
 command but an inferred latent code, and the forward model is asked to predict the next state from the current
 state plus that latent, then the pair *jointly learns* a latent action: the inverse model proposes it, and the
-forward model's prediction error tests whether it is sufficient to explain the transition. This inverse–forward
+forward model's prediction error tests whether it is sufficient to explain the transition. This inverse-forward
 pairing is the shared skeleton of the latent-action methods reviewed next (Section 2.3.2) and of the base method
 this project adapts (Section 2.3.3). *(This project instantiates the two models on visual embeddings and, for that
 reason, refers to them as the Inverse and Forward Transition Model; the naming rationale is given in Section 3.4.)*
@@ -349,15 +349,15 @@ reason, refers to them as the Inverse and Forward Transition Model; the naming r
 **2.3.2  The idea of a latent action.**
 The conditioning problem raised at the end of Section 2.2.1 is that the native motor command is a poor shared
 signal across bodies. A *latent action* addresses this by not using the native command at all. The idea is to look
-at two consecutive observations and infer a compact code — the latent action — that explains the change between
+at two consecutive observations and infer a compact code (the latent action) that explains the change between
 them. Formally, an *inverse* model reads (o_t, o_{t+1}) and outputs a latent action z_t; this is analogous to
 inverse dynamics in control, which asks "what action must have produced this transition?" The key property is that
 z_t is defined by *observed change*, not by any robot's motor format, so a single latent space can describe
 several embodiments at once, and it can be learned from video that has **no action labels** at all.
 
 This places the approach within the broader paradigm of **learning from observation** (also called imitation from
-observation): learning behaviour by watching, without access to the demonstrator's action labels, and — in the
-strongest form — from a third-person external view of a body that is not the learner's own. The latent-action line
+observation): learning behaviour by watching, without access to the demonstrator's action labels, and, in the
+strongest form, from a third-person external view of a body that is not the learner's own. The latent-action line
 is one way to make observation-only learning tractable, by recovering a usable action interface from the video
 itself.
 
@@ -368,10 +368,10 @@ pretraining toward real robot control, and CLAM (Liang et al., 2025) introduced 
 are the closest match to the continuous joint control needed for locomotion (a discrete code is ill-suited to
 smooth, graded limb movement). Zhang et al. (2025) provide a theoretical analysis of what latent action models
 actually capture, which is useful when interpreting whether a learned latent encodes behaviour or merely copies
-the next observation — a failure mode this project must actively prevent (Section 3.1, cross-augmentation).
+the next observation, a failure mode this project must actively prevent (Section 3.1, cross-augmentation).
 
 Most directly related to the cross-embodiment goal, UniSkill (Kim et al., 2025) learns an
-**embodiment-agnostic skill representation** from video — including human video — so that a robot can imitate a
+**embodiment-agnostic skill representation** from video (including human video) so that a robot can imitate a
 demonstration performed by a different body. Architecturally it is again the same building block of Section 2.3.1:
 it uses an **inverse skill dynamics** model (infer a skill code from an observation pair) and a **forward skill
 dynamics** model (predict a future observation from the current one plus the skill), confirming that the
@@ -382,8 +382,8 @@ which supports the feasibility of the present question. Second, and importantly,
 representation to align across bodies, whereas this project asks whether morphology-invariance can **emerge** from
 a world-model bottleneck *without* any dedicated cross-embodiment alignment objective and without the morphology
 ever being supplied. UniSkill also targets human-to-robot manipulation and imitation, not a controlled
-single-axis leg-length study or a dynamics-prediction world model. The contrast — invariance *aligned by design*
-versus invariance *tested for emergence* — is what sharpens the contribution of this work. An explicit
+single-axis leg-length study or a dynamics-prediction world model. The contrast, invariance *aligned by design*
+versus invariance *tested for emergence*, is what sharpens the contribution of this work. An explicit
 alignment objective of this kind is a possible future extension rather than a contingency the primary result
 depends on: if morphology-invariance does not emerge, that outcome is itself a valid and informative result about
 the limits of the emergent approach in this setting.
@@ -394,12 +394,12 @@ space across *heterogeneous* manipulation embodiments (for example a robot gripp
 hand keypoints, whose action spaces have different dimensions and meanings). Its architecture is the pipeline this
 project adapts, and it has four parts. (i) A **frozen visual encoder** (V-JEPA 2) turns each frame into an
 embedding e_t. (ii) An **Inverse Transition Model (ITM)** reads the pair (e_t, e_{t+1}) and produces the latent
-action z_t — "what happened between these two frames." (iii) A **Forward Transition Model (FTM)** takes (e_t, z_t)
+action z_t, meaning "what happened between these two frames." (iii) A **Forward Transition Model (FTM)** takes (e_t, z_t)
 and predicts the next embedding ê_{t+1}; its reconstruction error tests whether z_t, together with the current
 state, is sufficient to explain the observed transition. (iv) A **Motion Decoder (MD)** maps z_t back to the
 ground-truth motor action, which anchors the latent to real, executable motion so that it cannot collapse into a
 trivial or meaningless code. The world model is then conditioned on z_t rather than on any robot's native command,
-so one latent space covers several embodiments, and — importantly — adding embodiments *improves* the shared model
+so one latent space covers several embodiments, and, importantly, adding embodiments *improves* the shared model
 rather than fragmenting it.
 
 A subtle but essential detail is how LAC-WM prevents a shortcut. Because z_t is partly supervised to help
@@ -414,9 +414,9 @@ explicit-action baseline (EAC-WM, which is forced to use per-embodiment action e
 *scales positively* with embodiment diversity. Its motivating premise, however, is heterogeneity of *action
 spaces*: the baseline pathology it improves on exists precisely because different manipulators have genuinely
 different action formats. That premise does **not** hold in this project's single-species, leg-length-only setting,
-where all three bodies share an identical 18-dimensional action space. The reframing this requires — from
-*action-space* heterogeneity to *dynamics* heterogeneity, where the same command produces different motion per
-body — is the subject of Section 2.6.
+where all three bodies share an identical 18-dimensional action space. The reframing this requires, from
+*action-space* heterogeneity to *dynamics* heterogeneity (where the same command produces different motion per
+body), is the subject of Section 2.6.
 
 ## 2.4  Cross-Morphology and Cross-Embodiment Legged Locomotion
 
@@ -433,16 +433,16 @@ sample-efficiency benefit of the present method is measured (Section 3.6.3).
 **2.4.2  Explicit morphology conditioning.**
 QWM (Danesh et al., 2026) introduces a morphology-conditioned world model that generalises zero-shot to unseen
 quadruped morphologies, and it is the strongest cross-morphology transfer result in this area. It achieves this by
-reading physical parameters — limb lengths, masses, torque limits — out of each robot's CAD/USD description and
+reading physical parameters (limb lengths, masses, torque limits) out of each robot's CAD/USD description and
 conditioning the world model on those numbers. Its observation channel is proprioception, and it does not learn a
 latent *action*: the morphology is supplied, not inferred. QWM is therefore the closest and strongest prior art on
 one axis (world-model transfer across quadruped bodies) and the clearest contrast on another (it assumes an
 accurate machine-readable description of the new body). Notably, QWM routes what it calls "unmodeled real-world
 residuals" through a separate dynamic latent, an implicit acknowledgement that the design file does not fully
-describe the physical body — a point this project develops in Section 2.7.3.
+describe the physical body, a point this project develops in Section 2.7.3.
 
 **2.4.3  Online system identification.**
-A related family infers hidden dynamics parameters online from a short window of recent interaction — the robot
+A related family infers hidden dynamics parameters online from a short window of recent interaction: the robot
 moves, observes its own responses, and estimates what body it is. This removes the need for a design file but
 requires access to the robot's internal signals (proprioception, past commands) and enough new interaction to
 identify the parameters, so it still assumes an instrumented, controllable body.
@@ -466,7 +466,7 @@ fit for legged control, without yet making the latent space itself the object th
 
 Across all five families, the observation channel is proprioception or a design file, and the body information is
 obtained from inside the body or its specification. None studies whether an **external, vision-based latent action
-inferred from observed transitions**, with morphology never supplied, can serve as the shared representation — the
+inferred from observed transitions**, with morphology never supplied, can serve as the shared representation, the
 gap stated in Section 2.6.
 
 **2.4.6  Synthesis: positioning the methods.**
@@ -475,13 +475,13 @@ Table 2.1 places the main reviewed methods on the axes that matter for cross-mor
 *transfers across bodies*, and the domain in which they were demonstrated. Read down the "morphology information"
 column, every prior method obtains it from inside the body or from a design file; read across the bottom row, the
 present work is the only entry that observes externally (vision), is never given the morphology, uses an inferred
-latent action, and targets legged locomotion. The empty region this exposes — external observation, morphology
-never supplied, latent action, locomotion — is precisely the research gap of Section 2.6. It is also worth noting
+latent action, and targets legged locomotion. The empty region this exposes (external observation, morphology
+never supplied, latent action, locomotion) is precisely the research gap of Section 2.6. It is also worth noting
 that latent-action and cross-embodiment-from-video methods (LAC-WM, UniSkill, and the latent-action pretraining
 line) are overwhelmingly demonstrated on **manipulation**; legged locomotion, where the same command produces
 different motion purely through body geometry, remains largely unaddressed by this family.
 
-*Table 2.1 — Positioning of cross-morphology / cross-embodiment methods. "Transfers across bodies" asks whether a
+*Table 2.1. Positioning of cross-morphology / cross-embodiment methods. "Transfers across bodies" asks whether a
 single trained model is reused on a new body without per-body retraining.*
 
 | Method | Observation | Morphology information from | Action representation | Transfers across bodies? | Domain |
@@ -506,15 +506,15 @@ reference; the host lab already maintains a validated simulation model of the ex
 as a slow, statically-oriented walker, it exercises the cross-morphology question on a body whose gait is
 governed by leg coordination rather than by high-speed dynamics.
 
-Coordination in stick insects arises not from a central clock but from **decentralised local rules** — the "Cruse
-rules" — acting between neighbouring legs (for example, a leg is discouraged from starting its return stroke while
+Coordination in stick insects arises not from a central clock but from **decentralised local rules** (the "Cruse
+rules") acting between neighbouring legs (for example, a leg is discouraged from starting its return stroke while
 its neighbour is still returning, and a leg that completes a step encourages the next). A single walking cycle per
 leg alternates a *stance* phase (foot planted, propelling the body) with a *swing* phase (foot lifted, returning
 forward). The standard quantitative descriptors are the **anterior and posterior extreme positions (AEP/PEP)**,
 the boundaries of the stance stroke; the **duty factor**, the fraction of the cycle a foot is planted; and the
 **inter-leg phase**, the timing offset between legs. A well-known consequence of the decentralised control is that
 straight walking is largely an *emergent* property of the local rules and bilateral symmetry rather than the
-output of a dedicated heading controller — in classic experiments even a single remaining leg still produces the
+output of a dedicated heading controller: in classic experiments even a single remaining leg still produces the
 correct stepping pattern.
 
 Insect gaits form a spectrum with walking speed: at high speed a *tripod* gait (two alternating sets of three
@@ -546,7 +546,7 @@ heterogeneous leg lengths, and Chuthong et al. (2026) study resilient stick-inse
 the biological data, the validated simulation model, and a controller lineage that this project builds upon. The
 mature logged rollouts of this controller family are the source of the shared foot trajectories and binary contact
 labels used in the dataset redesign (Section 3.5.3). The present project reuses this substrate but pursues a
-different research question — a learned, vision-based, morphology-invariant *representation* of locomotion, rather
+different research question: a learned, vision-based, morphology-invariant *representation* of locomotion, rather
 than a hand-designed controller.
 
 ## 2.6  Research Gap
@@ -578,8 +578,8 @@ ask why a latent action is needed at all when every body accepts the same comman
 different, and arguably cleaner, source of heterogeneity. The bodies differ not in the *format* of the action but
 in the *dynamics* that action produces: as Section 3.7.1 measures directly, an identical command yields
 non-overlapping motion across leg lengths (p = 0.0079, complete separation). The problem is therefore not to
-reconcile different action dimensionalities but to learn a representation of the *behaviour* — the intent of a
-movement, such as "advance the middle-left leg into stance" — that is invariant to how a given body must actuate
+reconcile different action dimensionalities but to learn a representation of the *behaviour* (the intent of a
+movement, such as "advance the middle-left leg into stance") that is invariant to how a given body must actuate
 its joints to realise it. This dynamics-heterogeneity framing is what makes the single-axis leg-length setting a
 valid and, in fact, more controlled instance of the cross-embodiment problem than the action-space-heterogeneity
 setting: every confounding difference except the one under study (leg length) is held fixed.
@@ -595,8 +595,8 @@ thesis reports that honestly. This ablation is treated as the central experiment
 Framed abstractly, the goal is a representation that is *invariant* to a nuisance factor (morphology) while
 *preserving* a factor of interest (behaviour). This is the standard problem of learning an invariant, or partially
 disentangled, representation, and it comes with a standard pitfall that dictates how success must be measured. It
-is trivial to make morphology unrecoverable: a representation that discards all information — that maps every input
-to the same constant — leaks nothing about the body, but it also leaks nothing about the behaviour and is
+is trivial to make morphology unrecoverable: a representation that discards all information (one that maps every
+input to the same constant) leaks nothing about the body, but it also leaks nothing about the behaviour and is
 therefore useless. A criterion that only rewards *reduced morphology decodability* would score this degenerate
 "collapse" as a perfect result. For this reason the success criterion is deliberately **two-sided**, requiring
 both that morphology becomes *less* decodable from z_t than from the raw features **and** that behaviour remains
@@ -740,8 +740,8 @@ dimension 1408 per frame. This usage has direct precedent in V-JEPA 2-AC.
 **Naming.** The two learned transition models below are instances of the inverse and forward dynamics models
 described in Section 2.3.1: the ITM infers the latent action from a state transition, and the FTM predicts the next
 state from the current state and that latent. This project refers to them as **Transition Models** rather than
-*dynamics* models deliberately. The term "dynamics" carries a physical connotation — forces, masses, contact
-mechanics — whereas these modules never touch physical quantities; they operate entirely on **transitions between
+*dynamics* models deliberately. The term "dynamics" carries a physical connotation (forces, masses, contact
+mechanics), whereas these modules never touch physical quantities; they operate entirely on **transitions between
 visual embeddings** produced by the frozen encoder. "Transition Model" names precisely what the module computes (a
 mapping over embedding transitions) and avoids implying that the model estimates the body's physical dynamics,
 which it does not. The underlying technique is identical to the inverse/forward dynamics models of the literature;
@@ -813,14 +813,14 @@ the kinematics.
 
 ![Same command, different physical state](fig_same_command.png)
 
-*Figure 3.4 — A single timestep with a bit-identical joint command across the three bodies. The left-middle foot
+*Figure 3.4. A single timestep with a bit-identical joint command across the three bodies. The left-middle foot
 carries 5.7 N on the long body and 9.3 N on the short body but only 0.3 N on the medium body, where it is still
 airborne. The command cannot distinguish the bodies; the difference exists only in the resulting physical state.*
 
 ![Same angle versus same foot target](fig_ik_intuition.png)
 
-*Figure 3.5 — Why per-body commands are needed. Left: identical joint angles place the foot in different positions
-on a long versus a short leg. Right: inverse kinematics inverts the constraint — a shared foot target is reached
+*Figure 3.5. Why per-body commands are needed. Left: identical joint angles place the foot in different positions
+on a long versus a short leg. Right: inverse kinematics inverts the constraint, so a shared foot target is reached
 by different joint angles per body, which is the body-specific command the Motion Decoder must learn to produce.*
 
 ## 3.6  Evaluation Protocol
@@ -868,11 +868,11 @@ oscillation must not be mistaken for a locomotion difference.
 
 ![Morphology gap under identical commands](fig_step_minus1.png)
 
-*Figure 3.1 — Left: top-down body trajectories (five episodes per morphology) under an identical command
+*Figure 3.1. Left: top-down body trajectories (five episodes per morphology) under an identical command
 sequence, aligned to a common start and heading and drawn at true aspect ratio. Right: per-episode path length
 and net displacement with mean ± standard deviation; the three morphologies do not overlap.*
 
-A two-sided Mann–Whitney U test rejects the null hypothesis of equal outcomes for every pair of morphologies at
+A two-sided Mann-Whitney U test rejects the null hypothesis of equal outcomes for every pair of morphologies at
 p = 0.0079, with Cliff's δ = 1.00 (complete separation: every episode of a longer-legged body exceeds every
 episode of the shorter one; the worst long-leg net displacement, 4.032 m, still exceeds the best short-leg value,
 2.746 m). At n = 5 per group, p = 0.0079 is the smallest value the test can return, i.e. the strongest statement
@@ -901,16 +901,16 @@ morphology signal to leg length rather than session is scheduled with the datase
 
 ![Frozen features encode morphology](fig_morphology_evidence.png)
 
-*Figure 3.2 — Morphology is strongly and ordinally encoded in the frozen embedding. (a) A supervised linear
+*Figure 3.2. Morphology is strongly and ordinally encoded in the frozen embedding. (a) A supervised linear
 probe reaches ~100 percent and holds under episode-grouped cross-validation. (b) Unsupervised PCA, given no
 labels, orders the three bodies by leg length along its leading component. (c) A UMAP projection, shown for
 illustration only. Leg length and recording session are confounded in this pilot.*
 
 ![Foot-contact decodability within and across bodies](fig_sanity_check.png)
 
-*Figure 3.3 — Foot-contact behaviour is decodable within a body (mean macro-F1 0.84) but collapses across bodies
+*Figure 3.3. Foot-contact behaviour is decodable within a body (mean macro-F1 0.84) but collapses across bodies
 (mean 0.16), and a shuffled-label control sits at the chance floor. The behaviour information is present but
-entangled with body shape — the signal the latent action must preserve while making it body-independent.*
+entangled with body shape, the signal the latent action must preserve while making it body-independent.*
 
 **3.7.3  Two methodological findings that shaped the protocol.** First, a representation can *contain* a signal
 without that signal *dominating* it, so a single metric can mislead. Behaviour is decodable from the raw
@@ -931,7 +931,7 @@ carries a usable, morphology-entangled behaviour signal. This section states, co
 that remains, so that the scope of the committed work is explicit. Each step names what it produces and the
 condition under which it is considered complete.
 
-**Step A — Dataset redesign (inverse-kinematics retargeting).** Build the IK pipeline of Section 3.5.3: take the
+**Step A: Dataset redesign (inverse-kinematics retargeting).** Build the IK pipeline of Section 3.5.3: take the
 shared task-space foot trajectories from the lab's mature expert log (`expert_66k_aug3c_fcontact`), solve `simIK`
 separately per morphology to obtain per-body joint commands, and drive each body with its own command while
 recording, per timestep, the RGB frame, the joint command a_t, the body pose, and the simulator's binary
@@ -944,36 +944,36 @@ shared-command limitation of Section 3.5.2.
 - *Sub-step A2 (behaviours).* Include the walk trajectory; add turn and stop as additional task-space trajectories
   if reference data permits (Section 1.4), since the latent validation of Step D uses more than one behaviour.
 
-**Step B — Regenerate the preliminary analyses on the redesigned dataset.** Re-run the morphology-gap and
+**Step B: Regenerate the preliminary analyses on the redesigned dataset.** Re-run the morphology-gap and
 encoder-sanity analyses of Section 3.7 on the IK dataset, using the corrected evaluation of Section 3.6.1
 (macro-F1 / balanced accuracy for the imbalanced contact classes, episode-grouped cross-validation, and the
 multi-session probe from A1). *Produces:* the final baseline values for e_t against which z_t will be compared.
 *Gate:* the qualitative conclusions of Section 3.7 hold on the clean dataset; the morphology-versus-session
 attribution is resolved.
 
-**Step C — Train the latent action model (ITM + FTM + Motion Decoder).** Train the three modules of Section 3.4
+**Step C: Train the latent action model (ITM + FTM + Motion Decoder).** Train the three modules of Section 3.4
 jointly with the combined loss and cross-augmentation, on the two training morphologies (short and long). *Produces:*
 the learned latent action z_t and the trained transition and decoding modules. *Gate:* both losses converge and z_t
 does not collapse (the Motion Decoder reconstruction stays informative).
 
-**Step D — Latent-space validation (the two-sided criterion).** Probe z_t for behaviour transfer and for morphology
+**Step D: Latent-space validation (the two-sided criterion).** Probe z_t for behaviour transfer and for morphology
 decodability, and cluster z_t by behaviour across bodies. *Gate:* z_t lowers morphology decodability relative to
 e_t **and** raises cross-morphology behaviour transfer relative to e_t, measured together (Sections 2.6.4, 3.6.1).
 
-**Step E — The decisive ablation (run early, not last).** Compare a latent-conditioned forward model, F(e_t, z_t),
+**Step E: The decisive ablation (run early, not last).** Compare a latent-conditioned forward model, F(e_t, z_t),
 against a raw-joint-conditioned one, F(e_t, a_t), and an observation-only one, F(e_t, 0), under an identical
 encoder, capacity, dataset, and budget (Sections 2.6.3, 3.6.3). *Gate:* whether the latent improves held-out
 prediction over the raw command is the central question; this step is scheduled before the transfer experiment so
 that a negative answer is discovered early.
 
-**Step F — Transfer to the unseen morphology.** Adapt the pretrained model to the held-out medium body and measure
+**Step F: Transfer to the unseen morphology.** Adapt the pretrained model to the held-out medium body and measure
 the number of episodes needed to reach a target reconstruction error, against a from-scratch baseline. *Gate:* the
 pretrained model reaches the target with significantly fewer episodes (the sample-efficiency claim of Section
 3.6.3), or the result is reported as negative.
 
-**Step G — Analysis, writing, and scoped extensions.** Consolidate results into Chapter 4. Extensions that the
+**Step G: Analysis, writing, and scoped extensions.** Consolidate results into Chapter 4. Extensions that the
 pipeline makes cheap but that are not part of the core claim: an out-of-range (extrapolation) morphology beyond the
-0.5×–1.0× training range, and an explicit cross-embodiment alignment objective in the manner of UniSkill (Section
+0.5× to 1.0× training range, and an explicit cross-embodiment alignment objective in the manner of UniSkill (Section
 2.3.2). These are stated as directions, not commitments.
 
 ## 3.9  Work Plan
@@ -984,7 +984,7 @@ negative answer would surface before the transfer experiment.
 
 | Step (§3.8) | Activity | Aug | Sep | Oct | Nov |
 |---|---|---|---|---|---|
-| — | Simulation setup, morphology variants, vision capture, preliminary milestones (§3.7) | done | | | |
+| (setup) | Simulation setup, morphology variants, vision capture, preliminary milestones (§3.7) | done | | | |
 | A | Dataset redesign: IK retargeting, multi-session capture (A1), behaviours (A2) | x | | | |
 | B | Regenerate the preliminary analyses on the IK dataset (final e_t baselines) | x | x | | |
 | C | Train the latent action model (ITM + FTM + Motion Decoder) | | x | | |
