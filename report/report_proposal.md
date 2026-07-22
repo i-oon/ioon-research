@@ -414,9 +414,8 @@ explicit-action baseline (EAC-WM, which is forced to use per-embodiment action e
 *scales positively* with embodiment diversity. Its motivating premise, however, is heterogeneity of *action
 spaces*: the baseline pathology it improves on exists precisely because different manipulators have genuinely
 different action formats. That premise does **not** hold in this project's single-species, leg-length-only setting,
-where all three bodies share an identical 18-dimensional action space. The reframing this requires, from
-*action-space* heterogeneity to *dynamics* heterogeneity (where the same command produces different motion per
-body), is the subject of Section 2.6.
+where all three bodies share the same 18-dimensional action format. Why a latent action is nonetheless needed —
+because the same behaviour is realised by different commands on different bodies — is taken up in Section 2.6.
 
 ## 2.4  Cross-Morphology and Cross-Embodiment Legged Locomotion
 
@@ -570,23 +569,32 @@ makes the behaviour-versus-morphology comparison clean. Real-robot and sim-to-re
 scope (Section 1.4); the contribution is the controlled demonstration that the abstraction can, or cannot, be
 learned, which is a prerequisite to any later physical deployment.
 
-**2.6.2  The necessary reframing: from action-space heterogeneity to dynamics heterogeneity.**
-LAC-WM's justification for a shared latent (Section 2.3.3) is that its embodiments have genuinely *different action
-spaces*, which forces the explicit-action baseline into per-embodiment encoders. This project cannot borrow that
-justification, because its three bodies share an *identical* 18-dimensional action space; a reviewer would rightly
-ask why a latent action is needed at all when every body accepts the same command format. The answer is a
-different, and arguably cleaner, source of heterogeneity. The bodies differ not in the *format* of the action but
-in the *dynamics* that action produces: as Section 3.7.1 measures directly, an identical command yields
-non-overlapping motion across leg lengths (p = 0.0079, complete separation). The problem is therefore not to
-reconcile different action dimensionalities but to learn a representation of the *behaviour* (the intent of a
-movement, such as "advance the middle-left leg into stance") that is invariant to how a given body must actuate
-its joints to realise it. This dynamics-heterogeneity framing is what makes the single-axis leg-length setting a
-valid and, in fact, more controlled instance of the cross-embodiment problem than the action-space-heterogeneity
-setting: every confounding difference except the one under study (leg length) is held fixed.
+**2.6.2  Why a latent action is needed even though the action format is shared.**
+LAC-WM's shared latent is justified by its embodiments having genuinely *different action formats*: a gripper, a
+bimanual humanoid, and human-hand keypoints do not even have the same number of action dimensions, which forces
+its explicit-action baseline into a separate action encoder per embodiment (Section 2.3.3). That justification
+does not apply here. All three bodies in this study have the same six legs and eighteen joints, so their commands
+live in the same space, ℝ¹⁸. A reviewer could reasonably ask why a latent action is needed at all when the command
+format is already common.
+
+The answer is that a shared action *format* is not a shared action *meaning*. The same behaviour is produced by
+*different commands* on different bodies, and this project's data design makes that difference explicit rather than
+incidental: the inverse-kinematics retargeting of Section 3.5.3 takes one shared foot trajectory and solves it
+into a *different* joint command for each leg length. Section 3.7.1 shows the same fact from the opposite
+direction — a single fixed command produces non-overlapping motion across bodies (p = 0.0079, complete
+separation). In both directions the mapping between command and behaviour is body-dependent.
+
+A latent action is therefore motivated not by reconciling different action dimensions but by *separating what is
+shared from what is body-specific*. The latent zₜ is intended to carry the behaviour, which is common across
+bodies, while the Motion Decoder performs the body-specific conversion from that behaviour to a particular body's
+joint command. This division is exactly what the architecture implements, and it is what makes the single-axis
+leg-length setting a clean instance of the cross-embodiment problem: every difference except leg length is held
+fixed.
 
 **2.6.3  The decisive test built into the design.**
-Because the action space is shared, the value of the latent action is not assumed but tested head-on: a
-latent-conditioned dynamics model is compared against one conditioned directly on the raw 18-dimensional command,
+Because the action format is shared, the value of the latent action is not assumed but tested head-on: a
+latent-conditioned transition model is compared against one conditioned directly on the body's own
+(inverse-kinematics-retargeted) 18-dimensional joint command,
 under an identical encoder, model capacity, dataset, and training budget (Section 3.6.3). If the raw-command model
 transfers equally well across morphologies, the latent bottleneck adds nothing in this controlled setting, and the
 thesis reports that honestly. This ablation is treated as the central experiment rather than a supplementary one.
