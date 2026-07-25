@@ -8,7 +8,7 @@ Conventions used here:
 - Numbers are the regenerated / reproducible values (`report/NUMBERS.md`, `exp_*.md`). Report ranges, not false-precision decimals.
 
 Section order (fixed so Literature Review is contiguous and Problem Formulation is not sandwiched inside it):
-Background (2–4) → Literature Review (5–9) → Problem Formulation (10) → Research Question (11) → Method (12–16) → Evaluation (17) → Preliminary Results (18–20) → Final Protocol (21) → Decisive Ablation (22) → Outcomes (23) → Scope (24) → Contributions (25).
+Background (2–4) → Literature Review (5–9) → Problem Formulation (10) → Research Question (11) → Method (12–16) → Evaluation (17) → Preliminary Results (18–20) → Final Protocol (21) → Outcomes (22) → Scope (23) → Product & Downstream Use (24) → Contributions (25). Backup (after 25): latent-vs-raw comparison.
 
 ---
 
@@ -76,7 +76,13 @@ Speaker: the punchline is the stats line, not the table. "Same command, differen
 
 เราสร้างแมลง 3 ตัวใน CoppeliaSim เหมือนกันทุกอย่าง ต่างแค่ความยาวขา แล้ว**สั่งด้วยคำสั่งชุดเดียวกันเป๊ะทุก bit** วัดระยะทางจาก simulator ตรงๆ
 
-ผลคือ — ดูที่กราฟนะครับ สามกลุ่มแยกขาดจากกันเลย ขาสั้น 3.2 เมตร ขายาว 5.2 เมตร ทางสถิติ Mann-Whitney ได้ p เท่ากับ 0.0079 และ Cliff's delta เท่ากับ 1.00 ซึ่งแปลว่า**ทุก episode ของขายาว เดินไกลกว่าทุก episode ของขาสั้น ไม่มีทับกันเลย** ค่า p ที่เท่ากันทั้ง 3 คู่ไม่ใช่บังเอิญ แต่เป็นค่าต่ำสุดที่ทดสอบได้ที่ 5 ตัวอย่าง เพราะทุกคู่แยกขาดพร้อมกัน
+ผลคือ — ดูที่กราฟนะครับ สามกลุ่มแยกขาดจากกันเลย ขาสั้น 3.2 เมตร ขายาว 5.2 เมตร
+
+ผมยืนยันด้วยสถิติสองตัว ตัวแรก **Mann-Whitney** — มันเป็นการทดสอบที่ถามว่า 'สองกลุ่มนี้ต่างกันจริง หรือบังเอิญ' ค่าที่ได้คือ **p** ซึ่งแปลว่า 'ถ้าจริงๆ แล้วมันเท่ากัน โอกาสที่จะสุ่มได้ข้อมูลแยกกันขนาดนี้มีเท่าไหร่' ของเราได้ **p เท่ากับ 0.0079 คือ 0.79 เปอร์เซ็นต์** น้อยมาก แปลว่าไม่ใช่บังเอิญ — ต่างกันจริง
+
+ตัวที่สอง **Cliff's delta** — อันนี้วัด 'สองกลุ่มแยกขาดกันแค่ไหน' ค่าอยู่ระหว่าง 0 ถึง 1 โดย 1 คือแยกขาดสมบูรณ์ ของเราได้ **1.00 เต็ม** ซึ่งแปลว่า **ทุก episode ของขายาว เดินไกลกว่าทุก episode ของขาสั้น ไม่มีทับกันเลยแม้แต่ครั้งเดียว**
+
+แล้วมีจุดหนึ่งที่ต้องอธิบายกันงง — ค่า p ทั้ง 3 คู่ได้เท่ากันเป๊ะที่ 0.0079 อันนี้ไม่ใช่บังเอิญนะครับ แต่เพราะที่ 5 ตัวอย่างต่อกลุ่ม การทดสอบมันมี**เพดาน** — 0.0079 คือค่าต่ำสุดที่มันคำนวณได้ พอทุกคู่แยกขาดสมบูรณ์เหมือนกัน มันเลยชนเพดานพร้อมกันทั้งสามคู่
 
 ประโยคเดียวที่อยากให้จำ — **คำสั่งเดียวกัน ผลไม่เหมือนกัน และไม่ทับกันเลย** ปัญหามีจริงครับ"
 
@@ -124,11 +130,13 @@ Speaker: this frames the whole thesis — behaviour-level, not command-level, no
 
 **Shared assumption:** *the learner has access to an internal description of the body.*
 
-🎤 **บทพูด:** "ทีนี้มาดูว่าวงการเขาแก้ปัญหานี้ยังไงกันบ้างครับ ผมสรุปเป็น 4 กลุ่ม
+🎤 **บทพูด:** "ทีนี้มาดูว่าวงการเขาแก้ปัญหานี้ยังไงกันบ้างครับ ในตารางมีหลายวิธี แต่ผมอยากให้มองภาพรวมมากกว่าจำทีละอัน
 
-กลุ่มแรก **เทรนใหม่ต่อร่าง** เช่น DreamerV3 — เก่งมากแต่ต้องเทรนใหม่ทุกตัว กลุ่มสอง **บอกพารามิเตอร์ร่างกายให้โมเดล** เช่น QWM อ่านความยาวขา มวล จากไฟล์ CAD แล้วป้อนเข้าโมเดล กลุ่มสาม **เดาพารามิเตอร์จากการเคลื่อนไหวล่าสุด** แบบ online กลุ่มสี่ **แชร์ policy หลักแล้วต่อหัวเฉพาะร่าง** เช่น L3P
+บางวิธีเลือก**เทรนใหม่ทุกร่าง**ไปเลย อย่าง DreamerV3 — ได้ผลดีแต่จ่ายค่าเทรนซ้ำทุกตัว บางวิธี**บอกร่างกายให้โมเดลตรงๆ** อย่าง QWM ที่อ่านความยาวขากับมวลจากไฟล์ CAD แล้วป้อนเข้าไป บางวิธี**ให้หุ่นขยับแล้วเดาค่าร่างกายเอง**จากการเคลื่อนไหวล่าสุด และบางวิธี**แชร์ policy หลักไว้ แล้วต่อหัวเล็กๆ เฉพาะแต่ละร่าง** อย่าง L3P
 
-จุดที่น่าสนใจคือ — ทั้ง 4 กลุ่มนี้ ได้ข้อมูลร่างกายมาจากอย่างใดอย่างหนึ่งใน 3 ช่องทาง: ไฟล์สเปก, เซนเซอร์ในตัว, หรือการลองเคลื่อนไหวใหม่ **สมมติฐานร่วมของทุกกลุ่มคือ — ผู้เรียนต้องเข้าถึง 'คำอธิบายภายใน' ของร่างกายได้** จำประโยคนี้ไว้นะครับ เดี๋ยวช่องว่างของงานเราจะโผล่จากตรงนี้"
+แต่ละวิธีต่างกันในรายละเอียด — แต่ถ้าถอยมามองภาพรวม **ทุกวิธีมีสิ่งหนึ่งเหมือนกัน** คือมันต้องได้ข้อมูลร่างกายมาจากช่องทางใดช่องทางหนึ่ง: ไฟล์สเปก, เซนเซอร์ในตัว, หรือการลองขยับ
+
+พูดอีกแบบ — **ทุกวิธีสมมติว่าเราเข้าถึง 'ข้อมูลภายใน' ของร่างกายได้** จำประโยคนี้ไว้นะครับ เพราะช่องว่างของงานเราจะโผล่มาจากตรงนี้ — แล้วถ้าเราเข้าไม่ถึงข้างในล่ะ"
 
 ---
 
@@ -153,6 +161,36 @@ Why this gap is real:
 ทำไมช่องว่างนี้ถึงสำคัญจริงครับ — หนึ่ง ต่อให้เป็นหุ่นในแล็บ ไฟล์ CAD ก็เป็นแค่ค่าประมาณ ร่างที่ 'เขียนไว้' กับร่างที่ 'เดินจริง' ไม่เหมือนกัน มีการสึกหรอ มีน้ำหนักเพิ่ม สอง กรณีจริงเช่น สัตว์ หรือหุ่นที่ไม่มีเอกสาร เราเห็นมันเดินได้ แต่เข้าไม่ถึง encoder ข้อต่อข้างในเลย และสาม พอร่างต่างกันมากๆ เวกเตอร์ proprioception มันคนละมิติ คนละลำดับ คนละความหมาย แต่**ภาพจากภายนอกให้ format เดียวกันเสมอ**
 
 สรุปคือ — ถ้าอธิบายร่างกายตรงๆ ไม่ได้ บางทีเราอาจอนุมาน dynamics ได้จาก 'การที่สภาพที่มองเห็นเปลี่ยนไปตามเวลา' แทน"
+
+---
+
+## Slide 6B — Literature Review: Where the observer idea sits — the gap, filled
+
+Slide 6 said the body is **observable but not described**. This is the payoff table: the same prior strategies as Slide 5, now with our approach added as the bottom row, so the contrast is visual (Beam-style).
+
+The single axis that matters: **to place a *new* body into a shared representation, does the method need a description of that body's internals — or only a view of it moving?**
+
+| Approach | To slot in a *new* body, it needs | Needs the body's internal description |
+|---|---|:--:|
+| Per-body retraining — DreamerV3 | a full retrain: new interaction + a reward | — (retrains, no sharing) |
+| Morphology conditioning — QWM | accurate CAD/URDF params (leg lengths, masses) | **✓** |
+| Online system identification | recent proprioceptive + command history | **✓** |
+| Shared policy + adapters — L3P | that body's sensor/joint conventions | **✓** |
+| **This work — visual latent action** | **a video of it moving** | **✗** |
+
+**Bottom line:** every prior method needs the body's **internal description** — a spec file, sensor semantics, or joint conventions — before it can place that body in a shared structure. Those are exactly what you do **not** have for an animal, an undocumented robot, or a worn/repaired one. We place a body from **external video alone.**
+
+**⚠️ Honest scope (say this if asked "but don't you need the new body's joint commands?"):** yes — to make the new body *execute*, the motion decoder still outputs its 18-D motor command, like any controller. But that command is obtained as **ordinary logged interaction** (a decoder-supervision signal), **not from a kinematic model of the body**, and adaptation needs **fewer** such samples (Slide 24). "Observation only" describes how we learn and test the shared, morphology-agnostic representation — not a claim that the body is never commanded.
+
+Speaker: point at the last row. "Everyone above needs a description of the body's insides; we need only a view of its outside." If asked about actions, use the honest-scope line — don't dodge it, it's a strength: we need commands as supervision, not a body model, and fewer of them.
+
+🎤 **บทพูด:** "สไลด์ก่อนหน้าบอกว่า ร่างกาย 'มองเห็นได้ แต่อธิบายไม่ได้' — สไลด์นี้คือ**ตารางสรุปว่าไอเดีย observer ของเราไปเติมช่องว่างตรงไหน** เอาวิธีเดิมจากสไลด์ 5 มาเรียง แล้วเติมแถวล่างสุดเป็นของเรา
+
+แกนเดียวที่ต้องดูคือ — **เวลาจะเอาร่างใหม่มาใส่ในตัวแทนร่วม (shared representation) วิธีนั้นต้องรู้ 'ข้างใน' ของร่างนั้นไหม หรือแค่ 'ดูมันขยับ' ก็พอ** QWM ต้องมีไฟล์ CAD ที่แม่นยำ, online system-ID ต้องอ่าน proprioception ย้อนหลัง, L3P ต้องรู้ convention เซนเซอร์ของร่างนั้น — ทั้งหมดนี้ต้องรู้ **'คำอธิบายภายใน'** ของร่างก่อน ซึ่งเป็นสิ่งที่เรา**ไม่มี**สำหรับสัตว์ หุ่นที่ไม่มีเอกสาร หรือหุ่นที่สึกหรอ ส่วนของเรา — วางร่างใหม่ลงในพื้นที่ร่วมได้จาก**วิดีโอที่มันเดิน**อย่างเดียว
+
+**แต่ตรงนี้ต้องพูดให้ตรงครับ** เผื่อกรรมการถามว่า 'อ้าว แล้วไม่ต้องใช้คำสั่งข้อต่อของร่างใหม่เหรอ' — **ต้องใช้ครับ** ตอนจะให้ร่างใหม่**เดินจริง** motion decoder มันก็ต้องพ่นคำสั่งมอเตอร์ 18 ค่าออกมา เหมือน controller ทุกตัว แต่จุดต่างคือ — คำสั่งนั้นเราได้มาจาก**การบันทึกการขยับธรรมดา** (เป็นแค่สัญญาณสอน decoder) **ไม่ใช่จากโมเดลจลนศาสตร์ของร่างกาย** และเราต้องใช้มัน**น้อยลง** (เดี๋ยวโชว์ที่สไลด์ 22) เพราะงั้นคำว่า 'ใช้แค่การสังเกต' มันหมายถึง **วิธีที่เราเรียนและทดสอบตัวแทนที่ไม่ผูกกับรูปร่าง** ไม่ได้แปลว่าร่างนั้นไม่เคยถูกสั่งเลย
+
+พูดง่ายๆ — ทุกวิธีข้างบนต้องรู้ 'ข้างในร่าง' ก่อน ของเราขอแค่ 'มองร่างจากข้างนอก' ถ้าโดนถามเรื่อง action อย่าเลี่ยงนะครับ ตอบตรงๆ ว่าเราใช้ action เป็นแค่สัญญาณสอน ไม่ใช่โมเดลร่างกาย และใช้น้อยกว่า — อันนี้เป็นจุดแข็ง ไม่ใช่จุดอ่อน"
 
 ---
 
@@ -272,6 +310,43 @@ The learning problem becomes **sₜ₊₁ = f_m(sₜ, aₜ)**: the morphology m 
 
 ---
 
+## Slide 11B — Overview: the whole idea in one picture
+
+We have shown the problem is real (Step −1) and posed the question. **Before the detailed pipeline, here is the whole approach in one picture.**
+
+Instead of describing a new body **from the inside** (its link lengths, masses, sensors), we **watch it from the outside** and let a model read off *what it is doing*.
+
+`[FIG: observer_arc — draw in slides]` One left-to-right arc, four stages, arrows labelled underneath:
+
+```
+ ┌─────────────┐      ┌──────────────┐      ┌───────────┐      ┌──────────────┐
+ │  video of a │      │      👁       │      │    🧬     │      │  new body,   │
+ │ body walking│ ───► │   OBSERVER   │ ───► │  zₜ code  │ ───► │ diff. shape, │
+ │ (long legs) │      │ reads what   │      │ "behaviour│      │ same walk    │
+ │             │      │ it's DOING,  │      │  gene"    │      │ (medium/short│
+ │             │      │ not its shape│      │           │      │  legs)       │
+ └─────────────┘      └──────────────┘      └───────────┘      └──────────────┘
+      input             ── Observe ──         ── Encode ──        ── Transfer ──
+```
+*Show a long-leg silhouette entering on the left and a medium/short silhouette on the right, to make "same behaviour, different body" literal. This same figure doubles as the validation-pipeline picture Ajan Go asked for.*
+
+Three claims this talk defends — one per arrow:
+1. **Observe.** Behaviour can be captured externally, from video alone — no joint encoders, no CAD.
+2. **Encode.** The observer's code keeps the **behaviour** (foot contact, support transfer) …
+3. **Transfer.** … while dropping the **body shape**, so the code carries to an **unseen morphology**.
+
+The mechanism that turns "observe" into "predict the next observation" is a **world model**; the compact code we extract from it is the **latent action**. Both are introduced properly later — this slide is only the map.
+
+Speaker: this is the map for everything that follows. The pipeline slides after this detail each block; the preliminary results test whether each arrow holds. Say the arc out loud once, slowly, then go into the pipeline.
+
+🎤 **บทพูด:** "ก่อนลงรายละเอียด ผมขอวางภาพรวมทั้งงานไว้ในสไลด์เดียวก่อนครับ — ไอเดียหลักคือ แทนที่เราจะไป**เปิดร่างกายดูข้างใน** ว่าขายาวเท่าไหร่ มวลเท่าไหร่ เซนเซอร์อะไรบ้าง เรา**มองมันจากภายนอก** คือดูมันเคลื่อนไหวเฉยๆ
+
+ดูตามลูกศรนะครับ — เริ่มจาก **วิดีโอ**ของร่างที่กำลังเดิน ป้อนเข้า **ตัวสังเกต (observer)** หน้าที่ของมันคือ**อ่านว่าร่างนั้นกำลังทำพฤติกรรมอะไร ไม่ใช่จำว่าร่างหน้าตายังไง** แล้วบีบพฤติกรรมนั้นออกมาเป็น**โค้ดสั้นๆ** ตัวหนึ่ง — ผมชอบเรียกมันว่า '**จีน**' ของพฤติกรรม — จากนั้นเราเอาจีนตัวนี้ไป**ถ่ายให้ร่างที่รูปร่างต่างออกไป** แล้วให้มันทำพฤติกรรมเดียวกันได้
+
+ทั้ง talk นี้ผมกำลังจะพิสูจน์ 3 ข้อ ข้อละลูกศร — หนึ่ง พฤติกรรม**สังเกตจากภาพภายนอกได้จริง** ไม่ต้องแกะข้อต่อ สอง โค้ดที่ได้**เก็บพฤติกรรมไว้** เช่นจังหวะแตะพื้น การถ่ายน้ำหนัก และสาม โค้ดนั้น**ทิ้งรูปร่างทิ้ง** เลยถ่ายข้ามไปร่างที่ไม่เคยเห็นได้ กลไกที่ทำให้ 'สังเกต' กลายเป็น 'ทำนายเฟรมถัดไป' เราเรียกว่า world model และโค้ดที่ดึงออกมาคือ latent action — เดี๋ยวผมอธิบายทั้งสองอย่างละเอียดทีหลัง สไลด์นี้เป็นแค่แผนที่ครับ"
+
+---
+
 ## Slide 12 — Method: Data source and pre-processing
 
 `[FIG: pipeline diagram, stages 1–2 highlighted, 3–6 greyed]`
@@ -326,13 +401,17 @@ Signals: ITM updates from **both** objectives through zₜ (z takes gradient bot
 
 **Keep the Motion Decoder's weights after pretraining** — it is the module that maps a latent action back to a body-specific joint command, so it carries the "executability" property (Slide 4) and is the bridge to any later control use. (It is *not* discarded.)
 
+**How to read the whole pretraining phase (one paragraph):** the **world model itself is the FTM** — it predicts the **next visual embedding** êₜ₊₁. The "map back to a real joint command" is a **side head (the Motion Decoder)** that keeps the latent *executable*; it is not the world model. **Both train together**, so during pretraining we **do** feed the paired joint command **aₜ** for the two training bodies (long + short) — we have it, generated by IK in simulation — as the **decoder's supervision target**. So pretraining is **not 100% action-free**: it is **observation-driven, with aₜ as a supervision signal**, not as a world-model input. What we walk away with is a **world model whose latent zₜ is behaviour-grounded and shared across the 2 morphologies.**
+
 🎤 **บทพูด:** "นี่คือหัวใจของวิธีการครับ เรามีเวกเตอร์ภาพจากเมื่อกี้แล้ว ทีนี้จะเรียน latent action z-t มี 3 โมดูลเล็กๆ ทำงานร่วมกัน
 
 **หนึ่ง ITM — Inverse Transition Model** ดูภาพก่อนกับภาพหลัง แล้วถามว่า 'เกิดอะไรขึ้นระหว่างนั้น' คำตอบคือ z-t เหมือนดู before-after แล้วเดาว่าขยับอะไร **สอง FTM — Forward Transition Model** เป็นตัวเช็ก เราให้ภาพก่อนกับ z-t แล้วให้มัน**ทำนายภาพหลัง** ถ้า z-t จับได้จริง การทำนายต้องถูก **สาม Motion Decoder** ทำหน้าที่ยึด z-t ไว้กับความจริง คือแปลง z-t กลับเป็นคำสั่งข้อต่อจริง กันไม่ให้ z-t กลายเป็นอะไรที่ไร้ความหมาย
 
 จุดฉลาดคือ — **z-t อยู่ตรงกลางแล้วโดนดึงจากทั้งสองเป้าหมายพร้อมกัน** มันต้องทั้งอธิบายภาพถัดไปได้ และเชื่อมกับคำสั่งจริงได้ นั่นแหละที่บังคับให้มันเป็น action code ที่ใช้ได้จริง
 
-สองจุดเล็กแต่สำคัญ — reconstruction loss วัดใน**ปริภูมิเวกเตอร์ ไม่ใช่ pixel** เลยไม่ต้องสร้างภาพกลับ ประหยัดมาก และเรา**เก็บ Motion Decoder ไว้หลังเทรน** เพราะมันคือตัวที่แปลง latent action กลับเป็นคำสั่งเฉพาะร่าง เป็นสะพานไปสู่การควบคุมจริง — ไม่ได้ทิ้งครับ (อันนี้ตอบ feedback อาจารย์เรื่องนิยาม 'Transition' ด้วย เพราะโมดูลพวกนี้ทำงานบนการเปลี่ยนผ่านของ embedding ไม่ใช่ dynamics เชิงฟิสิกส์)"
+สองจุดเล็กแต่สำคัญ — reconstruction loss วัดใน**ปริภูมิเวกเตอร์ ไม่ใช่ pixel** เลยไม่ต้องสร้างภาพกลับ ประหยัดมาก และเรา**เก็บ Motion Decoder ไว้หลังเทรน** เพราะมันคือตัวที่แปลง latent action กลับเป็นคำสั่งเฉพาะร่าง เป็นสะพานไปสู่การควบคุมจริง — ไม่ได้ทิ้งครับ (อันนี้ตอบ feedback อาจารย์เรื่องนิยาม 'Transition' ด้วย เพราะโมดูลพวกนี้ทำงานบนการเปลี่ยนผ่านของ embedding ไม่ใช่ dynamics เชิงฟิสิกส์)
+
+ขอสรุปภาพรวมของ pretraining เป็นย่อหน้าเดียวนะครับ เผื่อกรรมการงง — **ตัว world model จริงๆ คือ FTM** มันทำนาย '**เวกเตอร์ภาพเฟรมถัดไป**' (e-t+1) ส่วนตัวที่แปลงกลับเป็นคำสั่งข้อต่อจริงคือ **หัวเสริมด้านข้าง (Motion Decoder)** ที่คอยยึด latent ให้ยังสั่งงานได้ — มันไม่ใช่ world model นะครับ **แต่ทั้งสองเทรนไปพร้อมกัน** เพราะงั้นตอน pretraining เรา**ต้องป้อนคำสั่งข้อต่อ a-t ของสองร่างที่ใช้เทรน (ขายาว ขาสั้น) เข้าไปด้วย** — ซึ่งเรามี เพราะสร้างจาก IK ใน simulation — โดยใช้มันเป็น**เป้าหมายสอน decoder** พูดให้ตรงคือ pretraining **ไม่ได้ปลอด action ร้อยเปอร์เซ็นต์** มันคือ '**ขับเคลื่อนด้วยการสังเกต โดยมี a-t เป็นสัญญาณสอน**' ไม่ใช่เอา a-t มาเป็น input ของ world model และสิ่งที่เราได้ตอนจบคือ — **world model ที่มี latent z-t ซึ่งผูกกับพฤติกรรม ไม่ผูกกับรูปร่าง และใช้ร่วมกันได้ทั้ง 2 morphology**"
 
 ---
 
@@ -495,7 +574,7 @@ Camera control: script-created camera identical across morphologies, third-perso
 - ✅ Step 0 — Does a morphology gap exist? (Slide 3)
 - ✅ Step 1 — Does frozen vision contain locomotion information? (Slide 18)
 - ⬜ Step 2 — Does zₜ preserve behaviour while reducing morphology information?
-- ⬜ Step 3 — Does zₜ improve held-out transfer over raw commands? (Slide 22)
+- ⬜ Step 3 — Does zₜ improve held-out transfer over raw commands? (Backup)
 
 Recorded per step: RGB, proprioception, command, contact, next RGB.
 
@@ -511,33 +590,7 @@ Recorded per step: RGB, proprioception, command, contact, next RGB.
 
 ---
 
-## Slide 22 — Decisive Ablation: does the latent action add value beyond raw joint commands?
-
-Compare three transition models under the **same encoder, FTM capacity, dataset, and training budget**:
-
-| Transition model | Conditioning input | What it tests |
-|---|---|---|
-| Observation only | F(eₜ, 0) | how predictable is motion with no action? |
-| Raw action | F(eₜ, aₜ) | standard body-specific command representation |
-| Latent action | F(eₜ, zₜ) | proposed transition-based representation |
-
-**Primary comparison:** **L_pred^medium(eₜ, zₜ) < L_pred^medium(eₜ, aₜ)** on the held-out medium body.
-
-The latent representation is useful **only if** it improves held-out transition prediction (or adaptation) relative to raw commands. If the raw-command model matches it across morphologies, the latent action is not justified in this controlled setting — and we would report that. This ablation *is* the thesis, so it is run early, not last.
-
-🎤 **บทพูด:** "สไลด์นี้สำคัญมาก เป็น**การทดลองที่ตัดสินทั้ง thesis** ครับ
-
-เพราะทั้ง 3 ร่างใช้ action format เดียวกัน กรรมการอาจถามว่า 'ถ้า action เหมือนกันหมด แล้วจะมี latent ไปทำไม' — เราไม่เลี่ยงคำถามนี้ เราทดสอบตรงๆ
-
-เราเทียบ transition model 3 แบบ ภายใต้ encoder ความจุ ข้อมูล และงบเทรนเท่ากันเป๊ะ — แบบแรกไม่ใส่ action เลย แบบสองใส่**คำสั่งดิบ** a-t แบบสามใส่ **latent** z-t
-
-การเปรียบเทียบหลักคือ — บนขากลางที่กันไว้ z-t ต้องทำนายได้**ดีกว่า** a-t ดิบ
-
-**latent จะมีประโยชน์ก็ต่อเมื่อมันดีกว่าคำสั่งดิบเท่านั้น** ถ้าคำสั่งดิบทำได้พอกันข้ามร่าง แปลว่า latent ไม่จำเป็นในเซ็ตอัพนี้ — และเราจะรายงานตามนั้นอย่างตรงไปตรงมา เพราะการทดลองนี้**คือ** thesis เราเลยรันมัน**เร็ว ไม่ใช่ท้ายสุด** จะได้รู้คำตอบลบตั้งแต่เนิ่นๆ ครับ"
-
----
-
-## Slide 23 — Possible Outcomes: what would the results mean?
+## Slide 22 — Possible Outcomes: what would the results mean?
 
 | Behaviour in zₜ | Morphology in zₜ | Prediction / transfer | Interpretation |
 |---|---|---|---|
@@ -557,7 +610,7 @@ The latent representation is useful **only if** it improves held-out transition 
 
 ---
 
-## Slide 24 — Scope and Limitations
+## Slide 23 — Scope and Limitations
 
 **Included:** simulation-based hexapod locomotion; three leg-length morphologies; fixed third-person RGB camera; forward locomotion and foot-contact behaviour; medium-leg interpolation test; ITM, FTM, Motion Decoder, and frozen V-JEPA2 encoder.
 
@@ -575,13 +628,60 @@ The latent representation is useful **only if** it improves held-out transition 
 
 ---
 
+## Slide 24 — Where this lands: adapting a new body by matching behaviour in latent space
+
+**What this thesis delivers (Phase 1 — the product).** A pretrained **visual latent-action world model** = a **frozen encoder + ITM + FTM + Motion Decoder**, with a **morphology-agnostic latent action zₜ** (behaviour, not body). The thesis tests this directly (the two-sided probe, Slide 18). **Adapting it to a new, unseen body is future work** — this is the cleanest route.
+
+**Adapt by matching behaviour in latent space — no action labels.** For the new body, close a loop:
+1. demo → **ITM** → **z_target** (the behaviour to reproduce);
+2. **Motion Decoder** decodes z_target to the new body's command → **execute**;
+3. re-encode the body's **actual** transition with **ITM** → **z_achieved**;
+4. reward **r = −‖z_achieved − z_target‖²**; **update the decoder** so achieved → target. Repeat.
+
+**Two things this buys:**
+- **Supervision is in zₜ-space → morphology-invariant.** We compare achieved-vs-target *behaviour*, not raw embeddings, so **body shape can't leak in** (no cross-body confound).
+- **No ground-truth commands needed.** The signal is "did the body *achieve* the intended behaviour?", not "match this exact aₜ."
+
+**Honest cost — it is RL, not backprop.** `aₜ → eₜ₊₁` is **real physics (not differentiable)**, so the match error is a **reward** and the decoder is trained by **RL**. Use a **sample-efficient** method (**CEM / off-policy actor-critic like SAC**) — **not PPO** (on-policy, sample-hungry, fights the few-shot goal). Because the loop reads the body's **real state each step**, phase can't drift.
+
+**Reused (frozen):** encoder, ITM. **Adapted:** the Motion Decoder. **Not used in this loop:** FTM. The controller acts in the compact **64-D zₜ — one behaviour space for every body** → competence in **fewer real episodes than from scratch**.
+
+`[FIG: pipeline_diagram.tex — online behaviour-matching loop]`
+
+```
+  demo → Encoder → ITM → z_target ───────────────┐  (decode to new body)
+                                                  ▼
+  ┌───► Motion Decoder → aₜ → New body → Encoder → eₜ,eₜ₊₁ → ITM → z_achieved
+  │        ▲(adapted)         (real physics)                          │
+  │        └──── RL update ◄──── reward = −‖z_achieved − z_target‖² ◄──┘
+  └ closed loop · z-space reward · no aₜ labels · no FTM
+```
+
+**Honest scope.** Phase 1 delivers *and tests* the representation; this adaptation loop is future work. Alternatives exist — offline (eₜ,aₜ) regression *if* you have action labels (differentiable, but needs labels); or a hand-designed task reward for autonomous goals. This z-matching route is the one that needs **neither action labels nor a body model** (Slide 6B).
+
+Speaker: this is how a new body is adapted. Key line: we score the body on **whether it achieved the intended behaviour, measured in zₜ-space** — so no command labels, and no body-shape confound. Say plainly it's RL (physics isn't differentiable), and you'd use a sample-efficient method, not PPO.
+
+🎤 **บทพูด:** "ก่อนสรุป ผมอยากให้เห็นว่า **ผลิตภัณฑ์ที่เราส่งมอบ เอาไปปรับให้ร่างใหม่ยังไง** — ส่วนนี้เป็นงานอนาคต
+
+**สิ่งที่ thesis นี้ให้ (Phase 1)** คือ visual latent-action world model ที่เทรนแล้ว = encoder + ITM + FTM + Motion Decoder ได้พื้นที่ latent z ที่ผูกกับพฤติกรรมไม่ผูกกับรูปร่าง เราทดสอบตัวนี้ตรงๆ ด้วย probe
+
+**ไอเดียการปรับร่างใหม่คือ 'จับคู่พฤติกรรมในปริภูมิ latent' โดยไม่ต้องมี label ของคำสั่ง** — เอา demo มาผ่าน ITM ได้ **z-target** (พฤติกรรมที่อยากได้) แล้วให้ Motion Decoder แปลงเป็นคำสั่งของร่างใหม่ สั่งให้ขยับจริง จากนั้น**เอา transition ที่ร่างทำได้จริงมาเข้า ITM อีกที** ได้ **z-achieved** แล้ววัด reward = ลบระยะห่าง ‖z-achieved − z-target‖² เอาไปอัปเดต decoder ให้ทำได้ใกล้เป้าขึ้น วนแบบนี้
+
+**สองข้อที่ได้จากการวัดใน z-space** — หนึ่ง z มันไม่ผูกกับรูปร่าง เราเลยเทียบ 'พฤติกรรม' ไม่ใช่เทียบภาพดิบ **ไม่มีปัญหา body shape ปนข้ามร่าง** สอง **ไม่ต้องมีคำสั่งจริง (a-t) เป็น label** — แค่ถามว่า 'ร่างทำพฤติกรรมได้ตามเป้าไหม'
+
+**พูดตรงๆ เรื่องต้นทุน — อันนี้เป็น RL ไม่ใช่ backprop** เพราะ a-t ไป e-t+1 มันคือฟิสิกส์จริง ต่าง diff ไม่ได้ เพราะงั้น match error เลยเป็น reward แล้วเทรน decoder ด้วย RL — ควรใช้วิธีที่ประหยัด sample เช่น CEM หรือ off-policy อย่าง SAC **ไม่ใช่ PPO** เพราะ PPO กิน sample เยอะ ขัดกับเป้า few-shot ของเรา และเพราะมันอ่านสภาพจริงของร่างทุก step phase เลยไม่หลุด
+
+ของที่ reuse: encoder กับ ITM (frozen) ที่ปรับคือ decoder ตัวเดียว ส่วน FTM ไม่ได้ใช้ในลูปนี้ครับ"
+
+---
+
 ## Slide 25 — Contributions and Milestones
 
 **Expected contributions.** The **first port of a latent-action world model from manipulation to legged locomotion**. A controlled, single-axis leg-length benchmark for locomotion representation across changing body morphology. A visual latent-action world model combining ITM, FTM, and command reconstruction. An evaluation framework separating behaviour preservation, morphology leakage, predictive sufficiency, executability, and adaptation efficiency. Evidence establishing whether visual latent actions improve held-out morphology transfer over raw joint commands.
 
 **Objectives.** Design and train the latent-action pipeline (ITM/FTM/MD) on simulation video with auto-logged action labels, stick insect × 3 morphologies. Test whether the learned latent action is morphology-agnostic (PCA / probe on zₜ across bodies performing the same behaviour). Test transfer to the unseen medium leg, and **measure whether the resulting world model reduces the data needed for a new morphology.**
 
-Milestones follow the remaining-work steps (proposal §3.8–3.9). Pilot setup and the two preliminary checks are done; the decisive ablation (E) is scheduled early so a negative answer surfaces before transfer.
+Milestones follow the remaining-work steps (proposal §3.8–3.9). Pilot setup and the two preliminary checks are done; the latent-vs-raw comparison (E) is scheduled early so a negative answer surfaces before transfer.
 
 | Step | Milestone | Aug | Sep | Oct | Nov |
 |---|---|:---:|:---:|:---:|:---:|
@@ -589,7 +689,7 @@ Milestones follow the remaining-work steps (proposal §3.8–3.9). Pilot setup a
 | A | Dataset redesign (IK) + multi-session | ██ | | | |
 | B | Regenerate baselines on IK data | ██ | ██ | | |
 | C | Train ITM + FTM + MD | | ██ | | |
-| E | Decisive ablation (latent vs raw) — early | | ██ | | |
+| E | Latent-vs-raw comparison — early | | ██ | | |
 | D | Latent validation (two-sided) | | ██ | ██ | |
 | F | Transfer to held-out medium | | | ██ | |
 | G | Analysis + writing | | | ██ | ██ |
@@ -607,3 +707,38 @@ The contribution is **not** an assumption that latent action must work — it is
 ดูตาราง milestone ครับ — setup กับ preliminary check **เสร็จแล้ว** ที่เหลือคือ Step A ถึง G ตั้งแต่ออกแบบชุดข้อมูล IK ไปจนถึงเทรน validate ทำ ablation ที่ตัดสิน แล้วทดสอบ transfer เป้าคือ core experiment เสร็จภายในตุลา แล้วพฤศจิกายนไว้เขียน
 
 ปิดท้ายด้วยประโยคที่อยากให้จำครับ — **งานนี้ไม่ได้ตั้งสมมติฐานว่า latent action ต้องเวิร์ก แต่เป็นการทดสอบแบบมีการควบคุม ว่าตัวแทนเชิงภาพที่อิงการเปลี่ยนผ่าน ให้คุณค่าข้ามรูปร่างที่วัดได้จริงหรือไม่** ต่อให้คำตอบเป็นลบ ก็เป็นผลวิจัยที่มีความหมาย ขอบคุณครับ ยินดีรับคำถามครับ"
+
+---
+
+## Backup (not in main flow) — If asked: why not just IK the raw joint command?
+
+*Use only if the committee raises the raw-command objection. The decisive evidence for the thesis is the two-sided probe (Slide 18 / Step 2); this slide only addresses whether the latent adds value **beyond** the raw command.*
+
+The primary evidence is the two-sided probe (Slide 18 / Step 2). This slide answers a *second* question: is the latent worth more than just using the raw command? Answered by **two measures that are deliberately not a reconstruction-loss comparison** (a direct loss comparison would be unfair — zₜ is inferred from the transition, so it has already seen the next frame, and it has more dimensions than aₜ).
+
+**1. Adaptation efficiency — the lab advisor's main usefulness metric.** Adapt the pretrained world model to the held-out medium body and count the **training episodes to reach a target error**, versus from-scratch and versus a model pretrained on the raw command. Fewer episodes = the representation transfers.
+
+| Start from | Episodes to target (fewer = better) |
+|---|---|
+| From scratch | reference |
+| Pretrained on raw command aₜ | ? |
+| **Pretrained on latent zₜ** | **should be fewest** |
+
+**2. The availability argument.** The raw command aₜ is *privileged*: getting the correct command for a new body needs that body's **kinematics** (via IK), which the motivating scenario assumes we do not have. zₜ is inferred from **video** and needs no kinematics. So a latent that merely *matches* the raw-command result is already a win — it recovers from vision what otherwise requires the body's internals.
+
+If neither measure favours the latent, we report that honestly.
+
+🎤 **บทพูด:** "สไลด์นี้ตอบคำถามที่กรรมการน่าจะถาม — 'ถ้า action format เหมือนกันหมด แล้วจะมี latent ไปทำไม ใช้คำสั่งดิบก็ได้'
+
+ผมขอเคลียร์ก่อน — หลักฐานหลักของ thesis คือ probe สไลด์ที่แล้ว (z-t เก็บพฤติกรรม + ลบรูปร่าง) สไลด์นี้ตอบคำถามที่**สอง** คือ latent คุ้มกว่าคำสั่งดิบไหม
+
+และผมจะ**ไม่**เทียบด้วยการวัด loss ตรงๆ นะครับ เพราะมันไม่แฟร์ — z-t มันอนุมานมาจากภาพสองเฟรม แปลว่ามันเห็นเฟรมอนาคตแล้ว ส่วนคำสั่งดิบไม่เห็น เทียบ loss ตรงๆ z-t ได้เปรียบฟรีๆ
+
+ผมวัดสองอย่างที่แฟร์กว่าแทน — **หนึ่ง adaptation efficiency** คือ เอา world model ที่เทรนแล้วไปปรับกับขากลาง นับว่าใช้กี่ episode ถึงจะถึงเป้า เทียบกับเทรนใหม่หมด ถ้าใช้ episode น้อยกว่าชัดเจน แปลว่า representation transfer ได้จริง — **อันนี้คือ metric ที่อาจารย์โก้บอกตั้งแต่แรกว่าเป็นตัววัดหลักว่า world model มีประโยชน์**
+
+**สอง — argument เรื่องความพร้อมใช้** คำสั่งดิบ a-t มันต้องรู้ kinematics ของขากลางถึงจะ IK ออกมาได้ แต่ในกรณีจริงร่างใหม่เราไม่รู้ kinematics ส่วน z-t อนุมานจากวิดีโอ ไม่ต้องรู้ kinematics เลย เพราะงั้นต่อให้ z-t แค่**เสมอ**กับคำสั่งดิบ ก็ถือว่าชนะแล้ว เพราะมันกู้สิ่งที่ปกติต้องมาจากข้างในร่างกาย ได้จากภาพภายนอกล้วนๆ
+
+ถ้าทั้งสองตัววัดไม่เข้าข้าง latent เราก็รายงานตรงๆ ครับ"
+
+---
+

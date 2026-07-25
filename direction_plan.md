@@ -435,6 +435,20 @@ leg lengths, kept physically grounded by the motion-decoding loss so it can't co
 This is EAC-WM ported *honestly* to our setting. **If the latent doesn't beat raw joints, the thesis is
 hollow.** Run it early — knowing this in month 1 is worth far more than in month 3.
 
+> **UPDATE (2026-07-25) — refined; keep the ablation but demote it from "sole decider," and do NOT judge it by a
+> raw loss comparison.** A one-step loss comparison of `F(e_t, z_t)` vs `F(e_t, a_t)` is **unfair**: `z_t` is
+> inferred by the ITM from `(e_t, e_{t+1})`, so it has already seen the target frame, and it is 64-dim vs `a_t`'s
+> 18-dim — a free information/capacity edge that lowers its loss regardless of any real transfer benefit. Current
+> position (matches proposal §3.6.3 and the deck):
+> - **Primary / decisive evidence = the two-sided probe** — `z_t` *raises* cross-morphology behaviour transfer
+>   AND *lowers* morphology decodability vs raw `e_t`, both at once. Needs only the held-out body's video.
+> - **Value-over-raw** is tested by (1) **adaptation efficiency** (episodes to a target error: pretrained-on-`z`
+>   vs pretrained-on-raw vs from-scratch) and (2) the **availability argument** (the correct `a_t` for a new body
+>   needs its kinematics via IK — privileged; `z_t` comes from vision, so a *tie* already wins).
+> - The `F(e_t, z_t)` vs `F(e_t, a_t)` vs `F(e_t, 0)` comparison stays as **Step E**, run early, as a *diagnostic*
+>   (with the observation-only control `F(e_t, 0)` to isolate the action's contribution) — not as "if the latent
+>   loses, the thesis is hollow." The probe is what's load-bearing.
+
 ### Also open: Ajan Blink wants real extrapolation
 He explicitly corrected short+long→medium as *"just Interpolation."* Currently **no out-of-range morphology
 exists**. `sim/make_leg_morphology.py` makes this nearly free — generating a **1.25×** (or 0.35×) 4th variant
@@ -632,6 +646,48 @@ riskiest given what we now know about reward readability.
    - If it generalises, the "new body needs only video" claim survives into Phase 2.
    - If it does not, we learn exactly how much action data a new body requires, which is a useful
      number in its own right.
+
+### Deployment is ONE closed loop (open-loop demo replay is rejected)
+
+Earlier framing had two deploy paths (imitation vs RL). **Collapsed to one closed-loop controller.** Reason:
+open-loop replay of a demo `z`-sequence on a differently-timed body **desynchronises**. `z_t` is a *local
+transition*, the new body's timing differs, so the demo's `z_t` (e.g. swing) lands on the body's actual `e_t`
+(e.g. still stance) — an `(e_t, z_t)` combination the decoder never saw in calibration (**OOD**) → wrong /
+unstable command. Gait is cyclic, so the drift compounds. This is the classic imitation distribution-shift
+problem; the fix is closed-loop.
+
+**The loop:** `e_t (real state) → z-selector → z_t → Motion Decoder → a_t → body → e_{t+1} → …`. The selector
+reads the body's **actual** state every step, so phase cannot drift.
+
+**Reward is optional — it is only the selector's objective** (this unifies the A/B/C candidates above):
+- **match a demo in latent space** — *no reward*; pick `z_t` whose FTM rollout best tracks the demo target.
+  This **is candidate B (planning)** — already the doc's preferred option. Caveat: matching `e`-embeddings across
+  bodies is **confounded by body shape** (V-JEPA2 encodes morphology ~100%), so match in `z`-space, not raw `e`.
+- **maximize a task reward** — RL in imagination, adds reward model + Critic. This **is candidate A (Dreamer)**.
+- **behaviour-matching RL (2026-07-25, current preferred variant)** — feed the demo's `z_target`, execute on the
+  new body, **re-encode the achieved transition with ITM → `z_achieved`**, and train the decoder by RL with
+  reward `r = −‖z_achieved − z_target‖²`. Two wins: supervision is in **`z`-space (morphology-invariant → no
+  cross-body confound)** and needs **no ground-truth `a_t` labels**. Cost: it is **RL, not backprop** — `a_t →
+  e_{t+1}` is real physics (non-differentiable), and the FTM can't substitute (it is `z`-conditioned, not
+  `a`-conditioned). Use a **sample-efficient** method (CEM / off-policy SAC), **not PPO** (on-policy, sample-hungry
+  → fights few-shot). This is the scheme drawn in `report/pipeline_diagram.tex` and on deck Slide 24. The
+  match-demo/reward options above remain valid alternatives — keep all three on the table.
+
+**Decoder calibration is unchanged, still offline and once:**
+- a few logged `(e_t, a_t)` rollouts of the *new body*; `e_t`↔`a_t` time-aligned *within* this set. ITM/FTM
+  reused frozen; only the decoder is adapted.
+- **Independent of, and NOT time-synchronised with, the demo/target.** The demo only needs consecutive frames.
+- **Coverage, not duration.** The decoder is reliable only on the `z`-region calibration covered; span the
+  deploy behaviours (walk / turn / stop). Minimum count = the adaptation-efficiency sweep (N = 5/10/20/50/100).
+- **Do not use the new body's own rollout as the target behaviour** — decoding its own `z` back is a trivial
+  round-trip (no transfer). Transfer means something only for a target we have **no** new-body actions for.
+
+**Open question / ablation — cross-behaviour generalisation.** Calibrate the decoder on **forward-walk only**,
+then drive a **turn** objective: does the new body turn? Asks the decoder to **extrapolate** to motor patterns
+it never saw paired with commands. Plausible if `z` is local / per-step and turning's per-step foot targets
+fall within walking's range; fails if turning needs joint coordination walking never produced. Either outcome
+is publishable. **Safe default: calibration spans the deploy behaviours; treat walk-only → turn as a measured
+ablation, not an assumption.**
 
 ---
 

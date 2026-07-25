@@ -277,6 +277,33 @@ LoRA rank 2 ให้เพิ่มน้อย parameters มากสำห�
 
 **การทดลองที่ต้องทำเพื่อตอบให้ได้จริง**: **latent-conditioned FDM vs raw-joint-conditioned FDM (shared encoder)** — ถ้า latent ชนะ = ตอบ Ajan Blink ได้ด้วยหลักฐาน ถ้าแพ้ = thesis กลวง **ต้องรู้ตั้งแต่เดือนแรก ไม่ใช่เดือนที่ 3**
 
+> **อัปเดต (2026-07-25) — ยังเก็บการทดลองนี้ไว้ แต่ปรับ framing: ห้ามตัดสินด้วยการเทียบ loss ตรงๆ และมันไม่ใช่ตัวตัดสินเดียว**
+> การเทียบ loss ของ `F(e_t, z_t)` กับ `F(e_t, a_t)` **ไม่แฟร์**: `z_t` อนุมานจาก `(e_t, e_{t+1})` แปลว่ามันเห็นเฟรมอนาคตแล้ว
+> และเป็น 64 มิติ เทียบกับ `a_t` 18 มิติ — ได้เปรียบข้อมูล/ความจุฟรีๆ ตำแหน่งปัจจุบัน (ตรงกับ proposal §3.6.3 และสไลด์):
+> - **หลักฐานหลัก/ตัวตัดสินจริง = two-sided probe** — `z_t` ทำให้ behaviour transfer ดีขึ้น **และ** morphology decode ได้น้อยลง
+>   พร้อมกัน เทียบกับ `e_t` ดิบ (ใช้แค่วิดีโอของร่างที่ hold out)
+> - **คุณค่าเหนือคำสั่งดิบ (value-over-raw)** วัดด้วย (1) **adaptation efficiency** (จำนวน episode ถึง target error:
+>   pretrained-on-`z` vs pretrained-on-raw vs from-scratch) และ (2) **availability argument** (จะได้ `a_t` ที่ถูกของร่างใหม่
+>   ต้องรู้ kinematics ผ่าน IK = privileged ส่วน `z_t` มาจากภาพ เพราะงั้นแค่**เสมอ**ก็ชนะแล้ว)
+> - การเทียบ `F(e_t,z_t)` vs `F(e_t,a_t)` vs `F(e_t,0)` ยังอยู่เป็น **Step E** (รันเร็ว) ในฐานะ *diagnostic* (มี observation-only
+>   control `F(e_t,0)` แยกส่วนที่ action ช่วย) — ไม่ใช่ "ถ้า latent แพ้ = thesis กลวง" ตัวที่ load-bearing คือ probe
+
+---
+
+## Phase 2 — Deployment (closed-loop) — บันทึก 2026-07-25
+
+Phase 2 อยู่นอก scope thesis แต่บันทึกไว้ให้ตรงกับ direction_plan.md (มีรายละเอียดเต็มที่นั่น) และ deck Slide 24 + `report/pipeline_diagram.tex`
+
+- **Deploy เป็นลูปปิดอันเดียว ไม่ใช่ open-loop replay** — เล่นซ้ำลำดับ `z` ของ demo บนร่างที่จังหวะต่างกันจะ **phase หลุด** (`z_t` เป็น transition เฉพาะที่; demo swing แต่ร่างจริงยัง stance → คู่ `(e_t, z_t)` ที่ decoder ไม่เคยเห็น = OOD) ลูปปิดอ่านสภาพจริงทุก step เลยไม่หลุด
+- **reward เป็นแค่ objective ของ selector — มีหรือไม่มีก็ได้** เก็บหลายไอเดียไว้:
+  1. **match a demo ใน z-space** (ไม่ต้อง reward) — planning; match ใน `z` ไม่ใช่ `e` ดิบ (เพราะ `e` มี body shape ปน)
+  2. **maximize reward** (RL/Dreamer) — ได้ควบคุมอัตโนมัติ แต่ต้องเพิ่ม reward model + Critic
+  3. **behaviour-matching RL (ตัวที่ชอบตอนนี้)** — ป้อน `z_target` → ทำจริง → เอา transition ที่ได้เข้า ITM → `z_achieved` →
+     เทรน decoder ด้วย RL, reward = `−‖z_achieved − z_target‖²` **ข้อดี: อยู่ใน z-space (ไม่ผูกรูปร่าง) + ไม่ต้องมี label `a_t`**
+     **ข้อควรรู้: เป็น RL ไม่ใช่ backprop** เพราะ `a_t → e_{t+1}` เป็นฟิสิกส์จริง diff ไม่ได้ (FTM แทนไม่ได้ เพราะมันรับ `z` ไม่ใช่ `a`)
+     → ใช้วิธีประหยัด sample (CEM / off-policy SAC) **ไม่ใช่ PPO**
+- decoder ยังต้อง **calibrate offline นิดหน่อย** ด้วยข้อมูล `(e_t, a_t)` ของร่างใหม่ (coverage สำคัญกว่า duration; ไม่ต้อง sync กับ demo)
+
 ---
 
 ## 9. สิ่งที่ยังต้องทำ / open questions

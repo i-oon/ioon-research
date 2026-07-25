@@ -1,6 +1,24 @@
-\documentclass[border=18pt]{standalone}
+% Phase 2 -- Online behaviour-matching adaptation (the z-space RL loop).
+%
+% Idea: don't supervise the decoder on ground-truth commands. Instead, feed the demo's
+% target behaviour z_target, execute on the new body, RE-ENCODE the body's actual
+% transition with ITM to get z_achieved, and drive the decoder so z_achieved -> z_target.
+%   * supervision is in z-space, which is morphology-invariant -> no cross-body confound
+%   * no ground-truth a_t needed
+%   * BUT the a_t -> e_{t+1} step is real physics (not differentiable), so the decoder
+%     is updated by RL (reward = -||z_achieved - z_target||^2), not by backprop.
+%   * FTM is NOT used in this loop.
+%
+% Colour legend:
+%   gray = frozen encoder   green = reused from Phase 1   red = new/adapted in Phase 2
+%   orange = latent action z   blue = data   amber = loss   white/dashed = physical body
+%   red dashed arrow = training signal (here: RL update, not a true gradient)
+%
+% pdflatex + TikZ -> single cropped page.
+
+\documentclass[border=16pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds}
 \usepackage{amsmath}
 \usepackage{xcolor}
 
@@ -11,218 +29,103 @@
 \definecolor{cGreen} {RGB}{220,252,231}
 \definecolor{cGray}  {RGB}{230,230,230}
 \definecolor{cOrange}{RGB}{255,214,170}
-\definecolor{cBg}    {RGB}{239,246,255}
-\definecolor{cSrc}   {RGB}{255,251,235}
-\definecolor{cPurple}{RGB}{237,233,254}
 
 %% ── Styles ───────────────────────────────────────────────────────────────────
 \tikzset{
-  mybox/.style  = {rounded corners=7pt, draw, align=center, inner sep=9pt, font=\small},
-  framebox/.style = {mybox, fill=cBlue,   draw=blue!40,   minimum width=3.2cm},
-  encbox  /.style = {mybox, fill=cGray,   draw=gray!50,   minimum width=3.4cm},
-  embbox  /.style = {mybox, fill=cBlue,   draw=blue!40,   minimum width=2.8cm},
-  modelbox/.style = {mybox, fill=cAmber,  draw=orange!50, minimum width=4.4cm},
-  ztbox   /.style = {mybox, fill=cOrange, draw=orange!65, minimum width=3.2cm},
-  predbox /.style = {mybox, fill=cRed,    draw=red!40,    minimum width=3.0cm},
-  lossbox /.style = {mybox, fill=cRed,    draw=red!45,    minimum width=5.0cm},
-  simbox  /.style = {mybox, fill=cPurple, draw=purple!45, minimum width=3.2cm},
-  validbox/.style = {mybox, fill=cGreen,  draw=green!50,  minimum width=14cm},
-  srcbox  /.style = {mybox, fill=cSrc,    draw=gray!40,   minimum width=12cm,
-                     font=\footnotesize},
-  combbox /.style = {mybox, fill=cSrc,    draw=gray!40,   text width=6.4cm,
-                     align=center},
-  %% arrows
-  arr    /.style = {-Stealth, semithick, draw=gray!65},
-  mainarr/.style = {-Stealth, line width=1.4pt, draw=orange!75},
-  simarr /.style = {-Stealth, semithick, draw=purple!60, dashed},
-  thkarr /.style = {-Stealth, thick, draw=gray!55},
-  %% labels
-  phaseborder/.style = {draw=gray!55, dashed, rounded corners=10pt, inner sep=16pt},
-  phaselabel /.style = {font=\bfseries\normalsize},
-  redannot   /.style = {font=\small\itshape, text=red!65!black, align=center,
-                        text width=3.8cm},
-  grayannot  /.style = {font=\footnotesize\itshape, text=gray!55, align=center,
-                        text width=3.6cm},
+  box/.style    = {rounded corners=6pt, draw, align=center, inner sep=6pt,
+                   font=\footnotesize, minimum height=1.05cm, text depth=0pt},
+  encbox/.style = {box, fill=cGray,  draw=gray!55,  minimum width=2.6cm},
+  reused/.style = {box, fill=cGreen, draw=green!55, minimum width=2.6cm},
+  adapt/.style  = {box, fill=cGreen, draw=red!55, line width=1pt, minimum width=2.7cm},
+  iobox/.style  = {box, fill=cBlue,  draw=blue!40,  minimum width=2.0cm},
+  ztbox/.style  = {box, fill=cOrange,draw=orange!65,minimum width=2.2cm},
+  lossbox/.style= {box, fill=cAmber, draw=orange!55,minimum width=3.4cm},
+  bodybox/.style= {box, fill=white,  draw=gray!55, dashed, minimum width=2.4cm},
+  ttl/.style    = {font=\bfseries\large, align=center},
+  cap/.style    = {font=\footnotesize, align=center, text width=16cm},
+  grp/.style    = {draw=gray!50, dashed, rounded corners=9pt, inner sep=11pt},
+  grplab/.style = {font=\bfseries\footnotesize, text=gray!45!black},
+  arr/.style    = {-Stealth, semithick, draw=gray!65},
+  mainarr/.style= {-Stealth, line width=1.2pt, draw=orange!80},
+  rl/.style     = {-Stealth, semithick, draw=red!65, densely dashed},
+  lbl/.style    = {font=\scriptsize, text=gray!40!black},
+  rllbl/.style  = {font=\scriptsize, text=red!70},
+}
+
+\newcommand{\legend}[1]{%
+  \node[encbox, minimum width=0.5cm, minimum height=0.38cm, below=1.0cm of #1] (l1){};
+  \node[right=1mm of l1, font=\scriptsize] (l1t){frozen encoder};
+  \node[reused, minimum width=0.5cm, minimum height=0.38cm, right=1.0cm of l1t] (l2){};
+  \node[right=1mm of l2, font=\scriptsize] (l2t){reused from Phase 1 (frozen)};
+  \node[adapt, minimum width=0.5cm, minimum height=0.38cm, right=1.0cm of l2t] (l3){};
+  \node[right=1mm of l3, font=\scriptsize] (l3t){decoder (adapted by RL)};
+  \node[ztbox, minimum width=0.5cm, minimum height=0.38cm, right=1.0cm of l3t] (l4){};
+  \node[right=1mm of l4, font=\scriptsize] (l4t){latent action $z$};
+  \draw[rl] ([xshift=1.0cm]l4t.east) -- ++(0.5,0) node[right=1mm, font=\scriptsize] {RL update};
 }
 
 \begin{document}
-\begin{tikzpicture}[node distance=1.0cm and 1.8cm]
+\begin{tikzpicture}
 
-%% ── Data source banner ───────────────────────────────────────────────────────
-\node[srcbox] (src)
-  {\textbf{Data:}\enspace Stick Insect Simulation \enspace|\enspace
-   3 morphologies: short\,/\,medium\,/\,long leg\\[2pt]
-   Video: third-person view RGB $224{\times}224{\times}3$\qquad
-   Action $a_t$: joint commands \textbf{auto-logged} by simulator};
+\node[ttl] at (6.7,3.7)
+  {Phase 2 -- Online behaviour-matching adaptation\\[2pt]
+   {\normalsize\mdseries drive the decoder so the body's \emph{achieved} behaviour matches the demo's target -- in $z$-space}};
 
-%% ── Frames ───────────────────────────────────────────────────────────────────
-\node[framebox, below=1.1cm of src, xshift=-5.2cm] (ft)
-  {$\boldsymbol{s_t}$ / $\mathrm{frame}_t$\\[4pt]
-   \scriptsize RGB $224{\times}224{\times}3$};
+% ── target setup (top row) ──
+\node[iobox]  (demo) at (2.7,2.4) {Demo video};
+\node[encbox] (enc0) at (5.4,2.4) {Visual Encoder\\{\scriptsize frozen}};
+\node[reused] (itm0) at (8.1,2.4) {ITM (frozen)\\{\scriptsize read behaviour}};
+\node[ztbox]  (ztgt) at (10.8,2.4){$z^{\text{target}}_t$\\{\scriptsize demo behaviour}};
 
-\node[framebox, below=1.0cm of ft] (ft1)
-  {$\boldsymbol{s_{t+1}}$ / $\mathrm{frame}_{t+1}$\\[4pt]
-   \scriptsize RGB $224{\times}224{\times}3$};
+\draw[arr] (demo) -- (enc0);
+\draw[arr] (enc0) -- (itm0);
+\draw[arr] (itm0) -- (ztgt);
 
-%% ── Shared encoder (frozen) ──────────────────────────────────────────────────
-\node[encbox, right=1.4cm of ft, yshift=-0.5cm] (enc)
-  {\textbf{Visual Encoder}\\[3pt]
-   \scriptsize V-JEPA2 RGB tokenizer\\[1pt]
-   {\color{gray!60}\scriptsize\textit{weights frozen, per-frame}}};
+% ── loop top row (right to left): MD -> a_t -> body -> encoder ──
+\node[adapt]   (md)   at (10.8,0.4) {Motion Decoder\\{\scriptsize adapted (RL)}};
+\node[iobox]   (at)   at (8.1,0.4)  {$a_t$};
+\node[bodybox] (body) at (5.4,0.4)  {New body\\{\scriptsize executes}};
+\node[encbox]  (enc1) at (2.7,0.4)  {Visual Encoder\\{\scriptsize frozen}};
 
-%% ── Embeddings ───────────────────────────────────────────────────────────────
-\node[embbox, right=1.4cm of enc, yshift=+0.56cm] (et)
-  {$e_t$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t$};
+\draw[mainarr] (md) -- (at);
+\draw[arr]     (at) -- (body) node[midway,above,lbl]{execute};
+\draw[arr]     (body) -- (enc1) node[midway,above,lbl]{real physics};
 
-\node[embbox, right=1.4cm of enc, yshift=-0.56cm] (et1)
-  {$e_{t+1}$: $256$ tokens $\in \mathbb{R}^{1408}$\\[3pt]\scriptsize feature $t{+}1$};
+% ── loop bottom row (left to right): e's -> ITM -> z_achieved -> loss ──
+\node[iobox]   (ee)   at (2.7,-1.6) {$e_t,\,e_{t+1}$\\{\scriptsize achieved}};
+\node[reused]  (itm1) at (5.4,-1.6) {ITM (frozen)};
+\node[ztbox]   (zach) at (8.1,-1.6) {$z^{\text{achieved}}_t$};
+\node[lossbox] (loss) at (10.8,-1.6){reward $r=-\|z^{\text{achieved}}_t - z^{\text{target}}_t\|^2$\\{\scriptsize behaviour match (used by RL, not backprop)}};
 
-%% ── ITM ──────────────────────────────────────────────────────────────────────
-\node[modelbox, right=1.6cm of et, yshift=-0.56cm] (itm)
-  {\textbf{Inverse State-Transition}\\[-2pt]\textbf{Model (ITM)}\\[4pt]
-   \scriptsize 4 causal-attn blocks + query $q_t$, 16 heads\\[1pt]
-   \scriptsize in:\;$[e_t,\,e_{t+1}]$\quad out:\;$z_t \in \mathbb{R}^{512}$};
+\draw[arr] (enc1) -- (ee);
+\draw[arr] (ee)   -- (itm1);
+\draw[arr] (itm1) -- (zach);
+\draw[arr] (zach) -- (loss);
 
-\node[redannot, above=0.4cm of itm] (annotitm)
-  {What transition happened\\between these two states?};
+% ── target z into decoder (down) and into loss (right side) ──
+\draw[mainarr] (ztgt) -- (md) node[midway,right,lbl]{decode to body};
+\draw[arr] (ztgt.east) -- ++(1.5,0) |- (loss.east) node[pos=0.25,right,lbl]{target};
 
-%% ── Latent action z_t ────────────────────────────────────────────────────────
-\node[ztbox, right=1.6cm of itm] (zt)
-  {\textbf{Latent Action}\;$z_t$\\[4pt]
-   \scriptsize $\mathbb{R}^{512}$,\quad $k = 512$};
+% ── RL update: loss -> decoder (NOT a true gradient: physics not differentiable) ──
+\draw[rl] (loss) -- (md) node[midway,right,rllbl]{RL update};
 
-%% ── Motion Decoder (top-right branch) ────────────────────────────────────────
-\node[modelbox, right=1.6cm of zt, minimum width=4.0cm] (motdec)
-  {\textbf{Motion Decoder}\\[4pt]
-   \scriptsize cross-attn$(z_t,\,e_t)$ + MLP $\to \mathbb{R}^{18}$\\[1pt]
-   \scriptsize in:\;$z_t$ (query),\;$e_t$ (context)};
+% note: decoder also conditioned on current e_t
+\node[lbl, below=1mm of md] {(also conditioned on current $e_t$)};
 
-\node[grayannot, below=0.15cm of motdec] (discard)
-  {\textit{discarded after pretraining}};
-
-%% ── Predicted action â_t ─────────────────────────────────────────────────────
-\node[predbox, right=1.3cm of motdec] (ahat)
-  {$\hat{a}_t$\\[3pt]
-   \scriptsize $\mathbb{R}^{18}$\\[-1pt]
-   \scriptsize predicted action};
-
-%% ── Simulation action labels a_t (purple) ────────────────────────────────────
-\node[simbox, above=1.0cm of ahat] (at)
-  {$a_t$\;(sim labels)\\[3pt]
-   \scriptsize joint cmd\;$\mathbb{R}^{18}$\\[-1pt]
-   \scriptsize auto-logged by sim.};
-
-%% ── L_motion ─────────────────────────────────────────────────────────────────
-\node[lossbox, below=1.0cm of ahat,
-      minimum width=5.0cm, text width=4.8cm, align=center] (lmotion)
-  {$\mathcal{L}_{\mathrm{motion}} = \|\hat{a}_t - a_t\|^2$\\[4pt]
-   {\scriptsize\textcolor{orange!70!black}%
-     {\textbf{supervised}\;---\;sim action labels}}};
-
-%% ── FTM ──────────────────────────────────────────────────────────────────────
-\node[modelbox, below=2.4cm of itm] (ftm)
-  {\textbf{Forward State-Transition}\\[-2pt]\textbf{Model (FTM)}\\[4pt]
-   \scriptsize 8 blocks: self-attn($e_t$) + self-attn($z_t$) + cross-attn, 16 heads\\[1pt]
-   \scriptsize in:\;$[e_t,\,z_t]$\quad out:\;$\hat{e}_{t+1} \in \mathbb{R}^{1408}$};
-
-%% ── Predicted next embedding ê_{t+1} ─────────────────────────────────────────
-\node[predbox, right=1.6cm of ftm] (ehat)
-  {$\hat{e}_{t+1}$\\[3pt]
-   \scriptsize $\mathbb{R}^{1408}$\\[-1pt]
-   \scriptsize predicted next emb.};
-
-%% ── L_recon ──────────────────────────────────────────────────────────────────
-\node[lossbox, below=1.0cm of ehat,
-      minimum width=5.0cm, text width=4.8cm, align=center] (lrecon)
-  {$\mathcal{L}_{\mathrm{recon}} = \|\hat{e}_{t+1} - e_{t+1}\|^2$\\[4pt]
-   {\scriptsize\textcolor{green!50!black}{\textbf{self-supervised}}}};
-
-%% ── Combined loss ────────────────────────────────────────────────────────────
-\node[combbox, below=1.3cm of lrecon] (totloss)
-  {$\mathcal{L} = \mathcal{L}_{\mathrm{recon}}
-      + \lambda\,\mathcal{L}_{\mathrm{motion}}$};
-
-%% ── Arrows ───────────────────────────────────────────────────────────────────
-
-%% frames → encoder → embeddings
-\draw[arr] (ft)  -- (enc);
-\draw[arr] (ft1) -- (enc);
-\draw[arr] (enc) -- (et);
-\draw[arr] (enc) -- (et1);
-
-%% embeddings → ITM
-\draw[arr] (et)  -- (itm);
-\draw[arr] (et1) -- (itm);
-
-%% ITM → z_t
-\draw[mainarr] (itm) -- (zt);
-
-%% z_t → Motion Decoder → â_t → L_motion
-\draw[mainarr] (zt)     -- (motdec);
-\draw[mainarr] (motdec) -- (ahat);
-\draw[mainarr] (ahat)   -- (lmotion);
-%% x_t (e_t) → Motion Decoder as visual context
-\draw[arr] (et.north) -- ++(0,0.5cm) -| (motdec.north);
-
-%% a_t (sim labels) → loss  (dashed purple; goes around ahat to avoid crossing)
-\draw[simarr] (at.east) -- ++(0.7,0) |- (lmotion.east);
-
-%% z_t → FTM  and  e_t → FTM
-\draw[mainarr] (zt)  |- (ftm);
-\draw[arr]     (et)  |- (ftm);
-
-%% FTM → ê_{t+1} → L_recon
-\draw[mainarr] (ftm)  -- (ehat);
-\draw[mainarr] (ehat) -- (lrecon);
-
-%% e_{t+1} → L_recon  (reconstruction target)
-\draw[arr] (et1) -| (lrecon);
-
-%% both losses → combined loss
-\draw[arr] (lrecon.south) -- (totloss.north);
-\draw[arr] (lmotion.south) -- ++(0,-0.5cm) -| (totloss.north);
-
-%% ── Phase 1 border ───────────────────────────────────────────────────────────
+% ── loop group ──
 \begin{scope}[on background layer]
-  \node[phaseborder, fill=cBg,
-        fit=(src)(ft)(ft1)(enc)(et)(et1)(itm)(zt)(motdec)(ahat)(at)
-            (lmotion)(ftm)(ehat)(lrecon)(totloss)(annotitm)(discard),
-        label={[phaselabel]above:\textbf{Phase 1 \;---\; Pretraining}}
-  ] (p1) {};
+  \node[grp, fill=cRed!8, fit=(md)(at)(body)(enc1)(ee)(itm1)(zach)(loss),
+        label={[grplab]below:Online behaviour-matching loop -- RL, reward $=$ behaviour match in $z$-space, no action labels, no FTM}] {};
 \end{scope}
 
-%% ── PCA Validation ───────────────────────────────────────────────────────────
-\node[validbox, below=1.4cm of p1.south, inner sep=13pt, align=center] (pca)
-{%
-  \textbf{Phase 1 Validation --- PCA of $z_t$}\\[7pt]
-  Collect $z_t$ from \textbf{short leg} (train) $+$ \textbf{long leg} (train)
-  $+$ \textbf{medium leg} (unseen)\quad|\quad
-  Behaviours: walk\,/\,turn\,/\,stop\\[5pt]
-  Plot 2-D PCA coloured by \textbf{\{behaviour\}} and by \textbf{\{morphology\}}\\[6pt]
-  \textcolor{green!50!black}{\textbf{Pass:}\enspace
-    $z_t$ clusters by behaviour, not by body shape}\\[3pt]
-  \textcolor{red!60!black}{\textbf{Fail:}\enspace
-    clusters split by morphology $\;\Rightarrow\;$ revisit Motion Decoder supervision}%
-};
+\node[cap] (cap) at (6.7,-3.6)
+  {Feed the demo's target behaviour $z^{\text{target}}_t$, decode to the new body, execute, then \textbf{re-encode
+   the body's actual transition with ITM} to get $z^{\text{achieved}}_t$, and push the decoder so
+   $z^{\text{achieved}}_t \to z^{\text{target}}_t$. \textbf{Supervision is in $z$-space} (morphology-invariant):
+   no ground-truth $a_t$, and no cross-body embedding matching. \textbf{But $a_t \to e_{t+1}$ is real physics
+   (not differentiable)}, so the match error is a \textbf{reward} and the decoder is updated by \textbf{RL}
+   (policy gradient / CEM), \emph{not} backprop. Reused frozen: Encoder, ITM. FTM is not used in this loop.};
 
-\draw[thkarr] (p1.south) -- (pca.north);
-
-%% ── Hierarchical Extension (HiLAM-style fallback) ───────────────────────────
-\node[mybox, fill=cAmber!60, draw=orange!40,
-      below=1.2cm of pca, minimum width=14cm,
-      inner sep=13pt, align=center,
-      text width=13.5cm] (hilam)
-{%
-  \textbf{Fallback: Hierarchical Latent Actions (if PCA fails)}\\[6pt]
-  Freeze ITM \enspace$\Rightarrow$\enspace collect $z_t$ sequences from all training clips\\[4pt]
-  $z_t$ sequence $\;\xrightarrow{\text{dynamic chunking (H-Net)}}\;$
-  $z^h$ (skill-level latent)\quad|\quad
-  $z^h$ should cluster \textbf{walk\,/\,turn\,/\,stop} more cleanly than flat $z_t$\\[4pt]
-  {\scriptsize V-JEPA2 encoding unchanged --- hierarchy is a second pass on $z_t$, not on frames}%
-};
-
-\draw[thkarr, dashed] (pca.south) -- (hilam.north)
-  node[midway, right=4pt, font=\footnotesize\itshape, text=red!60!black] {if fail};
-
+\legend{cap}
 \end{tikzpicture}
 \end{document}

@@ -178,11 +178,27 @@ HiLAM แก้ **temporal abstraction** ไม่ใช่ **embodiment invaria
 
 **การทดลองที่ต้องทำ**: latent-conditioned FDM **vs** raw-joint-conditioned FDM (shared encoder) — ถ้า latent ไม่ชนะ thesis กลวง **ต้องรู้เดือนแรก**
 
+> **อัปเดต (2026-07-25) — เก็บการทดลองไว้ แต่ปรับ framing (ตรงกับ proposal §3.6.3 + deck):** ห้ามตัดสินด้วยการเทียบ **loss** ตรงๆ
+> — `F(e_t,z_t)` vs `F(e_t,a_t)` ไม่แฟร์ เพราะ `z_t` เห็นเฟรมอนาคตแล้ว (อนุมานจาก `e_t,e_{t+1}`) และเป็น 64 มิติ vs 18 มิติ
+> **ตัวตัดสินจริง = two-sided probe** (`z_t` ทำ behaviour transfer ขึ้น + morphology decode ลง พร้อมกัน) ส่วน **value-over-raw**
+> วัดด้วย **adaptation efficiency** (episode ถึง target: pretrained-z vs pretrained-raw vs scratch) + **availability argument**
+> (`a_t` ที่ถูกต้องของร่างใหม่ต้องใช้ kinematics/IK = privileged; `z_t` มาจากภาพ → แค่เสมอก็ชนะ) การเทียบ FDM latent/raw/obs-only
+> ยังอยู่เป็น **diagnostic (Step E, รันเร็ว)** ไม่ใช่ตัวตัดสินเดียว
+
 ### 10.5 Phase 2 policy plan เดิมใช้ไม่ได้ → เปลี่ยนเป็น IK Retargeting
 
 repo ของ Ajan YuChen ให้ไม่ได้อย่างที่คิด: checkpoint ตัวดี (`66k_aug3c`) **ไม่มีในสำเนานี้**; ตัวที่มีเป็น **34-dim obs** แต่**ไม่มี `normalized_env*.py` ตัวไหนใน repo ที่ผลิต 34 dim** (base = 36, module ที่ทำได้ถูกลบไปแล้ว); normalization bounds เป็น **ค่า literal วัดมือต่อร่าง** ไม่มี tooling คำนวณใหม่ และ **ไม่มีการ clip** → ขาสั้นลงจะพังแบบเงียบๆ; expert data = **สัตว์ตัวเดียว gait เดียว trial เดียว** ใช้กับร่างที่ scale แล้วไม่ได้; ~1 วัน/run; **ไม่มี precedent เรื่องความยาวขาเลย** (ทุก variant คือ *ตัดขา* หรือ *เปลี่ยนพื้น*)
 
 → **IK retargeting** (ตัดสินใจแล้ว): นิยาม behavior เป็น Cartesian foot trajectory → `simIK` ต่อ morphology → ได้ **a_t ต่างกันต่อร่าง** โดยไม่ต้องเทรน และได้ turn/stop มาฟรี
+
+### 10.5b Phase 2 — Deployment scheme (closed-loop) — 2026-07-25
+
+นอก scope thesis แต่บันทึกให้ตรงกับ direction_plan.md (เต็มที่นั่น) + deck Slide 24 + `report/pipeline_diagram.tex`
+
+- **ลูปปิดอันเดียว ไม่ใช่ open-loop replay** — เล่นซ้ำ `z` ของ demo บนร่างจังหวะต่างกัน → phase หลุด (`z_t` เป็น transition; คู่ `(e_t,z_t)` กลายเป็น OOD)
+- **reward optional** เก็บหลายไอเดีย: (1) match-demo ใน z-space (ไม่ต้อง reward), (2) reward RL (Dreamer), (3) **behaviour-matching RL (preferred)** — `z_target` → ทำจริง → ITM re-encode → `z_achieved` → RL reward `−‖z_achieved−z_target‖²`
+- **behaviour-matching:** อยู่ใน z-space (ไม่ผูกรูปร่าง) + ไม่ต้องมี label `a_t` **แต่เป็น RL ไม่ใช่ backprop** (`a_t→e_{t+1}` = ฟิสิกส์ diff ไม่ได้; FTM แทนไม่ได้เพราะรับ `z`) → ใช้ CEM / off-policy SAC **ไม่ใช่ PPO**
+- decoder ยังต้อง calibrate offline นิดหน่อยด้วย `(e_t,a_t)` ของร่างใหม่ (coverage > duration)
 
 ### 10.6 ข้อมูลจาก paper ที่ยืนยัน/แก้ความเข้าใจ
 
@@ -461,7 +477,7 @@ fit ขายาว → ทดสอบขาสั้น: **R² = −5.23** (�
 
 ### Phase 4 — Step 2 + baselines (สัปดาห์ 10–12)
 - [ ] Transfer: pretrained vs scratch FTM, N=5/10/20/50/100, LoRA rank 2
-- [ ] 🎯 **Baseline 1 (บังคับ)**: raw-joint-conditioned FDM — ตัวตัดสิน thesis (ข้อ 10.4)
+- [ ] 🎯 **Baseline 1 (บังคับ)**: raw-joint-conditioned FDM — diagnostic (Step E, รันเร็ว) **ไม่ใช่ตัวตัดสินเดียว** ตัวตัดสินจริงคือ two-sided probe + adaptation efficiency (ดู update 10.4)
 - [ ] **Baseline 2**: Danesh et al. 2026 explicit morphology conditioning
 - [ ] **Bonus**: สร้าง morphology 1.25× → ตอบคำถาม extrapolation ของ Ajan Blink (ใช้ `make_leg_morphology.py` คำสั่งเดียว)
 

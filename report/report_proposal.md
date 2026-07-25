@@ -591,13 +591,21 @@ joint command. This division is exactly what the architecture implements, and it
 leg-length setting a clean instance of the cross-embodiment problem: every difference except leg length is held
 fixed.
 
-**2.6.3  The decisive test built into the design.**
-Because the action format is shared, the value of the latent action is not assumed but tested head-on: a
-latent-conditioned transition model is compared against one conditioned directly on the body's own
-(inverse-kinematics-retargeted) 18-dimensional joint command,
-under an identical encoder, model capacity, dataset, and training budget (Section 3.6.3). If the raw-command model
-transfers equally well across morphologies, the latent bottleneck adds nothing in this controlled setting, and the
-thesis reports that honestly. This ablation is treated as the central experiment rather than a supplementary one.
+**2.6.3  How the value of the latent action is tested.**
+The primary evidence is direct: the latent z_t is probed on its own for whether it *raises* cross-morphology
+behaviour transfer and *lowers* morphology decodability relative to the raw visual features, at the same time
+(Section 3.6.1). This examines z_t as a representation and needs only the held-out body's video, so it does not
+depend on a comparison against the native command.
+
+As a supporting check, the design also compares a latent-conditioned transition model against one conditioned on
+the body's own (inverse-kinematics-retargeted) joint command, under an identical encoder, capacity, dataset, and
+budget, evaluated zero-shot on the held-out body (Section 3.6.3). Two points keep this honest and are stated in
+full there: reconstruction loss structurally favours the latent (it is inferred from the transition and is
+higher-dimensional than the command), so an observation-only baseline is reported to isolate the action's real
+contribution; and the raw command is a *privileged* input, since obtaining the correct command for a new body
+requires that body's kinematics, which the motivating scenario assumes is unavailable, whereas the latent is
+inferred from observation. If the latent adds nothing over the raw command even with that handicap, the thesis
+reports that honestly.
 
 **2.6.4  Why success requires a two-sided criterion.**
 Framed abstractly, the goal is a representation that is *invariant* to a nuisance factor (morphology) while
@@ -848,11 +856,34 @@ on two morphologies and testing on the held-out one.
 - *Transfer:* pass if the pretrained world model reaches the same L_recon on the unseen morphology with
   significantly fewer episodes than a from-scratch model.
 
-**3.6.3  Baselines.** (1) A from-scratch world model on the unseen morphology (the sample-efficiency
-reference). (2) A **raw-joint-conditioned** forward model with a shared encoder (an "explicit action" analog):
-if the latent action does not beat raw joint conditioning, the latent bottleneck adds no value, which makes
-this the decisive ablation. (3) Where applicable, an explicit morphology-conditioned model in the spirit of QWM, as
-a contrast between explicit and implicit morphology handling.
+**3.6.3  Primary evidence and the value-over-raw-command check.**
+The **primary evidence** for the thesis is the latent-space validation of Section 3.6.2, measured with the probes
+of Section 3.6.1: does z_t raise cross-morphology behaviour transfer and lower morphology decodability relative to
+the raw encoder e_t, both at once. This test is clean because it examines z_t on its own — it needs only the
+held-out body's video, and it does not compare against the native command.
+
+**Does the latent add value over the raw command?** This is answered by two measures that are deliberately *not*
+a one-step reconstruction-loss comparison. A direct comparison of the reconstruction loss of F(e_t, a_t) against
+F(e_t, z_t) is unfair: z_t is inferred by the ITM from the pair (e_t, e_{t+1}), so it has already seen the target
+frame, whereas a_t has not, and z_t is 64-dimensional against a_t's 18 — an information and capacity advantage
+that would lower its loss regardless of any real transfer benefit. The value of the latent is therefore assessed
+by:
+
+1. **Adaptation efficiency (the primary usefulness metric, per the lab advisor).** Starting from the pretrained
+   world model, adapt to the held-out body and measure the number of training episodes needed to reach a target
+   reconstruction error, against a **from-scratch** model and against a model **pretrained with the raw command**
+   instead of the latent. This measures *how quickly* the representation transfers, which is fair because every
+   model is actually trained/adapted, and it is the metric the lab advisor identified as the main test of whether
+   the world model is useful. The observation-only start (no action) is included to isolate what the action
+   representation contributes.
+2. **The availability argument.** The raw command a_t is a *privileged* input: obtaining the correct command for a
+   new body requires that body's kinematics (through the inverse-kinematics retargeting of Section 3.5.3), which
+   the motivating scenario assumes is unavailable. The latent z_t is inferred from observation and needs no
+   kinematics. A latent that *matches* what the privileged command achieves is therefore already a substantive
+   result, because it recovers from vision alone what otherwise requires the body's internal description.
+
+A further contrast, where applicable, is an explicit morphology-conditioned model in the spirit of QWM, comparing
+explicit and implicit morphology handling.
 
 ## 3.7  Preliminary Validation of the Method
 
