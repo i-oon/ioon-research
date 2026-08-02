@@ -1,0 +1,136 @@
+"""Record an episode: RGB frames + time-aligned joint commands (a_t).
+
+This is the piece that was missing entirely — the link between the CoppeliaSim
+stick insect and the V-JEPA2 pipeline. Until now `scripts/` ran on pre-recorded
+B1 quadruped video from other renderers, and `sim/` emitted joint state only.
+
+Alignment is by construction, which is the whole point: within one stepped
+simulation tick we (a) advance physics, (b) render the vision sensor, (c) read
+the joint targets. Frame k and a_t[k] therefore describe the same instant. A
+screen recording cannot give this — it captures at wall-clock rate while the sim
+steps at its own, so frames drop/duplicate and the pairing drifts. The Motion
+Decoder's loss (L_motion = ||MD(x_t, z_t) - a_t||^2) is only meaningful if the
+pairing is exact.
+
+Requires the scene to already have a camera + proper floor:
+  python sim/set_floor_texture.py --scene <scene>
+  python sim/add_camera.py        --scene <scene>
+
+Usage (CoppeliaSim must be running):
+  python sim/record_episode.py --scene sim/env/medauroidea_stick_insect.ttt \\
+      --steps 300 --out data/episodes/long_walk_000
+"""
+import argparse
+import os
+
+import numpy as np
+from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+
+SENSOR_NAME = "vjepa_cam"
+TRACK_OBJ = "/head"        # camera follows this in x/y
+LEG_SUFFIXES = ["_FL", "_ML", "_HL", "_FR", "_MR", "_HR"]
+JOINT_NAMES = ["/m1", "/m2", "/m3"]   # ThC, CTr, FTi
+
+
+def get_joint_handles(sim):
+    """18 joint handles, ordered leg-major: [FL_m1, FL_m2, FL_m3, ML_m1, ...].
+    Matches the a_t ordering used by CoppeliaSimEnv / expert.py."""
+    handles = []
+    for leg in LEG_SUFFIXES:
+        for j in JOINT_NAMES:
+            handles.append(sim.getObject(f"{j}{leg}"))
+    return handles
+
+
+def capture(sim, cam):
+    sim.handleVisionSensor(cam)
+    buf, res = sim.getVisionSensorImg(cam)
+    img = np.frombuffer(buf, dtype=np.uint8).reshape(res[1], res[0], 3)
+    return np.flipud(img).copy()   # CoppeliaSim returns bottom-up
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--scene", type=str, required=True)
+    ap.add_argument("--steps", type=int, default=300, help="max steps (upper cap; --travel may stop earlier)")
+    ap.add_argument("--out", type=str, required=True)
+    ap.add_argument("--warmup", type=int, default=20, help="discard N settling steps")
+    ap.add_argument("--travel", type=float, default=0.0,
+                    help="stop once the body has travelled this many metres (0 = disabled, use --steps)")
+    args = ap.parse_args()
+
+    os.makedirs(args.out, exist_ok=True)
+
+    client = RemoteAPIClient("localhost", port=23000)
+    sim = client.require("sim")
+    sim.loadScene(os.path.abspath(args.scene))
+
+    cam = sim.getObject("/" + SENSOR_NAME)
+    track = sim.getObject(TRACK_OBJ)
+    joints = get_joint_handles(sim)
+
+    # Capture the camera's authored offset from the body (this encodes add_camera's
+    # RUNWAY_AIM framing). It is re-applied ONCE after warmup so the framing is
+    # anchored to the post-warmup body position -- drift-compensated and identical
+    # across morphologies regardless of their walking speed -- then the camera is
+    # held fixed for the whole episode (robot visibly travels across a static frame).
+    cam_pos0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
+    trk_pos0 = np.array(sim.getObjectPosition(track, sim.handle_world))
+    offset_xy = cam_pos0[:2] - trk_pos0[:2]
+    cam_z = cam_pos0[2]
+
+    sim.setStepping(True)
+    sim.startSimulation()
+
+    frames, actions, track_xy = [], [], []
+    total = args.warmup + args.steps
+    start_xy = None
+    for k in range(total):
+        sim.step()
+
+        # camera stays put (fixed world-frame). Read the body position only for
+        # logging and the distance gate below -- never to move the camera.
+        p = np.array(sim.getObjectPosition(track, sim.handle_world))
+
+        if k < args.warmup:
+            continue
+
+        if start_xy is None:
+            start_xy = p[:2].copy()
+            # one-time recenter: fix the camera to frame this post-warmup position
+            # with the authored offset, then never move it again this episode.
+            sim.setObjectPosition(cam, sim.handle_world,
+                                  [p[0] + offset_xy[0], p[1] + offset_xy[1], cam_z])
+
+        frames.append(capture(sim, cam))
+        actions.append([sim.getJointTargetPosition(h) for h in joints])
+        track_xy.append(p[:2])
+
+        # distance-gate: stop once the body has travelled --travel metres, so every
+        # morphology covers the same spatial window (kills the position-in-frame vs
+        # morphology confound). --travel 0 disables it (record the full --steps).
+        if args.travel > 0 and float(np.linalg.norm(p[:2] - start_xy)) >= args.travel:
+            break
+
+    sim.stopSimulation()
+
+    frames = np.asarray(frames, dtype=np.uint8)      # (N, 256, 256, 3)
+    actions = np.asarray(actions, dtype=np.float32)  # (N, 18)
+
+    np.save(os.path.join(args.out, "frames.npy"), frames)
+    np.save(os.path.join(args.out, "actions.npy"), actions)
+
+    moved = float(np.linalg.norm(np.array(track_xy)[-1] - np.array(track_xy)[0]))
+    print(f"scene   : {os.path.basename(args.scene)}")
+    print(f"frames  : {frames.shape}  dtype={frames.dtype}")
+    print(f"actions : {actions.shape}  dtype={actions.dtype}")
+    print(f"a_t range: [{actions.min():.3f}, {actions.max():.3f}] rad")
+    print(f"a_t std/joint (first 6): {np.round(actions.std(axis=0)[:6], 4)}")
+    print(f"robot moved: {moved:.3f} m over {args.steps} steps")
+    print(f"frame brightness: mean={frames.mean():.1f} std={frames.std():.1f}")
+    assert len(frames) == len(actions), "frame/action count mismatch"
+    print(f"\nsaved -> {args.out}/{{frames,actions}}.npy")
+
+
+if __name__ == "__main__":
+    main()

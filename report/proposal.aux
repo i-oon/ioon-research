@@ -1,0 +1,141 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand*\HyPL@Entry[1]{}
+\HyPL@Entry{0<</S/r>>}
+\@writefile{toc}{\contentsline {frontmatter}{ABSTRACT (THAI)}{iii}{Doc-Start}\protected@file@percent }
+\@writefile{toc}{\contentsline {frontmatter}{ABSTRACT}{iv}{Doc-Start}\protected@file@percent }
+\@writefile{toc}{\contentsline {frontmatter}{LIST OF TABLES}{viii}{chapter*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {frontmatter}{LIST OF FIGURES}{xi}{chapter*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {frontmatter}{LIST OF SYMBOLS}{xii}{chapter*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {frontmatter}{LIST OF ABBREVIATIONS}{xiii}{chapter*.5}\protected@file@percent }
+\HyPL@Entry{13<</S/D>>}
+\@writefile{toc}{\contentsline {chapter}{\numberline {1}INTRODUCTION}{1}{chapter.1}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {1.1}Background and Significance}{1}{section.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}Objectives}{2}{section.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.3}Expected Benefits}{2}{section.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.4}Scope of the Research}{2}{section.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.5}Research Procedure}{3}{section.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}LITERATURE REVIEW}{4}{chapter.2}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Fundamental Concepts}{4}{section.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.1}Reinforcement learning and policies}{4}{subsection.2.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.2}Neural networks, encoders, and embeddings}{4}{subsection.2.1.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.3}Self-supervised learning}{5}{subsection.2.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.4}The Transformer and the attention mechanism}{5}{subsection.2.1.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1.5}Evaluation: probing and metrics}{6}{subsection.2.1.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}World Models and Video Representation Learning}{6}{section.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}What a world model is, and why it is used here}{6}{subsection.2.2.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces The DreamerV3 world model and actor-critic (Hafner et al., 2023). Observations are encoded into a compact latent state whose evolution a sequence model predicts from actions; the actor and critic then learn on trajectories \emph  {imagined} inside the model rather than in the real environment. Predictions are conditioned on the agent's \emph  {native} action, the body-specific conditioning signal this thesis replaces with a latent action.}}{7}{figure.caption.6}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{fig:dreamer}{{2.1}{7}{The DreamerV3 world model and actor-critic (Hafner et al., 2023). Observations are encoded into a compact latent state whose evolution a sequence model predicts from actions; the actor and critic then learn on trajectories \emph {imagined} inside the model rather than in the real environment. Predictions are conditioned on the agent's \emph {native} action, the body-specific conditioning signal this thesis replaces with a latent action}{figure.caption.6}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}Video foundation models and the JEPA objective}{8}{subsection.2.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Latent Action Models and Latent Action World Models}{8}{section.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}Inverse and forward dynamics models: the general building block}{8}{subsection.2.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.2}{\ignorespaces V-JEPA~2 multistage training (Assran et al., 2025). Left: self-supervised pretraining on internet-scale video with a mask-prediction objective in \emph  {representation} space (the JEPA objective), which favours motion-relevant features. Right: the encoder is then frozen and an action-conditioned predictor (V-JEPA~2-AC) is learned on top. This project reuses only the frozen encoder as a per-frame visual front-end (Section 3.3).}}{9}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:vjepa2}{{2.2}{9}{V-JEPA~2 multistage training (Assran et al., 2025). Left: self-supervised pretraining on internet-scale video with a mask-prediction objective in \emph {representation} space (the JEPA objective), which favours motion-relevant features. Right: the encoder is then frozen and an action-conditioned predictor (V-JEPA~2-AC) is learned on top. This project reuses only the frozen encoder as a per-frame visual front-end (Section 3.3)}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}The idea of a latent action}{9}{subsection.2.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.3}{\ignorespaces Overview of UniSkill (Kim et al., 2025). (a) An Inverse Skill Dynamics model and a Forward Skill Dynamics model are jointly trained on diverse video to encode a body-independent skill representation; (b) a skill-conditioned policy is trained on robot data; (c) skills extracted from a human-video prompt are executed on the robot to reproduce the behaviour. The inverse/forward pairing matches this project's ITM/FTM (Section 3.4); the difference is that UniSkill \emph  {aligns} its representation across bodies by training on cross-embodiment data, whereas this project tests whether such invariance \emph  {emerges} without any alignment objective.}}{11}{figure.caption.8}\protected@file@percent }
+\newlabel{fig:uniskill}{{2.3}{11}{Overview of UniSkill (Kim et al., 2025). (a) An Inverse Skill Dynamics model and a Forward Skill Dynamics model are jointly trained on diverse video to encode a body-independent skill representation; (b) a skill-conditioned policy is trained on robot data; (c) skills extracted from a human-video prompt are executed on the robot to reproduce the behaviour. The inverse/forward pairing matches this project's ITM/FTM (Section 3.4); the difference is that UniSkill \emph {aligns} its representation across bodies by training on cross-embodiment data, whereas this project tests whether such invariance \emph {emerges} without any alignment objective}{figure.caption.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}Latent Action World Models (the base method)}{11}{subsection.2.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.4}{\ignorespaces LAC-WM architecture (Huang et al., 2026), the pipeline this thesis adapts. During pretraining an inverse model encodes an observation pair into a unified latent action that conditions a forward model, and a motion decoder maps the latent back to each embodiment's motor labels; a finetuning-stage action projector lets the world model also condition on an unseen body's raw actions. The paper's inverse/forward \emph  {dynamics} models are what this project instantiates on visual embeddings and renames the Inverse/Forward \emph  {Transition} Model (Section 3.4).}}{12}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:lacwm}{{2.4}{12}{LAC-WM architecture (Huang et al., 2026), the pipeline this thesis adapts. During pretraining an inverse model encodes an observation pair into a unified latent action that conditions a forward model, and a motion decoder maps the latent back to each embodiment's motor labels; a finetuning-stage action projector lets the world model also condition on an unseen body's raw actions. The paper's inverse/forward \emph {dynamics} models are what this project instantiates on visual embeddings and renames the Inverse/Forward \emph {Transition} Model (Section 3.4)}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Cross-Morphology and Cross-Embodiment Legged Locomotion}{12}{section.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}Per-body retraining}{12}{subsection.2.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}Explicit morphology conditioning}{13}{subsection.2.4.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.5}{\ignorespaces The QWM framework (Danesh et al., 2026). A Physical Morphology Encoder derives a static embedding from each robot's USD design file and conditions the world model on it (left); a policy is then learned entirely in imagination for a new morphology (middle) and deployed by injecting that morphology's embedding (right). The morphology is \emph  {supplied} from a design file, exactly the privileged input this thesis removes by inferring behaviour from external vision.}}{13}{figure.caption.10}\protected@file@percent }
+\newlabel{fig:qwm}{{2.5}{13}{The QWM framework (Danesh et al., 2026). A Physical Morphology Encoder derives a static embedding from each robot's USD design file and conditions the world model on it (left); a policy is then learned entirely in imagination for a new morphology (middle) and deployed by injecting that morphology's embedding (right). The morphology is \emph {supplied} from a design file, exactly the privileged input this thesis removes by inferring behaviour from external vision}{figure.caption.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.3}Online system identification}{13}{subsection.2.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.4}Shared policy with per-robot adapters}{13}{subsection.2.4.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2.6}{\ignorespaces The L3P framework (Zheng et al., 2025). A shared latent policy backbone is wrapped by a per-robot observation encoder (raw sensing $\to $ shared latent space) and a per-robot latent-action decoder (latent action $\to $ robot-specific motor command), with recovery modules enforcing latent-space consistency. This shared-latent-with-body-specific-heads structure parallels this project's latent action plus Motion Decoder, but L3P operates on proprioception and must fit an encoder and decoder per robot.}}{14}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:l3p}{{2.6}{14}{The L3P framework (Zheng et al., 2025). A shared latent policy backbone is wrapped by a per-robot observation encoder (raw sensing $\to $ shared latent space) and a per-robot latent-action decoder (latent action $\to $ robot-specific motor command), with recovery modules enforcing latent-space consistency. This shared-latent-with-body-specific-heads structure parallels this project's latent action plus Motion Decoder, but L3P operates on proprioception and must fit an encoder and decoder per robot}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.5}Latent-action approaches in locomotion}{14}{subsection.2.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.6}Synthesis: positioning the methods}{15}{subsection.2.4.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2.1}{\ignorespaces Positioning of cross-morphology / cross-embodiment methods. ``Transfers across bodies'' asks whether a single trained model is reused on a new body without per-body retraining.}}{15}{table.caption.12}\protected@file@percent }
+\newlabel{tab:positioning}{{2.1}{15}{Positioning of cross-morphology / cross-embodiment methods. ``Transfers across bodies'' asks whether a single trained model is reused on a new body without per-body retraining}{table.caption.12}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}Biomechanics of Insect Walking and Prior Work}{16}{section.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}Why a stick insect, and how it walks}{16}{subsection.2.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}Dynamic similarity and why leg length changes the outcome}{17}{subsection.2.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}Directly related prior work}{17}{subsection.2.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}Research Gap}{17}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}The gap in the literature}{17}{subsection.2.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}Why a latent action is needed even though the action format is shared}{18}{subsection.2.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}How the value of the latent action is tested}{18}{subsection.2.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.4}Why success requires a two-sided criterion}{19}{subsection.2.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.7}Why the Observation Modality Is Part of the Research Question}{19}{section.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.1}Explicit morphology answers a different question}{20}{subsection.2.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.2}Vision is the adversarial modality, not the convenient one}{20}{subsection.2.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.3}The requirements differ in where they land, not in whether they exist}{20}{subsection.2.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.4}Only visual data scales beyond bodies one already owns}{21}{subsection.2.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.5}Consistency with the biological framing}{21}{subsection.2.7.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.6}Costs accepted}{21}{subsection.2.7.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}RESEARCH METHODOLOGY}{22}{chapter.3}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}System Overview}{22}{section.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces System pipeline. A frozen V-JEPA2 encoder maps each RGB frame to an embedding $e_t$; the Inverse Transition Model infers the latent action $z_t$ from $(e_t, e_{t+1})$; the Forward Transition Model predicts $\hat  {e}_{t+1}$ from $(e_t, z_t)$ (loss $\mathcal  {L}_{\text  {recon}}$); and the Motion Decoder maps $z_t$ back to a body-specific joint command $\hat  {a}_t$ (loss $\mathcal  {L}_{\text  {motion}}$).}}{22}{figure.caption.13}\protected@file@percent }
+\newlabel{fig:pipeline}{{3.1}{22}{System pipeline. A frozen V-JEPA2 encoder maps each RGB frame to an embedding $e_t$; the Inverse Transition Model infers the latent action $z_t$ from $(e_t, e_{t+1})$; the Forward Transition Model predicts $\hat {e}_{t+1}$ from $(e_t, z_t)$ (loss $\mathcal {L}_{\text {recon}}$); and the Motion Decoder maps $z_t$ back to a body-specific joint command $\hat {a}_t$ (loss $\mathcal {L}_{\text {motion}}$)}{figure.caption.13}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3.1}{\ignorespaces Input/output specification of each block in the pipeline.}}{22}{table.caption.14}\protected@file@percent }
+\newlabel{tab:io}{{3.1}{22}{Input/output specification of each block in the pipeline}{table.caption.14}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Simulation Environment and Morphology Variants}{23}{section.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Simulator and model}{23}{subsection.3.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Leg-length variants}{23}{subsection.3.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}Observation capture}{23}{subsection.3.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Visual Encoder (Frozen V-JEPA2)}{23}{section.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Latent Action Model}{23}{section.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}Inverse Transition Model (ITM)}{24}{subsection.3.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.2}Forward Transition Model (FTM)}{24}{subsection.3.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.3}Motion Decoder (MD)}{24}{subsection.3.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.4}Dimensions and hyperparameters}{24}{subsection.3.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Data Collection}{24}{section.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}Pilot dataset (reference-gait replay)}{24}{subsection.3.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}Why the pilot dataset is not sufficient for the main experiment}{25}{subsection.3.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.3}Dataset redesign (inverse-kinematics retargeting)}{25}{subsection.3.5.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces A single timestep with a bit-identical joint command across the three bodies. The left-middle foot carries 5.7~N on the long body and 9.3~N on the short body but only 0.3~N on the medium body, where it is still airborne. The command cannot distinguish the bodies; the difference exists only in the resulting physical state.}}{26}{figure.caption.15}\protected@file@percent }
+\newlabel{fig:same-command}{{3.2}{26}{A single timestep with a bit-identical joint command across the three bodies. The left-middle foot carries 5.7~N on the long body and 9.3~N on the short body but only 0.3~N on the medium body, where it is still airborne. The command cannot distinguish the bodies; the difference exists only in the resulting physical state}{figure.caption.15}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces Why per-body commands are needed. Left: identical joint angles place the foot in different positions on a long versus a short leg. Right: inverse kinematics inverts the constraint, so a shared foot target is reached by different joint angles per body, which is the body-specific command the Motion Decoder must learn to produce.}}{26}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:ik-intuition}{{3.3}{26}{Why per-body commands are needed. Left: identical joint angles place the foot in different positions on a long versus a short leg. Right: inverse kinematics inverts the constraint, so a shared foot target is reached by different joint angles per body, which is the body-specific command the Motion Decoder must learn to produce}{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Evaluation Protocol}{27}{section.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.1}Metrics}{27}{subsection.3.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.2}Milestone gates}{27}{subsection.3.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6.3}Primary evidence and the value-over-raw-command check}{27}{subsection.3.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Preliminary Validation of the Method}{28}{section.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.1}The morphology gap is measurable and statistically decisive}{28}{subsection.3.7.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.2}{\ignorespaces Distance travelled under an identical command sequence, five episodes per morphology.}}{28}{table.caption.17}\protected@file@percent }
+\newlabel{tab:gap}{{3.2}{28}{Distance travelled under an identical command sequence, five episodes per morphology}{table.caption.17}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.4}{\ignorespaces Left: top-down body trajectories (five episodes per morphology) under an identical command sequence, aligned to a common start and heading and drawn at true aspect ratio. Right: per-episode path length and net displacement with mean $\pm $ standard deviation; the three morphologies do not overlap.}}{29}{figure.caption.18}\protected@file@percent }
+\newlabel{fig:gap}{{3.4}{29}{Left: top-down body trajectories (five episodes per morphology) under an identical command sequence, aligned to a common start and heading and drawn at true aspect ratio. Right: per-episode path length and net displacement with mean $\pm $ standard deviation; the three morphologies do not overlap}{figure.caption.18}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.2}The frozen encoder carries the required behaviour signal, entangled with body shape}{29}{subsection.3.7.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3.5}{\ignorespaces Morphology is strongly and ordinally encoded in the frozen embedding. (a) A supervised linear probe reaches ${\sim }100$ percent and holds under episode-grouped cross-validation. (b) Unsupervised PCA, given no labels, orders the three bodies by leg length along its leading component. (c) A UMAP projection, shown for illustration only. Leg length and recording session are confounded in this pilot.}}{30}{figure.caption.19}\protected@file@percent }
+\newlabel{fig:morph-evidence}{{3.5}{30}{Morphology is strongly and ordinally encoded in the frozen embedding. (a) A supervised linear probe reaches ${\sim }100$ percent and holds under episode-grouped cross-validation. (b) Unsupervised PCA, given no labels, orders the three bodies by leg length along its leading component. (c) A UMAP projection, shown for illustration only. Leg length and recording session are confounded in this pilot}{figure.caption.19}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.6}{\ignorespaces Foot-contact behaviour is decodable within a body (mean macro-F1 0.84) but collapses across bodies (mean 0.16), and a shuffled-label control sits at the chance floor. The behaviour information is present but entangled with body shape, the signal the latent action must preserve while making it body-independent.}}{30}{figure.caption.20}\protected@file@percent }
+\newlabel{fig:sanity}{{3.6}{30}{Foot-contact behaviour is decodable within a body (mean macro-F1 0.84) but collapses across bodies (mean 0.16), and a shuffled-label control sits at the chance floor. The behaviour information is present but entangled with body shape, the signal the latent action must preserve while making it body-independent}{figure.caption.20}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7.3}Two methodological findings that shaped the protocol}{31}{subsection.3.7.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Remaining Work and Next Steps}{31}{section.3.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.9}Work Plan}{33}{section.3.9}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3.3}{\ignorespaces Work plan. The core experiments (through Step F) target completion by the end of October, leaving November for analysis and writing.}}{33}{table.caption.21}\protected@file@percent }
+\newlabel{tab:plan}{{3.3}{33}{Work plan. The core experiments (through Step F) target completion by the end of October, leaving November for analysis and writing}{table.caption.21}{}}
+\bibcite{hafner2023}{1}
+\bibcite{assran2025}{2}
+\bibcite{huang2026}{3}
+\bibcite{danesh2026}{4}
+\bibcite{li2021}{5}
+\bibcite{bruce2024}{6}
+\bibcite{ye2024}{7}
+\bibcite{liang2025}{8}
+\bibcite{zhang2025}{9}
+\bibcite{ha2018}{10}
+\bibcite{pathak2017}{11}
+\bibcite{baker2022}{12}
+\bibcite{kim2025}{13}
+\bibcite{larsen2023}{14}
+\@writefile{toc}{\contentsline {frontmatter}{REFERENCES}{34}{chapter*.22}\protected@file@percent }
+\bibcite{chuthong2026}{15}
+\bibcite{cruse1990}{16}
+\bibcite{alexander1983}{17}
+\bibcite{gupta2022}{18}
+\bibcite{ai2025}{19}
+\bibcite{zheng2025}{20}
+\gdef \@abspage@last{48}

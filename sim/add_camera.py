@@ -39,18 +39,24 @@ VARIANTS = [
     "medauroidea_stick_insect_short.ttt",     # 0.5x
 ]
 
-# --- camera framing (identical for every morphology) ---
-# Tuned empirically. Constraint: the frame must contain NO sky/void. At
-# elevation 30 with a 60 deg FOV the top edge sits exactly on the horizon, so
-# ~15% of every frame was pure black void -- which is the ViT register-token
-# failure mode (blank patches fluctuate more than the moving robot; measured
-# r = -0.20 on the white-background clip). Tilting down + narrowing the FOV
-# fills the frame with floor and enlarges the robot (better vs the 16px patch).
-DISTANCE = 2.0      # metres from robot centre
-ELEVATION = 40.0    # degrees above horizontal. >30 so the horizon is out of frame.
+# --- camera framing (identical for every morphology, FIXED to the world) ---
+# The camera no longer follows the robot; it is bolted in place so the robot
+# visibly travels left->right through a static frame (that world-frame travel is
+# exactly what an internal joint encoder cannot report). Far distance + a narrow
+# FOV ("telephoto") compresses perspective so apparent size stays ~constant
+# across the run, without a true orthographic projection (which V-JEPA2 never saw
+# in training). The frame is aimed RUNWAY_AIM metres ahead of the body's start so
+# the robot enters near one edge and crosses the centre.
+# Constraint unchanged: the frame must contain NO sky/void (ViT register-token
+# failure) and NO floor edge. Verify both with --preview before recording.
+DISTANCE = 8.0      # metres. Far => perspective compressed => apparent size ~constant.
+ELEVATION = 40.0    # degrees above horizontal. >30 keeps the horizon/void out.
 AZIMUTH = 90.0      # degrees around +x (robot's forward). 90 = pure side view
-VIEW_ANGLE = 45.0   # degrees FOV. Narrower => no void at top, robot larger.
+VIEW_ANGLE = 15.0   # degrees FOV. Telephoto; balances robot size vs runway (tune with --preview).
 TARGET_Z = 0.10     # nominal robot centre height to aim at
+RUNWAY_AIM = 0.75   # metres. Robot walks in-frame LEFT (world +x); positive aim starts it on
+                    # the RIGHT side but fully inside (whole body clears the edge), then it
+                    # walks left. Gate --travel so it never exits the left edge either.
 
 
 def robot_centre(sim):
@@ -105,8 +111,13 @@ def add_camera(sim, scene_path, preview=False):
     except Exception:
         pass
 
-    centre = robot_centre(sim)
-    target = np.array([centre[0], centre[1], TARGET_Z])
+    # Aim at a fixed world point RUNWAY_AIM metres ahead of the body's start,
+    # using the head's x/y (consistent across morphologies) rather than the
+    # feet-averaged centre (which shifts with leg length). Same offset for all
+    # three bodies -> framing identical by construction.
+    centre = robot_centre(sim)  # kept for the log line below
+    head = np.array(sim.getObjectPosition(sim.getObject("/head"), sim.handle_world))
+    target = np.array([head[0] + RUNWAY_AIM, head[1], TARGET_Z])
     cam_pos = target + camera_offset()
 
     # options: bit0(1)=explicitly handled, bit1(2)=perspective, bit2(4)=hide frustum

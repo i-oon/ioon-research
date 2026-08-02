@@ -702,7 +702,7 @@ The contribution is **not** an assumption that latent action must work — it is
 
 🎤 **บทพูด:** "สไลด์สุดท้ายครับ — สรุป contribution กับแผนงาน
 
-**สิ่งที่งานนี้ให้** — หนึ่ง เป็น**ครั้งแรกที่นำ latent-action world model จากงานหยิบจับ มาสู่ locomotion** สอง benchmark ที่คุมตัวแปรความยาวขาแกนเดียว สาม visual latent-action world model ที่รวม ITM FTM และการ reconstruct คำสั่ง และสี่ กรอบการวัดผลที่แยกพฤติกรรม รูปร่าง การทำนาย และการปรับตัวออกจากกันชัดเจน
+**สิ่งที่งานนี้ให้** — หนึ่ง **การนำ latent-action world model จากงานหยิบจับ มาปรับใช้กับ locomotion** สอง benchmark ที่คุมตัวแปรความยาวขาแกนเดียว สาม visual latent-action world model ที่รวม ITM FTM และการ reconstruct คำสั่ง และสี่ กรอบการวัดผลที่แยกพฤติกรรม รูปร่าง การทำนาย และการปรับตัวออกจากกันชัดเจน
 
 ดูตาราง milestone ครับ — setup กับ preliminary check **เสร็จแล้ว** ที่เหลือคือ Step A ถึง G ตั้งแต่ออกแบบชุดข้อมูล IK ไปจนถึงเทรน validate ทำ ablation ที่ตัดสิน แล้วทดสอบ transfer เป้าคือ core experiment เสร็จภายในตุลา แล้วพฤศจิกายนไว้เขียน
 

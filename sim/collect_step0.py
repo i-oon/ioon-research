@@ -59,7 +59,7 @@ def read_forces(sim, force_handles):
     return out
 
 
-def run_episode(sim, scene, steps, warmup):
+def run_episode(sim, scene, steps, warmup, travel=0.0):
     sim.loadScene(os.path.abspath(scene))
     settle(sim)
 
@@ -68,6 +68,10 @@ def run_episode(sim, scene, steps, warmup):
     joints = [sim.getObject(f"{j}{leg}") for leg in LEG_SUFFIXES for j in JOINT_NAMES]
     force_h = [sim.getObject(n) for n in FORCE_NAMES]
 
+    # fixed world-frame camera: capture the authored offset (encodes add_camera's
+    # RUNWAY_AIM framing), re-apply it ONCE after warmup so framing is anchored to
+    # the post-warmup body position (drift-compensated, identical across bodies),
+    # then hold the camera fixed so the robot visibly travels across a static frame.
     cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
     trk0 = np.array(sim.getObjectPosition(track, sim.handle_world))
     off_xy, cam_z = cam0[:2] - trk0[:2], cam0[2]
@@ -76,16 +80,23 @@ def run_episode(sim, scene, steps, warmup):
     sim.startSimulation()
 
     frames, actions, heads, forces = [], [], [], []
+    start_xy = None
     for k in range(warmup + steps):
         sim.step()
         p = np.array(sim.getObjectPosition(track, sim.handle_world))
-        sim.setObjectPosition(cam, sim.handle_world, [p[0] + off_xy[0], p[1] + off_xy[1], cam_z])
         if k < warmup:
             continue
+        if start_xy is None:
+            start_xy = p[:2].copy()
+            sim.setObjectPosition(cam, sim.handle_world, [p[0] + off_xy[0], p[1] + off_xy[1], cam_z])
         frames.append(capture(sim, cam))
         actions.append([sim.getJointTargetPosition(h) for h in joints])
         heads.append(p)
         forces.append(read_forces(sim, force_h))   # (6,) raw foot forces
+        # distance-gate: keep the robot inside the fixed frame and give every body
+        # the same spatial window. travel=0 disables (record the full --steps).
+        if travel > 0 and float(np.linalg.norm(p[:2] - start_xy)) >= travel:
+            break
 
     sim.stopSimulation()
     settle(sim)
@@ -98,8 +109,10 @@ def run_episode(sim, scene, steps, warmup):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--episodes", type=int, default=3)
-    ap.add_argument("--steps", type=int, default=200)
+    ap.add_argument("--steps", type=int, default=200, help="max steps (cap; --travel may stop earlier)")
     ap.add_argument("--warmup", type=int, default=20)
+    ap.add_argument("--travel", type=float, default=0.0,
+                    help="stop once the body has travelled this many metres (keeps it in the fixed frame)")
     ap.add_argument("--out", type=str, required=True)
     args = ap.parse_args()
 
@@ -112,7 +125,7 @@ def main():
     for morph, fname in MORPHOLOGIES:
         for ep in range(args.episodes):
             t0 = time.time()
-            f, a, h, fc = run_episode(sim, os.path.join(ENV_DIR, fname), args.steps, args.warmup)
+            f, a, h, fc = run_episode(sim, os.path.join(ENV_DIR, fname), args.steps, args.warmup, args.travel)
             tag = f"{morph}_ep{ep}"
             np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                 frames=f, actions=a, head=h, forces=fc,
