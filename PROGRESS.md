@@ -17,6 +17,7 @@
 13. [AMP — เทรน controller ต่อร่าง เพื่อสร้าง behavior dataset](#13--amp--เทรน-controller-ต่อร่าง-เพื่อสร้าง-behavior-dataset-2026-08-in-progress)
 14. [อัปเดต 2026-08-06 — กลับมาใช้ IK forward-only + 4-leg preview](#14--อัปเดต-2026-08-06--กลับมาใช้-ik-forward-only--4-leg-preview)
 15. [อัปเดต 2026-08-06 — ขยาย render-lock check + validate train(long+short)→test(medium)](#15--อัปเดต-2026-08-06--ขยาย-render-lock-check-เป็น-6-episodes--validate-trainlongshorttestmedium)
+16. [อัปเดต 2026-08-07 — เทรน world model + เจอ data bug (framing)](#16--อัปเดต-2026-08-07--เทรน-world-model-จริง-3-รอบ--เจอ-data-bug-ใหญ่-framing)
 
 ---
 
@@ -527,8 +528,9 @@ proprioception แชร์ไม่ได้เลย แต่ vision (pixel) 
 `sim/rollout_b1_mujoco.py` → `sim/render_b1_replay.py`:
 - **ที่พบ**: B1 policy (PPO, `base_gait3/model_600.pt`) เดินได้ใน MuJoCo แต่ CoppeliaSim รัน policy เองไม่ได้
 - **วิธีทำ**: rollout ใน MuJoCo → **replay kinematic ใน CoppeliaSim** (set base pose + joint แล้ว capture)
-  → render ด้วยกล้อง+พื้นเดียวกับ insect = ไม่มี render-style confound. `sim/build_b1_scene.py` สร้าง scene B1
-  จาก scene insect (พื้น/แสง/กล้องเดียวกัน)
+  → `sim/build_b1_scene.py` สร้าง scene B1 จาก scene insect (พื้น/แสง/ค่ากล้องเดียวกัน)
+- ⚠️ **ฉาก+ค่ากล้องเดียวกันยังไม่พอ** — ต้องให้ทั้งสองร่าง spawn ที่ตำแหน่งโลกเดียวกันด้วย ไม่งั้นเห็นพื้น
+  คนละบริเวณ (รายละเอียด §16.8) ใช้ `--spawn` / `--cam_dx` / `--travel` ให้ตรงกันทั้งสองฝั่ง
 - ข้อมูล: `data/b1_v1/` (8 clips: fwd 0.2–0.5, turn, spin, strafe), trajectory `data/b1_traj/`
 
 ### 12.4 ข้อมูล hexapod
@@ -769,3 +771,150 @@ input เองกำกวม การทดสอบนี้ต้อง iso
 comparison แบบเดียวกับที่ `gait_report.py` ใช้เทียบ AMP กับ expert (ให้ภาพว่า "ดูเหมือนเดินจริงไหม" ซึ่ง
 ให้ความหมายมากกว่า raw joint-MSE อย่างเดียว) + ครึ่งที่สองของ two-sided validation (`direction_plan.md`
 Step 1.5): morphology probe บน `z_t` ของ medium ควรใกล้ chance ด้วย ไม่งั้น `z_t` แอบจำร่างกายอยู่
+
+---
+
+## 16. 🧪 อัปเดต 2026-08-07 — เทรน world model จริง 3 รอบ + เจอ data bug ใหญ่ (framing)
+
+โค้ดอยู่ที่ `wm/` (ITM + FTM + Motion Decoder ตาม LAC-WM) · ผลทั้งหมด + README อยู่ที่ `results/wm/`
+
+### 16.1 สามรอบที่เทรน
+
+ตั้งชื่อแบบ `stage1_<episodes>ep_<frames>` เทรนบน long+short กัน medium ไว้ทดสอบ
+
+| run | episodes | frames | steps |
+|---|---|---|---|
+| `stage1_6ep_clipped` | 6 | ทั้งหมด 0-65 | 9,750 |
+| `stage1_100ep_clipped` | 100 | ทั้งหมด 0-65 | 30,880 |
+| `stage1_100ep_clean` | 100 | 45-65 เท่านั้น | 9,500 |
+
+### 16.2 🔴 พบ data bug: หุ่นถูกตัดขอบภาพ 67% ของทุก clip
+
+กล้อง fixed ถูกวางอ้างอิงกับ **ตำแหน่งเริ่มต้น**ของหุ่น + `RUNWAY_AIM=0.75` → หุ่นเริ่มที่**ขอบขวาแบบโดนตัด**
+แล้วค่อยเดินเข้ามาในเฟรม วัดได้:
+
+| ร่าง | เฟรมที่โดนตัด |
+|---|---|
+| long | 47/66 (70%) |
+| medium | 44/66 (66%) |
+| short | 36/66 (58%) |
+
+**อันตรายเพราะไม่เท่ากันต่อร่าง** → morphology decodability ที่วัดได้ 99% อาจกำลังอ่าน "การจัดเฟรม" ไม่ใช่รูปร่างจริง
+และหุ่นกินพื้นที่แค่ ~1% ของพิกเซล (patch 16×16 ของ V-JEPA2 แตะหุ่นแค่ ~10% ของ patch ทั้งหมด)
+
+### 16.3 ผลการทดลอง (motion MSE บน medium ที่ไม่เคยเห็น)
+
+**หน่วย:** action ถูก standardise ต่อข้อต่อ (หารด้วย std ของชุดเทรน, std จริง 0.174-0.595 rad
+เฉลี่ย 0.389 rad) → MSE ไม่มีหน่วย · **1.0 = เดาค่าเฉลี่ย (ไม่มีทักษะ)** · คอลัมน์ deg คือ
+RMSE แปลงกลับเป็นองศาต่อข้อต่อ
+
+| run | frames | steps | with z | zero z | shuffled z | **องศา/ข้อต่อ** |
+|---|---|---|---|---|---|---|
+| `stage1_6ep_clipped` | ทั้งหมด | 9,750 | **0.166** | 0.848 | 0.975 | **9.6°** |
+| `stage1_100ep_clipped` | ทั้งหมด | 30,880 | **0.422** | 0.470 | 1.197 | **15.3°** |
+| `stage1_100ep_clean` | 45-65 | 9,500 | **0.179** | 1.675 | 1.071 | **10.0°** |
+
+**การถ่ายทอดไปร่างใหม่ขึ้นกับ "จำนวน steps" ไม่ใช่ "การจัดเฟรม"**
+
+- clipping แยกดี/แย่ไม่ได้ — `stage1_6ep_clipped` เป็น clipped แต่ผลดี (0.166 = 9.6°)
+- steps แยกได้เป๊ะ — สอง run ที่ผลดีอยู่ที่ ~9.5k steps เท่ากัน, run ที่ผลแย่อยู่ที่ 30.9k
+
+⚠️ **ยังไม่เคยเทรน clean frames เกิน 9,500 steps** → `clean vs clipped` ถูก confound กับ
+`9.5k vs 30.9k steps` แบบสมบูรณ์ ยังสรุปไม่ได้ว่า framing มีผลต่อ transfer หรือไม่
+
+**สิ่งที่ framing มีผลจริง (วัดที่ steps เท่ากัน):** `val_motion` = 0.0068 (clean @1,425 steps)
+เทียบ 0.023-0.027 (clipped @~1,550 steps) → **เรียนเร็วกว่า 3.4 เท่าต่อ step** เป็นเรื่อง
+learning efficiency ไม่ใช่ cross-body transfer
+
+**การทดลองที่ชี้ขาด (ยังไม่ได้ทำ):** เทรน clean frames ถึง ~31k steps (~65 epochs) แล้วดู
+`heldout/motion` — ถ้าเสื่อมลงเป็น ~0.42 (15°) คือ over-specialization จากการเทรนนาน
+ถ้าไม่เสื่อมคือ framing มีส่วนจริง
+
+### 16.4 🔑 ผลที่ยังยืนอยู่: validation แบบมาตรฐานมองไม่เห็นการล้มเหลวข้ามร่าง
+
+ใน `stage1_100ep_clean` จาก epoch 2 → 20:
+```
+val_motion (episode ที่ไม่เคยเห็น, ร่างเดิม):  0.0122 → 0.0013   ดีขึ้น 9.3 เท่า
+heldout    (ร่างที่ไม่เคยเห็น):                0.1447 → 0.1806   ไม่ดีขึ้นเลย
+```
+ดีขึ้น 9.3 เท่าในกลุ่มเดิม แต่**ร่างใหม่ไม่ได้อะไรเลย** — เพราะ validation แบ่งด้วย episode ของ**ร่างเดิม**
+ร่างใหม่คือ **คนละ distribution** ไม่ใช่ held-out sample ของอันเดิม
+→ แก้แล้ว: `wm/train.py` วัด `heldout/motion` ทุก epoch + เซฟ checkpoint เป็นระยะ (`wm/sweep_checkpoints.py` re-score ทีหลังด้วย sample เยอะกว่า 10 เท่า)
+
+### 16.5 morphology ยังอ่านออก ~99% ทุกรอบ (ผลที่ทนทาน)
+
+| run | decode จาก e | decode จาก z | silhouette e → z |
+|---|---|---|---|
+| `stage1_6ep_clipped` | 0.9969 | 0.9855 | 0.0335 → 0.0148 |
+| `stage1_100ep_clipped` | 0.9989 | 0.9963 | 0.0220 → 0.0283 |
+| `stage1_100ep_clean` | 0.9987 | 0.9997 | 0.0640 → 0.0403 |
+
+**ข้าม 3 รอบที่ต่างกันหมด (6 vs 100 episodes, clipped vs clean, 9.7k vs 31k steps) → z ยังบอกได้ ~99% ว่าเป็นร่างไหน**
+"ความครอบงำ" (silhouette/variance) ลดลง แต่ "การมีอยู่" ไม่ลด
+
+**สาเหตุเชิงโครงสร้าง:** ไม่มีเทอมไหนใน loss ลบ morphology ออกจาก `z` — ทั้ง `L_recon` และ `L_motion`
+ต่างก็รับ `x_t` ซึ่งมีข้อมูลร่างกายอยู่แล้ว จึงไม่มีอะไรลงโทษ `z` ที่พกมันมาด้วย
+(cross-augmentation แก้ shortcut คนละเรื่อง) **น่าจะเป็นจริงกับ LAC-WM ด้วย เขาแค่ไม่เคยวัด**
+
+### 16.6 💡 invariance ≠ transferability (ข้อค้นพบที่ใหม่ที่สุด)
+
+`z` **รู้ว่าเป็นร่างไหน 99%** แต่ก็ **ถ่ายทอดไปร่างใหม่ได้ดี** (0.18 เทียบ 1.67 ตอนตัด z ออก) พร้อมกัน
+
+วงการสมมติว่า *ต้อง* invariant ก่อนถึงจะ transfer ได้ — จึงไล่ทำ "unified/embodiment-agnostic latent space"
+และใช้ภาพ UMAP ที่ cluster ทับกันเป็นหลักฐาน **แต่ข้อมูลเราบอกว่าไม่จำเป็น**
+
+⚠️ **ยังเป็นสมมติฐาน ไม่ใช่ข้อสรุป** — ทดสอบแค่ 3 ร่างที่ใช้ 18-D ร่วมกัน และ**ยังไม่เคยลองบังคับให้ invariant**
+การทดลองชี้ขาดคือ `--z_dim` เล็กลง / adversarial head แล้วดูว่า transfer เปลี่ยนไหม (ทุกผลลัพธ์ตีพิมพ์ได้)
+
+### 16.7 🔧 แก้ framing แล้ว (2 flag ใหม่ใน `sim/collect_ik.py`)
+
+- **`--cam_dx -0.6`** — เลื่อนกล้อง ลด runway aim 0.75 → 0.15
+- **`--spawn 0 0`** — respawn หุ่นที่**กลางพื้น** (พื้นแค่ 5×5 m, เดิมหุ่นอยู่ห่างขอบแค่ 0.95 m)
+
+| | ก่อน | หลัง |
+|---|---|---|
+| เฟรมโดนตัด | 47/44/36 จาก 66 | **0/66 ทุกร่าง** |
+| ขอบพื้นในเฟรม | 2.4% | **0%** |
+| margin ซ้าย/ขวา | 0.055 / 0.152 | **0.102 / 0.109** |
+| transition ใช้ได้ | 3,800 (เฉพาะเฟรม 45-65) | **13,000** |
+
+**ลำดับสำคัญ:** ต้องอ่าน `off_xy` (offset กล้องเทียบหุ่นตามที่ฉากออกแบบไว้) **ก่อน** respawn เสมอ
+ถ้าอ่านหลังย้ายหุ่น จะได้ offset ที่วัดจากตำแหน่งใหม่ → กล้องไม่ตามหุ่นไป หุ่นเดินออกนอกเฟรม
+
+### 16.8 🔴 B1 ไม่ได้ render-lock กับตั๊กแตนจริง (สำคัญมากกับ Stage 2)
+
+การใช้ฉาก พื้น และค่ากล้องชุดเดียวกัน **ไม่เพียงพอ** ที่จะเรียกว่า render-lock
+
+กล้องถูกวางอ้างอิงกับตำแหน่งเริ่มของ**แต่ละหุ่นเอง** และ B1 ถูก replay ที่พิกัดดิบจาก MuJoCo
+→ ทั้งสองร่าง **ยืนคนละที่บนพื้น 5×5 m** จึงเห็นพื้นคนละบริเวณ
+
+| เทียบ | ความต่างของพื้นหลัง |
+|---|---|
+| ตั๊กแตน long vs short | **0.29** / 255 |
+| **ตั๊กแตน vs B1** | **8.3 เฉลี่ย, 33 สูงสุด — 27% ของพิกเซลต่างกันเกิน 10 ระดับ** |
+
+→ ถ้าไม่แก้ "embodiment decodable จาก z" จะกำลังวัด**พื้นหลัง** ไม่ใช่ embodiment (และ `e_t` อ่าน morphology
+ได้ 99% แม้ระหว่าง render ที่แทบเหมือนกัน — 27% นี่อ่านง่ายมาก) **Stage 2 จะได้ผลที่ดูเหมือนสำเร็จแต่ผิด**
+
+**ยังพบอีก 2 อย่าง:**
+- B1 เดินไกล 1.31–3.06 m แต่กล้องเห็นแค่ 2.11 m → **เดินออกนอกเฟรม** (ที่ vx0.4 ขึ้นไป)
+- ความเร็วจริงต่ำกว่าที่ label ไว้มาก → **`fwd_vx0.4` = 0.164 m/s ใกล้ตั๊กแตน long (0.174 m/s) ที่สุด**
+
+แก้แล้วใน `sim/render_b1_replay.py`: เพิ่ม `--spawn`, `--cam_dx/dy`, `--travel` และเปลี่ยนกล้องให้ยึด
+**ตำแหน่งเริ่ม** แบบเดียวกับตั๊กแตน (เดิมเล็งที่จุดกึ่งกลางเส้นทาง)
+
+### 16.9 คำสั่งที่ใช้เก็บข้อมูลรอบใหม่
+
+```
+python3 sim/collect_ik.py --port 23000 --episodes <100 eps> --repeats 1 --scale 0.5 \
+    --travel 0.8 --cam_dx -0.6 --spawn 0 0 --out data/ik_walk_100_framed
+
+python3 sim/render_b1_replay.py --scene sim/env/b1_flat.ttt --traj data/b1_traj/fwd_vx0.4.npz \
+    --spawn 0 0 --cam_dx -0.6 --travel 0.8 --out data/b1_framed
+```
+
+### 16.10 สถานะ / ต้องทำต่อ
+- ☐ เก็บ `data/ik_walk_100_framed` (~55 นาที) + re-render B1 ให้ตรงกัน
+- ☐ เทรนใหม่บนข้อมูลที่ framing ถูก (ครั้งแรกที่ได้ทั้ง**เฟรมสะอาด**และ**gait ครบรอบ**)
+- ☐ ทดลอง `--z_dim` / adversarial → ชี้ขาดเรื่อง invariance vs transferability
+- ☐ Stage 2: `wm/train.py --sources hexapod=... b1=...` (โค้ดพร้อมแล้ว, `wm/evaluate.py` ยังไม่มี metric ข้าม embodiment)

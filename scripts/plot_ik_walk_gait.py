@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = "/home/aria/ioon-research"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV = os.path.join(ROOT, "sim/env/expert_66k_aug3c_fcontact.csv")
 LEGS = ["FL", "ML", "HL", "FR", "MR", "HR"]
 MORPHS = ["long", "medium", "short"]

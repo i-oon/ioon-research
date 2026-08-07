@@ -40,6 +40,12 @@ def main():
     ap.add_argument("--traj", required=True)
     ap.add_argument("--out", default="")
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--cam_dx", type=float, default=0.0, help="shift the fixed camera along world x")
+    ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
+    ap.add_argument("--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
+                    help="replay from this world x y; use the same value as the insect collector")
+    ap.add_argument("--travel", type=float, default=0.0,
+                    help="stop once the body has moved this far (m); keeps it inside the fixed frame")
     args = ap.parse_args()
 
     T = np.load(args.traj)
@@ -60,16 +66,31 @@ def main():
     root = sm[ROOT_ALIAS]
     cam = sim.getObject("/" + SENSOR)
 
-    # Re-aim the fixed camera at the trajectory's mid-x so the whole walk stays in frame
-    # (matches the insect's fixed world-frame framing: the body travels through a static shot).
-    mid = base_pos[n // 2]
-    cur = sim.getObjectPosition(cam, sim.handle_world)
-    # keep the camera's existing offset, just recentre its aim on the path midpoint in x
-    dx = float(mid[0] - base_pos[0, 0])
-    sim.setObjectPosition(cam, sim.handle_world, [cur[0] + dx, cur[1], cur[2]])
+    # Authored camera offset, read before anything moves. Same convention as the insect
+    # collector: the camera is pinned relative to the body's START pose, not re-aimed at the
+    # path midpoint, or the body enters and leaves an otherwise static shot.
+    cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
+    root0 = np.array(sim.getObjectPosition(root, sim.handle_world))
+    off_xy, cam_z = cam0[:2] - root0[:2], cam0[2]
+
+    # Replay at the same world point as the insect. Without this B1 stands on a different
+    # patch of a 5 m floor and its background differs from the insect's across ~27% of pixels,
+    # which a probe would read as an embodiment difference.
+    if args.spawn is not None:
+        base_pos = base_pos.copy()
+        base_pos[:, 0] += args.spawn[0] - base_pos[0, 0]
+        base_pos[:, 1] += args.spawn[1] - base_pos[0, 1]
+
+    sim.setObjectPosition(cam, sim.handle_world,
+                          [base_pos[0, 0] + off_xy[0] + args.cam_dx,
+                           base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
 
     frames = []
     for k in range(n):
+        # B1 covers 1.3-3.1 m depending on commanded speed while the camera sees about 2.1 m,
+        # so the walk has to be gated or the body leaves the frame.
+        if args.travel > 0 and float(np.linalg.norm(base_pos[k, :2] - base_pos[0, :2])) >= args.travel:
+            break
         q = base_quat[k]                                    # (w, x, y, z)
         sim.setObjectPosition(root, sim.handle_world, [float(v) for v in base_pos[k]])
         sim.setObjectQuaternion(root, sim.handle_world,
@@ -79,7 +100,8 @@ def main():
         frames.append(capture(sim, cam))
 
     frames = np.asarray(frames, np.uint8)
-    print(f"rendered {frames.shape} from {n} traj steps  mean px {frames.mean():.1f}")
+    n = len(frames)   # the travel gate can stop early; everything saved must match
+    print(f"rendered {frames.shape} from {len(base_pos)} traj steps  mean px {frames.mean():.1f}")
 
     if args.preview:
         import matplotlib
@@ -96,8 +118,8 @@ def main():
         os.makedirs(args.out, exist_ok=True)
         tag = os.path.splitext(os.path.basename(args.traj))[0]
         # carry the rollout's proprio/command straight through (physics-correct from MuJoCo)
-        extra = {k: T[k] for k in ("joint_pos", "joint_vel", "action", "command",
-                                   "foot_contact", "base_pos", "base_quat")
+        extra = {k: T[k][:n] for k in ("joint_pos", "joint_vel", "action", "command",
+                                       "foot_contact", "base_pos", "base_quat")
                  if k in T.files}
         np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                             frames=frames, joint_order_sdk=T["joint_order_sdk"], **extra)

@@ -1,211 +1,406 @@
-# SIM_GUIDE — running the CoppeliaSim → V-JEPA2 pipeline
+# SIM_GUIDE
 
-The one usage guide for the sim. File origins/attribution live in
-[sim/SOURCES.md](sim/SOURCES.md); everything about *running* it is here.
+Setup and usage guide for this project on a new machine.
 
-- CoppeliaSim v4.10.0 Edu installed at `/home/aria/CoppeliaSim` (not in this repo)
-- Python connector lives in the project venv `/home/aria/ioon-research/.venv`
-- All sim scripts talk to CoppeliaSim over the ZMQ Remote API on `localhost:23000`
+Scope: how to install, run the simulator, collect data, and train/evaluate the world model.
+Related documents:
 
----
+| Document | Contents |
+|---|---|
+| [PROGRESS.md](PROGRESS.md) | Full chronological research log, findings, dated sections |
+| [direction_plan.md](direction_plan.md) | Current research direction, roadmap, experiment design |
+| [sim/SOURCES.md](sim/SOURCES.md) | File origins and attribution for migrated simulator assets |
+| [OPEN_QUESTION.md](OPEN_QUESTION.md) | Unresolved questions |
 
-## 1. One-time install
-
-CoppeliaSim itself is downloaded from `downloads.coppeliarobotics.com` to
-`/home/aria/CoppeliaSim`. The Python-side connector packages go in the venv:
+Throughout this guide `$REPO` means the repository root and `$SIM` means the CoppeliaSim
+install directory. Set them once per shell:
 
 ```bash
-source /home/aria/ioon-research/.venv/bin/activate
-pip install coppeliasim_zmqremoteapi_client pyzmq msgpack cbor2 pandas
+export REPO=$HOME/ioon-research
+export SIM=$HOME/CoppeliaSim
 ```
 
 ---
 
-## 2. Launch CoppeliaSim (do this first, every time)
+## 1. Requirements
 
-**Always activate the venv *before* launching.** CoppeliaSim's ZMQ server spawns
-its own `python3` using whatever is on `PATH`; if the venv isn't active it can't
-find `zmq`/`cbor2` and the server silently never comes up (then every script
-hangs at `client.require("sim")`).
-
-```bash
-source /home/aria/ioon-research/.venv/bin/activate
-cd /home/aria/CoppeliaSim
-./coppeliaSim.sh
-```
-
-That's it — **no scene needed.** The pipeline scripts each call `sim.loadScene()`
-themselves over ZMQ, so whatever is open at launch gets replaced by the scene the
-script wants. Only pass a scene if *you* want to eyeball one in the GUI:
-
-```bash
-./coppeliaSim.sh -f /home/aria/ioon-research/sim/env/medauroidea_stick_insect.ttt   # optional
-```
-
-Run the pipeline scripts from a **second terminal** (venv active there too).
-
-**Use GUI mode, not headless** (`-h`/`-H`). Headless opens port 23000 briefly
-then segfaults during Python-subprocess cleanup on this machine. GUI is stable.
-
-### Verify the connection is alive
-
-```bash
-python3 -c "from coppeliasim_zmqremoteapi_client import RemoteAPIClient; \
-c=RemoteAPIClient('localhost',port=23000); s=c.require('sim'); \
-print('objects:', len(s.getObjectsInTree(s.handle_scene, s.handle_all)))"
-```
-
-Prints a number (~123 for the base scene) → good. Hangs → CoppeliaSim isn't up,
-or the venv wasn't active when you launched it.
+- Linux with an NVIDIA GPU (CUDA). Training was developed on an RTX 2080 Ti (11 GB); 8 GB is
+  the practical minimum at the default batch size.
+- Python 3.10
+- CoppeliaSim 4.10.0 Edu
 
 ---
 
-## 3. Vision pipeline (run in order, CoppeliaSim must be running)
+## 2. Install
+
+### 2.1 CoppeliaSim
+
+Download CoppeliaSim 4.10.0 Edu for Linux from `downloads.coppeliarobotics.com` and extract
+it to `$SIM`. It is not part of this repository.
+
+### 2.2 Python environment
 
 ```bash
-# 1. floor: matte, mildly-textured, non-repeating (NOT cosmetic — see below)
-python3 sim/set_floor_texture.py --all
+cd $REPO
+python3 -m venv .venv --system-site-packages
+.venv/bin/pip install torch transformers coppeliasim_zmqremoteapi_client pyzmq msgpack cbor2 \
+    pandas numpy opencv-python imageio imageio-ffmpeg scikit-learn umap-learn tensorboard
+```
 
-# 2. camera: fixed world-frame telephoto side view, added programmatically
-python3 sim/add_camera.py --all --preview        # --preview writes PNGs to /tmp
+Reference versions known to work: torch 2.13.0+cu130, transformers 5.13.1, scikit-learn 1.7.2,
+numpy 2.2.6.
 
-# 3. record an episode (per scene): frames.npy + actions.npy, exactly aligned
-python3 sim/record_episode.py \
+Every command in this guide uses `.venv/bin/python3` explicitly. Activating the environment
+(`source .venv/bin/activate`) also works, in which case `python3` is enough.
+
+### 2.3 Point CoppeliaSim at the virtual environment
+
+Required. CoppeliaSim runs scene scripts in a Python subprocess. If that subprocess is the
+system interpreter it cannot import `zmq`/`cbor2`, the scene script raises, CoppeliaSim pauses
+the simulation on script error, and training then runs against frozen physics without any
+visible failure.
+
+Edit `~/.CoppeliaSim/usrset.txt`:
+
+```
+defaultPython = /absolute/path/to/ioon-research/.venv/bin/python3
+```
+
+### 2.4 Verify
+
+Start CoppeliaSim (section 3), then:
+
+```bash
+cd $REPO && .venv/bin/python3 -c "
+from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+sim = RemoteAPIClient('localhost', port=23000).require('sim')
+print('connected, objects:', len(sim.getObjectsInTree(sim.handle_scene, sim.handle_all)))"
+```
+
+A number is printed on success. A hang means CoppeliaSim is not running or its ZMQ server did
+not start.
+
+---
+
+## 3. Running CoppeliaSim
+
+Headless, one instance per port:
+
+```bash
+cd $SIM && ./coppeliaSim.sh -h -GzmqRemoteApi.rpcPort=23000
+```
+
+No scene argument is needed. Every script calls `sim.loadScene()` itself over ZMQ. Pass
+`-f <scene.ttt>` only to inspect a scene manually in the GUI (omit `-h` for that).
+
+Run all other commands from a second terminal.
+
+### Multiple instances
+
+Each instance needs its own install directory and port, because instances share state through
+their install path. Copy the directory to run several:
+
+```bash
+cp -r $SIM ${SIM}_b
+cd ${SIM}_b && ./coppeliaSim.sh -h -GzmqRemoteApi.rpcPort=23001
+```
+
+Apply section 2.3 to each copy.
+
+### Scenes
+
+| Scene | Morphology |
+|---|---|
+| `sim/env/medauroidea_stick_insect.ttt` | long, 1.0x leg length (base) |
+| `sim/env/medauroidea_stick_insect_medium.ttt` | medium, 0.75x |
+| `sim/env/medauroidea_stick_insect_short.ttt` | short, 0.5x |
+
+Camera, lighting and floor must remain identical across all three. That render lock is what
+makes the morphology comparison valid; see PROGRESS.md section 15.2 for its current limits.
+
+---
+
+## 4. Data collection
+
+### 4.1 Stick insect, IK-retargeted forward walk
+
+The primary Stage 1 dataset. One expert foot trajectory is retargeted per morphology with
+`simIK`, so behaviour is held fixed while joint commands differ per body.
+
+```bash
+cd $REPO && .venv/bin/python3 sim/collect_ik.py \
+    --port 23000 \
+    --episodes 6,20,22,28 \
+    --repeats 1 \
+    --scale 0.5 \
+    --travel 0.8 \
+    --out data/ik_walk_100
+```
+
+- `--episodes` selects rows from the expert CSV (`sim/env/expert_66k_aug3c_fcontact.csv`,
+  1000 episodes of 66 frames). All three morphologies are collected in one call.
+- `--repeats 1` is intended. Repeats of one episode share a bit-identical action sequence and
+  near-identical frames, so they add no information.
+- Throughput is about 33 s per episode for all three bodies.
+
+Output: one `.npz` per body per episode containing `frames (66,256,256,3)`, `actions (66,18)`,
+`forces`, `head`, and metadata.
+
+### 4.2 Unitree B1 quadruped
+
+Rolled out in MuJoCo, then replayed kinematically in CoppeliaSim so it is rendered with the
+same camera and floor as the insect.
+
+```bash
+cd $REPO && .venv/bin/python3 sim/rollout_b1_mujoco.py
+cd $REPO && .venv/bin/python3 sim/render_b1_replay.py
+```
+
+Output in `data/b1/`: `frames (300,256,256,3)`, `action (300,12)`, `foot_contact (300,4)`,
+`base_pos`, `base_quat`.
+
+### 4.3 Generating a new morphology
+
+Scales each leg segment and repositions downstream joints. Requires a running CoppeliaSim,
+since it edits the model over ZMQ and then saves.
+
+```bash
+cd $REPO && .venv/bin/python3 sim/make_leg_morphology.py \
+    --factor 0.625 --out sim/env/medauroidea_stick_insect_0625.ttt
+```
+
+---
+
+## 5. Data checks
+
+Run before trusting any dataset.
+
+```bash
+cd $REPO && .venv/bin/python3 scripts/render_lock_check.py \
+    --data data/ik_walk_100 --out results/ik/render_lock
+```
+
+Reports whether morphology is present in the frozen encoder's embeddings (expected), and
+whether repeated recordings of the same clip are distinguishable (should be near chance).
+Read PROGRESS.md section 15.2 before interpreting the repeat test.
+
+```bash
+cd $REPO && .venv/bin/python3 scripts/audit_ik_dataset.py --data data/ik_walk_100
+```
+
+---
+
+## 6. World model
+
+Implementation lives in `wm/`. Architecture follows LAC-WM; optimisation is scaled down for a
+single GPU. See `wm/config.py` for all hyperparameters.
+
+| Module | Role |
+|---|---|
+| `wm/models/itm.py` | Inverse Transition Model: two frames to latent action `z` |
+| `wm/models/ftm.py` | Forward Transition Model: predicts the next visual embedding |
+| `wm/models/motion_decoder.py` | Decodes `z` to joint commands; shared backbone, per-embodiment head |
+| `wm/data/` | Datasets, augmentation, embodiment adapters |
+| `wm/train.py` | Training entry point |
+| `wm/evaluate.py` | Latent validation and transfer evaluation |
+
+### 6.1 Train
+
+Run from the repository root so `-m wm.train` resolves.
+
+```bash
+cd $REPO && .venv/bin/python3 -m wm.train \
+    --data_dir data/ik_walk_100 \
+    --epochs 20 \
+    --batch_size 8 \
+    --val_episodes 5 \
+    --train_morphs long short \
+    --heldout_morph medium \
+    --name run_name
+```
+
+Key options:
+
+| Option | Meaning |
+|---|---|
+| `--train_morphs` | Bodies used for gradient updates |
+| `--heldout_morph` | Body never trained on; reported each epoch as `heldout/motion` |
+| `--val_episodes` | Episodes held out from the training bodies, used to select `best.pt` |
+| `--frame_start`, `--frame_stop` | Restrict the frame range within each clip |
+| `--lambda_recon`, `--lambda_motion` | Loss weights; the source paper reports no values |
+| `--z_dim` | Latent action dimensionality, default 64 |
+
+Splitting is by expert episode, never by repeat. Repeats of one episode share identical
+actions, so holding one out measures nothing.
+
+Outputs in `wm/runs/<name>/`: `best.pt`, `best_motion.pt`, periodic `epoch###.pt`, and
+TensorBoard logs under `summary/`.
+
+Approximate cost: 1543 steps per epoch on 100 episodes and two bodies, about 23 minutes per
+epoch on an RTX 2080 Ti, 4.8 GB of GPU memory at batch size 8.
+
+### 6.2 Monitor
+
+```bash
+python3 -m tensorboard.main --logdir $REPO/wm/runs --port 6006
+```
+
+`val/*` measures unseen episodes of the training bodies. `heldout/*` measures the held-out
+body. These can diverge: a run reached `val/motion` 0.0016 while the held-out body degraded to
+0.42. Treat `val/*` alone as insufficient evidence of generalisation.
+
+`heldout/*` is for reporting only. Selecting checkpoints on it would leak the test body.
+
+### 6.3 Evaluate
+
+```bash
+cd $REPO && .venv/bin/python3 -m wm.evaluate \
+    --ckpt wm/runs/run_name/best.pt --out results/wm/run_name
+```
+
+Writes `evaluation.json` with:
+
+- `motion_mse` per body, including `zero_z` and `shuffled_z` ablations and a `predict_mean`
+  reference. Actions are standardised, so 1.0 corresponds to no skill.
+- `morphology_structure`: decode accuracy, silhouette, and between-class variance for raw
+  embeddings and for `z`. Report all three; decode measures whether a signal is present,
+  silhouette whether it dominates, and they can disagree.
+- `behaviour_transfer_macro_f1`: foot-contact transfer across bodies, from raw embeddings and
+  from `z`.
+
+Contact labels are used only for evaluation, never for training.
+
+---
+
+## 7. Rendering and gait diagnostics
+
+Use a separate CoppeliaSim instance so training instances are not disturbed.
+
+```bash
+cd $REPO && .venv/bin/python3 scripts/render_rollout.py \
+    --port 23063 \
     --scene sim/env/medauroidea_stick_insect.ttt \
-    --steps 300 --out data/episodes/long_walk_000
-
-# 4. encode frames with frozen V-JEPA2  (needs working CUDA)
-python3 scripts/step0_encode.py
-
-# 5. analyse / probe / figures
-python3 scripts/step0_analyze_v2.py
-python3 scripts/plot_morphology_evidence.py
-python3 scripts/plot_sanity_check.py
+    --ckpt amp/logs/<run>/model/step<N> \
+    --out results/rollouts/name.mp4
 ```
 
-Run `set_floor_texture` / `add_camera` on **all three** scenes so every
-morphology is byte-identical (that render-lock is what the morphology-vs-behaviour
-comparison depends on):
+```bash
+cd $REPO && .venv/bin/python3 scripts/gait_report.py \
+    --port 23063 \
+    --scene sim/env/medauroidea_stick_insect.ttt \
+    --ckpt amp/logs/<run>/model/step<N> \
+    --tag name
+```
 
-| Scene file | Scale |
-|---|---|
-| `sim/env/medauroidea_stick_insect.ttt` | long 1.0× (base) |
-| `sim/env/medauroidea_stick_insect_medium.ttt` | 0.75× |
-| `sim/env/medauroidea_stick_insect_short.ttt` | 0.5× |
-
-### Why the floor script is not cosmetic
-A **checkerboard** floor aliases under sub-pixel motion (pixels change where
-nothing moved; measured corr(pixel-motion, embedding-change) r = −0.16). A
-**blank** floor is equally bad — ViTs repurpose featureless patches as scratch
-space, so their embeddings fluctuate *more* than the robot (r = −0.20).
-`set_floor_texture.py` targets the middle: matte, low-contrast, non-repeating,
-fixed seed (identical across every variant).
+`gait_report.py` compares duty factor, inter-leg phase and stride rate against the expert
+without assuming a gait template. Aggregate returns and video alone are not sufficient to
+judge gait quality.
 
 ---
 
-## 4. Camera config (fixed world-frame, telephoto side)
+## 8. Determinism and episode length
 
-Set in `sim/add_camera.py`. The camera is **bolted to the world** — it does not
-follow the robot — so the robot visibly travels through a static frame. That
-world-frame travel is exactly the outcome a joint encoder cannot report.
+Contact-rich legged dynamics amplify floating-point differences.
 
-| Param | Value | Why |
+| Condition | Spread across identical runs |
+|---|---|
+| Scene loaded once, stop and start only | 0.0000 m |
+| Scene reloaded per run | about 1.8 m |
+
+Consequences:
+
+- For reproducibility, load the scene once and run many episodes from it.
+- Any single-episode measurement needs error bars. Report mean and standard deviation over
+  several episodes.
+- The floor is 10 m across, the robot walks about 0.46 m/s, and the timestep is 50 ms (20 Hz).
+  About 300 steps stays on the floor; 1000 steps walks off the edge.
+
+Engine settings: Bullet 2.78, 20 Hz, 10 substeps, 100 solver iterations, realtime off.
+
+---
+
+## 9. Troubleshooting
+
+**A script hangs at `client.require("sim")`.** CoppeliaSim is not running, or its ZMQ server
+did not start. Check section 2.3 and the verification in section 2.4.
+
+**Simulation is paused and training produces frozen or nonsense values.** A scene script
+raised and CoppeliaSim paused on script error. Almost always the `defaultPython` setting in
+section 2.3.
+
+**A vision sensor renders black, or the GUI shows no scene.** GPU rendering is unavailable,
+usually an NVIDIA driver and library version mismatch after an update without a reboot.
+`nvidia-smi` reporting "Failed to initialize NVML" confirms it. Reboot.
+
+**CUDA out of memory during evaluation while training runs.** Both processes load their own
+copy of the frozen encoder, about 2 GB each. Run evaluation after training, or on another GPU.
+
+**`ModuleNotFoundError: transformers`.** The system interpreter is being used instead of the
+virtual environment. Use `.venv/bin/python3`.
+
+**`git push` rejected for file size.** Model checkpoints exceed GitHub's 100 MB limit. They
+are covered by `.gitignore`, but files committed before a rule was added remain tracked:
+`git rm --cached <file>` then commit.
+
+### Constraints already handled in the scripts
+
+- Vision sensors view along +Z. Along -Z the frame is entirely black.
+- `createVisionSensor` defaults to visibility layer 8 and must be set to `0xFFFF`, otherwise
+  it renders nothing without reporting an error.
+- `loadScene` and `saveScene` require absolute paths.
+- The floor texture must be matte, low contrast and non-repeating. A checkerboard aliases
+  under sub-pixel motion; a blank floor causes ViT embeddings to fluctuate more than the robot
+  does. See PROGRESS.md section 4.
+---
+
+## 10. Moving to another machine
+
+Cloning the repository is not sufficient. Three categories of file are deliberately not in git
+because of GitHub's 100 MB limit, and must be copied across manually.
+
+### Required, not in git
+
+| Path | Size | Needed for |
 |---|---|---|
-| `DISTANCE` | 8.0 m | far → perspective compressed → apparent size ~constant across the run |
-| `VIEW_ANGLE` | 18° | narrow "telephoto"; near-constant size without orthographic (which V-JEPA2 never saw) |
-| `ELEVATION` | 40° | >30° keeps horizon/void out of frame |
-| `AZIMUTH` | 90° | pure side view; +x travel reads left↔right |
-| `RUNWAY_AIM` | 1.0 m | aim ahead of body start, so it enters near an edge and crosses centre |
-| resolution | 256×256 | V-JEPA2 native input |
+| `sim/env/expert_66k_aug3c_fcontact.csv` | 132 MB | all IK collection; `sim/collect_ik.py` reads it directly |
+| `data/` | varies | training and evaluation. `data/ik_walk_100_framed` is 379 MB |
+| `wm/runs/` | 366 MB per checkpoint | only if continuing from existing checkpoints |
 
-**Preview checklist** (from the `--preview` PNGs in `/tmp`, before recording):
-1. no void (no black sky, no floor edge in frame)
-2. robot ~35–45 px tall (legs resolvable vs the 16 px patch)
-3. framing identical across the 3 bodies (only the robot differs)
-4. ~2–2.5 m of runway visible
-
-> **In progress — fixed-camera migration.** `add_camera.py` is updated.
-> `record_episode.py` still has the old per-step camera-follow — remove that
-> block (and add distance-gating) before recording the fixed-cam dataset.
-
----
-
-## 5. Connect from Python (for custom collection / control)
-
-```python
-from sim.coppeliasim_env import CoppeliaSimEnv
-
-env = CoppeliaSimEnv()      # connects on localhost:23000, homes the joints
-obs = env.reset()
-obs, reward, terminated, truncated, info = env.step(action)   # action: (18,) in [-1,1]
-```
-
-Action/observation bounds and the joint/leg naming convention are documented
-inline in `sim/coppeliasim_env.py`.
-
-### Regenerate a morphology variant
-Scales each leg's coxa/femur/tibia and repositions downstream joints. **Requires a
-running CoppeliaSim** (it edits the model live over ZMQ, then saves):
+Copy them directly, for example:
 
 ```bash
-python3 sim/make_leg_morphology.py --factor 0.5 --out sim/env/medauroidea_stick_insect_short.ttt
+rsync -av --progress \
+    aria@source-host:/home/aria/ioon-research/sim/env/expert_66k_aug3c_fcontact.csv \
+    aria@source-host:/home/aria/ioon-research/data/ik_walk_100_framed \
+    aria@source-host:/home/aria/ioon-research/data/b1 \
+    aria@source-host:/home/aria/ioon-research/data/b1_traj \
+    $REPO/
 ```
 
----
+Datasets can also be regenerated from the expert CSV with section 4, which is slower (about
+55 minutes for 100 episodes) but needs only the CSV.
 
-## 6. Determinism & episode length (know this before collecting)
+### In git and portable
 
-**The sim is chaotic, not buggy.** Contact-rich legged dynamics amplify last-bit
-differences exponentially:
+Scene files (`sim/env/*.ttt`), the floor texture, and all code. Paths in the active scripts are
+derived from the file's own location, so the repository can live anywhere.
 
-| Condition | Spread over identical runs |
-|---|---|
-| Scene loaded **once**, stop/start only | 0.0000 m — bit-exact |
-| **Reload** scene each run | ~1.8 m — diverges |
+### Not portable
 
-Practical consequences:
-- Need reproducibility? **Load the scene once, run many episodes from it** (don't reload).
-- For data collection the per-reload variation is harmless — free diversity across episodes.
-- **Any single-episode measurement needs error bars.** Report mean ± std over N episodes.
+Some scripts still hold absolute paths to assets outside this repository:
 
-**Episode length vs floor size (open):** the floor is **10 m** across; the robot
-walks ~0.46 m/s; timestep is 50 ms (20 Hz). ~300 steps (~15 s, ~7 m) keeps it on
-the floor; ~1000 steps would walk ~23 m off the edge. If you need longer runs:
-larger floor, or a re-centring reset. Engine, for the record: Bullet 2.78, 20 Hz,
-10 substeps, 100 solver iterations, realtime off; the scene script has no
-randomness.
+- `sim/rollout_b1_mujoco.py` and `sim/build_b1_scene.py` point at `~/Sim2Real-B1` and
+  `sim/assets/b1_description`. Only needed to regenerate B1 trajectories or rebuild the B1 scene;
+  the existing `sim/env/b1_flat.ttt` and `data/b1_traj` avoid this.
+- Anything under `sim/_archive/` or `scripts/_archive/`.
 
----
-
-## 7. Troubleshooting (the ones we actually hit)
-
-**Script hangs at `client.require("sim")`** — CoppeliaSim isn't running, or the
-ZMQ server didn't start. Launch it from an activated venv (§2), confirm with the
-verify one-liner.
-
-**Vision sensor renders pure black (`mean=0.00`) and/or the GUI shows garbage /
-no scene** — GPU rendering is down, almost always an **NVIDIA driver/library
-version mismatch** after a driver update without a reboot:
+### Checklist
 
 ```bash
-nvidia-smi     # "Failed to initialize NVML: Driver/library version mismatch" == this bug
+cd $REPO
+python3 -c "import torch, transformers; print(torch.cuda.is_available())"   # expect True
+ls sim/env/expert_66k_aug3c_fcontact.csv          # expect it to exist
+ls data/ik_walk_100_framed | wc -l                 # expect 301 (300 clips + manifest)
 ```
 
-Fix: `sudo reboot` (reloads the matching kernel module; also restores CUDA for the
-encoder step). After reboot, `nvidia-smi` should print the GPU table.
-
-**Remoting via AnyDesk?** Before rebooting, force the autologin session to **X11**
-(AnyDesk is unreliable on Wayland → black screen):
-
-```bash
-sudo sed -i 's/#WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf
-```
-
-Autologin (`AutomaticLogin=aria`) and the `anydesk` service are already enabled,
-so the desktop returns on its own after boot.
-
-### Rendering gotchas already handled in the scripts (don't re-break)
-- Vision sensors view along **+Z** (−Z gives an all-black frame, `min_depth=1.0`).
-- `createVisionSensor` defaults to visibility layer 8 → must set `0xFFFF`, else it renders nothing silently.
-- Elevation 30° + FOV 60° puts the horizon at the top edge → ~15% void; the current 40°/18° avoids it.
-- `loadScene`/`saveScene` require **absolute** paths.
+Then start CoppeliaSim (section 3) and run the verification in section 2.4.

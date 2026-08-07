@@ -7,7 +7,7 @@ Two-sided probe: a useful z_t should raise cross-morphology behaviour transfer w
 lowering morphology decodability, both measured against raw e_t as the baseline.
 
 Run from the repository root:
-  .venv/bin/python3 -m wm.evaluate --ckpt wm/runs/wm_v1/best.pt
+  .venv/bin/python3 -m wm.evaluate --ckpt wm/runs/stage1_6ep_clipped/best.pt
 """
 import argparse
 import json
@@ -70,7 +70,7 @@ def decode(md, embeddings, z, chunk):
 
 
 @torch.no_grad()
-def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0):
+def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_range=(0, 0)):
     """Latents, motion predictions and probe features for every transition in `paths`.
 
     Alongside the real prediction, the decoder is also run with a zeroed and a shuffled
@@ -82,9 +82,15 @@ def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0):
     records = {key: [] for key in keys}
     records["morph"] = []
 
+    start, stop = frame_range
     for path in paths:
         clip = load_clip(path)
-        embeddings = encode_clip(encoder, clip["frames"], chunk).to(device)
+        # score the same frame range the model was trained on, or the mismatch is measured
+        # instead of the model
+        frames = clip["frames"][start:stop or None]
+        actions = clip["actions"][start:stop or None]
+        forces = clip["forces"][start:stop or None]
+        embeddings = encode_clip(encoder, frames, chunk).to(device)
         e_t = embeddings[:-1]
 
         z = latents(itm, embeddings, chunk)
@@ -95,8 +101,8 @@ def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0):
         records["pred_shuffled"].append(decode(md, e_t, z[permutation], chunk))
         records["e"].append(e_t.mean(dim=1).cpu().numpy())
         records["z"].append(z.cpu().numpy())
-        records["target"].append((clip["actions"][:-1] - mean) / std)
-        records["contact"].append(contact_labels(clip["forces"][:-1]))
+        records["target"].append((actions[:-1] - mean) / std)
+        records["contact"].append(contact_labels(forces[:-1]))
         records["morph"] += [clip["morph"]] * len(z)
 
     out = {key: np.concatenate(records[key]) for key in keys}
@@ -165,7 +171,8 @@ def main():
     encoder = VJEPA2FrameEncoder(device=str(device))
     morphs = tuple(cfg.train_morphs) + (cfg.heldout_morph,)
     paths = clip_paths(data_dir, morphs)
-    data = collect(encoder, itm, md, paths, mean, std, device)
+    data = collect(encoder, itm, md, paths, mean, std, device,
+                   frame_range=(cfg.frame_start, cfg.frame_stop))
 
     variants = {"with_z": "pred", "zero_z": "pred_zero", "shuffled_z": "pred_shuffled"}
     results = {"trained_on": list(cfg.train_morphs), "held_out": cfg.heldout_morph, "motion_mse": {}}

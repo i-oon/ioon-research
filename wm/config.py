@@ -12,8 +12,21 @@ class Config:
     train_morphs: tuple = ("long", "short")
     heldout_morph: str = "medium"
     val_episodes: int = 1
-    heldout_clips: int = 4
+    # Sized in transitions, not clips: a clip yields (frames_used - 1) transitions, so a fixed
+    # clip count silently shrinks the probe when frame_start/frame_stop narrow the range. At 80
+    # transitions the held-out MSE swung 0.14-0.34 between epochs from sampling noise alone.
+    heldout_pairs: int = 400
     checkpoint_every: int = 2
+    # Frames before ~45 have the robot partly outside the right edge: the fixed camera is
+    # anchored to the start pose and the robot walks into view. 0 keeps every frame.
+    frame_start: int = 0
+    frame_stop: int = 0
+
+    # Cross-embodiment mode. Empty keeps the single-morphology path above; otherwise give
+    # "name=dir" per embodiment, e.g. hexapod=data/ik_walk_100 b1=data/b1. Batches are drawn
+    # from one embodiment at a time and routed to that embodiment's decoder head.
+    sources: tuple = ()
+    val_fraction: float = 0.1
 
     token_dim: int = 1408
     grid: int = 16

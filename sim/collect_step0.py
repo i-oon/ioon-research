@@ -23,7 +23,9 @@ import time
 import numpy as np
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
-ENV_DIR = "/home/aria/ioon-research/sim/env"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ENV_DIR = os.path.join(ROOT, "sim", "env")
 MORPHOLOGIES = [
     ("long", "medauroidea_stick_insect.ttt"),          # 1.0x  (base)
     ("medium", "medauroidea_stick_insect_medium.ttt"),  # 0.75x

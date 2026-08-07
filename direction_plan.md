@@ -1,53 +1,46 @@
 # Research Direction — Cross-Morphology Locomotion via Latent Action World Models
 
-> 📋 **See also**: `report/audit_2026-07.md` — full project audit (2026-07-17). Long-form English record of
-> every finding behind the corrections in this file, including the doc-drift table, LAC-WM's exact
-> hyperparameters, the literature/baseline inventory, and the 12-week phased path.
-> Thai summary in `PROGRESS.md` §10. **Timeline: Aug–Nov, target October.**
->
-> **Convention (2026-08-06 onward)**: this file states **only the current direction** — what we're doing
-> now and why, kept short enough to read straight through. The full chronological history (debugging,
-> dead ends, what we tried and abandoned) lives in `PROGRESS.md`, organized by numbered dated sections.
-> When direction changes, this file gets edited to reflect the new state — it does not accumulate old
-> decisions on top of new ones. If a section here looks self-contradictory, it's a bug in the doc, not
-> a snapshot of history to preserve — fix it forward, don't append another update note.
+**Target**: Stage 1 (cross-morphology) then Stage 2 (cross-embodiment), then a
+deployment loop. See `PROGRESS.md` for the dated engineering log and `SIM_GUIDE.md` for how to run
+anything described here.
+
+**Vocabulary** — three separate things, kept distinct:
+
+| Term | Meaning |
+|---|---|
+| **Stage** | research stage. Stage 1 = cross-morphology (3 leg lengths). Stage 2 = cross-embodiment (hexapod + quadruped) |
+| **Step** | a numbered task inside a stage, listed in section 5 |
+| **Pretraining / Deployment** | training the world model, versus using it to control a body. Deployment is out of thesis scope but constrains design |
+
+**Conventions** — this file states the *current* direction only; history lives in `PROGRESS.md`.
+Status is one of `done`, `in progress`, `blocked`, `open`. Every number carries its unit and a
+reference point. Blockquotes are reserved for caveats.
 
 ---
 
 ## Contents
 
-- [Core Claim](#core-claim)
-- [🔄 Direction update (2026-08) — staged: cross-morphology → cross-embodiment](#-direction-update-2026-08--staged-cross-morphology--cross-embodiment)
-- [Pipeline (confirmed)](#pipeline-confirmed)
-- [Decisions Still Needed](#decisions-still-needed)
-- [Execution Plan](#execution-plan)
-  - [Staged roadmap + timeline](#staged-roadmap--timeline)
-  - [Step -1 — Morphology Gap Check](#step--1--morphology-gap-check--pass)
-  - [Step 0 — Visual Encoder Sanity Check](#step-0--visual-encoder-sanity-check)
-  - [Step 0.5 — per-body actions (IK, blocks Step 1)](#-step-05--precondition-per-body-actions-blocks-step-1)
-  - [Step 1 — Train Phase 1 Pipeline](#step-1--train-phase-1-pipeline)
-  - [Step 1.5 — Latent Space Validation](#step-15--latent-space-validation)
-  - [Step 2 — Transfer to Unseen Morphology](#step-2--transfer-to-unseen-morphology)
-  - [Step 3 — Extrapolation](#step-3-future--extrapolation)
-- [🔴 Critical Confound — Render-Style Dominance](#-critical-confound--render-style-dominance-threatens-step-15s-validity)
-- [🎯 The Motivation Problem](#-the-motivation-problem--why-do-we-need-a-latent-action-at-all)
-- [Phase 2 Design Sketch](#phase-2-design-sketch-out-of-thesis-scope-but-it-constrains-phase-1)
-- [If Step 1.5 Fails — Fallback](#if-step-15-fails--fallback)
-- [Baseline](#baseline)
-- [Notes from ICLR Reviews](#notes-from-iclr-reviews)
-- [Lab Resources](#lab-resources)
-- [Open Questions](#open-questions)
+1. [Claim](#1-claim)
+2. [Approach](#2-approach)
+3. [Pipeline](#3-pipeline)
+4. [Roadmap](#4-roadmap)
+5. [Steps](#5-steps)
+6. [Risks and confounds](#6-risks-and-confounds)
+7. [Fallbacks](#7-fallbacks)
+8. [Deployment (out of scope)](#8-deployment-out-of-scope)
+9. [Baselines and references](#9-baselines-and-references)
+10. [Open decisions](#10-open-decisions)
 
 ---
 
-## Core Claim
+## 1. Claim
 Learn a **morphology-agnostic latent action z_t** from simulation video
 that clusters by **behavior** (walk/turn/stop), not by body shape.
 Prove it transfers to an unseen morphology without retraining.
 
 ---
 
-## 🔄 Direction update (2026-08) — staged: cross-morphology → cross-embodiment
+## 2. Approach
 > Full detail in `PROGRESS.md` §12. The Core Claim above is now **Stage 1** of a two-stage plan.
 
 The committee's core push (*"why is vision worth it over proprioception?"*) can't be answered on
@@ -76,154 +69,141 @@ the two stages prove different things.
 
 ---
 
-## Pipeline (confirmed)
+## 3. Pipeline
 
-- **Encoder**: V-JEPA2 RGB tokenizer — frozen ✓ (confirmed: ViT-g/16, 1B params)
-  - per-frame, no temporal mixing inside encoder
-  - output: 16×16 = 256 patch tokens per frame, each ∈ ℝ^1408
-  - pre-encode offline → save e_t to disk (keep encoder in loop only if using cross-augmentation)
+Implemented in `wm/`. Architecture follows LAC-WM; optimisation is scaled to one GPU.
+All hyperparameters live in `wm/config.py`.
 
-  **V-JEPA2 Encoder — Input / Flow / Output**
+![Pretraining Pipeline](/doc/images/Pretraining_pipeline.png)
 
-  ```
-  INPUT
-    frame_t  ∈ ℝ^{256×256×3}     raw RGB from sim camera
 
-  PREPROCESSING (before encoder, your code)
-    aug1 = transform(frame_t)     random crop + color jitter + flip  → ℝ^{256×256×3}
-    aug2 = transform(frame_t)     different random params             → ℝ^{256×256×3}
+### Encoder — V-JEPA2, frozen
 
-  PATCH SPLITTING
-    256×256 ÷ 16 = 16×16 grid → 256 patches of 16×16×3 pixels each
+`facebook/vjepa2-vitg-fpc64-256`, ViT-g/16, 1B parameters, weights never updated.
 
-  LINEAR PROJECTION
-    each patch → Linear → ℝ^{1408}
-    + positional embedding (3D-RoPE)
+```
+frame_t  ∈ ℝ^{256×256×3}          RGB from the sim camera
+  → 16×16 grid of 16×16 px patches
+  → linear projection + 3D-RoPE positional embedding
+  → frozen ViT, self-attention across patches
+e_t      ∈ ℝ^{256×1408}           256 patch tokens, 1408 dims each
+```
 
-  VIT TRANSFORMER (frozen, 1B params)
-    256 tokens attend to each other (self-attention across patches)
-    each token becomes spatially context-aware
+Each frame is encoded **independently** — fed twice into the minimal 2-frame tubelet so the
+model acts as an image encoder, not a video encoder. Feeding a real clip would let each frame
+see the future through bidirectional attention, so `e_t` would not be independent per timestep
+(`scripts/vjepa2_encoder.py`, verified in `scripts/test_vjepa2_frame_isolation.py`).
 
-  OUTPUT
-    e_t¹  ∈ ℝ^{256×1408}   from aug1  → to ITM + Motion Decoder
-    e_t²  ∈ ℝ^{256×1408}   from aug2  → to FTM
-    e_{t+1}¹ ∈ ℝ^{256×1408} from aug1 → to ITM + L_recon target
-  ```
+The encoder **stays inside the training loop**: cross-augmentation needs fresh random views every
+epoch, so embeddings cannot be cached. It is the dominant cost — four encoder passes per sample.
 
-  **Load code**
-  ```python
-  from transformers import AutoModel
-  encoder = AutoModel.from_pretrained("facebook/vjepa2-vitg-fpc64-256")
-  encoder.eval()
-  for p in encoder.parameters():
-      p.requires_grad = False   # frozen — no gradient flows through
-  ```
+Frozen because V-JEPA2 is pretrained on ~1M hours of video and already carries motion-relevant
+features; fine-tuning would cost far more compute and risk losing that generality. Step 0 confirms
+the features are usable before any training.
 
-  **Why frozen**: V-JEPA2 pretrained on 1M hours of internet video (VM22M, 22M videos).
-  Already learned motion-relevant features. Fine-tuning would require massive compute and risk losing generality.
-  Step 0 verifies these features are useful before committing to training.
+### Cross-augmentation
 
-- **ITM**: attention-based ✓ (confirmed from LAC-WM Table 4)
-  - 4 attention blocks, 16 heads, learned query token q_t
-  - in: [e_t, e_{t+1}] (512 tokens total) → out: **z_t ∈ ℝ^64**
-  - **CORRECTION**: z_t was previously written as ℝ^512 here — that was a misread of LAC-WM Table 4.
-    Table 4's "Latent Dimension = 512" is the ITM/FTM **internal hidden width**, not the latent action.
-    LAC-WM §4.2 states separately: *"Both models employ an action embedding dimension of 64."* → z_t ∈ ℝ^64
-  - NOT a simple MLP
+Two independent augmentations `A1`, `A2` are drawn per sample and each is applied to **both**
+frames of the pair, so the transition itself carries no augmentation difference:
 
-- **FTM**: attention-based ✓ (confirmed from LAC-WM Table 4)
-  - 8 blocks: self-attn(e_t) + self-attn(z_t) + cross-attn(e_t→z_t), 16 heads
-  - in: [e_t, z_t] → out: ê_{t+1} ∈ ℝ^1408
-  - NOT a simple MLP
+```
+A1 → (x_t¹, x_{t+1}¹)      ITM consumes this pair
+A2 → (x_t², x_{t+1}²)      FTM is scored against this one
 
-- **Motion Decoder**: cross-attn(z_t, x_t) + MLP ✓ (confirmed from LAC-WM)
-  - z_t = query, x_t = visual context (keys/values)
-  - out: â_t ; L_motion = ||â_t − a_t||²
-  - **not used when measuring Phase 1, but KEEP THE WEIGHTS** (corrected 2026-07-19; previously
-    written as "discarded after pretraining", which is right for the representation claim and wrong
-    for anything downstream). The MD is the only bridge from a latent action back to executable joint
-    commands. A Phase 2 policy would emit `z_t` and need exactly this module to run it on a body:
-    `policy → z_t → MD → 18 joint targets → robot`. Discarding it would leave the latent unexecutable.
-  - This is also the answer to Ajan Blink's week-4 objection ("if the robot needs joint commands
-    anyway, why convert to a latent and back?"): the policy learns in the latent space *because that
-    part transfers across bodies*, while the MD does the body-specific decoding. The conversion is
-    what separates the transferable part from the non-transferable part.
+z_t     = ITM(x_t¹, x_{t+1}¹)
+x̂_{t+1} = FTM(x_t², z_t)          L_recon = ‖x̂_{t+1} − x_{t+1}²‖²
+```
 
-- **Cross-augmentation**: YES ✓ (following LAC-WM)
-  - two independent augmentations A1, A2 applied to the frame pair (O_t, O_{t+1}) before encoding
-    → (x_t¹, x_{t+1}¹) and (x_t², x_{t+1}²)
-  - ITM uses pair 1: z_t¹ = ITM(x_t¹, x_{t+1}¹) ; FTM uses pair 2: ê_{t+1}² = FTM(x_t², z_t¹)
-  - why: since z_t is partially supervised by L_recon, ITM could shortcut by smuggling
-    x_{t+1}'s content directly into z_t instead of learning the actual action — cross-augmentation
-    breaks this because ITM's augmented view of t+1 doesn't match what FTM is scored against
-    (confirmed from LAC-WM paper, Section "Cross-Augmentation Inputs")
-  - encoder called per single frame (image mode, not clip mode) — must stay in training loop
-    since each epoch needs fresh random augmentations before encoding
+Without it the ITM can satisfy `L_recon` by smuggling `x_{t+1}`'s content into `z_t` instead of
+learning the action; the mismatch between views blocks that shortcut.
 
-- **Total loss**: L = λ_recon · L_recon + λ_motion · L_motion
+Augmentations are **random crop (85–100%) plus brightness/contrast jitter**. Horizontal flip is
+excluded: mirroring swaps the robot's left and right legs while the supervised action vector keeps
+its original leg order, so the motion target would contradict the image (`wm/data/augment.py`).
 
-- **Simulator**: CoppeliaSim v4.10 ✓ (corrected — earlier "IsaacSim 5.0" was wrong, see Decisions table)
+### Inverse Transition Model — `wm/models/itm.py`
 
-- **Data**: stick insect, 3 morphologies, third-person RGB + auto-logged joint commands
-  - **Action type**: joint position targets ℝ^18 (6 legs × 3 joints)
-  - **Episode length**: 1000 steps (~16s at 60Hz physics)
-  - **Episodes**: ~100 per morphology per behavior (walk/turn/stop) → ~200,000 training pairs for short+long
-  - **Camera**: **single** fixed camera, side view, ~30° elevated, sees all 6 legs clearly
-    — 🔴 **DOES NOT EXIST YET.** The CoppeliaSim scene has no vision sensor and no code captures RGB from it.
-    This is blocker #1; everything from Step 0 onward is gated on building it.
-    - **Multi-angle (3-camera) capture was considered and REJECTED**: (1) walk/turn/stop are whole-body
-      behaviors — single-view suffices, and this view already avoids occlusion; (2) V-JEPA2 has **no fusion
-      mechanism** for simultaneous views — we'd have to invent one with no counterpart in LAC-WM; (3) it
-      **triples the render-confound surface** (see Critical Confound below) — 3× the chance of invalidating
-      Step 1.5; (4) sim gives ground-truth joint angles free, so occlusion can be checked without more cameras.
-    - Revisit **only** if Step 0/1 demonstrates specific leg motions are systematically occluded — a real
-      failure, not a speculative upgrade. Full reasoning: `report/audit_2026-07.md` §5.1.
-  - **Data collection policy**: ✅ **IK retargeting** — define each behavior as a Cartesian foot trajectory,
-    solve per morphology with `simIK`. Gives per-body-different `a_t` with no training. See rationale below.
-  - **Behaviors**: walk / turn / stop — 🔴 **only walk exists** (`ds_loopsm.csv` = 67 rows, one forward cycle;
-    AIRL reward is forward-velocity-only). Turn/stop must be built via IK retargeting.
-  - **Morphologies**: ✅ built + numerically verified (`sim/env/*.ttt`, via `sim/make_leg_morphology.py`) —
-    **short 0.5× / medium 0.75× / long 1.0× (base)**, exact reach ratios on all 6 legs
-  - **Train morphologies**: short + long leg
-  - **Held-out morphology**: medium leg (Step 2 transfer test)
+```
+in:  e_t, e_{t+1}  (2 × 256 tokens, projected to width 512)
+out: z_t ∈ ℝ^64
+```
+2 causal self-attention blocks then 2 cross-attention blocks, 16 heads (LAC-WM Table 4 gives 4
+blocks total, 512 hidden, action embedding 64). Causal masking means `x_t`'s tokens cannot attend
+to `x_{t+1}` — verified: `x_t`'s representation is bit-identical when the future frame changes,
+while `z_t` still responds to it. A learned query token then cross-attends to that context and is
+projected to `z_t`.
 
-- **Why IK retargeting, and why `a_t` MUST differ per morphology** (this is load-bearing, not a convenience):
-  - The Motion Decoder is `MD(x_t, z_t) → â_t` — it conditions on visual context `x_t`.
-  - If every morphology receives **identical commands**, `a_t` is identical per behavior → `L_motion` trivially
-    forces `z_t` morphology-agnostic, and `MD` never needs `x_t`. A reviewer says: *"of course your latent
-    action is body-independent — you fed every body the same action."* **Circular result.**
-  - If `a_t` **differs per body** (what IK gives you), `MD` must use `x_t` to know which body it's looking at →
-    a `z_t` carrying pure behavior is an **earned** result.
-  - Rejected alternative — AIRL retraining per morphology: normalization bounds in `normalized_env*.py` are
-    hand-measured literals per body (nothing parameterized by leg length, no tooling to recompute, and the
-    clip line is commented out so wrong bounds fail *silently*); expert data is one animal / one gait / one
-    trial and is invalid for a rescaled body; ~1 day GPU per run. Not on the critical path.
+### Forward Transition Model — `wm/models/ftm.py`
 
----
+```
+in:  e_t, z_t   →   out: ê_{t+1} ∈ ℝ^{256×1408}
+```
+8 blocks, 16 heads, each block: self-attention over visual tokens, self-attention over latent
+tokens, then cross-attention from visual to latent.
 
-## Decisions Still Needed
+### Motion Decoder — `wm/models/motion_decoder.py`
 
-| Block | Status | Note |
-|---|---|---|
-| z_t dimension k | **64 (LAC-WM §4.2: "action embedding dimension of 64")** | previously recorded as 512 — that was Table 4's ITM/FTM *hidden width*, not the latent action. Ablate smaller/larger k for locomotion. Bonus: 8× smaller latent eases the 2080 Ti compute problem |
-| λ_recon, λ_motion | **undecided — and NOT in the paper** | LAC-WM never reports numeric λ values anywhere (nor LR/optimizer/schedule). Start equal, ablate. |
-| Stick insect DoF | ✅ **confirmed + in hand** — from Ajan YuChen's `airl-insect-walking` (Medauroidea extradentata, CoppeliaSim) | migrated to `sim/env/`. **All 3 leg-length variants now built and numerically verified** (0.5× / 0.75× / 1.0×) via `sim/make_leg_morphology.py` |
-| Data collection policy | ✅ **RESOLVED: IK retargeting** — and **promoted to a Step 1 precondition, see Step 0.5** | ⚠️ Not a data-collection detail. All collected `a_t` are currently **bit-identical across bodies** (verified 2026-07-21, variance 7.2e-16), which is correct for Step -1 but makes the latent action vacuous in Step 1: with a shared command there is nothing to retarget and MD has no reason to condition on the body. Behaviors = Cartesian foot trajectories → `simIK` per morphology → per-body-different `a_t`, zero training. **Why the old plan died**: (1) the mature `66k_aug3c` checkpoints every script points at **are not in this copy** — only logs proving they once existed; (2) the checkpoints that *do* exist are **34-dim obs** and **no `normalized_env*.py` in the repo produces 34 dims** (base = 36; the module that did was deleted) — they likely won't load without reverse-engineering; (3) normalization bounds are hand-measured literals per body with no tooling to recompute, and normalization is **not clipped**, so a 0.5× leg breaks them *silently*; (4) expert data is **one animal / one gait cycle / one trial** — invalid for a rescaled body; (5) ~1 day GPU per run; (6) **no leg-length precedent exists** in that repo — every variant is leg *removal* or terrain. |
-| 🔴 **Camera / RGB capture** | **MISSING — blocker #1** | The CoppeliaSim scene has **no vision sensor**; no code anywhere captures RGB from it (zero `getVisionSensorImg` calls; `.ttt` binaries contain no vision-sensor objects; the lab repo has none either). All V-JEPA2 work to date ran on pre-recorded **B1 quadruped** `.mp4`s from *other* renderers — i.e. **Step 0 has never touched the stick insect.** Everything from Step 0 onward is gated on building this. |
-| 🔴 **Turn / Stop behaviors** | **MISSING — but resolved BY Step 0.5, not separately** | Nothing produces them yet: `ds_loopsm.csv` = 67 rows of one forward gait cycle; AIRL reward = `discriminator_logit + vx*100` (forward velocity only). **IK delivers these as extra foot trajectories in the same step that produces per-body `a_t` — see Step 0.5 "IK also delivers walk/turn/stop".** Load-bearing: K-means(K=3) in Step 1.5 and the "≥3 behaviors" answer to the ICLR critique both depend on it. |
-| Step 2 evaluation metric | **training time reduction** (confirmed Ajan Go) | pretrained FTM reaches same L_recon with fewer medium leg episodes than scratch |
-| Baseline exact setup | undecided | separate pipeline per morphology vs. scratch RL |
-| LAC-WM source code | not found yet | rejected ICLR 2026, accepted ICML 2026 — no public code yet |
-| Simulator/framework | **CoppeliaSim confirmed** (supersedes earlier "IsaacSim 5.0 ✓" — that was wrong) | The lab's actual Medauroidea model runs in CoppeliaSim v4.10, not IsaacSim. Installed and connection-tested locally (`sim/`); GUI mode stable, headless mode currently segfaults on cleanup (unresolved, see `sim/SOURCES.md`) |
+```
+in:  e_t (visual context), z_t (query)   →   out: â_t      L_motion = ‖â_t − a_t‖²
+```
+Visual tokens are downsampled by a strided 2D convolution over the patch grid (16×16 → 8×8) to cut
+compute, then `z_t` cross-attends to them and an MLP produces the action.
 
----
+**Shared backbone, one output head per embodiment.** The backbone (4.96M parameters) reads the
+behaviour from `z_t` against the visual context and is shared by every body; only the final
+projection is embodiment-specific (0.27M each: 18-D hexapod, 12-D quadruped), because action spaces
+of different dimensionality have no common coordinates. **95% of the decoder transfers**; adapting
+to a new body means fitting a small new head, not retraining the model.
 
-## Execution Plan
+Conditioning on `e_t` is what lets one latent decode to different joint values for different bodies,
+and the weights are **kept**, not discarded: the decoder is the only bridge from a latent action back
+to executable commands (`policy → z_t → MD → joint targets → robot`). This is the answer to the
+week-4 objection *"if the robot needs joint commands anyway, why convert to a latent and back?"* —
+the policy learns in the latent space because that part transfers; the decoder does the body-specific
+part. The conversion is exactly what separates the transferable from the non-transferable.
+
+### Loss
+
+```
+L = λ_recon · L_recon + λ_motion · L_motion          currently λ_recon = λ_motion = 1.0
+```
+LAC-WM reports no numeric λ. Note the two terms sit on different scales (reconstruction ≈ 1.3,
+motion ≈ 0.002 in standardised action units), so equal λ does not mean equal influence.
+
+### Simulator and data
+
+CoppeliaSim 4.10, Bullet 2.78, 20 Hz (50 ms timestep), rendering fixed across every body.
+
+| | |
+|---|---|
+| Bodies | short 0.5× / medium 0.75× / long 1.0× leg length, built and verified with `sim/make_leg_morphology.py` |
+| Action | joint position targets ∈ ℝ^18 (6 legs × 3 joints), radians |
+| Clip length | 66 frames (~3.3 s) — one expert episode |
+| Episodes | 100 forward-walk episodes per body, from a 1000-episode expert set |
+| Behaviours | forward walk only; turn and stop are excluded until they can be collected without a camera/path shortcut |
+| Camera | single fixed world-frame side view, 8 m distance, 15° FOV, 40° elevation, 256×256 |
+| Framing | `--cam_dx -0.6 --spawn 0 0` — the body stays fully in frame for all 66 frames and the floor edge stays out of view |
+| Train / held out | long + short / medium |
+
+The camera is **fixed in the world**, not tracking the robot, so the body visibly travels through a
+static frame — that world-frame travel is exactly what a joint encoder cannot report.
+
+### Why `a_t` must differ per body
+
+The decoder is `MD(e_t, z_t) → â_t`. If every body received identical commands, `a_t` would be the
+same per behaviour, `L_motion` would trivially force `z_t` to be body-independent, and the decoder
+would never need `e_t`. The result would be circular: *"of course the latent is body-independent —
+you fed every body the same action."*
+
+IK retargeting gives per-body-different `a_t` for the same Cartesian foot trajectory, so the decoder
+must read `e_t` to know which body it is looking at, and a `z_t` carrying pure behaviour becomes an
+earned result rather than an artefact of the data.
+
+## 4. Roadmap
 
 > **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
 > cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
 
-### Staged roadmap + timeline
 
 **Stage 1 — Cross-morphology** (3 leg lengths, **IK-retargeting**; shared 18-D space)
 *Goal: pipeline works end-to-end + latent organizes by behavior + latent beats raw-joint. Does **not**
@@ -235,13 +215,14 @@ source. IK is back to being the primary route; see the Step 0.5 section below fo
 
 | # | Step | Tests / produces | Status | ~Week |
 |---|---|---|---|---|
-| -1 | Morphology gap check | same command → different behavior per leg length | ✅ PASS | done |
-| 0 | Visual-encoder sanity | is the behavior signal present in `e_t`? (foot-contact decodable) | ✅ macro-F1 0.886 | done |
-| 1a | **Render-lock gate** | domain-UMAP across sessions/bodies must **overlap** (else everything downstream is invalid) | ✅ PASS on `data/ik_walk_all6` (mean repeat-decode 0.393 vs chance 0.333) | done |
-| 1b | Collect IK dataset | walk (6 expert episodes × 3 bodies × 3 repeats, 3564 frames) via IK-retargeting, fixed cam → per-body-different `a_t` | ✅ `data/ik_walk_all6` | done |
-| 1c | Train ITM + FTM + MD | `z_t`=64, fp16, trained on **long + short** only (medium held out) | ☐ | 2–4 |
-| 1d | Latent validation (two-sided) | behavior transfers **up** across legs **and** morphology decode **down** | ☐ | 4–5 |
+| -1 | Morphology gap check | same command → different behavior per leg length | passed | done |
+| 0 | Visual-encoder sanity | is the behavior signal present in `e_t`? (foot-contact decodable) | passed, macro-F1 0.886 | done |
+| 1a | **Render-lock gate** | domain-UMAP across sessions/bodies must **overlap** (else everything downstream is invalid) | passes between insect bodies, but the test is weak (repeats are re-runs in one session, not independent recordings) and it **fails between insect and B1** — see the framing note below | revisit |
+| 1b | Collect IK dataset | walk via IK-retargeting, fixed cam → per-body-different `a_t` | re-collecting as `data/ik_walk_100_framed` (100 episodes, framing fixed) | 1 |
+| 1c | Train ITM + FTM + MD | `z_t`=64, fp16, trained on **long + short** only (medium held out) | implemented in `wm/`; 3 runs done | done |
+| 1d | Latent validation (two-sided) | behavior transfers **up** across legs **and** morphology decode **down** | **half passes** — behaviour transfer up (+0.11 to +0.22 macro-F1); morphology decode stays **~99%** across all 3 runs | done |
 | 1e | Decisive ablation | latent-conditioned FDM vs raw-joint-conditioned FDM (diagnostic) | ☐ | 5 |
+| 1e′ | **Invariance ablation** (new, highest value) | shrink `z_dim` / adversarial head → does *forcing* invariance change transfer? Every outcome is informative | ☐ | 5 |
 | 1f | Transfer test: medium held-out | frozen ITM+MD (trained on long+short) predicts `â_t` from medium's own frames; score against medium's real IK actions (`L_motion`) + gait-diagram similarity. **Note**: medium is not a simple interpolation of long/short in embedding space (perpendicular distance from the long↔short line ≈ long↔short distance itself) — this is closer to mild extrapolation than the easy case. | ☐ | 5–6 |
 
 **Stage 2 — Cross-embodiment / compositional transfer** (train 6-leg insect + B1, test 4-leg insect)
@@ -251,17 +232,44 @@ new 4-leg insect that combines insect appearance with quadruped leg count.*
 
 | # | Step | Tests / produces | Status | ~Week |
 |---|---|---|---|---|
-| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | ✅ `data/b1_v1` | done |
-| 2b | 4-leg insect candidate | **"middle-loss"** variant (remove ML/MR, keep front+hind legs) picked from a 3-way preview — front-loss falls, hind-loss spins/drifts, middle-loss moves forward (ugly but usable). Still needs its own walker/data source (self-trained, PPO) — the lab's cutlegs AIRL policy is unusable. | 🔄 candidate picked, walker not yet trained | 7–8 |
+| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | `data/b1_v1` | done |
+| 2b | 4-leg insect candidate | **"middle-loss"** variant (remove ML/MR, keep front+hind legs) picked from a 3-way preview — front-loss falls, hind-loss spins/drifts, middle-loss moves forward (ugly but usable). Still needs its own walker/data source (self-trained, PPO) — the lab's cutlegs AIRL policy is unusable. | candidate picked, walker not yet trained | 7–8 |
 | 2c | Train latent WM across {6-leg insect, B1} | shared ITM/FTM backbone (vision is embodiment-agnostic) + **per-embodiment Motion Decoder head** (18-D / 12-D) — see diagram `report/pipeline_diagram_stage2_cross_embodiment.png` | ☐ | 8–9 |
 | 2d | Held-out 4-leg test | 4-leg's action space is new (not 18-D, not 12-D) → **cannot be zero-shot** like Stage 1's medium test. Freeze ITM/FTM, fit a small **new** head on a little real 4-leg `(frame,action)` data (few-shot, N=5/10/20/50/100), then score `L_motion` | ☐ | 9–10 |
 | 2e | Cross-embodiment validation | behavior/contact transfer across embodiments; embodiment decode down | ☐ | 10 |
+
+> **Data quality — read before trusting any pre-2026-08-07 number.**
+> The fixed camera was anchored to the robot's *start* pose with a 0.75 m runway aim, so the
+> robot began **outside the right image edge** and walked in: **67% of all frames were clipped**,
+> and unequally per body (long 70% / medium 66% / short 58%). Morphology decodability was
+> therefore partly measuring *framing*. The floor (only 5×5 m) also intruded into frame.
+> Fixed with `--cam_dx -0.6 --spawn 0 0` → 0/66 clipped, no floor edge, and **13,000 usable
+> transitions instead of 3,800**. Measured benefit: **3.4× faster learning per gradient step**.
+>
+> **What this fix does NOT explain.** Held-out-body error tracks **training length**, not framing:
+> both good runs sat at ~9.5k steps (clipped 0.166, clean 0.179) while the bad one ran 30.9k
+> (clipped 0.422). Clean frames were never trained past 9.5k, so clean-vs-clipped is perfectly
+> confounded with short-vs-long training. **Over-specialisation remains the leading explanation for
+> the cross-body collapse, and it is untested on clean data** — that run (clean frames to ~31k
+> steps) is the decisive experiment. Everything in `PROGRESS.md` §16.
+>
+> **B1 was never actually render-locked to the insect.** Both cameras anchor to their own
+> robot's start, and B1 replays at raw MuJoCo coordinates, so the two stand on different parts
+> of the floor: backgrounds differ across **27% of pixels** (insect long-vs-short: 0.29/255).
+> Uncorrected, Stage 2's "embodiment decodable from `z`" would have measured background.
+> Fixed by giving `render_b1_replay.py` the same `--spawn` / `--cam_dx` / `--travel`.
 
 *Detailed write-ups of each Stage-1 step follow below.*
 
 ---
 
-### Step -1 — Morphology Gap Check ✅ **PASS**
+## 5. Steps
+
+Every step follows the same shape: what it tests, how, what came out, and where it stands.
+Stage 1 runs Steps -1 through 2; Stage 2 reuses the same numbering on the cross-embodiment data.
+
+### Step -1 — Morphology gap check
+**Status** done, passed.
 **Goal**: confirm short leg and long leg actually behave differently under same command
 
 | Task | Send identical joint command to short leg and long leg |
@@ -286,7 +294,7 @@ Front-left foot shows it most clearly: long/base has sharp swing peaks to ~0.39 
 visibly different rhythm. Identical commands → qualitatively different gait character, not just a scaled
 version of the same motion.
 
-> ⭐ **Step -1 is not merely a sanity check — it is the evidence base for the entire motivation.**
+> **Step -1 is not merely a sanity check** — it is the evidence base for the whole motivation.
 > See "The Motivation Problem" below. These numbers are what justify needing a latent action at all.
 
 **Caveat (honest)**: the PASS is a human read against the plan's own qualitative criterion ("visually distinct
@@ -295,181 +303,233 @@ automated gate.
 
 ---
 
-### Step 0 — Visual Encoder Sanity Check
-**Goal**: confirm V-JEPA2 frozen features are meaningful for legged locomotion before any training
+### Step 0 — Visual encoder sanity check
+**Status** done, passed.
+**Goal**: confirm frozen V-JEPA2 features carry usable behaviour information before training anything.
 
-## ✅ RESULT — PASS (2026-07-17, walk-only pilot, real stick insect)
+**Data**: 3 morphologies × 5 episodes × 200 steps, render-locked. Labels are **6-bit foot contact**
+(which feet are planted) — a real body-pose quantity, measured from force sensors. An earlier
+`step mod 64` time label was dropped: the gait CSV is a hand-trimmed loop, so it measured an
+artefact rather than pose, and it understated the encoder by ~17 points.
 
-*(Previously blocked: the scene had no camera, so all earlier V-JEPA2 work ran on B1 quadruped footage from
-other renderers. Camera + recorder built 2026-07-17; this is the first run on the actual subject, so Ajan Go's
-gate — "test Visual Encoder first" — is now genuinely addressed.)*
-
-**Data**: 3 morphologies × 3 episodes × 200 steps = **1800 frames**, locked render environment.
-`sim/collect_step0.py` → `scripts/step0_encode.py` → `scripts/step0_analyze.py`.
-Gait period verified empirically = **exactly 64 steps** (`a_t` repeats bit-exactly at 64/128/192) → phase labels
-are exact, not estimated. **`a_t` is bit-identical across every morphology and episode** → any morphology signal
-in `e_t` is *purely visual*.
-
-### ✅ Check 1 (THE GATE) — phase IS decodable → **PASS**
-| probe | accuracy | chance |
+| | within one body | across bodies (train 2, test held-out) |
 |---|---|---|
-| linear probe (random 5-fold) | **85.1% ± 5.6** | 12.5% |
-| linear probe (**grouped** CV — whole episode held out, no frame leakage) | **92.7% ± 1.8** | 12.5% |
-| k-NN (k=5) | 75.3% ± 8.9 | 12.5% |
-| **shuffled-label control** | **12.3%** ≈ chance | 12.5% |
+| foot-contact decode | **85.1%** | **55.2%** |
 
-Shuffle control lands exactly on chance → **signal is real, not overfitting**. (Mandatory check: 1408 dims vs
-~1440 training samples.) **The ITM has something to extract.**
+Foot contact is highly decodable within a body and **transfers only partially across bodies**
+(85% → 55%). That residual is the gap ITM + cross-augmentation exist to close, and it is the
+baseline Step 1.5 must beat. Current headline figure: **macro-F1 0.886** (`scripts/step0_macro_f1.py`).
 
-### 📊 Check 2 (BASELINE, not a gate) — morphology dominates, exactly as predicted
-- **morphology probe = 99.9% ± 0.1** (chance 33.3%); shuffle control 34.2% ≈ chance
-- **silhouette(`e_t` | morphology) = +0.0835**, between-class var **22.4%** ← Step 1.5 must LOWER
-- ~~silhouette(`e_t` | phase) = **−0.0222**, between-class var 7.6% ← Step 1.5 must RAISE~~
-  **⚠️ RETRACTED 2026-07-19.** `phase` is `(step % 64) // 8`, an artefact of the hand-chosen 64-step trim,
-  not an expert gait annotation (`scripts/step0_encode.py:65`). The number regenerates exactly but measures
-  an artificial variable, so it cannot serve as a Step 1.5 target. **Restate this target against
-  `contact_8`** (6-bit which-feet-planted) before Step 1.5 is evaluated. See `report/NUMBERS.md` §3.0.
+**Morphology is ~100% decodable from raw `e_t`, and that is expected, not a failure.** A 0.5× leg
+genuinely looks different from a 1.0× leg; an encoder blind to that would be a worse encoder.
+Removing morphology is the ITM's job, not the encoder's. Record it as the **baseline** against
+which `z_t` is compared.
 
-### 🔑 THE KEY FINDING — the phase code is **morphology-entangled**
+> **Report probe *and* silhouette — they answer different questions.**
+> Silhouette measures **dominance** (is this the main axis of variation?); a probe measures
+> **presence** (is it there and linearly extractable?). They can disagree completely: a signal
+> silhouette calls absent (≈0) can be 85–93% decodable, because Euclidean distance in 1408-d is
+> swamped by everything else. QWM (App. F-E) reports silhouette only; reporting both is a
+> differentiator, and reporting one alone gives the wrong answer.
 
-> ⚠️ **The numbers in this section use the retracted `phase` artefact label.** The *conclusion* survives,
-> because the same within/across collapse was later reproduced with the `contact_8` label
-> (83.7% within → 41.3% across, `report/NUMBERS.md` §3). But every figure in the table below must be
-> regenerated against `contact_8` before it is quoted. Do not present these values.
+**Failure condition** (not triggered): `e_t` carries no behaviour information at all → ITM has
+nothing to extract. The response would be partial fine-tuning of the last V-JEPA2 blocks, or
+revisiting camera framing/resolution (the 16×16-patch caveat vs thin legs). We have seen this for
+real on B1 footage, where render style so dominated `e_t` that behaviour signal was undetectable.
 
-| | phase accuracy |
-|---|---|
-| **within** one morphology | long **97.3%** · medium **96.3%** · short **93.8%** |
-| **across** morphologies (train on 2, test held-out) | long **39.0%** · medium **34.8%** · short **27.0%** |
+**Caveat**: contact labels derive from one animal's replay with a non-smooth loop. Raw forces
+are stored, so alternative labels can be tried without re-collecting.
 
-Phase is nearly perfectly readable *inside* a body but **does not transfer between bodies** (93–97% → 27–39%).
-**Each morphology has its own phase manifold** — visible in the UMAP: three separated islands, phase varying
-*within* each island, no global phase structure.
+*Abandoned approach, kept only as a warning: per-patch temporal-similarity heatmaps were tested on
+three backgrounds and gave no reliable signal (r = −0.16 / −0.20 / −0.006). The problem was the
+per-patch method itself, not the background. Blank patches fluctuate **most** — a known ViT
+artefact, and the reason the floor must be matte and mildly textured rather than flat.*
 
-> **This is exactly the gap ITM + cross-augmentation exist to close — now measured.**
 
-#### 🔧 UPDATE (v2, 2026-07-18) — part of that gap was a WEAK LABEL, not the encoder
-The 27–39% above used `phase = step mod 64` — a *time* label. But `a_t` is a trimmed CSV loop (not a natural
-period, loop seam jumps 14.75°), and identical commands ≠ identical pose across bodies (a short leg plants its
-foot earlier). So we re-collected with **foot-force ground truth** (`data/step0_v2`, 3×5×200 = 3000 frames)
-and relabelled by **6-bit foot contact** (which feet are planted — a real body-pose label, the same quantity
-Ajan YuChen's own notebooks use). Cross-morphology transfer, per label:
+### Step 0.5 — Per-body actions
+**Status** done. Blocks Step 1: identical commands across bodies make the latent vacuous.
 
-| label | within-body | **across-body** | transfer |
-|---|---|---|---|
-| `step mod 64` (time, old) | 92.5% | 38.4% | 0.42 |
-| **6-bit foot contact (new)** | 85.1% | **55.2%** | **0.65** |
+**Verified 2026-07-21**: `a_t` is **bit-identical across all three bodies** in every collected episode.
+`np.array_equal` is True for each pair; variance across bodies at fixed `t` is 7.2e-16, i.e. machine
+epsilon. Confirmed on `data/step0_v2/{long,medium,short}_ep0.npz`.
 
-→ **+17 points** just by labelling true pose instead of time. So the encoder is *better* than v1 implied;
-part of the "entanglement" was measurement error. **But 55% ≠ 100%**, so a real morphology-entangled residual
-remains — that is the genuine gap for Step 1.5.
-**Revised Step 1.5 target: raise cross-morphology contact-transfer from 55% upward, morphology probe below 99%.**
-Use **6-bit contact as the primary label** henceforth, not step-mod-64. (`scripts/step0_analyze_v2.py`,
-`step0_v2_labels.png`.)
-🔴 Caveat: contact label still derives from one animal's replay with a non-smooth loop — must be recollected
-once a proper per-morphology expert (lab CPG / AIRL) exists. Raw forces are saved, so other labels can be
-tried without re-collecting.
+**This is correct and intentional for Step -1.** Holding the command constant is exactly what makes the
+morphology-gap test valid: identical input, different outcome. The problem is that the Step 0 dataset
+inherited it, and **Step 1 cannot run on data with this property.**
 
-### ⚠️ Methodological finding — silhouette alone would have given the WRONG answer
-`silhouette(e_t | phase) = −0.0222` says *"no phase signal"*. The probe says **85–93%**. Both are right:
-- **silhouette measures DOMINANCE** (is it the main axis of variation?) → phase is not.
-- **a probe measures PRESENCE** (is it there and linearly extractable?) → phase is.
+**Why identical `a_t` makes the latent action vacuous**
 
-Euclidean geometry in 1408-d is swamped by non-phase variance. Check 3 (noise floor) confirms: same-phase pairs
-40.23 vs different-phase 44.93 — only **1.12×**, i.e. phase contributes almost nothing to raw distance.
-**QWM (App. F-E) reports silhouette only** — we must report **both**, or we would wrongly call a present signal
-absent. Applies to Step 1.5.
+`L_motion = ‖MD(z_t) − a_t‖²` is the only loss that grounds `z_t` to actions. With `a_t` shared:
 
-### ⚠️ Step 0's criteria were REWRITTEN (2026-07-17) — the original ones were logically wrong
+- MD sees the same target regardless of which body produced the frame, so **nothing pushes it to
+  condition on the body at all**. It can satisfy the loss as a function of timestep alone, ignoring `z_t`.
+- There is **no retargeting to learn**, because the command was already body-independent before training.
 
-**The original spec said**: *Pass = "morphology doesn't dominate raw `e_t`"; Fail = "morphology dominates →
-sim domain gap severe → partial fine-tune last 2 V-JEPA2 blocks"*, with pass criterion
-*"silhouette by behavior > silhouette by morphology"*.
+Note what this does *not* break: training still converges, and the factorisation stays self-consistent
+(`e_t` carries morphology at 99.9%, `z_t` shared, `a_t` shared). **What breaks is the claim.** Asserting
+"`z_t` is a body-independent action representation" invites the immediate reply: *the action was already
+body-independent, so what did the model contribute?* There is no good answer.
 
-**Why that was wrong:**
-1. **A 0.5× leg genuinely LOOKS different from a 1.0× leg.** An encoder that *failed* to separate them would be
-   blind to real visual content — that would be a **worse** encoder, not a better one.
-2. **If raw `e_t` were already morphology-agnostic, the ITM would be unnecessary** — the whole pipeline exists
-   precisely because it is not. Removing morphology is **ITM + cross-augmentation's job, not the encoder's**.
-3. **The criterion would fail by construction.** Leg length is a large, static, global visual difference; gait
-   phase is a subtle, local, dynamic one. On raw embeddings morphology wins essentially always.
-4. **The fail action didn't follow.** "Morphology dominates" ≠ "sim domain gap" — different phenomena.
-   Fine-tuning cannot fix the former, and shouldn't: we *want* the encoder to see the legs.
+**What is actually being represented (the question this resolves)**
 
-**Step 0 is about INFORMATION PRESENCE, not INVARIANCE.** Ajan Go's actual gate was that the encoder must
-separate robot (High Relation) from background (Low Relation) — not that it be morphology-blind.
-
-| | Question | Pass condition |
-|---|---|---|
-| **Check 1** | **Does `e_t` carry gait-phase information?** (the signal ITM must extract) | phase is **decodable** from `e_t` — linear probe / k-NN above chance; silhouette by phase-bin > noise floor |
-| **Check 2** | **Does `e_t` separate the morphologies?** | **Expected YES — this is NOT a failure.** Record it as the **baseline** (see below). |
-| **Check 3** | **Noise floor** — frozen/standing robot control | `e_t` should be near-constant. Quantifies how much `e_t` variation is real signal vs encoder noise. **Free to produce: just don't actuate the joints.** |
-| ~~old Check 3~~ | ~~Temporal similarity heatmap~~ | ❌ **ABANDONED — see below** |
-
-### 💡 Check 2 is the "before" of a before/after result — not a gate
+There is **no joint→joint and no foot→foot correspondence anywhere in the architecture**. `z_t ∈ ℝ^64` is
+unconstrained; only the two losses shape it. `contact_8` is the **evaluation label, never a training
+signal** — it is the ruler, not the target. The intended factorisation is:
 
 ```
-Step 0    silhouette(e_t | morphology)  = HIGH   <- encoder plainly sees leg length      [baseline]
-Step 1.5  silhouette(z_t | morphology)  = LOW    <- ITM abstracted it away               [the result]
-          silhouette(z_t | contact_8)   = HIGH   <- ...while keeping behavior
-                                                    (was "phase"; retracted, see Check 2)
+e_t  = which body this is        (measured: 99.9% decodable)
+z_t  = what movement happened    (hoped to be body-independent; nothing enforces it)
+MD   = re-expresses z_t as THIS body's joint command
 ```
-**The delta between these is the contribution.** Same metric QWM uses (App. F-E: silhouette + between/within
-class variance decomposition) — they only ever measured the morphology-negative side; measuring **both** sides
-is our differentiator. So Step 0 must *quantify* morphology separation, not merely tolerate it.
 
-### The ONE real failure condition
-**`e_t` carries no phase information at all** → the ITM has nothing to extract → genuinely fatal.
-*Only then* does the response become: partial fine-tune of the last 2 V-JEPA2 blocks, or revisit camera
-framing/resolution (recall the 16×16-patch caveat vs thin legs). We have seen this failure mode for real: on the
-B1 footage, render style so dominated `e_t` that behavior signal was undetectable.
+That last line is only meaningful once `a_t` differs per body. **Then** `z_t` means something like
+"swing the left-middle leg forward" and MD means "for long legs that is this joint vector, for short legs
+another." That is the thesis claim, and it is untestable on the current data.
 
-**Check 3 — ABANDONED (tested and failed on 3 different backgrounds)**
+**Requirement**
 
-The idea: per-patch cosine similarity between consecutive frames; expect background (static) → high similarity,
-legs (moving) → low. Intended to answer Ajan Go's "High Relation vs Low Relation" question.
+Each morphology needs its **own** command sequence for the same locomotion task, so that identical
 
-Result: **no reliable signal on any background tried.** The predicted positive relationship never appeared:
-
-| Background | Video | Result | Cause |
+*behaviour* maps to different *joint values*.
+| Route | Cost | Behaviour correspondence | Verdict |
 |---|---|---|---|
-| Checkerboard | `forward_walk.mp4` | r = **−0.16**, p = 7.6e-24 | aliasing — pixels change without real motion |
-| Blank white | `removebg_forward_walk.mp4` | r = **−0.20**, p = 4.7e-37 | **empty patches fluctuate the MOST** — known ViT artifact (blank tokens repurposed as internal compute space) |
-| Thin grid | `play-step-0_realtime.mp4` | r = **−0.006**, p = 0.70 | negative bias removed, but noise floor remains — no positive signal |
+| **IK retargeting** (Cartesian foot trajectory → `simIK` per body) | zero training | holds by construction | **current route** |
+| AMP policy per body | ~0.5–1 GPU-day per body | via a shared discriminator, not by construction | rejected — gaits stayed uncoordinated; kept as a negative-result baseline (`PROGRESS.md` §13) |
 
-**Conclusion: the problem is the per-patch method itself, not the background.** Dropped as primary evidence.
-Scripts retained for reference: `scripts/temporal_similarity_{heatmap,quantified,correlation}.py`.
-The planned negative control (stop-clip → flat heatmap) was **never implemented** — so there is no evidence
-ruling out that this line was noise from the start.
+IK is not merely the cheaper option, it is the cleaner experiment: it fixes the behaviour and varies
+only the joint values, which is precisely the retargeting the Motion Decoder is supposed to discover.
+A per-body RL policy gives different `a_t` with no guarantee the behaviours correspond — which is the
+failure AMP actually ran into.
 
-→ **Ajan Go's High/Low Relation question is now answered by Check 1/2 instead** (whole-frame `e_t`, which
-averages over 256 patches and doesn't inherit this per-patch noise floor).
+**Dataset**: 100 expert episodes × 3 bodies, forward walk only, collected with the framing fix
+(`--cam_dx -0.6 --spawn 0 0`; see the data-quality note in the roadmap). Turn and stop are excluded
+for now — those clips carried a camera/path shortcut that let a probe separate them too easily to trust.
+IK is not merely the cheaper option, it is the cleaner experiment: it fixes the behaviour and varies only
+the joint values, which is precisely the retargeting the Motion Decoder is supposed to discover. A
+per-body RL policy would give different `a_t` but no guarantee the behaviours correspond, which
+reintroduces a confound — which is exactly the failure mode AMP ran into.
 
-**Requirements for the re-run** (learned the hard way):
-- **Quantitative metrics, not eyeballing.** `scripts/umap_domain_check.py` currently has **zero** — its
-  "3 non-overlapping clusters" conclusion is a visual read of a *stochastic* UMAP projection, and UMAP is known
-  to manufacture apparent separation. Report **silhouette score + between/within-class variance** (QWM App. F-E
-  methodology); use UMAP only as an illustration, never as evidence.
-- Implement the **frozen-robot negative control** (noise floor).
-- **Report, don't gate, the morphology separation** — it is the baseline for Step 1.5.
+**Anticipated objection**: if `a_t` is generated as `IK(trajectory, body)`, is learning MD just learning
+IK? Yes, and that is the point worth stating plainly — the claim is that **the model recovers body-specific
+retargeting from observation alone, without being given the kinematics**. State it that way rather than
+letting a reviewer frame it as circular.
 
-**Step 0 pilot scope (walk-only)** — see "Data collection policy" in the Decisions table:
-with only the walk gait available, "behavior" collapses to **gait phase**. That is still a real and sufficient
-test of Check 1: *does `e_t` encode where in the stride we are, rather than which body it is?* Phase labels come
-free — the gait is a deterministic 63-row CSV loop, so phase is recoverable from the step index (verify the
-period empirically against the recorded `a_t`, which is identical across morphologies by construction).
+**IK also delivers walk / turn / stop — same task, not a separate one**
 
-| Pass | phase decodable from `e_t` above the frozen-control noise floor → ITM has something to work with → proceed to Step 1 |
-|---|---|
-| Fail | phase not decodable → partial fine-tune last 2 V-JEPA2 blocks, and/or revisit camera framing/resolution |
-| Record (not a gate) | silhouette(`e_t` \| morphology) — the **baseline** that Step 1.5's `z_t` must beat |
+The Turn/Stop-behaviours gap (see "Decisions Still Needed") is **not a separate work item; IK resolves it
+in the same step.** IK defines a behaviour as a Cartesian foot trajectory, so adding behaviours is adding
+trajectories, not building a new system:
+- walk = feet cycle forward
+- turn = left/right feet cycle at different rates
+- stop = feet held stationary
 
-> Ajan Go: test Visual Encoder first, do not proceed to Step 1 until this passes — must show the encoder
-> separates robot features (High Relation) from background (Low Relation)
+Each is solved per body: `IK(behaviour, body) → a_t`. So a single successful IK pipeline unblocks three
+things at once: per-body `a_t` (this section), the K-means(K=3) test in Step 1.5, and the "≥3 behaviours"
+answer to the ICLR critique.
+
+Sequencing: **get IK working on walk first** (proves retargeting), then add turn/stop as extra
+trajectories. Two cautions when adding them:
+- **turn vs drift**: `turn` is *commanded* heading change, but the open-loop gait also *drifts*. The metric
+  must separate commanded turning from uncommanded drift (reuse the path-length / net-displacement split
+  from Step -1), or `turn` and `walk-that-drifted` will be conflated.
+- **stop may be too easy**: a stationary body gives near-static frames the encoder can separate trivially,
+  inflating behaviour-decode. Check whether `stop` makes the result look better than it is.
+
+**Gate**: verify `a_t` differs across bodies before any Step 1 training run. Re-run the check above and
+require variance well above machine epsilon.
 
 ---
 
-## 🔴 CRITICAL CONFOUND — Render-Style Dominance (threatens Step 1.5's validity)
+### Step 1 — Train the pretraining pipeline
+**Status** done, three runs; see `results/wm/README.md`.
+**Goal**: train ITM + FTM + Motion Decoder on short + long leg
+
+**Blocked on Step 0.5.** Training on bit-identical `a_t` produces a result that cannot be defended.
+
+| Task | Train on short + long leg data, cross-augmentation on, LoRA off |
+|---|---|
+| Monitor | L_recon and L_motion both decreasing over training |
+| Sanity check mid-training | sample z_t every 10k steps → UMAP should show emerging structure |
+| Pass criterion | L_recon converges, L_motion < threshold → proceed to Step 1.5 |
+| Fail | loss not converging → check λ weighting, learning rate, data pipeline |
+
+---
+
+### Step 1.5 — Latent validation
+**Status** done. Behaviour transfer passes; morphology invariance does not.
+**Goal**: prove z_t is morphology-agnostic before testing transfer
+
+| Task | Collect z_t from short + long + medium leg × 3 behaviors |
+|---|---|
+| Check 1 | UMAP colored by behavior → 3 clusters (walk / turn / stop) visible |
+| Check 2 | UMAP colored by morphology → no separation between short / long / medium |
+| Check 3 | K-means (K=3) → cluster labels match behavior labels (quantitative) |
+| Pass | clusters by behavior, not morphology → proceed to Step 2 |
+| Fail | clusters by morphology → fallback to **UniSkill** (see below — *not* HiLAM, which was the wrong fallback) |
+
+> **Result — the two sides came apart, and that is the finding.**
+> Across three runs differing in every respect (6 vs 100 episodes, clipped vs clean frames,
+> 9.7k vs 31k steps), morphology stays **~99% decodable from `z`** every time. Its *dominance*
+> falls (silhouette 0.034→0.015, between-class variance 8.1%→4.7%) but its *presence* never does.
+>
+> **Structural cause, not a training failure:** no term in the objective removes body identity.
+> `L_recon` and `L_motion` both condition on `x_t`, which already carries morphology, so neither
+> penalises `z` for carrying it too. Cross-augmentation blocks a *different* shortcut. This is
+> almost certainly true of LAC-WM as well — they report only UMAP pictures, never a probe.
+>
+> **Yet transfer works anyway:** `z` predicts an unseen body's joint commands at 0.18 vs 1.67
+> with the latent ablated, and beats raw `e_t` on cross-body behaviour transfer by +0.11 to +0.22.
+>
+> So **invariance and transferability are separable** — the field assumes you need the first to
+> get the second; our data says you do not. This is currently the most novel thing the project has.
+> It is a hypothesis, not a conclusion: only 3 bodies, all sharing 18-D, and we have **not** tested
+> *forcing* invariance. That test (Step 1e′) is the decisive one, and every possible outcome is
+> publishable — transfer unchanged (invariance unnecessary), improved (we found the fix), or
+> degraded (body information in `z` is actively useful).
+>
+> **Also settled:** standard validation cannot see cross-body failure. In `stage1_100ep_clean`,
+> `val_motion` improved **9.3×** (0.0122 → 0.0013) from epoch 2 to 20 while held-out-body error
+> did not improve at all. Validation splits by episode within the *training bodies*; a new body is
+> a different distribution, not a held-out sample. `wm/train.py` now logs `heldout/motion` per
+> epoch and snapshots checkpoints so this is visible rather than inferred.
+
+> Note: failure mode = z_t encoding body-shape visual features instead of motion.
+> In LAC-WM this was viewpoint clustering. In our work it would be morphology clustering.
+
+---
+
+### Step 2 — Transfer to an unseen morphology
+**Status** open.
+**Goal**: prove pretrained World Model reduces data needed for medium leg
+
+| Task | Fine-tune ITM + FTM on N medium leg episodes using LoRA rank 2 |
+|---|---|
+| Condition A | pretrained FTM + N episodes |
+| Condition B | scratch FTM + N episodes (baseline) |
+| Vary N | 5 / 10 / 20 / 50 / 100 episodes |
+| Metric | L_recon on held-out medium leg test set |
+| Pass | pretrained reaches same L_recon as scratch with significantly fewer episodes |
+| Fail | no gap between pretrained and scratch → z_t did not transfer → revisit Step 1.5 |
+
+> Ajan Go: main claim = "World Model ลด training time อย่างชัดเจน"
+> This is interpolation (medium leg is between short and long) — not extrapolation
+
+---
+
+### Step 3 — Extrapolation
+**Status** open, out of proposal scope.
+**Goal**: test morphology outside training range
+
+> Out of pre-proposal scope. Good future direction if Steps 1-2 succeed.
+
+---
+
+## 6. Risks and confounds
+
+Things that can make a clean-looking result meaningless. Each has a mitigation that must be in
+place *before* the measurement it threatens.
+
+### Render-style dominance
 
 **The finding** (`scripts/umap_domain_check.py`, logged in `PROGRESS.md §5`): three videos of the **same
 behavior** (walking), rendered by three different setups (white bg / IsaacSim grid / MuJoCo checkerboard),
@@ -502,8 +562,6 @@ would look clean and be meaningless. This confound is invisible unless controlle
 
 ---
 
-## 🎯 THE MOTIVATION PROBLEM — why do we need a latent action at all?
-
 **Three independent sources converge on the same objection. It is currently unanswered.**
 
 1. **Ajan Blink, Week 4** (recorded in `feedbacks/feedback_ajan_go.md:21-23`): *"if the policy and robot
@@ -520,7 +578,9 @@ would look clean and be meaningless. This confound is invisible unless controlle
 
 **A reviewer will ask: "why do you need a latent action if every body takes the same 18-dim command?"**
 
-### The answer — reframe the motivation
+### Motivation: why a latent action at all
+
+**The reframing**
 Not **action-space heterogeneity** (we have none) but **dynamics heterogeneity**: identical joint commands
 produce *materially different motion* depending on leg length. **Step -1 already proved this** — same command,
 3.49 m vs 4.77 m, and swing clearance 0.13–0.16 m (consistent) vs 0.05–0.38 m (erratic).
@@ -531,197 +591,85 @@ leg lengths, kept physically grounded by the motion-decoding loss so it can't co
 
 **Be explicit in the writeup that this is a reframing, not what LAC-WM tested.**
 
-### The decisive experiment (promoted from "optional baseline" to load-bearing)
-**Latent-conditioned FDM vs. raw-joint-conditioned FDM (single shared 18-dim encoder).**
-This is EAC-WM ported *honestly* to our setting. **If the latent doesn't beat raw joints, the thesis is
-hollow.** Run it early — knowing this in month 1 is worth far more than in month 3.
+**What counts as evidence**
 
-> **UPDATE (2026-07-25) — refined; keep the ablation but demote it from "sole decider," and do NOT judge it by a
-> raw loss comparison.** A one-step loss comparison of `F(e_t, z_t)` vs `F(e_t, a_t)` is **unfair**: `z_t` is
-> inferred by the ITM from `(e_t, e_{t+1})`, so it has already seen the target frame, and it is 64-dim vs `a_t`'s
-> 18-dim — a free information/capacity edge that lowers its loss regardless of any real transfer benefit. Current
-> position (matches proposal §3.6.3 and the deck):
-> - **Primary / decisive evidence = the two-sided probe** — `z_t` *raises* cross-morphology behaviour transfer
->   AND *lowers* morphology decodability vs raw `e_t`, both at once. Needs only the held-out body's video.
-> - **Value-over-raw** is tested by (1) **adaptation efficiency** (episodes to a target error: pretrained-on-`z`
->   vs pretrained-on-raw vs from-scratch) and (2) the **availability argument** (the correct `a_t` for a new body
->   needs its kinematics via IK — privileged; `z_t` comes from vision, so a *tie* already wins).
-> - The `F(e_t, z_t)` vs `F(e_t, a_t)` vs `F(e_t, 0)` comparison stays as **Step E**, run early, as a *diagnostic*
->   (with the observation-only control `F(e_t, 0)` to isolate the action's contribution) — not as "if the latent
->   loses, the thesis is hollow." The probe is what's load-bearing.
+**Not a raw loss comparison.** Comparing `F(e_t, z_t)` against `F(e_t, a_t)` one-step is unfair to
+the baseline: `z_t` is inferred by the ITM from `(e_t, e_{t+1})`, so it has already seen the target
+frame, and it is 64-dim against `a_t`'s 18 — a free information and capacity edge that lowers its
+loss regardless of any real transfer benefit.
 
-### Also open: Ajan Blink wants real extrapolation
+Three things carry the argument instead:
+
+1. **Held-out-body motion prediction with latent ablations.** Predict an unseen body's joint
+   commands from its video alone, and compare against zeroed and shuffled `z`. Measured on Stage 1:
+   **0.18 with `z` vs 1.67 ablated** — the latent is doing the work, not the frame.
+2. **Adaptation efficiency** — episodes needed to reach a target error, pretrained-on-`z` vs
+   pretrained-on-raw vs from scratch (N = 5/10/20/50/100).
+3. **The availability argument** — the correct `a_t` for a new body requires its kinematics via IK,
+   which is privileged information; `z_t` comes from vision alone. A tie already favours the latent.
+
+`F(e_t, z_t)` vs `F(e_t, a_t)` vs `F(e_t, 0)` stays as an early **diagnostic** (Step 1e), with the
+observation-only control isolating the action's contribution.
+
+> **On the two-sided probe.** The ideal is that `z_t` raises cross-morphology behaviour transfer
+> *and* lowers morphology decodability. On Stage 1 **only the first half holds**: behaviour transfer
+> improves by +0.11 to +0.22 macro-F1 while morphology stays ~99% decodable in every run. Report both
+> halves; the second is a finding, not a gate. The structural reason is in Step 1.5.
+
+**Extrapolation beyond the training range**
 He explicitly corrected short+long→medium as *"just Interpolation."* Currently **no out-of-range morphology
 exists**. `sim/make_leg_morphology.py` makes this nearly free — generating a **1.25×** (or 0.35×) 4th variant
 answers him with one command. Cheap, high-value.
 
 ---
 
-### 🔴 Step 0.5 — PRECONDITION: per-body actions (blocks Step 1)
+## 7. Fallbacks
 
-**Verified 2026-07-21**: `a_t` is **bit-identical across all three bodies** in every collected episode.
-`np.array_equal` is True for each pair; variance across bodies at fixed `t` is 7.2e-16, i.e. machine
-epsilon. Confirmed on `data/step0_v2/{long,medium,short}_ep0.npz`.
+### HiLAM — not the right fallback for this failure mode
 
-**This is correct and intentional for Step -1.** Holding the command constant is exactly what makes the
-morphology-gap test valid: identical input, different outcome. The problem is that the Step 0 dataset
-inherited it, and **Step 1 cannot run on data with this property.**
+Original plan was: freeze ITM → dynamic-chunk `z_t` sequences → skill-level `z^h`, hoping `z^h` clusters by
+behavior more cleanly than flat `z_t`. **After reading the paper (`doc/2603.05815v1`), this is a mismatch.**
 
-#### Why identical `a_t` makes the latent action vacuous
+- HiLAM solves **temporal abstraction** ("existing LAMs... focus on short-horizon frame transitions... capture
+  low-level motion while overlooking longer-term temporal structure") — **not embodiment invariance**.
+- Its chunking operator is a boundary rule over feature dissimilarity between **temporally-adjacent tokens
+  within a single video**. There is **no cross-embodiment alignment objective anywhere in it** — no mechanism
+  to disentangle nuisance (body) from behavior, no contrastive/alignment term across agents.
+- Therefore: if `z_t` already encodes morphology strongly, chunking **pools existing features** and would build
+  a *separate* skill hierarchy per body — **inheriting and reifying** the morphology clustering, not fixing it.
+- Its experiments are 100% LIBERO tabletop manipulation. **No locomotion. No code released.**
 
-`L_motion = ‖MD(z_t) − a_t‖²` is the only loss that grounds `z_t` to actions. With `a_t` shared:
+**HiLAM is only the right fallback if the failure mode is "z_t captures only short-horizon kinematics and
+misses longer behavioral structure" — a different problem than the one we fear.**
 
-- MD sees the same target regardless of which body produced the frame, so **nothing pushes it to
-  condition on the body at all**. It can satisfy the loss as a function of timestep alone, ignoring `z_t`.
-- There is **no retargeting to learn**, because the command was already body-independent before training.
+### UniSkill — the correct fallback
 
-Note what this does *not* break: training still converges, and the factorisation stays self-consistent
-(`e_t` carries morphology at 99.9%, `z_t` shared, `a_t` shared). **What breaks is the claim.** Asserting
-"`z_t` is a body-independent action representation" invites the immediate reply: *the action was already
-body-independent, so what did the model contribute?* There is no good answer.
+**UniSkill** (Kim et al. 2025, CoRL) — *"Imitating Human Videos via Cross-Embodiment Skill Representations"*.
+- Explicitly targets **cross-embodiment skill representation** — exactly the failure mode of Step 1.5.
+- Telling detail: **HiLAM itself uses UniSkill's IDM/FDM as its frozen submodules.** The cross-embodiment
+  property HiLAM borrows comes from UniSkill; HiLAM's own contribution (hierarchical chunking) is orthogonal.
+- → If `z_t` clusters by morphology, go to the paper that solves *that*, not the one built on top of it.
 
-#### What is actually being represented (the question this resolves)
+**Secondary option worth considering**: **DiLA** (Zhang et al. 2026, *Disentangled Latent Action World Models*)
+— content/structure disentanglement, aimed at keeping body-specific visual features out of the behavior latent.
 
-There is **no joint→joint and no foot→foot correspondence anywhere in the architecture**. `z_t ∈ ℝ^64` is
-unconstrained; only the two losses shape it. `contact_8` is the **evaluation label, never a training
-signal** — it is the ruler, not the target. The intended factorisation is:
-
-```
-e_t  = which body this is        (measured: 99.9% decodable)
-z_t  = what movement happened    (hoped to be body-independent; nothing enforces it)
-MD   = re-expresses z_t as THIS body's joint command
-```
-
-That last line is only meaningful once `a_t` differs per body. **Then** `z_t` means something like
-"swing the left-middle leg forward" and MD means "for long legs that is this joint vector, for short legs
-another." That is the thesis claim, and it is untestable on the current data.
-
-#### Requirement
-
-Each morphology needs its **own** command sequence for the same locomotion task, so that identical
-*behaviour* maps to different *joint values*.
-
-| Route | Cost | Behaviour correspondence | Verdict |
-|---|---|---|---|
-| **IK retargeting** (Cartesian foot trajectory → `simIK` per body) | zero training | correspondence holds by construction | **current route** |
-| AMP policy per body (frozen lab gait prior + leg-scaled command) | ~0.5–1 GPU-day per body | via shared discriminator + matched command (not by construction) | tried, set aside — see below |
-
-**Final decision (2026-08-06): IK retargeting.** An AMP detour was tried in between — full engineering log
-in `PROGRESS.md` §13 — motivated by IK's `ik_v1` set being too thin and producing a stiff, scripted
-trajectory that doesn't adapt to each morphology. AMP did train (reward = frozen lab gait discriminator +
-leg-scaled command, both leg-length-scaled), but the resulting gaits stayed messy and uncoordinated even
-after fixing the reward design (the discriminator-clip bug documented in `PROGRESS.md` §13.3). **Verdict:
-AMP is kept only as a documented negative-result baseline for the proposal** ("we tried RL, here's why
-vision-latent + IK ground truth is the more defensible route") — it is not the data source going forward.
-
-IK was re-collected properly instead: 6 expert episodes × 3 bodies × 3 repeats (`data/ik_walk_all6`,
-3564 frames, forward-walk only — turn/stop excluded for now, they had a camera/path shortcut that made
-them separate too easily to trust). Render-lock gate re-verified at this larger scale: **PASS** (mean
-repeat-decode 0.393 vs. chance 0.333).
-
-IK is not merely the cheaper option, it is the cleaner experiment: it fixes the behaviour and varies only
-the joint values, which is precisely the retargeting the Motion Decoder is supposed to discover. A
-per-body RL policy would give different `a_t` but no guarantee the behaviours correspond, which
-reintroduces a confound — which is exactly the failure mode AMP ran into.
-
-**Anticipated objection**: if `a_t` is generated as `IK(trajectory, body)`, is learning MD just learning
-IK? Yes, and that is the point worth stating plainly — the claim is that **the model recovers body-specific
-retargeting from observation alone, without being given the kinematics**. State it that way rather than
-letting a reviewer frame it as circular.
-
-#### IK also delivers walk / turn / stop — same task, not a separate one
-
-The Turn/Stop-behaviours gap (see "Decisions Still Needed") is **not a separate work item; IK resolves it
-in the same step.** IK defines a behaviour as a Cartesian foot trajectory, so adding behaviours is adding
-trajectories, not building a new system:
-- walk = feet cycle forward
-- turn = left/right feet cycle at different rates
-- stop = feet held stationary
-
-Each is solved per body: `IK(behaviour, body) → a_t`. So a single successful IK pipeline unblocks three
-things at once: per-body `a_t` (this section), the K-means(K=3) test in Step 1.5, and the "≥3 behaviours"
-answer to the ICLR critique.
-
-Sequencing: **get IK working on walk first** (proves retargeting), then add turn/stop as extra
-trajectories. Two cautions when adding them:
-- **turn vs drift**: `turn` is *commanded* heading change, but the open-loop gait also *drifts*. The metric
-  must separate commanded turning from uncommanded drift (reuse the path-length / net-displacement split
-  from Step -1), or `turn` and `walk-that-drifted` will be conflated.
-- **stop may be too easy**: a stationary body gives near-static frames the encoder can separate trivially,
-  inflating behaviour-decode. Check whether `stop` makes the result look better than it is.
-
-**Gate**: verify `a_t` differs across bodies before any Step 1 training run. Re-run the check above and
-require variance well above machine epsilon.
+**Action**: read UniSkill before Step 1.5 runs, so the fallback is ready rather than discovered under pressure.
 
 ---
 
-### Step 1 — Train Phase 1 Pipeline
-**Goal**: train ITM + FTM + Motion Decoder on short + long leg
+## 8. Deployment (out of scope)
 
-⚠️ **Blocked on Step 0.5.** Training on bit-identical `a_t` produces a result that cannot be defended.
-
-| Task | Train on short + long leg data, cross-augmentation on, LoRA off |
-|---|---|
-| Monitor | L_recon and L_motion both decreasing over training |
-| Sanity check mid-training | sample z_t every 10k steps → UMAP should show emerging structure |
-| Pass criterion | L_recon converges, L_motion < threshold → proceed to Step 1.5 |
-| Fail | loss not converging → check λ weighting, learning rate, data pipeline |
-
----
-
-### Step 1.5 — Latent Space Validation
-**Goal**: prove z_t is morphology-agnostic before testing transfer
-
-| Task | Collect z_t from short + long + medium leg × 3 behaviors |
-|---|---|
-| Check 1 | UMAP colored by behavior → 3 clusters (walk / turn / stop) visible |
-| Check 2 | UMAP colored by morphology → no separation between short / long / medium |
-| Check 3 | K-means (K=3) → cluster labels match behavior labels (quantitative) |
-| Pass | clusters by behavior, not morphology → proceed to Step 2 |
-| Fail | clusters by morphology → fallback to **UniSkill** (see below — *not* HiLAM, which was the wrong fallback) |
-
-> Note: failure mode = z_t encoding body-shape visual features instead of motion.
-> In LAC-WM this was viewpoint clustering. In our work it would be morphology clustering.
-
----
-
-### Step 2 — Transfer to Unseen Morphology
-**Goal**: prove pretrained World Model reduces data needed for medium leg
-
-| Task | Fine-tune ITM + FTM on N medium leg episodes using LoRA rank 2 |
-|---|---|
-| Condition A | pretrained FTM + N episodes |
-| Condition B | scratch FTM + N episodes (baseline) |
-| Vary N | 5 / 10 / 20 / 50 / 100 episodes |
-| Metric | L_recon on held-out medium leg test set |
-| Pass | pretrained reaches same L_recon as scratch with significantly fewer episodes |
-| Fail | no gap between pretrained and scratch → z_t did not transfer → revisit Step 1.5 |
-
-> Ajan Go: main claim = "World Model ลด training time อย่างชัดเจน"
-> This is interpolation (medium leg is between short and long) — not extrapolation
-
----
-
-### Step 3 (Future) — Extrapolation
-**Goal**: test morphology outside training range
-
-> Out of pre-proposal scope. Good future direction if Steps 1-2 succeed.
-
----
-
-## Phase 2 Design Sketch (out of thesis scope, but it constrains Phase 1)
-
-Phase 2 is the eventual use: a policy that makes a new body walk. It is not part of this thesis, but
-several Phase 1 decisions are only correct or incorrect relative to it, so the target is recorded here.
+Deployment is the eventual use: a policy that makes a new body walk. It is not part of this thesis, but
+several pretraining decisions are only correct or incorrect relative to it, so the target is recorded here.
 
 ### What the execution loop requires
 
 ```
 policy --> z_t --> Motion Decoder --> 18 joint targets --> robot
-                   ^ the module Phase 1 was going to throw away
+                   ^ the module pretraining was going to throw away
 ```
 
-### What transfers and what does not (settled empirically, not assumed)
+### What transfers and what does not
 
 | Component | Role | Transfers across bodies? | Evidence |
 |---|---|---|---|
@@ -735,7 +683,7 @@ This is close to what L3P arrived at from a different direction (frozen backbone
 which is mild evidence the decomposition is the right one. Our version differs in having a world model
 and a latent action inferred by an inverse model, neither of which L3P has.
 
-### Three candidate Phase 2 architectures
+### Three candidate architectures
 
 | | Method | Needs a reward model? | Main risk |
 |---|---|---|---|
@@ -747,7 +695,7 @@ Current preference: **B is the most interesting and sidesteps the reward problem
 already demonstrated this exact architecture on real hardware). **C is the safe fallback.** A is the
 riskiest given what we now know about reward readability.
 
-### Phase 1 decisions that follow from this
+### What this requires of pretraining
 
 1. **Keep the Motion Decoder weights.** Corrected above.
 2. **Keep logging `a_t` for the held-out morphology.** Already done. Needed to test whether the MD
@@ -757,11 +705,11 @@ riskiest given what we now know about reward readability.
 4. **New experiment worth adding to Step 2** (cheap, data already collected):
    *does the Motion Decoder generalise across bodies?* Train MD on short + long, then ask it to decode
    `z_t` into joint commands for the medium body.
-   - If it generalises, the "new body needs only video" claim survives into Phase 2.
+   - If it generalises, the "new body needs only video" claim survives into deployment.
    - If it does not, we learn exactly how much action data a new body requires, which is a useful
      number in its own right.
 
-### Deployment is ONE closed loop (open-loop demo replay is rejected)
+### One closed loop, not open-loop replay
 
 Earlier framing had two deploy paths (imitation vs RL). **Collapsed to one closed-loop controller.** Reason:
 open-loop replay of a demo `z`-sequence on a differently-timed body **desynchronises**. `z_t` is a *local
@@ -805,41 +753,10 @@ ablation, not an assumption.**
 
 ---
 
-## If Step 1.5 Fails — Fallback
+## 9. Baselines and references
 
-### ❌ ~~HiLAM~~ — WRONG FALLBACK, do not use for this failure mode
+### What we compare against
 
-Original plan was: freeze ITM → dynamic-chunk `z_t` sequences → skill-level `z^h`, hoping `z^h` clusters by
-behavior more cleanly than flat `z_t`. **After reading the paper (`doc/2603.05815v1`), this is a mismatch.**
-
-- HiLAM solves **temporal abstraction** ("existing LAMs... focus on short-horizon frame transitions... capture
-  low-level motion while overlooking longer-term temporal structure") — **not embodiment invariance**.
-- Its chunking operator is a boundary rule over feature dissimilarity between **temporally-adjacent tokens
-  within a single video**. There is **no cross-embodiment alignment objective anywhere in it** — no mechanism
-  to disentangle nuisance (body) from behavior, no contrastive/alignment term across agents.
-- Therefore: if `z_t` already encodes morphology strongly, chunking **pools existing features** and would build
-  a *separate* skill hierarchy per body — **inheriting and reifying** the morphology clustering, not fixing it.
-- Its experiments are 100% LIBERO tabletop manipulation. **No locomotion. No code released.**
-
-**HiLAM is only the right fallback if the failure mode is "z_t captures only short-horizon kinematics and
-misses longer behavioral structure" — a different problem than the one we fear.**
-
-### ✅ UniSkill — the correct fallback
-
-**UniSkill** (Kim et al. 2025, CoRL) — *"Imitating Human Videos via Cross-Embodiment Skill Representations"*.
-- Explicitly targets **cross-embodiment skill representation** — exactly the failure mode of Step 1.5.
-- Telling detail: **HiLAM itself uses UniSkill's IDM/FDM as its frozen submodules.** The cross-embodiment
-  property HiLAM borrows comes from UniSkill; HiLAM's own contribution (hierarchical chunking) is orthogonal.
-- → If `z_t` clusters by morphology, go to the paper that solves *that*, not the one built on top of it.
-
-**Secondary option worth considering**: **DiLA** (Zhang et al. 2026, *Disentangled Latent Action World Models*)
-— content/structure disentanglement, aimed at keeping body-specific visual features out of the behavior latent.
-
-**Action**: read UniSkill before Step 1.5 runs, so the fallback is ready rather than discovered under pressure.
-
----
-
-## Baseline
 - **What we beat**: training from scratch per morphology (no transfer)
 - **Metric**: sample efficiency on medium leg — with vs. without pretrained FTM
 - No existing locomotion cross-morphology baseline → comparison is transfer vs. no-transfer
@@ -852,7 +769,7 @@ misses longer behavioral structure" — a different problem than the one we fear
 
 ---
 
-## Notes from ICLR Reviews
+### Notes from ICLR reviews of LAC-WM
 - **V-JEPA2 pixel decoder**: not included in V-JEPA2 — must be trained separately if needed for pixel-space output.
   L_recon = ||ê_{t+1} − e_{t+1}||² is computed in *embedding* space → no pixel decoder required for training.
 - **Training scale**: LAC-WM used 64 H200 GPUs × 4 days for 3 manipulation datasets (confirmed App. A.5).
@@ -861,16 +778,26 @@ misses longer behavioral structure" — a different problem than the one we fear
   Professors will likely raise same concern → plan for ≥2 baselines and ≥3 behaviors.
 - **EAC-WM degrades with more embodiments**; LAC-WM improves. This is our key supporting evidence.
 
-## Lab Resources
+### Lab resources
 - Stick insect model: confirmed — Ajan YuChen's `airl-insect-walking` repo, CoppeliaSim model, migrated to `sim/`
 - Data collection policy: ask lab if scripted controller already exists for the model
 - P'Beam's work may connect to this in future
 
-## Open Questions
+## 10. Open decisions
+
+| Block | Status | Note |
+|---|---|---|
+| λ_recon, λ_motion | **open** | LAC-WM reports no numeric λ (nor LR, optimiser or schedule). Currently 1.0 / 1.0, but the terms sit on different scales — reconstruction ≈ 1.3, motion ≈ 0.002 — so equal weights do not mean equal influence. Ablate. |
+| `z_t` dimension | 64, following LAC-WM §4.2 | Also the lever for the invariance ablation: shrinking it should evict morphology first, since `e_t` already supplies body identity to both losses. |
+| Turn / stop behaviours | **missing** | Only forward walk exists. IK produces them as extra foot trajectories, but the earlier attempt let a probe separate them from a camera/path shortcut rather than from gait, so they need re-collecting before use. K-means(K=3) in Step 1.5 and the "≥3 behaviours" answer to the ICLR critique both depend on this. |
+| Step 2 evaluation metric | sample efficiency on the held-out body (confirmed with Ajan Go) | Episodes needed to reach a target error, pretrained vs from scratch (N = 5/10/20/50/100). |
+| Baseline exact setup | open | Separate pipeline per morphology, versus scratch. |
+| LAC-WM source code | not released | Rejected ICLR 2026, accepted ICML 2026; no public code. |
+---
+
 - Fine-tune last 2 V-JEPA2 blocks if Step 0 shows sim gap?
   - Note: V-JEPA2 paper only ablates **fully frozen vs. fully unfrozen** — partial/last-N-block fine-tuning is
     *not* tested anywhere in it. Reasonable extrapolation, but no empirical backing to cite.
 - k = 64 (LAC-WM §4.2) or ablate for locomotion?
 - λ values? ablate from equal weights (paper gives no numbers — see Decisions table)
-- ~~Baseline: EAC-WM analog~~ → **PROMOTED out of open questions. This is now the decisive experiment, not an
-  optional baseline.** See "The Motivation Problem" section above.
+- Baseline: an EAC-WM analogue is a required comparison, not an optional one. See section 6.

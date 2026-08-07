@@ -10,10 +10,13 @@ Usage:
   python sim/make_leg_morphology.py --factor 0.85 --out sim/env/medauroidea_stick_insect_medium.ttt
 """
 import argparse
+import os
 
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
-BASE_SCENE = "/home/aria/ioon-research/sim/env/medauroidea_stick_insect.ttt"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+BASE_SCENE = os.path.join(ROOT, "sim", "env", "medauroidea_stick_insect.ttt")
 LEG_SUFFIXES = ["_FL", "_ML", "_HL", "_FR", "_MR", "_HR"]
 # full kinematic chain per leg, root first. Each segment's own origin sits at
 # its geometric center, so its length is split into two equal offsets: one

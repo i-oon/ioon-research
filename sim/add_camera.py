@@ -30,9 +30,11 @@ import os
 import numpy as np
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 SENSOR_NAME = "vjepa_cam"
 RESOLUTION = 256
-ENV_DIR = "/home/aria/ioon-research/sim/env"
+ENV_DIR = os.path.join(ROOT, "sim", "env")
 VARIANTS = [
     "medauroidea_stick_insect.ttt",           # long / base 1.0x
     "medauroidea_stick_insect_medium.ttt",    # 0.75x

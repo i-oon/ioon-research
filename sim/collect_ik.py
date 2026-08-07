@@ -25,7 +25,9 @@ import numpy as np
 import pandas as pd
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
-ENV = "/home/aria/ioon-research/sim/env"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ENV = os.path.join(ROOT, "sim", "env")
 CSV = f"{ENV}/expert_66k_aug3c_fcontact.csv"
 LEGS = ["FL", "ML", "HL", "FR", "MR", "HR"]
 SEG = {"m1": "TC", "m2": "CF", "m3": "FT"}
@@ -34,6 +36,7 @@ SCENES = [("long", "medauroidea_stick_insect.ttt"),
           ("short", "medauroidea_stick_insect_short.ttt")]
 SENSOR = "vjepa_cam"
 TRACK = "/head"
+ROBOT_ROOT = "/abdomen"
 FORCE_NAMES = [f"/forceSensor_{leg}" for leg in LEGS]
 EP = 66
 
@@ -119,19 +122,37 @@ def precompute_commands(sim, simIK, scene, brel, scale):
     return cmds, diagnostic
 
 
-def drive_and_record(sim, scene, cmds, travel, warmup):
-    """Open-loop drive of cmds with the FIXED camera; returns frames/actions/forces/head."""
+def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None):
+    """Open-loop drive of cmds with the FIXED camera; returns frames/actions/forces/head.
+
+    cam_dx/cam_dy shift the camera in the world plane on top of the scene's authored offset.
+    With the authored offset alone the robot starts against the right image edge and stays
+    partly outside it for roughly the first two thirds of every clip.
+    """
     sim.loadScene(f"{ENV}/{scene}")
     settle(sim)
     cam = sim.getObject("/" + SENSOR)
     track = sim.getObject(TRACK)
+
     joints = [sim.getObject(f"/{jn}_{leg}") for leg in LEGS for jn in SEG]  # matches cmds order
     force_h = [sim.getObject(n) for n in FORCE_NAMES]
 
-    # authored camera offset (encodes RUNWAY_AIM); re-applied once after warmup
+    # authored camera offset (encodes RUNWAY_AIM); must be read BEFORE any respawn, or it
+    # measures the camera against the moved robot instead of the authored framing
     cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
     trk0 = np.array(sim.getObjectPosition(track, sim.handle_world))
     off_xy, cam_z = cam0[:2] - trk0[:2], cam0[2]
+
+    # The scene spawns the robot near the floor's edge, which puts the floor corner inside the
+    # frame. Re-spawning at the floor centre keeps the edge outside the field of view, and using
+    # the same spawn for every embodiment makes them stand on identical floor -- without that,
+    # the insect and B1 backgrounds differ across ~27% of pixels.
+    if spawn is not None:
+        root = sim.getObject(ROBOT_ROOT)
+        pos = sim.getObjectPosition(root, sim.handle_world)
+        head = sim.getObjectPosition(track, sim.handle_world)
+        sim.setObjectPosition(root, sim.handle_world,
+                              [spawn[0] + pos[0] - head[0], spawn[1] + pos[1] - head[1], pos[2]])
 
     sim.setStepping(True)
     sim.startSimulation()
@@ -150,7 +171,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup):
         p = np.array(sim.getObjectPosition(track, sim.handle_world))
         if start_xy is None:
             start_xy = p[:2].copy()
-            sim.setObjectPosition(cam, sim.handle_world, [p[0] + off_xy[0], p[1] + off_xy[1], cam_z])
+            sim.setObjectPosition(cam, sim.handle_world,
+                                  [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
         frames.append(capture(sim, cam))
         actions.append(cmds[t].copy())
         forces.append(read_forces(sim, force_h))
@@ -171,6 +193,11 @@ def main():
                     help="shared absolute foot-path scale about each target body's hip")
     ap.add_argument("--travel", type=float, default=0.8, help="distance gate (m); keeps robot in the fixed frame")
     ap.add_argument("--warmup", type=int, default=20)
+    ap.add_argument("--cam_dx", type=float, default=0.0,
+                    help="shift the fixed camera along world x; see drive_and_record")
+    ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
+    ap.add_argument("--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
+                    help="respawn the robot head at this world x y; use the same value for every\n                         embodiment so they stand on identical floor")
     ap.add_argument("--repeats", type=int, default=1,
                     help="record each (episode,morph) this many times (fresh chaotic draw each) "
                          "-> repeated same-body-same-behavior for the render-lock gate")
@@ -204,7 +231,7 @@ def main():
                   f"IK residual mean/max={ikdiag['residual_mean_mm']:.2f}/{ikdiag['residual_max_mm']:.2f}mm")
             stance = np.tile(cmds[0], (args.stop, 1))               # hold pose -> stand still
             for rep in range(args.repeats):
-                f, a, fc, h = drive_and_record(sim, scene, stance, 0.0, args.warmup)
+                f, a, fc, h = drive_and_record(sim, scene, stance, 0.0, args.warmup, args.cam_dx, args.cam_dy, args.spawn)
                 tag = f"{morph}_stop_r{rep}" if args.repeats > 1 else f"{morph}_stop"
                 np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                     frames=f, actions=a, forces=fc, head=h,
@@ -235,7 +262,7 @@ def main():
                 cmds = np.tile(cmds, (args.loops, 1))
             pre = "" if args.behavior == "walk" else f"{args.behavior}_"
             for rep in range(args.repeats):
-                f, a, fc, h = drive_and_record(sim, scene, cmds, args.travel, args.warmup)  # fresh draw each
+                f, a, fc, h = drive_and_record(sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn)  # fresh draw each
                 tag = f"{morph}_{pre}ep{ep}_r{rep}" if args.repeats > 1 else f"{morph}_{pre}ep{ep}"
                 np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                     frames=f, actions=a, forces=fc, head=h,

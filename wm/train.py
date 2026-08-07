@@ -5,7 +5,7 @@ random views each epoch, so embeddings cannot be cached. Training uses the morph
 cfg.train_morphs; the held-out body is never seen here.
 
 Run from the repository root:
-  .venv/bin/python3 -m wm.train --epochs 50 --batch_size 8 --name wm_v1
+  .venv/bin/python3 -m wm.train --epochs 50 --batch_size 8 --name stage1_100ep_clean
 """
 import argparse
 import os
@@ -22,7 +22,16 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import Config  # noqa: E402
-from wm.data.dataset import IKWalkPairs, available_episodes, clip_paths, load_clip  # noqa: E402
+from wm.data.dataset import (  # noqa: E402
+    EmbodimentBatchSampler,
+    IKWalkPairs,
+    MultiEmbodimentPairs,
+    available_episodes,
+    clip_paths,
+    embodiment_split,
+    load_clip,
+)
+from wm.data.embodiment import REGISTRY  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -42,10 +51,12 @@ def encode_batch(encoder, batch):
 def forward_step(models, encoder, batch, cfg, device):
     views = encode_batch(encoder, batch)
     action = batch["action"].to(device)
+    # batches are single-embodiment by construction, so one head serves the whole batch
+    embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
 
     z = models["itm"](views["view1_t"], views["view1_next"])
     pred_next = models["ftm"](views["view2_t"], z)
-    pred_action = models["md"](views["view1_t"], z)
+    pred_action = models["md"](views["view1_t"], z, embodiment)
     return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg)
 
 
@@ -80,18 +91,22 @@ def cache_heldout(encoder, data_dir, cfg, device):
     """Embed a fixed slice of the held-out body once.
 
     Validation on unseen episodes of the *training* bodies cannot see cross-body
-    over-specialisation: in wm_v2 it read 0.0016 while the held-out body degraded to 0.42.
+    over-specialisation: in stage1_100ep_clipped it read 0.0016 while the held-out body degraded to 0.42.
     Evaluation needs no augmentation, so the embeddings are constant and can be cached;
     each epoch then costs only an ITM and decoder pass.
     """
-    paths = clip_paths(data_dir, (cfg.heldout_morph,))[:cfg.heldout_clips]
+    start, stop = cfg.frame_start, cfg.frame_stop
+    all_paths = clip_paths(data_dir, (cfg.heldout_morph,))
+    per_clip = max(1, (stop or 66) - start - 1)
+    n_clips = min(len(all_paths), max(1, -(-cfg.heldout_pairs // per_clip)))
+    paths = all_paths[:n_clips]
     embeddings, actions = [], []
     for path in paths:
         clip = load_clip(path)
-        frames = clip["frames"]
+        frames = clip["frames"][start:stop or None]
         parts = [encoder.encode(list(frames[i:i + 8])).float() for i in range(0, len(frames), 8)]
         embeddings.append(torch.cat(parts))
-        actions.append(clip["actions"][:-1])
+        actions.append(clip["actions"][start:stop or None][:-1])
     return {
         "embeddings": [e.to(device) for e in embeddings],
         "actions": [torch.tensor(a, device=device) for a in actions],
@@ -99,26 +114,44 @@ def cache_heldout(encoder, data_dir, cfg, device):
 
 
 @torch.no_grad()
-def evaluate_heldout(models, cache, mean, std, device):
-    """Motion error on the held-out body, with the latent ablated as a reference."""
+def evaluate_heldout(models, cache, mean, std, device, chunk=8):
+    """Motion error on the held-out body, with the latent ablated as a reference.
+
+    Chunked: a whole clip at once would run 512-token attention over ~65 transitions, which
+    does not fit alongside the training step's own allocations.
+    """
     mean_t = torch.tensor(mean, device=device)
     std_t = torch.tensor(std, device=device)
     errors, ablated = [], []
     for embeddings, actions in zip(cache["embeddings"], cache["actions"]):
-        e_t, e_next = embeddings[:-1], embeddings[1:]
         target = (actions - mean_t) / std_t
-        z = models["itm"](e_t, e_next)
-        errors.append(((models["md"](e_t, z) - target) ** 2).mean().item())
-        ablated.append(((models["md"](e_t, torch.zeros_like(z)) - target) ** 2).mean().item())
+        total = len(embeddings) - 1
+        for start in range(0, total, chunk):
+            stop = min(start + chunk, total)
+            e_t, e_next = embeddings[start:stop], embeddings[start + 1:stop + 1]
+            expected = target[start:stop]
+            z = models["itm"](e_t, e_next)
+            errors.append(((models["md"](e_t, z) - expected) ** 2).mean().item())
+            ablated.append(((models["md"](e_t, torch.zeros_like(z)) - expected) ** 2).mean().item())
     return float(np.mean(errors)), float(np.mean(ablated))
 
 
-def build_models(cfg, device):
+def build_models(cfg, device, heads=None):
     return {
         "itm": InverseTransitionModel(cfg).to(device),
         "ftm": ForwardTransitionModel(cfg).to(device),
-        "md": MotionDecoder(cfg).to(device),
+        "md": MotionDecoder(cfg, heads=heads).to(device),
     }
+
+
+def build_cross_embodiment(cfg, root):
+    """Datasets, sampler and decoder heads for training across embodiments."""
+    specs = [tuple(s.split("=", 1)) for s in cfg.sources]
+    train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root)
+    train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed)
+    val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed)
+    heads = {name: REGISTRY[name].action_dim for name, _ in specs}
+    return train_set, val_set, heads
 
 
 def parse_args(cfg):
@@ -142,25 +175,38 @@ def main():
     device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
 
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
-    episodes = available_episodes(data_dir, cfg.train_morphs)
-    if len(episodes) <= cfg.val_episodes:
-        raise ValueError(f"need more than {cfg.val_episodes} episodes, found {episodes}")
-    val_episodes = episodes[-cfg.val_episodes:]
-    train_episodes = episodes[:-cfg.val_episodes]
+    cross_embodiment = bool(cfg.sources)
 
-    train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed)
-    val_set = IKWalkPairs(
-        data_dir, cfg.train_morphs, val_episodes,
-        mean=train_set.mean, std=train_set.std, seed=cfg.seed,
-    )
-    print(f"train episodes {train_episodes} | val episodes {val_episodes}")
+    if cross_embodiment:
+        train_set, val_set, heads = build_cross_embodiment(cfg, ROOT)
+        train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed)
+        val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, False, cfg.seed)
+        train_loader = DataLoader(train_set, batch_sampler=train_sampler, num_workers=cfg.num_workers)
+        val_loader = DataLoader(val_set, batch_sampler=val_sampler, num_workers=cfg.num_workers)
+        counts = {k: len(v) for k, v in train_set.embodiment_indices().items()}
+        print(f"cross-embodiment: {counts} | heads {heads}")
+    else:
+        heads, train_sampler = None, None
+        episodes = available_episodes(data_dir, cfg.train_morphs)
+        if len(episodes) <= cfg.val_episodes:
+            raise ValueError(f"need more than {cfg.val_episodes} episodes, found {episodes}")
+        val_episodes = episodes[-cfg.val_episodes:]
+        train_episodes = episodes[:-cfg.val_episodes]
 
-    loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)
-    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-    val_loader = DataLoader(val_set, shuffle=False, **loader_args)
+        frame_range = (cfg.frame_start, cfg.frame_stop)
+        train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
+                                frame_range=frame_range)
+        val_set = IKWalkPairs(
+            data_dir, cfg.train_morphs, val_episodes,
+            mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,
+        )
+        print(f"train episodes {train_episodes} | val episodes {val_episodes}")
+        loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)
+        train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+        val_loader = DataLoader(val_set, shuffle=False, **loader_args)
 
     encoder = VJEPA2FrameEncoder(device=str(device))
-    models = build_models(cfg, device)
+    models = build_models(cfg, device, heads=heads)
     parameters = [p for model in models.values() for p in model.parameters()]
     optimizer = torch.optim.AdamW(parameters, lr=cfg.lr, weight_decay=cfg.weight_decay)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
@@ -170,45 +216,62 @@ def main():
     os.makedirs(run_dir, exist_ok=True)
     writer = SummaryWriter(os.path.join(run_dir, "summary"))
     trainable = sum(p.numel() for p in parameters)
-    heldout_cache = cache_heldout(encoder, data_dir, cfg, device)
-    n_heldout = sum(len(a) for a in heldout_cache["actions"])
+    # the held-out-body monitor is specific to the single-morphology setting; cross-embodiment
+    # transfer is measured separately, per embodiment, in wm.evaluate
+    heldout_cache = None if cross_embodiment else cache_heldout(encoder, data_dir, cfg, device)
+    heldout_note = (
+        "heldout n/a (cross-embodiment)" if cross_embodiment
+        else f"heldout '{cfg.heldout_morph}' {sum(len(a) for a in heldout_cache['actions'])} pairs"
+    )
     print(f"train {len(train_set)} pairs | val {len(val_set)} pairs | "
-          f"heldout '{cfg.heldout_morph}' {n_heldout} pairs | trainable {trainable/1e6:.1f}M")
+          f"{heldout_note} | trainable {trainable/1e6:.1f}M")
 
     def checkpoint(epoch):
-        return {
+        state = {
             "config": asdict(cfg),
             "epoch": epoch,
-            "action_mean": train_set.mean,
-            "action_std": train_set.std,
             **{name: model.state_dict() for name, model in models.items()},
         }
+        if cross_embodiment:
+            state["action_stats"] = train_set.stats
+        else:
+            state["action_mean"] = train_set.mean
+            state["action_std"] = train_set.std
+        return state
 
     # tracked separately: total is ~99% reconstruction, so selecting on it alone would
     # ignore the motion term that grounds the latent in real joint commands
     best = {"total": float("inf"), "motion": float("inf")}
     for epoch in range(1, cfg.epochs + 1):
         train_set.set_epoch(epoch)
+        if train_sampler is not None:
+            train_sampler.set_epoch(epoch)
         train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler)
         val_metrics = run_epoch(models, encoder, val_loader, cfg, device)
-        heldout, heldout_ablated = evaluate_heldout(
-            models, heldout_cache, train_set.mean, train_set.std, device
-        )
+        heldout = heldout_ablated = float("nan")
+        if heldout_cache is not None:
+            heldout, heldout_ablated = evaluate_heldout(
+                models, heldout_cache, train_set.mean, train_set.std, device
+            )
         schedule.step()
 
         for key, value in train_metrics.items():
             writer.add_scalar(f"train/{key}", value, epoch)
         for key, value in val_metrics.items():
             writer.add_scalar(f"val/{key}", value, epoch)
-        writer.add_scalar("heldout/motion", heldout, epoch)
-        writer.add_scalar("heldout/motion_zero_z", heldout_ablated, epoch)
+        if heldout_cache is not None:
+            writer.add_scalar("heldout/motion", heldout, epoch)
+            writer.add_scalar("heldout/motion_zero_z", heldout_ablated, epoch)
         writer.add_scalar("lr", schedule.get_last_lr()[0], epoch)
+        suffix = (
+            "" if heldout_cache is None
+            else f" | heldout {cfg.heldout_morph} {heldout:.4f} (zero_z {heldout_ablated:.4f})"
+        )
         print(
             f"epoch {epoch:3d} | train {train_metrics['total']:.4f} "
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
-            f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f}) | "
-            f"heldout {cfg.heldout_morph} {heldout:.4f} (zero_z {heldout_ablated:.4f})"
+            f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})" + suffix
         )
 
         for key, filename in (("total", "best.pt"), ("motion", "best_motion.pt")):

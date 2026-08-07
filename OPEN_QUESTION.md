@@ -1,7 +1,7 @@
 # Cross-embodiment plan — status & open questions
 
 Living doc. Supersedes the old "argue vs prove / terrain / leg-length" questions,
-which are now settled (see bottom). Updated 2026-08-03.
+which are now settled (see bottom). Updated 2026-08-07.
 
 ## The decision (settled)
 
@@ -22,18 +22,28 @@ proprioception *can't*."
   sim2sim gap). Spawn transient cropped.
 - **6-leg hexapod (18-DOF)** — `data/hexapod_v1/` (24 clips = long/medium/short × 8),
   CSV gait via `sim/collect_step0.py`.
-- **Render consistency (critical)** — B1 scene is built FROM an insect scene
-  (`sim/build_b1_scene.py`), so both embodiments share the **identical gray floor +
-  lighting + elevation-40 side viewpoint**. Only body/behavior differs → no
-  render-style confound. Verified side-by-side.
+- **Render consistency (critical)** — B1's scene is built FROM an insect scene
+  (`sim/build_b1_scene.py`), so both share the same floor, lighting and camera settings.
+  **That alone is not sufficient.** Each collector anchors the camera to its own robot's
+  start pose, and B1 replays at raw MuJoCo coordinates, so the two embodiments stand on
+  different parts of a 5x5 m floor: backgrounds differ across **27% of pixels** (8.3 mean,
+  33 max out of 255), against 0.29/255 between insect bodies. Both embodiments must
+  therefore spawn at the **same world point** (`--spawn 0 0`) with a matched `--cam_dx`;
+  B1 additionally needs `--travel`, since it covers 1.3-3.1 m while the camera sees 2.1 m.
+  Without this, "body identity hard to decode from `z`" measures background, not embodiment.
 - Both datasets: `frames` (256², shared vision space) + per-body command + proprioception.
 
 ## The experiment (test plan)
 
 1. Encode frames with frozen **V-JEPA2** → train **ITM/FTM + per-embodiment Motion
    Decoder** (18-D / 12-D heads) across embodiments. Morphology never told — spec-free.
-2. **Validate latent is morphology-invariant** (two-sided): behavior decodes/transfers
-   across bodies; body identity is hard to decode from `z`.
+2. **Validate the latent (two-sided)**: behaviour decodes and transfers across bodies;
+   body identity should be hard to decode from `z`. On Stage 1 **only the first half holds** —
+   behaviour transfer improves (+0.11 to +0.22 macro-F1 over raw `e_t`) while body identity stays
+   **~99% decodable from `z`** across runs differing in data and training length. Nothing in the
+   objective removes it: both losses condition on `x_t`, which already carries morphology. Transfer
+   to an unseen body works regardless (0.18 with `z` vs 1.67 ablated), so **invariance and
+   transferability are separable**. Report both halves; the second is a finding, not a gate.
 3. **Cross-embodiment transfer / "loss drop"**: pretrain, adapt to held-out body with
    few clips, measure **reconstruction-loss sample efficiency vs from-scratch**.
 4. **Vision-vs-proprioception proof**: the same WM on proprioception **can't** form a
@@ -81,6 +91,24 @@ gait is fully valid (V-JEPA2 sees a hexapod walking either way). **Lean: keep CS
 - Data volume: current clip counts are a start; may scale the command sweeps.
 - Writing caveats (Tee): single-step Markov is deliberate; which modules fine-tune on a
   new body; large-model fine-tuning/scaling limitation.
+
+## Q5. Does forcing invariance help, hurt, or do nothing? (new, 2026-08-07 — highest value)
+
+`z` is ~99% body-decodable yet transfers well, so invariance is evidently not *required*. What
+we have never tested is whether it *helps*. Two cheap interventions: shrink `z_dim` (64 → 16 → 8;
+morphology is redundant given `x_t`, so a bottleneck should evict it first) or add an adversarial
+head (gradient reversal on a morphology classifier, ~30 lines).
+
+The measurement that matters is **not** whether morphology decodability drops — it is what happens
+to transfer when it does:
+
+| outcome | reading |
+|---|---|
+| transfer unchanged | invariance is unnecessary — supports the separability claim |
+| transfer improves | invariance does matter, and we found the mechanism |
+| transfer degrades | body information in `z` is actively useful — most interesting |
+
+Every outcome is reportable, which is rare. One training run, no new data.
 
 ---
 

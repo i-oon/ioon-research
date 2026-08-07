@@ -12,13 +12,16 @@ Usage (CoppeliaSim up, GUI visible):
   python3 sim/play_ik.py --port 23000 --morph all --loops 3
 """
 import argparse
+import os
 import time
 
 import numpy as np
 import pandas as pd
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
-ENV = "/home/aria/ioon-research/sim/env"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+ENV = os.path.join(ROOT, "sim", "env")
 CSV = f"{ENV}/expert_66k_aug3c_fcontact.csv"
 LEGS = ["FL", "ML", "HL", "FR", "MR", "HR"]
 SEG = {"m1": "TC", "m2": "CF", "m3": "FT"}
