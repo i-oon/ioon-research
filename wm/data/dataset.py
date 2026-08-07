@@ -45,10 +45,33 @@ def load_clip(path):
         }
 
 
-def action_stats(clips):
+def action_stats(clips, within_body=True):
+    """Per-joint mean and scale used to standardise the motion target.
+
+    The scale decides how much each joint contributes to the motion loss, so pooling every
+    body together is not neutral: bodies with different leg lengths hold their coxa-femur
+    and femur-tibia joints at different mean angles, and that gap between bodies lands in
+    the pooled standard deviation as if it were signal amplitude. Measured on
+    data/ik_walk_100_framed with long and short as the training bodies, pooling gives a
+    coxa-femur scale of 18.4 degrees while either body on its own moves that joint by only
+    6.4-9.0 degrees, so the joint receives (6.4/18.4)^2 = 0.12 of the weight thorax-coxa
+    gets. The joints that differ most between bodies are precisely the ones a
+    cross-morphology model has to learn, so the pooled scale silences them.
+
+    Averaging the per-body variances removes the between-body term and leaves each joint
+    weighted by how much it actually moves. The mean stays pooled: an unseen body's mean
+    posture is not knowable at test time.
+    """
     actions = np.concatenate([clip["actions"] for clip in clips], axis=0)
     mean = actions.mean(axis=0)
-    std = actions.std(axis=0)
+    if within_body:
+        groups = {}
+        for clip in clips:
+            groups.setdefault(clip["morph"], []).append(clip["actions"])
+        variances = [np.concatenate(v, axis=0).var(axis=0) for v in groups.values()]
+        std = np.sqrt(np.mean(variances, axis=0))
+    else:
+        std = actions.std(axis=0)
     return mean, np.maximum(std, 1e-6)
 
 
@@ -61,7 +84,7 @@ class IKWalkPairs(Dataset):
     action sequence and near-identical frames, so holding one out measures nothing."""
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
-                 frame_range=None):
+                 frame_range=None, within_body_std=True):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if episodes is not None:
             keep = set(episodes)
@@ -70,7 +93,7 @@ class IKWalkPairs(Dataset):
             raise ValueError(f"no clips in {data_dir} for morphs={morphs} episodes={episodes}")
 
         if mean is None or std is None:
-            mean, std = action_stats(self.clips)
+            mean, std = action_stats(self.clips, within_body_std)
         self.mean, self.std = mean.astype(np.float32), std.astype(np.float32)
 
         start, stop = frame_range or (0, 0)

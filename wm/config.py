@@ -22,6 +22,13 @@ class Config:
     frame_start: int = 0
     frame_stop: int = 0
 
+    # Scale the motion target by how much each joint moves within a body rather than by the
+    # spread of the training bodies pooled together. Pooling counts the posture gap between
+    # bodies as amplitude and drops the coxa-femur and femur-tibia weight to ~0.12 of
+    # thorax-coxa; see action_stats in wm/data/dataset.py. False reproduces runs recorded
+    # before 2026-08-08.
+    within_body_std: bool = True
+
     # Cross-embodiment mode. Empty keeps the single-morphology path above; otherwise give
     # "name=dir" per embodiment, e.g. hexapod=data/ik_walk_100 b1=data/b1. Batches are drawn
     # from one embodiment at a time and routed to that embodiment's decoder head.

@@ -195,7 +195,7 @@ def main():
 
         frame_range = (cfg.frame_start, cfg.frame_stop)
         train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
-                                frame_range=frame_range)
+                                frame_range=frame_range, within_body_std=cfg.within_body_std)
         val_set = IKWalkPairs(
             data_dir, cfg.train_morphs, val_episodes,
             mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,

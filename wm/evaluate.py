@@ -110,6 +110,35 @@ def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_r
     return out
 
 
+JOINT_TYPES = ("TC", "CF", "FT")
+
+
+def per_joint_type(pred, target):
+    """Split the motion error by joint type, leg-major order (FL TC/CF/FT, ML ...).
+
+    The aggregate hides which joints transferred. Measured on the held-out medium body,
+    thorax-coxa scored 0.006 while coxa-femur scored 0.382 -- worse than predicting that
+    joint's own mean -- yet the average across all 18 read 0.208 and looked healthy.
+    Thorax-coxa swings the leg fore and aft by a similar angle whatever the leg length;
+    the two distal joints set how high and how far the foot goes, which is what leg length
+    changes, so they are the ones a cross-morphology claim rests on.
+
+    The baseline is that joint's own mean over the clip, not the training mean, so a score
+    above 1.0 means the prediction is worse than a constant.
+    """
+    scores = {}
+    for offset, name in enumerate(JOINT_TYPES):
+        index = list(range(offset, pred.shape[1], len(JOINT_TYPES)))
+        error = ((pred[:, index] - target[:, index]) ** 2).mean()
+        constant = ((target[:, index].mean(axis=0) - target[:, index]) ** 2).mean()
+        scores[name] = {
+            "mse": float(error),
+            "constant_baseline": float(constant),
+            "times_better_than_constant": float(constant / max(error, 1e-9)),
+        }
+    return scores
+
+
 def behaviour_labels(contact):
     codes = np.array(["".join(map(str, row)) for row in contact])
     values, counts = np.unique(codes, return_counts=True)
@@ -175,13 +204,20 @@ def main():
                    frame_range=(cfg.frame_start, cfg.frame_stop))
 
     variants = {"with_z": "pred", "zero_z": "pred_zero", "shuffled_z": "pred_shuffled"}
-    results = {"trained_on": list(cfg.train_morphs), "held_out": cfg.heldout_morph, "motion_mse": {}}
+    results = {"trained_on": list(cfg.train_morphs), "held_out": cfg.heldout_morph,
+               "motion_mse": {}, "motion_mse_per_joint_type": {}}
     for body in morphs:
         mask = data["morph"] == body
         target = data["target"][mask]
         scores = {name: float(((data[key][mask] - target) ** 2).mean()) for name, key in variants.items()}
-        scores["predict_mean"] = float((target ** 2).mean())
+        # standardisation uses the training bodies' statistics, so predicting the training
+        # mean costs 1.0 only on those bodies; on a held-out body the trivial score is
+        # whatever that body's own posture happens to cost, and it is the honest baseline
+        scores["predict_training_mean"] = float((target ** 2).mean())
+        scores["predict_this_body_mean"] = float(((target.mean(axis=0) - target) ** 2).mean())
         results["motion_mse"][body] = scores
+        if target.shape[1] % len(JOINT_TYPES) == 0:
+            results["motion_mse_per_joint_type"][body] = per_joint_type(data["pred"][mask], target)
 
     codes, keep = behaviour_labels(data["contact"])
     results["morphology_structure"] = {
