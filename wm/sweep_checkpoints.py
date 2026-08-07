@@ -40,17 +40,22 @@ def load_config(state):
 
 
 @torch.no_grad()
-def embed_heldout(encoder, cfg, data_dir, device, max_clips, chunk=8):
-    """Encode the held-out body once; every checkpoint is scored against the same frames."""
+def embed_heldout(encoder, cfg, data_dir, max_clips, chunk=8):
+    """Encode the held-out body once; every checkpoint is scored against the same frames.
+
+    The cache stays on CPU: 40 clips of 20 frames is 1.2 GB at 256x1408 float32, which
+    is worth keeping off a GPU that may be shared with a training run.
+    """
     start, stop = cfg.frame_start, cfg.frame_stop
     clips = []
     for path in clip_paths(data_dir, (cfg.heldout_morph,))[:max_clips]:
         clip = load_clip(path)
         frames = clip["frames"][start:stop or None]
-        parts = [encoder.encode(list(frames[i:i + chunk])).float() for i in range(0, len(frames), chunk)]
+        parts = [encoder.encode(list(frames[i:i + chunk])).float().cpu()
+                 for i in range(0, len(frames), chunk)]
         clips.append((
-            torch.cat(parts).to(device),
-            torch.tensor(clip["actions"][start:stop or None][:-1], device=device),
+            torch.cat(parts),
+            torch.tensor(clip["actions"][start:stop or None][:-1]),
         ))
     return clips
 
@@ -61,11 +66,12 @@ def score(itm, md, clips, mean, std, device, chunk=8):
     std_t = torch.tensor(std, device=device)
     errors, ablated, n = 0.0, 0.0, 0
     for embeddings, actions in clips:
-        target = (actions - mean_t) / std_t
+        target = (actions.to(device) - mean_t) / std_t
         total = len(embeddings) - 1
         for start in range(0, total, chunk):
             stop = min(start + chunk, total)
-            e_t, e_next = embeddings[start:stop], embeddings[start + 1:stop + 1]
+            e_t = embeddings[start:stop].to(device)
+            e_next = embeddings[start + 1:stop + 1].to(device)
             expected = target[start:stop]
             z = itm(e_t, e_next)
             size = stop - start
@@ -79,6 +85,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", required=True, help="run directory containing epoch*.pt")
     parser.add_argument("--max_clips", type=int, default=40)
+    parser.add_argument("--encode_chunk", type=int, default=8,
+                        help="frames per encoder forward; lower it when the GPU is shared")
+    parser.add_argument("--encode_device", default="",
+                        help="device for the V-JEPA2 encoder; defaults to the training device")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -92,8 +102,8 @@ def main():
     device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
 
-    encoder = VJEPA2FrameEncoder(device=str(device))
-    clips = embed_heldout(encoder, cfg, data_dir, device, args.max_clips)
+    encoder = VJEPA2FrameEncoder(device=args.encode_device or str(device))
+    clips = embed_heldout(encoder, cfg, data_dir, args.max_clips, chunk=args.encode_chunk)
     del encoder
     torch.cuda.empty_cache()
 
