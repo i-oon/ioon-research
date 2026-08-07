@@ -1,0 +1,29 @@
+=== gait report: medium_peak_240k  (vs expert ep926; NO gait template assumed) ===
+checkpoint: amp/logs/insect_medium/20260805-0638/model/step240000/actor.pth
+rollout: 250 steps, ran to limit
+
+-- trajectory --
+forward reach : +4.58 m      mean vx : +0.362 m/s
+speed target  : 0.337 m/s (morphology-scaled)
+lateral drift : -0.51 m      yaw drift : -41.5 deg
+
+-- stepping RATE (compared in real time, since raw step counts differ) --
+sample dt     : learned 0.0500 s   expert 0.0500 s
+stride period : learned 7 samples (2.86 Hz)   expert 11 samples (1.82 Hz)
+plotted cycles: 5.91 in BOTH gait-diagram panels
+  -> learned steps 1.57x the expert's rate
+
+-- per-frame posture (support-gated discriminator g; blind to rate) --
+g : learned 2.08+/-1.28   expert 2.83+/-1.53   ratio 0.74
+raw clamped g : learned 2.94   expert 2.83
+support mean  : learned 0.703   expert 1.000
+OOD state/value: learned 71.6%/4.7%   expert 0.0%/0.0%
+
+-- coordination, rate-invariant & expert-referenced --
+phase-offset distance to expert : 0.182   (0 = same inter-leg timing as expert, 0.5 = opposite)
+duty = fraction of a stride in stance ; phase = stride-fraction lag vs FL
+             FL    ML    HL    FR    MR    HR
+dutyL   :  0.28  0.54  0.22  0.26  0.44  0.44
+dutyE   :  0.29  0.65  0.56  0.47  0.47  0.48
+phaseL  :  0.00  0.00  0.29  0.86  0.00  0.14
+phaseE  :  0.00  0.18  0.82  0.82  0.82  0.36

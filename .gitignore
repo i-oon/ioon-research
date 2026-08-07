@@ -21,3 +21,6 @@ airl-insect-walking/
 # Generated figures are kept (report/*.png); scripts regenerate them.
 # If you want the reference PDFs out of git too, uncomment:
 # doc/*.pdf
+amp/
+results/
+wm/runs/

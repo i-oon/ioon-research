@@ -13,6 +13,10 @@
 9. [Step -1 — Morphology Gap Check: PASS](#9-step--1--morphology-gap-check-pass)
 10. [Full Project Audit (6 agents) — ข้อค้นพบที่เปลี่ยนทิศทาง](#10-full-project-audit-6-agents--ข้อค้นพบที่เปลี่ยนทิศทาง)
 11. [สถานะปัจจุบัน / ต้องทำต่อ](#11-สถานะปัจจุบัน--ต้องทำต่อ)
+12. [อัปเดตใหญ่ 2026-08 — Cross-Embodiment pivot](#12--อัปเดตใหญ่-2026-08--cross-embodiment-pivot--แผน-staged)
+13. [AMP — เทรน controller ต่อร่าง เพื่อสร้าง behavior dataset](#13--amp--เทรน-controller-ต่อร่าง-เพื่อสร้าง-behavior-dataset-2026-08-in-progress)
+14. [อัปเดต 2026-08-06 — กลับมาใช้ IK forward-only + 4-leg preview](#14--อัปเดต-2026-08-06--กลับมาใช้-ik-forward-only--4-leg-preview)
+15. [อัปเดต 2026-08-06 — ขยาย render-lock check + validate train(long+short)→test(medium)](#15--อัปเดต-2026-08-06--ขยาย-render-lock-check-เป็น-6-episodes--validate-trainlongshorttestmedium)
 
 ---
 
@@ -441,6 +445,9 @@ fit ขายาว → ทดสอบขาสั้น: **R² = −5.23** (�
 
 ## 11. สถานะปัจจุบัน / ต้องทำต่อ
 
+> 🔄 **อัปเดต 2026-08 — ดู §12 ท้ายไฟล์สำหรับสถานะล่าสุด** (pivot ไป cross-embodiment + แผน staged)
+> §11 ด้านล่างนี้คือสถานะ ณ ก.ค. 2026 (cross-morphology อย่างเดียว) เก็บไว้เป็นประวัติ
+
 **Timeline: Aug–Nov ตั้งเป้าจบ ตุลาคม ≈ 12 สัปดาห์**
 
 ### ✅ เสร็จแล้ว
@@ -486,3 +493,279 @@ fit ขายาว → ทดสอบขาสั้น: **R² = −5.23** (�
 - [ ] คุยกับ Ajan Go เรื่อง **motivation reframe** (ข้อ 10.4) ก่อนลงแรง 12 สัปดาห์
 - [ ] แก้ headless segfault ถ้าต้อง collect แบบ unattended
 - [ ] Rewrite `report/pre_proposal.md` (PCA→UMAP, forward-only→3 behaviors, simulator, ชื่ออาจารย์/นักศึกษาที่ยังว่าง)
+
+---
+
+## 12. 🔄 อัปเดตใหญ่ 2026-08 — Cross-Embodiment pivot + แผน staged
+
+### 12.1 ทำไมต้อง pivot ไป cross-embodiment
+คำวิจารณ์หลักของกรรมการ (Preaw/Hap): *"ทำไม vision ถึงคุ้มกว่า proprioception?"* หลัง vision
+pipeline เสร็จ (fixed camera, render-lock, foot-contact macro-F1 = **0.886**) สรุปได้ว่า **บนร่าง
+topology เดียวกัน (3 ความยาวขา, 18-D เหมือนกัน) พิสูจน์ "vision > proprioception" ไม่ได้** เพราะ
+proprioception ก็แชร์ 18-D ข้ามร่างได้ → vision ได้เปรียบแค่ **reach** ไม่ใช่ **accuracy**
+
+**การตัดสินใจ**: เพื่อ *พิสูจน์* (ไม่ใช่ argue) ต้องมีร่างที่ **action space ไม่ comparable (disjoint)** —
+proprioception แชร์ไม่ได้เลย แต่ vision (pixel) เป็นพื้นที่ร่วม → เพิ่ม **Unitree B1 quadruped
+(12-DOF)** เทียบกับ hexapod (18-DOF)
+> **disjoint action space ≠ IK-retargeting**: IK = ค่า a_t ต่างกันใน **space เดียวกัน (18-D)** →
+> comparable (proprioception ยังแชร์ได้); disjoint = **คนละ space** (18-D vs 12-D, ไม่มี correspondence)
+> → proprioception แชร์ไม่ได้. นี่คือเหตุผลที่ 2 stage พิสูจน์คนละอย่าง (ดู 12.2)
+
+### 12.2 แผน staged
+- **Stage 1 — Cross-morphology** (3 ความยาวขา, **IK-retargeting**, 18-D เหมือนกัน): ทำให้ pipeline
+  ทั้งเส้นเดินได้ในกรณีควบคุม + latent จัดกลุ่มตาม behavior ไม่ใช่ body + transfer. พิสูจน์ **"latent ดีกว่า
+  raw-joint"** (แต่ยัง *ไม่* พิสูจน์ vision>proprio เพราะ topology เดียวกัน) — ใช้ IK เพื่อให้ a_t ต่างต่อร่าง
+  → Motion Decoder ต้องอ่าน x_t (ไม่ vacuous)
+- **Stage 2 — Cross-embodiment / compositional transfer**: เทรนบน **6-leg stick insect + Unitree B1
+  quadruped** แล้ว **ทดสอบ transfer ไป 4-leg stick insect**. นี่คือคำตอบตรงต่อฟีดแบคกรรมการว่า
+  "3 ความยาวขาง่ายเกินไปเมื่อเทียบกับศักยภาพ pipeline": train set มี action space คนละชนิด
+  (hexapod 18-D vs B1 12-D) → proprioception แชร์ไม่ได้ แต่ vision เป็นพื้นที่ร่วม; test body 4-leg
+  แชร์ appearance กับ insect และแชร์ leg-count/topology idea กับ quadruped → เป็น compositional held-out
+  body ไม่ใช่แค่ interpolation.
+
+### 12.3 B1 pipeline (สร้างเสร็จ session นี้)
+`sim/rollout_b1_mujoco.py` → `sim/render_b1_replay.py`:
+- **ที่พบ**: B1 policy (PPO, `base_gait3/model_600.pt`) เดินได้ใน MuJoCo แต่ CoppeliaSim รัน policy เองไม่ได้
+- **วิธีทำ**: rollout ใน MuJoCo → **replay kinematic ใน CoppeliaSim** (set base pose + joint แล้ว capture)
+  → render ด้วยกล้อง+พื้นเดียวกับ insect = ไม่มี render-style confound. `sim/build_b1_scene.py` สร้าง scene B1
+  จาก scene insect (พื้น/แสง/กล้องเดียวกัน)
+- ข้อมูล: `data/b1_v1/` (8 clips: fwd 0.2–0.5, turn, spin, strafe), trajectory `data/b1_traj/`
+
+### 12.4 ข้อมูล hexapod
+- `data/hexapod_v1/` (CSV gait, long/medium/short × 8, 2699 เฟรม)
+- `data/ik_v1/` (IK-retargeted, long/medium/short × 3) — **Stage 1 ใช้ IK** (บางไป ต้องเก็บเพิ่ม)
+
+### 12.5 4-leg insect — policy ของแล็บใช้ไม่ได้ → เทรนเอง
+- **ที่พบ**: AIRL cutlegs policy ของแล็บรันไม่ได้ (obs config หาย, กู้ไม่ครบ) — เช่นเดียวกับ AIRL 6-leg
+- **สรุป**: world model ต้องการแค่ **เฟรม+command** ของ 4-leg ไม่ใช่ obs ของ policy → ถ้าจะทำ 4-leg **เทรนเอง
+  (PPO, ไม่ต้อง expert demo)** เลือกขาที่ตัดเอง (น่าจะตัดคู่หน้า = quadruped-like). hexapod ใช้ CSV gait (เดินดีอยู่แล้ว)
+
+### 12.6 Cleanup (session นี้)
+จัด sim/scripts/data: ย้ายของเลิกใช้ (terrain, deprecated B1 direct-physics `collect_b1`, old recorder) →
+`sim/_archive/`; merge `temporal_similarity_*` 3 ไฟล์ → 1 (`--mode`); ข้อมูลเก่า (step0_v2, terrain_all,
+step0_fixedcam) → `data/_archive/`. **เก็บ**: report-figure generators ทั้งหมดใน scripts/, IK tooling (คืนมาแล้ว)
+
+### 12.7 สถานะ / ต้องทำต่อ (staged)
+**✅ เสร็จ**: vision pipeline (macro-F1 0.886) · morphology variants + Step -1 · audit + Phase 0 · **B1 pipeline+data** · **hexapod data (CSV+IK)** · render-lock ข้ามร่าง · cleanup
+
+**🔴 Stage 1 (cross-morphology — current working route = IK forward-only, ดู §14; AMP log kept in §13)**
+- [x] render-lock/encoder check บน `data/ik_walk`: `results/render_lock_ik_walk/` — body decode 0.951, behavior/repeat skipped เพราะ walk-only/no repeats
+- [🔄] ใช้ `data/ik_walk` เป็น forward-only clean pilot ก่อน; postpone turn/strafe เพราะ fixed-camera path-in-frame confound ชัดเกินไป
+- [ ] เทรน ITM+FTM+MD (z_t=64, fp16)
+- [ ] latent validation two-sided แบบ forward-only ก่อน: morphology signal ใน raw `e_t` มีจริง → หลัง train ต้องดูว่า `z_t` ลด morphology และยังรักษา gait/contact signal ได้ไหม
+- [ ] decisive ablation latent vs raw-joint FDM (diagnostic)
+- [ ] transfer / sample-efficiency curve
+
+**🔴 Stage 2 (cross-embodiment / compositional held-out)**
+- [ ] สร้าง/เก็บข้อมูล 4-leg stick insect สำหรับ held-out test (น่าจะต้องเทรน walker เอง; policy cutlegs เดิมใช้ไม่ได้)
+- [ ] เทรน latent WM บน {6-leg insect 18-D, B1 12-D} (per-embodiment Motion Decoder head)
+- [ ] ทดสอบ transfer ไป 4-leg insect; เทียบ scratch / proprio baseline
+- [ ] proof framing: proprioception แชร์ไม่ได้ข้าม 18/12-D; vision-latent แชร์ได้ และ generalize ไป body ใหม่ที่ compose จากสอง embodiment
+
+**ค้าง/ต้องถาม**: คุย Ajan Go เรื่อง reframe (dynamics heterogeneity + cross-embodiment) · วิธีสร้าง/เก็บ 4-leg
+held-out ให้เร็วและน่าเชื่อ · proposal deadline
+
+---
+
+## 13. 🦿 AMP — เทรน controller ต่อร่าง เพื่อสร้าง behavior dataset (2026-08, in progress)
+
+**ทำไมเปลี่ยนจาก IK มาเป็น AMP**: Stage 1 เดิมวางไว้ใช้ **IK-retargeting** สร้าง `a_t` ต่อร่าง (§12.4,
+direction_plan Step 0.5) แต่ `ik_v1` **บางไป** และ IK ให้ trajectory ที่ scripted/แข็ง — บังคับขาสั้นเดินตาม
+foot path ของขายาว **ไม่ปรับ gait ตาม morphology**. เปลี่ยนมาเทรน **AMP (Adversarial Motion Priors)**
+policy ต่อร่างแทน → ได้ gait ที่ **natural + ปรับตามความยาวขาเอง** และแต่ละร่างเดินด้วยจังหวะ/สปีดของตัวเอง.
+งานอยู่ใน `amp/` เท่านั้น (**ไม่แตะ `airl-insect-walking/`** = reference อย่างเดียว).
+
+### 13.1 reward = frozen gait prior + leg-scaled command
+`reward = g(s') + λ(step) · command_reward`
+- **`g(s')`** = gait prior จาก discriminator ของเพื่อนในแล็บ (`amp/discriminator.pth`, `AIRLDiscrim` 28-D,
+  เทรนบน expert ขายาว *Medauroidea*) — **frozen + shared ทั้ง 3 ร่าง**. นี่คือกลไก **behavior correspondence**:
+  ทุกร่างถูกดึงเข้าหา gait distribution อ้างอิงเดียวกัน → "ท่าเดียวกัน" นิยามด้วย gait prior ร่วม ไม่ใช่ Cartesian
+  path ร่วม (อ่อนกว่า IK by-construction แต่แลกกับ gait ที่เป็นธรรมชาติ). ตอบข้อกังขาเดิม "RL อาจไม่ align
+  ข้ามร่าง" — align ถูก anchor ด้วย shared frozen prior + command ที่ leg-scaled ไม่ใช่หวัง emergent luck.
+- **obs 28-D**: body_z(1) + orientation(3, IMU-relative) + joint_angles(18, leg-major) + contacts(6).
+- **command_reward = `track` mode**: `exp(−(vx−vx_target)²/σ²)` ∈ [0,1] — bounded, reward การ **hit** สปีด
+  เป้า ไม่ให้รางวัลกับการวิ่งเกิน (กัน reared sprint). เดิมใช้ `vx*coef` (unbounded) → vx โดม g ~20:1 → เดินเชิดหัว.
+
+### 13.2 morphology scaling (task-space เท่านั้น — ดู memo `morphology-scaling`)
+วัด leg_length + standing height ตอน env init แล้ว scale อัตโนมัติ:
+- **vx_target ∝ leg**: long 0.45 → medium 0.337 → short 0.225 m/s (ขาสั้นไม่ถูกบังคับวิ่ง 2× จังหวะตัวเอง)
+- **track σ ∝ leg** (คง relative precision), **body_z obs bounds ∝ standing height** (0.254/0.195/0.135 m —
+  ไม่งั้น stance ปกติของขาสั้นถูก normalize เป็น −2.49 = discriminator เห็นเป็น "ล้ม")
+- **ไม่ scale**: joint-angle obs/action, orientation/contact, contact-force threshold (มวลเท่ากันทุกร่าง)
+
+### 13.3 design fixes ที่ทำระหว่างทาง (กัน retrain ซ้ำ)
+- **`g_clip=3.0`** — policy game frozen discriminator ได้ถึง g~7-8 (expert ~2.8) ด้วยการยืนนิ่งท่า adversarial
+  → cap g ใกล้ช่วง expert ให้ command reward สู้ได้ = ต้องเดินจริง
+- **`g_center`** — ลบ g_clip ออกจาก training reward ให้ค่าใกล้ 0 (critic converge เร็ว; policy ไม่เปลี่ยน
+  เพราะ constant offset หายใน GAE advantage). critic loss 602 → ~4
+- **λ gait-first schedule** — λ แบน `lam_min` ช่วง warmup (ให้ gait ก่อ) แล้ว ramp แบบ convex (quadratic,
+  slow-start) ขึ้น `lam_max` = "เก่ง gait ก่อน แล้วค่อยตามคำสั่ง". env_reward bounded → lam_max เป็นเพดาน
+  แข็ง command กลบ gait prior ไม่ได้อีก
+- **windowed avg-velocity reward (anti-rocking, 2026-08-04)** — `track` เดิมอ่าน **instantaneous** head vx →
+  ขาสั้น game ได้ด้วยการ **โยกตัวไปมา** (หัวแตะสปีดเป้าชั่วขณะทุกรอบ แต่ net displacement ~0, return/test ~80
+  ทั้งที่ x_dist ~0). แก้เป็น **เฉลี่ย vx จาก net head displacement ต่อ window (25 step)** → การโยกหักล้างกันใน
+  window ได้ ~0, เดินจริงเท่านั้นถึงได้รางวัล (`--track_window`, default 25). ยืนยันหลัง restart: short
+  return/test 80 → 0.15 = exploit ตายแล้ว, ทั้ง 3 ร่างเริ่มที่ baseline เป็นธรรม
+- **root-cause bug ที่เคยทำ sim ค้าง**: CoppeliaSim ใช้ system python3 (ไม่มี zmq) → scene script error →
+  pause-on-error → sim ค้าง state=8 เทรนบนฟิสิกส์แช่แข็ง. แก้ด้วย `defaultPython` ใน `~/.CoppeliaSim/usrset.txt`
+  + ลบ auto-runner `/script` (TARGET_RUNS=1) ออกจาก scene ทั้ง 3
+
+### 13.4 setup การรัน
+- 3 ร่าง เทรนขนานผ่าน 3 CoppeliaSim GUI (port 23060/61/62; render copy 23063). launch จาก venv เสมอ
+- `amp/amp_train.py --port P --scene <body>.ttt --name insect_{long,medium,short}` +
+  `--lam_warmup_frac --lam_ramp_frac` (schedule สั้น 0.03/0.15 → full λ ~350k, feedback ~4-5h)
+- diagnostics: TensorBoard (`return/test`, `eval/x_dist`, `gait/g_eval`, `eval/pitch_abs`, `eval/ep_len`,
+  loss/entropy/ratio) · `scripts/gait_report.py` (rate-normalized, ไม่ assume tripod) · `scripts/render_rollout.py`
+
+### 13.5 สถานะ (2026-08-04)
+- ✅ pipeline healthy: g_eval ~2.9 (≈expert), ep_len 1000 (ไม่ล้ม), pitch ต่ำ, PPO stable
+- ✅ long/medium **เดินหน้าจริง** ตั้งแต่ warmup; anti-rocking fix ทำให้ทั้ง 3 เริ่มที่ baseline เป็นธรรม
+- 🔄 กำลังดู: `eval/x_dist` climb หลัง λ ramp (โดยเฉพาะ short ที่ตอนนี้ game ไม่ได้แล้ว) — เช็ค ~100-150k
+- ☐ ถัดไป: forward validate → command-conditioned fwd/turn/strafe (actor รับ command, disc คง 28-D,
+  warm-start จาก forward policy) → เก็บ behavior dataset ต่อร่าง สำหรับ world model Stage 1
+- IK ยังเก็บไว้เป็น clean-correspondence sanity baseline ถ้าต้องใช้
+
+---
+
+## 14. 🧭 อัปเดต 2026-08-06 — กลับมาใช้ IK forward-only + 4-leg preview
+
+### 14.1 ทำไมพัก AMP/turn แล้วกลับมา forward-only ก่อน
+หลัง train/evaluate AMP หลาย checkpoint พบว่า policy เดินได้ช่วงสั้น ๆ แต่ gait pattern ยังไม่คล้าย expert
+พอจะใช้เป็น evidence ที่ convincing; frozen discriminator `g(s')` เป็น state-only จึงให้คะแนน posture/phase
+รายเฟรมได้ แต่ไม่บังคับ temporal wave-gait transition ชัดพอ. สรุปตอนนี้: **AMP ยังเก็บไว้เป็น engineering
+log/ทางเลือก แต่ไม่ใช่ main path สำหรับ proposal evidence ตอนนี้**.
+
+ด้าน IK: audit ยืนยันว่า old forward IK logic ถูกกว่าและสะอาดกว่า:
+- `data/ik_walk` = 9 clips (long/medium/short × ep521/625/926), 66 frames, forward-only, มีวิดีโอแล้ว
+- `data/ik_v2` = 90 clips แต่ปน walk/old fake turn/stop; walk-only มี 54 clips (6 episodes × 3 repeats × 3 morphs)
+- forward IK มี property สำคัญ: task-space foot path เดียวกัน แต่ joint action ต่างกันต่อ morphology
+  (action RMS ≈ 0.407 rad, contact mismatch ข้าม morphology ≈ 0.09)
+
+การทดลอง turn ล่าสุด:
+- ใช้ expert curvy episode 472 แล้ว loop 3 รอบได้ turn ที่เห็นจริง (`data/ik_turn`, `data/ik_fair_96`)
+- แต่ fixed side camera ทำให้ behavior แยกจาก **position/path-in-frame** ง่ายเกินไป: walk วิ่งขวา→ซ้าย,
+  turn โค้งลง/ออกอีกตำแหน่ง. Position/path-only probe แยก walk vs turn ได้ 100%.
+- ดังนั้น turn ยังเหมาะเป็น video evidence/debug แต่ **ไม่เหมาะเป็น training/evaluation หลักตอนนี้**.
+
+**Decision:** Stage 1 เดินด้วย **forward-only IK** ก่อน เพื่อให้ pipeline เรียบและ thesis story ไม่โดน shortcut
+จากกล้อง/trajectory.
+
+### 14.2 Render-lock / encoder check บน `data/ik_walk`
+รัน `scripts/render_lock_check.py --data data/ik_walk --out results/render_lock_ik_walk`
+
+ผล:
+- 9 clips, 594 frames, behavior = walk only, episodes = 521/625/926
+- `silhouette(body) = +0.033`
+- body decode = **0.951** (chance 0.333)
+- behavior metric skipped เพราะมี behavior เดียว
+- repeat-lock gate skipped เพราะ `data/ik_walk` ไม่มี repeats
+
+Artifacts:
+- `results/render_lock_ik_walk/emb.npz`
+- `results/render_lock_ik_walk/umap.png`
+
+Interpretation: raw V-JEPA2 `e_t` เห็น morphology ชัดจริง แต่ UMAP ไม่ใช่สามเกาะแยกแข็ง ๆ; เป็น walking
+manifold เดียวที่ long/medium/short occupy คนละ band. นี่เหมาะเป็น baseline ก่อน train ITM: ต่อไป `z_t`
+ควรลด morphology decodability ลง แต่ยังรักษา gait/contact/action information.
+
+### 14.3 4-leg stick insect preview สำหรับ Stage 2
+เพิ่ม preview scripts:
+- `sim/render_leg_loss_preview.py` — static render/contact sheet
+- `sim/render_leg_loss_walk.py` — rough walking video โดยใช้ six-leg open-loop gait เดิม แล้วทำ selected legs
+  เป็น ghost/disabled เพื่อไม่ให้ scene script พัง
+
+Artifacts:
+- `results/leg_loss_preview_headcam/leg_loss_contact_sheet.png`
+- `results/leg_loss_walk/grid_leg_loss_walk.mp4`
+- `results/leg_loss_walk/six_leg_base.mp4`
+- `results/leg_loss_walk/front_loss.mp4`
+- `results/leg_loss_walk/middle_loss.mp4`
+- `results/leg_loss_walk/hind_loss.mp4`
+
+Rough walking preview (ยัง **ไม่ใช่** controller ที่ train สำหรับ 4-leg):
+| variant | dx | dy | final_z | read |
+|---|---:|---:|---:|---|
+| six_leg_base | +3.080 | +0.607 | 0.234 | normal baseline |
+| front_loss (remove FL/FR) | -0.543 | -0.359 | 0.025 | fails/falls |
+| **middle_loss (remove ML/MR)** | **+2.237** | -1.353 | 0.155 | ugly but moves forward |
+| hind_loss (remove HL/HR) | -0.223 | +1.943 | 0.145 | spins/drifts |
+
+**Stage 2 candidate:** `middle_loss` is the best held-out 4-leg insect because it leaves front+hind legs,
+which is quadruped-like, while retaining stick-insect appearance. This supports the slide framing:
+train on **6-leg insect + B1 quadruped**, test on **4-leg insect** as compositional transfer.
+
+### 14.4 Immediate next plan
+1. Use `data/ik_walk` as the first forward-only Stage-1 dataset.
+2. Train/validate the minimal ITM+FTM+MD pipeline on short+long, evaluate medium held-out.
+3. Report raw `e_t` morphology baseline (`results/render_lock_ik_walk`) vs learned `z_t`.
+4. Keep `data/ik_v2` walk-only as scale-up data after the small pipeline works.
+5. Keep turn/4-leg as proposal/Stage-2 evidence, not the first training target.
+
+---
+
+## 15. 🔎 อัปเดต 2026-08-06 — ขยาย render-lock check เป็น 6 episodes + validate train(long+short)→test(medium)
+
+### 15.1 ทำไมขยายจาก 3 เป็น 6 episodes
+เอา UMAP จาก `data/ik_walk_3sec` (3 ep × 3 ร่าง, ไม่มี repeat = 594 เฟรม) ไปถาม AI ตัวอื่นดู — สรุปว่า
+"เล็กเกินไปและสะอาดเกินไป" (3 episode อาจ overfit เป็น manifold เปราะบาง) แนะนำให้ใช้ทั้ง 6 forward-walk
+episodes ที่มีอยู่ (144, 285, 521, 625, 926, 997) พร้อม repeat เพื่อเช็ค render-lock
+
+**พบว่าข้อมูลที่แนะนำมีอยู่แล้ว** ใน `data/ik_all` — 6 episodes × 3 ร่าง × 3 repeats × 66 เฟรม = **3564 เฟรม
+forward-walk** (บวก turn/stop ที่เก็บไว้ด้วยแต่ยังไม่ใช้ตามมติเดิม "forward-only ปลอดภัยกว่า") ไม่ต้องเก็บ
+ข้อมูลใหม่ — สร้าง symlink dir `data/ik_walk_all6` (54 ไฟล์ forward-only) แล้วรัน
+`scripts/render_lock_check.py --data data/ik_walk_all6` ใหม่
+
+### 15.2 ผลลัพธ์ — PASS ที่ scale ใหญ่ขึ้น 6 เท่า
+```
+3564 เฟรม | body decode = 0.995 (chance 0.333) | silhouette(body) = +0.034
+RENDER-LOCK GATE: mean repeat-decode = 0.393  vs chance 0.333  ->  PASS (threshold fail คือ >1.5x chance = 0.50)
+```
+- ทุกกลุ่ม (body×episode) ใกล้ chance ยกเว้น 3 กลุ่มที่สูงกว่านิดหน่อย: `long_521` (0.505), `medium_521`
+  (0.566), `medium_144` (0.485) — episode 521 หลุดสูงสุดในทั้งสองร่าง น่าจะเป็นจุดที่ session การอัดมี
+  variation มากกว่าอันอื่นเล็กน้อย ไม่ถึงกับ fail แต่บันทึกไว้เผื่อกลับมาเช็ค
+- Artifacts: `results/ik/render_lock_ik_walk_all6/{emb.npz,umap.png,sample_frames.png}`
+
+**สรุป**: การขยายข้อมูล 3→6 episodes (594→3564 เฟรม) เป็นการอัปเกรดจริง ไม่ใช่แค่ "ข้อมูลเยอะขึ้นเฉยๆ" —
+ผ่าน render-lock gate เดิมได้สบาย ควรใช้ **`data/ik_walk_all6` เป็น canonical Stage-1 dataset** แทน
+`data/ik_walk_3sec` ต่อจากนี้
+
+### 15.3 🔑 พบว่า medium ไม่ได้อยู่ "ระหว่างกลาง" long กับ short ใน embedding space
+เช็คด้วย centroid ของ raw `e_t` (1408-D, ไม่ใช่ 2D UMAP projection ที่บิดเบือนง่าย):
+```
+long <-> medium: 4.01     medium <-> short: 4.99     long <-> short: 6.51
+medium project ไปที่ 40% ของเส้น long->short (สมเหตุสมผล คร่าวๆ)
+แต่ perpendicular distance จากเส้นนั้น = 3.08  (ใกล้เคียงกับระยะ long<->short เองที่ 6.51!)
+```
+**ความหมาย**: ถ้า medium เป็นแค่ "ส่วนผสม" ของ long กับ short จริงๆ มันควรอยู่ใกล้เส้นตรงระหว่างสองจุดนั้น
+(perpendicular distance ≈ 0) แต่มันไม่ใช่ — medium มีทิศทางของตัวเองใน embedding space ที่ชัดเจน
+
+**ผลต่อแผน train(long+short)→test(medium)**: การทดสอบนี้ไม่ใช่ interpolation ง่ายๆ (กรณีที่ง่าย) แต่ใกล้เคียง
+**mild extrapolation** มากกว่า (โมเดลไม่เคยเห็นทิศทางที่ medium อยู่) — ไม่ใช่เหตุผลที่จะไม่ทำการทดลองนี้ ถ้า
+มันสำเร็จได้ทั้งที่เป็น extrapolation จะเป็นผลลัพธ์ที่ **แข็งแกร่งกว่า** interpolation ธรรมดา แต่ถ้าล้มเหลว ก็เป็น
+finding จริง ไม่ใช่ bug — ควรตั้งความคาดหวังให้ตรงกับความยากของ task นี้
+
+### 15.4 Protocol ที่ชัดเจนสำหรับ train(long+short) → test(medium) held-out
+คลี่ความสับสนที่เกิดขึ้น (สำคัญพอที่จะบันทึกไว้กันงงซ้ำ):
+
+**"ต้องใช้ controller ไหนขับ medium เพื่อป้อน e_t?"** — ไม่ต้องมี controller ใหม่ frame ของ medium ที่ต้องใช้
+มีอยู่แล้วใน `data/ik_walk_all6` (สร้างจาก IK controller เดียวกับ long/short) "held-out" หมายถึงไม่เอา
+`(frame, action)` คู่ของ medium ไปเทรนเท่านั้น ไม่ได้แปลว่าไม่มี frame ให้ใช้ตอน evaluate
+
+**"medium ต้องเดินดีหรือเดินยุ่งๆ?"** — ต้องเป็น IK walk ที่สะอาด (คุณภาพเดียวกับ long/short) เพราะ IK
+เป็น scripted/deterministic — ถ้า input เดินยุ่งเราจะแยกไม่ออกว่า `â_t` แย่เพราะ generalize ไม่ได้ หรือเพราะ
+input เองกำกวม การทดสอบนี้ต้อง isolate เฉพาะความสามารถ generalize จริงๆ
+
+**"เป็นการโกงไหม ถ้า frame มาจาก IK ตัวเดียวกับที่สร้าง ground truth action?"** — ไม่โกง เพราะ **โมเดลไม่เคย
+เห็นตัวเลข action ของ medium เป็น input เลยไม่ว่าจุดไหน**:
+- ITM รับแค่ `(e_t, e_{t+1})` = พิกเซลล้วนๆ
+- Motion Decoder รับแค่ `z_t` + `x_t` (พิกเซลอีกเช่นกัน) → ทาย `â_t` ออกมา
+- `a_t` จริง (ที่ IK สั่งจริง) ใช้แค่ "หลังจบ" เพื่อเทียบคะแนน `L_motion = ‖â_t − a_t‖²` เท่านั้น ไม่เคยเป็น input
+- Video เป็นแค่พิกเซล ไม่รั่วตัวเลข joint angle ออกมา — ระบบ sim ให้ทั้งภาพและ ground-truth ตัวเลขพร้อมกัน
+  เป็นเรื่องปกติของ synthetic data ไม่ใช่ circular reasoning
+- สิ่งที่จะโกงจริงๆ คือถ้าป้อนตัวเลข joint angle เข้าโมเดลเป็น extra input หรือถ้า training เคยเห็นคู่
+  `(frame, action)` ของ medium แม้แต่ครั้งเดียว — ทั้งสองอย่างนี้ไม่เกิดขึ้นในแผนนี้
+
+**Metric แนะนำ**: `L_motion` (MSE joint-angle) เป็นตัวเลขหลัก + เสริมด้วย duty-factor/phase/forward-reach
+comparison แบบเดียวกับที่ `gait_report.py` ใช้เทียบ AMP กับ expert (ให้ภาพว่า "ดูเหมือนเดินจริงไหม" ซึ่ง
+ให้ความหมายมากกว่า raw joint-MSE อย่างเดียว) + ครึ่งที่สองของ two-sided validation (`direction_plan.md`
+Step 1.5): morphology probe บน `z_t` ของ medium ควรใกล้ chance ด้วย ไม่งั้น `z_t` แอบจำร่างกายอยู่

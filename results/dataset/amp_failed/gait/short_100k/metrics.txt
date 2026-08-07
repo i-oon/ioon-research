@@ -1,0 +1,23 @@
+=== gait report: short_100k  (vs expert ep926; NO gait template assumed) ===
+checkpoint: amp/logs/insect_short/20260803-2331/model/step100000/actor.pth
+rollout: 454 steps, FELL
+
+-- trajectory --
+forward reach : +8.85 m      mean vx : +0.390 m/s
+lateral drift : -3.78 m      yaw drift : +49.9 deg
+
+-- stepping RATE (compared in real time, since raw step counts differ) --
+stride period : learned 92 steps (0.22 Hz)   expert 9 steps (2.22 Hz)
+  -> learned steps 0.10x the expert's rate
+
+-- per-frame posture (discriminator g; blind to rate) --
+g : learned 2.06+/-0.69   expert 2.83+/-1.53   ratio 0.73
+
+-- coordination, rate-invariant & expert-referenced --
+phase-offset distance to expert : 0.143   (0 = same inter-leg timing as expert, 0.5 = opposite)
+duty = fraction of a stride in stance ; phase = stride-fraction lag vs FL
+             FL    ML    HL    FR    MR    HR
+dutyL   :  0.31  0.44  0.39  0.25  0.28  0.43
+dutyE   :  0.30  0.65  0.56  0.47  0.47  0.47
+phaseL  :  0.00  0.22  0.05  0.04  0.11  0.02
+phaseE  :  0.00  0.22  0.89  0.89  0.00  0.44

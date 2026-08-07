@@ -20,6 +20,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 PERIOD = 64
+MORPHS = ("long", "medium", "short")
 
 
 def label(arr, txt):
@@ -39,10 +40,18 @@ def write_mp4(path, frames_iter, fps):
     w.close()
 
 
+def morph_from_tag(tag):
+    for morph in MORPHS:
+        if tag == morph or tag.startswith(morph + "_"):
+            return morph
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", type=str, default="data/step0")
     ap.add_argument("--fps", type=int, default=20)  # sim is 20 Hz -> real-time
+    ap.add_argument("--pattern", type=str, default="*_ep*.npz")
     args = ap.parse_args()
 
     out = os.path.join(args.data, "videos")
@@ -51,7 +60,7 @@ def main():
     for old in glob.glob(os.path.join(out, "*.mp4")) + glob.glob(os.path.join(out, "*.gif")):
         os.remove(old)
 
-    files = sorted(glob.glob(os.path.join(args.data, "*_ep*.npz")))
+    files = sorted(glob.glob(os.path.join(args.data, args.pattern)))
     for f in files:
         tag = os.path.basename(f).replace(".npz", "")
         d = np.load(f)
@@ -65,8 +74,10 @@ def main():
     # grid: one episode per morphology, side by side
     picks = {}
     for f in files:
-        m = os.path.basename(f).split("_ep")[0]
-        picks.setdefault(m, f)
+        tag = os.path.basename(f).replace(".npz", "")
+        m = morph_from_tag(tag)
+        if m is not None:
+            picks.setdefault(m, f)
     order = [picks[m] for m in ["long", "medium", "short"] if m in picks]
     labs = ["long 1.0x", "medium 0.75x", "short 0.5x"]
     arrs = [np.load(p)["frames"] for p in order]

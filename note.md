@@ -22,6 +22,23 @@ policy เดิมใช้ไม่ได้เลย ต้องเริ่
 
 ---
 
+### 🔄 อัปเดตทิศทาง (2026-08) — staged: cross-morphology → cross-embodiment
+> รายละเอียดเต็มที่ `PROGRESS.md` §12. เป้าหมายด้านบน (cross-morphology) กลายเป็น **Stage 1** ของแผน 2 ชั้น
+
+คำถามหลักของกรรมการ ("ทำไม vision ถึงคุ้มกว่า proprioception?") ตอบด้วยร่าง topology เดียวกันไม่ได้ — 3 ความยาวขาใช้ **18-D เหมือนกัน** proprioception ก็แชร์ได้ → vision ได้เปรียบแค่ **reach** ไม่ใช่ข้อพิสูจน์ เพื่อ *พิสูจน์* ต้องเพิ่มร่างที่ action space **disjoint** (แชร์ proprioception ไม่ได้เลย แต่ vision แชร์ได้)
+
+- **Stage 1 — cross-morphology** (Step -1 … 2 ในไฟล์นี้): 3 ความยาวขา, **IK-retargeting** (a_t ต่างต่อร่างใน space 18-D เดียวกัน). ทำ pipeline ให้เดินได้ + latent จัดกลุ่มตาม behavior + ablation latent vs raw-joint. พิสูจน์ "latent ดีกว่า" **แต่ยังไม่พิสูจน์ vision>proprio** (topology เดียวกัน)
+- **Stage 2 — cross-embodiment / compositional transfer**: เทรนบน **6-leg stick insect + Unitree B1
+  quadruped (12-D)** แล้ว test บน **4-leg stick insect**. นี่คือการตอบ feedback กรรมการว่า
+  3 ความยาวขาง่ายเกินไป: train set มี action space คนละชนิด (hexapod 18-D vs B1 12-D) ที่ proprioception
+  แชร์ตรงๆ ไม่ได้ แต่ vision แชร์ได้; 4-leg test body แชร์รูปร่างกับ insect และแชร์จำนวนขากับ quadruped
+  จึงเป็น held-out body ที่ทดสอบการ compose ความรู้สองด้าน. ต้องหา/เทรน 4-leg walker เอง; policy cutlegs
+  ของแล็บใช้ไม่ได้ (obs config drift)
+
+**คำศัพท์**: disjoint action space (Stage 2) **≠** IK-retargeting (Stage 1). IK = ค่า a_t ต่างกันใน **space เดียวกัน** (comparable — proprioception ยังแชร์ได้); disjoint = **คนละ space** ไม่มี correspondence (proprioception แชร์ไม่ได้) — นี่คือเหตุผลที่ 2 stage พิสูจน์คนละอย่าง
+
+---
+
 ## 2. Intuition — ทำไมถึงทำแบบนี้
 
 ### ทำไมต้องการ morphology-agnostic representation

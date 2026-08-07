@@ -4,6 +4,39 @@
 > every finding behind the corrections in this file, including the doc-drift table, LAC-WM's exact
 > hyperparameters, the literature/baseline inventory, and the 12-week phased path.
 > Thai summary in `PROGRESS.md` §10. **Timeline: Aug–Nov, target October.**
+>
+> **Convention (2026-08-06 onward)**: this file states **only the current direction** — what we're doing
+> now and why, kept short enough to read straight through. The full chronological history (debugging,
+> dead ends, what we tried and abandoned) lives in `PROGRESS.md`, organized by numbered dated sections.
+> When direction changes, this file gets edited to reflect the new state — it does not accumulate old
+> decisions on top of new ones. If a section here looks self-contradictory, it's a bug in the doc, not
+> a snapshot of history to preserve — fix it forward, don't append another update note.
+
+---
+
+## Contents
+
+- [Core Claim](#core-claim)
+- [🔄 Direction update (2026-08) — staged: cross-morphology → cross-embodiment](#-direction-update-2026-08--staged-cross-morphology--cross-embodiment)
+- [Pipeline (confirmed)](#pipeline-confirmed)
+- [Decisions Still Needed](#decisions-still-needed)
+- [Execution Plan](#execution-plan)
+  - [Staged roadmap + timeline](#staged-roadmap--timeline)
+  - [Step -1 — Morphology Gap Check](#step--1--morphology-gap-check--pass)
+  - [Step 0 — Visual Encoder Sanity Check](#step-0--visual-encoder-sanity-check)
+  - [Step 0.5 — per-body actions (IK, blocks Step 1)](#-step-05--precondition-per-body-actions-blocks-step-1)
+  - [Step 1 — Train Phase 1 Pipeline](#step-1--train-phase-1-pipeline)
+  - [Step 1.5 — Latent Space Validation](#step-15--latent-space-validation)
+  - [Step 2 — Transfer to Unseen Morphology](#step-2--transfer-to-unseen-morphology)
+  - [Step 3 — Extrapolation](#step-3-future--extrapolation)
+- [🔴 Critical Confound — Render-Style Dominance](#-critical-confound--render-style-dominance-threatens-step-15s-validity)
+- [🎯 The Motivation Problem](#-the-motivation-problem--why-do-we-need-a-latent-action-at-all)
+- [Phase 2 Design Sketch](#phase-2-design-sketch-out-of-thesis-scope-but-it-constrains-phase-1)
+- [If Step 1.5 Fails — Fallback](#if-step-15-fails--fallback)
+- [Baseline](#baseline)
+- [Notes from ICLR Reviews](#notes-from-iclr-reviews)
+- [Lab Resources](#lab-resources)
+- [Open Questions](#open-questions)
 
 ---
 
@@ -11,6 +44,35 @@
 Learn a **morphology-agnostic latent action z_t** from simulation video
 that clusters by **behavior** (walk/turn/stop), not by body shape.
 Prove it transfers to an unseen morphology without retraining.
+
+---
+
+## 🔄 Direction update (2026-08) — staged: cross-morphology → cross-embodiment
+> Full detail in `PROGRESS.md` §12. The Core Claim above is now **Stage 1** of a two-stage plan.
+
+The committee's core push (*"why is vision worth it over proprioception?"*) can't be answered on
+same-topology bodies alone: the 3 leg-length variants share an identical **18-D** joint space, so
+proprioception could share it too — vision's edge there is *reach*, not a provable advantage. To
+**prove** it we add a genuinely different body whose action space is **disjoint** from the hexapod's,
+where proprioception can't be shared at all but vision (pixels) can.
+
+- **Stage 1 — cross-morphology** (this doc's Steps -1 … 2): 3 leg lengths, **IK-retargeting** (per-body-
+  different `a_t` in the *same* 18-D space). Gets the pipeline working + latent organizes by behavior +
+  the decisive latent-vs-raw-joint ablation. Proves the latent is *better*; does **not** prove
+  vision > proprioception (same topology).
+- **Stage 2 — cross-embodiment / compositional transfer**: train on **6-leg stick insect + Unitree B1
+  quadruped (12-D)**, then test on a **4-leg stick insect**. This directly answers the committee's
+  "3 leg lengths is too simple for this pipeline" feedback: the train set contains two disjoint action
+  spaces (hexapod 18-D and B1 12-D), while the test body shares appearance with the insect and leg-count
+  structure with the quadruped. A proprioceptive model cannot be shared cleanly across these spaces; a
+  vision-latent model can. B1 data + render pipeline already exist (`data/b1_v1`, MuJoCo rollout →
+  CoppeliaSim kinematic replay, same camera/floor as insect = render-consistent). The 4-leg insect will
+  likely need a self-trained walker/data source; the lab's cutlegs AIRL policy is unusable (obs-config drift).
+
+**Terminology** — "disjoint action space" (Stage 2, B1) **≠** IK-retargeting (Stage 1). IK gives
+different *values* in the *same* 18-D space (comparable — proprioception still shares); disjoint =
+*different spaces* with no correspondence (proprioception can't share). That distinction is exactly why
+the two stages prove different things.
 
 ---
 
@@ -157,6 +219,45 @@ Prove it transfers to an unseen morphology without retraining.
 ---
 
 ## Execution Plan
+
+> **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
+> cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
+
+### Staged roadmap + timeline
+
+**Stage 1 — Cross-morphology** (3 leg lengths, **IK-retargeting**; shared 18-D space)
+*Goal: pipeline works end-to-end + latent organizes by behavior + latent beats raw-joint. Does **not**
+prove vision > proprioception (same topology — that's Stage 2).*
+*Data-generation route (final, 2026-08-06): **IK retargeting**. An AMP (RL-trained per-body controller)
+route was tried in between (full log: `PROGRESS.md` §13) but produced gaits too messy/uncoordinated to
+trust as ground truth — kept only as a documented negative-result baseline for the proposal, not the data
+source. IK is back to being the primary route; see the Step 0.5 section below for the current setup.*
+
+| # | Step | Tests / produces | Status | ~Week |
+|---|---|---|---|---|
+| -1 | Morphology gap check | same command → different behavior per leg length | ✅ PASS | done |
+| 0 | Visual-encoder sanity | is the behavior signal present in `e_t`? (foot-contact decodable) | ✅ macro-F1 0.886 | done |
+| 1a | **Render-lock gate** | domain-UMAP across sessions/bodies must **overlap** (else everything downstream is invalid) | ✅ PASS on `data/ik_walk_all6` (mean repeat-decode 0.393 vs chance 0.333) | done |
+| 1b | Collect IK dataset | walk (6 expert episodes × 3 bodies × 3 repeats, 3564 frames) via IK-retargeting, fixed cam → per-body-different `a_t` | ✅ `data/ik_walk_all6` | done |
+| 1c | Train ITM + FTM + MD | `z_t`=64, fp16, trained on **long + short** only (medium held out) | ☐ | 2–4 |
+| 1d | Latent validation (two-sided) | behavior transfers **up** across legs **and** morphology decode **down** | ☐ | 4–5 |
+| 1e | Decisive ablation | latent-conditioned FDM vs raw-joint-conditioned FDM (diagnostic) | ☐ | 5 |
+| 1f | Transfer test: medium held-out | frozen ITM+MD (trained on long+short) predicts `â_t` from medium's own frames; score against medium's real IK actions (`L_motion`) + gait-diagram similarity. **Note**: medium is not a simple interpolation of long/short in embedding space (perpendicular distance from the long↔short line ≈ long↔short distance itself) — this is closer to mild extrapolation than the easy case. | ☐ | 5–6 |
+
+**Stage 2 — Cross-embodiment / compositional transfer** (train 6-leg insect + B1, test 4-leg insect)
+*Goal: answer the committee's "too simple" critique with a real embodiment jump. Train on two bodies with
+disjoint action spaces (hexapod 18-D, B1 12-D), then test whether the learned vision-latent transfers to a
+new 4-leg insect that combines insect appearance with quadruped leg count.*
+
+| # | Step | Tests / produces | Status | ~Week |
+|---|---|---|---|---|
+| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | ✅ `data/b1_v1` | done |
+| 2b | 4-leg insect candidate | **"middle-loss"** variant (remove ML/MR, keep front+hind legs) picked from a 3-way preview — front-loss falls, hind-loss spins/drifts, middle-loss moves forward (ugly but usable). Still needs its own walker/data source (self-trained, PPO) — the lab's cutlegs AIRL policy is unusable. | 🔄 candidate picked, walker not yet trained | 7–8 |
+| 2c | Train latent WM across {6-leg insect, B1} | shared ITM/FTM backbone (vision is embodiment-agnostic) + **per-embodiment Motion Decoder head** (18-D / 12-D) — see diagram `report/pipeline_diagram_stage2_cross_embodiment.png` | ☐ | 8–9 |
+| 2d | Held-out 4-leg test | 4-leg's action space is new (not 18-D, not 12-D) → **cannot be zero-shot** like Stage 1's medium test. Freeze ITM/FTM, fit a small **new** head on a little real 4-leg `(frame,action)` data (few-shot, N=5/10/20/50/100), then score `L_motion` | ☐ | 9–10 |
+| 2e | Cross-embodiment validation | behavior/contact transfer across embodiments; embodiment decode down | ☐ | 10 |
+
+*Detailed write-ups of each Stage-1 step follow below.*
 
 ---
 
@@ -502,13 +603,26 @@ Each morphology needs its **own** command sequence for the same locomotion task,
 
 | Route | Cost | Behaviour correspondence | Verdict |
 |---|---|---|---|
-| **IK retargeting** (Cartesian foot trajectory → `simIK` per body) | zero training | correspondence holds by construction | **preferred** |
-| RL policy per body | ~1 GPU-day per body; AIRL checkpoints in the borrowed repo are broken (see line 149) | emergent, may not align across bodies | fallback only |
+| **IK retargeting** (Cartesian foot trajectory → `simIK` per body) | zero training | correspondence holds by construction | **current route** |
+| AMP policy per body (frozen lab gait prior + leg-scaled command) | ~0.5–1 GPU-day per body | via shared discriminator + matched command (not by construction) | tried, set aside — see below |
+
+**Final decision (2026-08-06): IK retargeting.** An AMP detour was tried in between — full engineering log
+in `PROGRESS.md` §13 — motivated by IK's `ik_v1` set being too thin and producing a stiff, scripted
+trajectory that doesn't adapt to each morphology. AMP did train (reward = frozen lab gait discriminator +
+leg-scaled command, both leg-length-scaled), but the resulting gaits stayed messy and uncoordinated even
+after fixing the reward design (the discriminator-clip bug documented in `PROGRESS.md` §13.3). **Verdict:
+AMP is kept only as a documented negative-result baseline for the proposal** ("we tried RL, here's why
+vision-latent + IK ground truth is the more defensible route") — it is not the data source going forward.
+
+IK was re-collected properly instead: 6 expert episodes × 3 bodies × 3 repeats (`data/ik_walk_all6`,
+3564 frames, forward-walk only — turn/stop excluded for now, they had a camera/path shortcut that made
+them separate too easily to trust). Render-lock gate re-verified at this larger scale: **PASS** (mean
+repeat-decode 0.393 vs. chance 0.333).
 
 IK is not merely the cheaper option, it is the cleaner experiment: it fixes the behaviour and varies only
 the joint values, which is precisely the retargeting the Motion Decoder is supposed to discover. A
 per-body RL policy would give different `a_t` but no guarantee the behaviours correspond, which
-reintroduces a confound.
+reintroduces a confound — which is exactly the failure mode AMP ran into.
 
 **Anticipated objection**: if `a_t` is generated as `IK(trajectory, body)`, is learning MD just learning
 IK? Yes, and that is the point worth stating plainly — the claim is that **the model recovers body-specific
@@ -730,6 +844,11 @@ misses longer behavioral structure" — a different problem than the one we fear
 - **Metric**: sample efficiency on medium leg — with vs. without pretrained FTM
 - No existing locomotion cross-morphology baseline → comparison is transfer vs. no-transfer
 - LAC-WM baseline (EAC-WM) is manipulation-only, cannot port directly
+- **AMP (RL-trained per-body controller), as a negative-result baseline**: documents that a plausible
+  alternative to vision-latent + IK ground truth (train a policy per body against a shared gait prior)
+  was tried and produced worse, less coordinated behaviour than the IK route — supports the case for the
+  chosen approach rather than being an oversight. Failure-mode videos + gait diagnostics already exist
+  (`PROGRESS.md` §13, `results/amp_failed_peaks/`).
 
 ---
 
