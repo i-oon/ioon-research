@@ -13,7 +13,7 @@ sim/env/experttemp.csv
 sim/env/expert_66k_aug3c_fcontact.csv
 
 # Data artifacts (regenerable: encoded embeddings, episode npz, rendered videos, frames)
-data/
+
 *.npz
 
 airl-insect-walking/
