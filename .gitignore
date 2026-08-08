@@ -26,7 +26,6 @@ results/
 wm/runs/
 
 data/ik_walk_100_framed/
-data/ik_walk_8body/
 data/ik_turn/
 data/ik_all/
 data/hexapod/
