@@ -527,15 +527,57 @@ episodes each across 6–8 bodies before running this.
 
 ---
 
+### Step 2.5 — More bodies, more morphology dimensions
+**Status** done for the data, one run finished and one running.
+**Goal**: test whether coverage is what cross-body transfer was missing
+
+`sim/make_leg_morphology.py` now scales coxa, femur and tibia independently, so morphology is a
+volume rather than a line and a held-out body can be a combination no training body has.
+`data/ik_walk_8body` holds 7 usable bodies at 30 clips each with 0.0% edge clipping.
+
+> **Coverage is the only intervention that has worked.** Five training bodies instead of two cut
+> held-out error from 11.04 to **3.57 deg**, and for the first time the model beats the baseline
+> that averages the training bodies' commands (3.57 against 11.48). The latent became far more
+> load-bearing: the z-ablation gap went from 3-4x to **10-37x**.
+>
+> A matched control confirms bracketing rather than data volume is what did it. `m3d_bracketed`
+> and `m3d_outside` share everything except which body is held out, and the bracketed body scores
+> **10 to 30 times better** at every epoch.
+>
+> Two other interventions failed: rescaling the motion target, and shrinking the decoder head
+> (1.4 to 2.1 times worse over ten epochs).
+>
+> **The morphology space is 3 parameters but 2 dimensions.** Scaling the coxa moves the joint
+> commands by 0.73 deg where the tibia moves them by 28.63, so the family lives in a plane. Two
+> numbers place the held-out body to 0.20 deg, which is the ceiling this task allows.
+
+### Step 2.6 — Why it still copies
+**Status** mechanism identified, intervention running.
+
+> Crossing the decoder's two inputs shows it takes the body from **`z`, not from the frame**:
+> body A's frame with body B's latent yields body B's commands to within **3.48 deg**, where the
+> bodies differ by 28.63. `z` itself is 64.1% gait and 11.1% body, so it is doing its job, but a
+> probe still recovers the body from it at **0.724** against 0.200 chance, and that small
+> component is what the decoder keys off. From the output side, **0.883** of the mixture weight
+> sits on one training body.
+>
+> A lookup over five body codes is cheaper than reading leg geometry from 256x1408 tokens, and it
+> has no entry for an unseen body. `--lambda_adv` removes the code with a gradient-reversal head;
+> `heldout/motion_zero_x` and `scripts/swap_pathway.py` say whether the decoder then turns to the
+> frame. See OPEN_QUESTION.md Q5.
+
 ### Step 3 — Extrapolation
 **Status** measured once, out of proposal scope for the write-up.
 **Goal**: test morphology outside training range
 
 > Fold 2 (`--train_morphs long medium --heldout_morph short`) is extrapolation: leg scale 0.5
-> sits outside the 0.75–1.0 training range. Held-out error was **flat at 6.93–7.07 across 28
-> epochs** while validation improved 8×, and the model scored the same as copying the nearest
-> training body. Same failure as interpolation, same cause (two training bodies), so extrapolation
-> is not a separate open question until the body count goes up.
+> sits outside the 0.75–1.0 training range. Held-out error was **flat at 6.93–7.07 across 41
+> epochs** while validation improved 12.8×, and the model scored the same as copying the nearest
+> training body.
+>
+> With five training bodies this changes: `m3d_outside` improves **0.78x** from early to late
+> epochs where the two-body run was flat at 1.02x. Coverage helps outside the hull too, just far
+> less than inside it (10-30x worse than the bracketed body at every epoch).
 
 ---
 

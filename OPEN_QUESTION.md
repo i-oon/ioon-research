@@ -1,7 +1,10 @@
 # Cross-embodiment plan — status & open questions
 
 Living doc. Supersedes the old "argue vs prove / terrain / leg-length" questions,
-which are now settled (see bottom). Updated 2026-08-07.
+which are now settled (see bottom). Updated 2026-08-08.
+
+Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
+this file carries only what is still undecided.
 
 ## The decision (settled)
 
@@ -15,23 +18,30 @@ proprioception *can't*."
 
 ## What's DONE
 
-- **B1 quadruped (12-DOF)** — `data/b1_v1/` (8 clips: fwd 0.2–0.5, turn, spin, strafe).
+- **B1 quadruped (12-DOF)** — `data/b1_framed/` (14 forward clips from two policies).
   Policy walks in native MuJoCo; we **roll out in MuJoCo → replay kinematically in
   CoppeliaSim** (`sim/rollout_b1_mujoco.py` + `sim/render_b1_replay.py`) because
   CoppeliaSim's engines can't run the policy (MuJoCo won't float the base; Newton/Bullet
   sim2sim gap). Spawn transient cropped.
-- **6-leg hexapod (18-DOF)** — `data/hexapod_v1/` (24 clips = long/medium/short × 8),
-  CSV gait via `sim/collect_step0.py`.
-- **Render consistency (critical)** — B1's scene is built FROM an insect scene
-  (`sim/build_b1_scene.py`), so both share the same floor, lighting and camera settings.
-  **That alone is not sufficient.** Each collector anchors the camera to its own robot's
-  start pose, and B1 replays at raw MuJoCo coordinates, so the two embodiments stand on
-  different parts of a 5x5 m floor: backgrounds differ across **27% of pixels** (8.3 mean,
-  33 max out of 255), against 0.29/255 between insect bodies. Both embodiments must
-  therefore spawn at the **same world point** (`--spawn 0 0`) with a matched `--cam_dx`;
-  B1 additionally needs `--travel`, since it covers 1.3-3.1 m while the camera sees 2.1 m.
-  Without this, "body identity hard to decode from `z`" measures background, not embodiment.
+- **6-leg hexapod (18-DOF)** — `data/ik_walk_8body/` (7 bodies x 30 clips, segment scales varied
+  independently), IK retargeting via `sim/collect_ik.py`. Edge clipping 0.0% on every body used.
+- **Render consistency — now fixed and verified.** Same spawn point, same travel gate, and the
+  cameras were also mismatched: the insect scene used a 0.2618 rad field of view and b1_flat.ttt
+  0.4189 rad, 60 percent wider, so B1 frames contained a horizon band the insect frames did not.
+  `sim/match_b1_camera.py` copies the insect camera's offset-from-robot, field of view, clipping
+  and resolution onto the B1 scene. Background difference on median images fell from **5.03/255
+  with 12.8% of pixels off by more than 10** to **1.13/255 with 3.3%**, and outside the robot's
+  own footprint to **0.52**, against 0.21 between two insect bodies. Edge contact went from
+  10-14% of frames to **0.0%** after `--travel 0.63`. Without this, "embodiment hard to decode
+  from `z`" measures the camera.
 - Both datasets: `frames` (256², shared vision space) + per-body command + proprioception.
+- **Behaviour and speed matched across embodiments.** The insect data is forward walking only, so
+  B1's turn, strafe and spin clips are excluded: any turning clip would necessarily be B1 and a
+  probe would read behaviour as embodiment. Speed is matched too -- the insect bodies span
+  0.00567 to 0.01014 m per frame, and B1 uses **two policies** (2.0 Hz and 1.7 Hz gait, genuinely
+  different gaits: 12 against 10 steps per leg, duty 0.52 against 0.61) across seven commanded
+  speeds covering the same range, so neither speed nor gait identifies the embodiment.
+  14 clips, 1,129 transitions.
 
 ## The experiment (test plan)
 
@@ -92,23 +102,69 @@ gait is fully valid (V-JEPA2 sees a hexapod walking either way). **Lean: keep CS
 - Writing caveats (Tee): single-step Markov is deliberate; which modules fine-tune on a
   new body; large-model fine-tuning/scaling limitation.
 
-## Q5. Does forcing invariance help, hurt, or do nothing? (new, 2026-08-07 — highest value)
+## Q5. Does removing the body code from `z` make the decoder read the frame? (ANSWERED: yes, and it does not help)
 
-`z` is ~99% body-decodable yet transfers well, so invariance is evidently not *required*. What
-we have never tested is whether it *helps*. Two cheap interventions: shrink `z_dim` (64 → 16 → 8;
-morphology is redundant given `x_t`, so a bottleneck should evict it first) or add an adversarial
-head (gradient reversal on a morphology classifier, ~30 lines).
+No longer a shot in the dark. `FINDINGS.md` F18 and F19 establish the mechanism this targets:
 
-The measurement that matters is **not** whether morphology decodability drops — it is what happens
-to transfer when it does:
+- `z` splits **64.1 percent gait phase, 11.1 percent body**, so it is doing what it was designed
+  for, yet a linear probe recovers the body from it at **0.724** against a 0.200 chance level.
+- Crossing the decoder's inputs shows it takes the body **from `z`, not from the frame**: body
+  A's frame with body B's latent produces body B's commands to within **3.48 deg**, where the two
+  bodies differ by 28.63. The preference strengthens with training.
+- From the output side, **0.883 of the mixture weight** sits on a single training body, and the
+  segment scales the answer implies are (0.98, 0.98, 0.97) against an actual (0.80, 0.90, 0.90).
+
+So the decoder is running a lookup over five body codes while ignoring a frame that carries leg
+lengths in full. A lookup has no entry for an unseen body, which is every failure in F4 to F7.
+
+**Intervention:** `--lambda_adv` puts a gradient-reversal classifier on `z` (`wm/models/adversary.py`),
+with `adv_warmup_epochs` ramping it in. Two things were tried first and did not work: rescaling
+the motion target (F9) and shrinking the decoder head (F4b, 1.4 to 2.1 times worse).
+
+**What decides it,** in order of how directly each bears on the claim:
+
+| measurement | now | success looks like |
+|---|---|---|
+| `scripts/swap_pathway.py` | answer follows `z` | answer follows the frame |
+| `heldout/motion_zero_x` | not yet measured | larger gap than the control |
+| post-hoc probe on frozen `z` | 0.724 | **0.200**, not lower |
+| held-out RMSE | 3.57 deg | below 3.0 |
+
+Below-chance probe accuracy is a failure mode, not a success: being wrong 99.8 percent of the
+time with five classes needs information, so it means the latent is rotating the code faster
+than the classifier tracks it. A 5-epoch smoke run reached 0.002 that way.
+
+**Answer, from `m3d_adv01` against `m3d_bracketed` over seven epochs (FINDINGS F21):**
+
+| | control | adversarial |
+|---|---|---|
+| held-out error | **0.101** | 0.124 (**1.23x worse**) |
+| z-gap | 27.2x | 5.9x |
+| **x-gap** | 11.1x | **19.1x** |
+
+The decoder did move onto the frame, by 1.7x on the ablation that measures exactly that, and
+transfer still got worse. F20 says why: a ridge probe on mean-pooled `e_t` recovers a held-out
+body's segment scales to 0.05, so the information is there and linearly available, but the
+decoder reaches the frame only through cross-attention with `z` as the query and never asks for
+it. The body code in `z` was a symptom.
+
+**This closes the invariance question.** Forcing invariance neither helps nor is required; what
+it does is expose that the decoder cannot use the frame. The open question moved to Q6.
+
+## Q6. Can the decoder be given the view that works? (open, next)
+
+The probe that recovers morphology sees the mean of all 256 patch tokens. The decoder sees those
+tokens only through cross-attention with `z` as the query. The smallest change consistent with
+F20 is to feed the decoder the mean-pooled embedding directly alongside the attention path, so
+the morphology signal is reachable without `z` having to ask for it.
 
 | outcome | reading |
 |---|---|
-| transfer unchanged | invariance is unnecessary — supports the separability claim |
-| transfer improves | invariance does matter, and we found the mechanism |
-| transfer degrades | body information in `z` is actively useful — most interesting |
+| held-out error drops toward the 0.18 deg linear-mixture ceiling | the access path was the bottleneck |
+| unchanged | the decoder can reach it and still will not use it, which points at the objective rather than the architecture |
+| training-body error rises | the mean-pooled path is competing with the attention path rather than adding to it |
 
-Every outcome is reportable, which is rare. One training run, no new data.
+Cheap: no new data, one architecture flag, one run against `m3d_bracketed`.
 
 ---
 
