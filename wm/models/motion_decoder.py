@@ -15,17 +15,31 @@ does exactly that. See FINDINGS.md F4b.
   mlp     cross-attention backbone, two-layer head. The original design.
   linear  cross-attention backbone, single linear projection as the head.
   probe   no backbone at all: mean-pooled visual tokens concatenated with z, one linear layer.
+  pooled  mlp, plus the mean over patch tokens concatenated onto the attention output.
+
+`pooled` exists because of a specific measurement. Ridge regression on the mean over V-JEPA2's
+256 patch tokens recovers a held-out body's three segment scales to 0.050, 0.039 and 0.002,
+while the trained decoder's answer for that body implies (0.98, 0.98, 0.97) against an actual
+(0.80, 0.90, 0.90) -- worse than the linear map, with 5.2M parameters against 4,227
+(FINDINGS.md F20). The information is in the frame, linearly available, and the decoder does not
+use it.
+
+The difference is how each one reaches the tokens. The probe averages all of them. The decoder
+sees them only through cross-attention with `z` as the query, so it retrieves what `z` asks for,
+and `z` is 64 percent gait phase (F19); morphology sits in the tokens unqueried. `pooled` adds
+the averaged view alongside the attention path, so the same signal the probe uses is reachable
+without `z` having to ask.
 """
 import torch
 import torch.nn as nn
 
 from .blocks import CrossAttentionBlock
 
-HEAD_MODES = ("mlp", "linear", "probe")
+HEAD_MODES = ("mlp", "linear", "probe", "pooled")
 
 
 def _head(mode, hidden, action_dim):
-    if mode == "mlp":
+    if mode in ("mlp", "pooled"):
         return nn.Sequential(
             nn.LayerNorm(hidden),
             nn.Linear(hidden, hidden),
@@ -63,11 +77,31 @@ class MotionDecoder(nn.Module):
             self.downsample = nn.Conv2d(cfg.hidden, cfg.hidden, cfg.md_pool, stride=cfg.md_pool)
             self.query_proj = nn.Linear(cfg.z_dim, cfg.hidden)
             self.cross = CrossAttentionBlock(cfg.hidden, cfg.heads, cfg.mlp_ratio, cfg.dropout)
+            if self.mode == "pooled":
+                # Projected from the raw token dimension, so this route does not depend on
+                # anything z conditions.
+                #
+                # It adds a residual term to the action rather than being concatenated into the
+                # head's input. Concatenating was tried first and the model learned to suppress
+                # it: over four epochs the frame-ablation gap fell from 12.5x to 7.1x, meaning
+                # the decoder used the frame *less* once given a second route to it. A fusion
+                # layer can down-weight whichever input it likes, and it down-weighted the new
+                # one. A residual cannot be routed around -- it lands directly on the output --
+                # so the only way to keep it from hurting is to make it carry something useful.
+                self.pooled_proj = nn.Sequential(
+                    nn.LayerNorm(cfg.token_dim), nn.Linear(cfg.token_dim, cfg.hidden), nn.GELU())
 
-        self.heads = nn.ModuleDict(
-            {name: _head(self.mode, self.width, dim)
-             for name, dim in (heads or {"default": cfg.action_dim}).items()}
-        )
+        spec = heads or {"default": cfg.action_dim}
+        self.heads = nn.ModuleDict({name: _head(self.mode, self.width, dim)
+                                    for name, dim in spec.items()})
+        # per-embodiment because action spaces differ in dimension, but one linear layer each,
+        # so the share of the decoder that transfers to a new embodiment barely moves
+        self.offsets = nn.ModuleDict(
+            {name: nn.Linear(cfg.hidden, dim) for name, dim in spec.items()}
+        ) if self.mode == "pooled" else None
+        if self.offsets is not None:
+            for layer in self.offsets.values():
+                nn.init.zeros_(layer.weight); nn.init.zeros_(layer.bias)
 
     def features(self, x_t, z):
         if self.mode == "probe":
@@ -79,10 +113,19 @@ class MotionDecoder(nn.Module):
         return self.cross(self.query_proj(z).unsqueeze(1), tokens)
 
     def forward(self, x_t, z, embodiment="default"):
-        return self.heads[embodiment](self.features(x_t, z)).squeeze(1)
+        action = self.heads[embodiment](self.features(x_t, z)).squeeze(1)
+        if self.offsets is not None:
+            # starts at exactly zero, so training begins identical to the mlp decoder and any
+            # departure from it is the pooled route being used
+            action = action + self.offsets[embodiment](self.pooled_proj(x_t.mean(dim=1)))
+        return action
 
     def add_head(self, name, hidden, action_dim, device=None):
         """A body with a new action space needs its own head; the backbone stays frozen."""
         head = _head(self.mode, self.width, action_dim)
         self.heads[name] = head.to(device) if device else head
+        if self.offsets is not None:
+            offset = nn.Linear(hidden, action_dim)
+            nn.init.zeros_(offset.weight); nn.init.zeros_(offset.bias)
+            self.offsets[name] = offset.to(device) if device else offset
         return self.heads[name]

@@ -593,9 +593,12 @@ between two bodies whose commands differ by 28.63 deg (`scripts/swap_pathway.py`
 
 Row two is the result: given body A's frame and body B's latent, the decoder emits body B's
 commands to within 3.48 deg, almost as accurately as when both inputs agree. The frame it is
-looking at makes no difference. Row three shows the same preference more weakly, and the
-preference strengthens with training -- the two columns are 4.6 deg apart at epoch 6 and 12.1
-deg apart at epoch 8.
+looking at makes no difference.
+
+The preference strengthens throughout training. At epoch 20 the crossed case reaches **2.08 deg**
+against the latent's body, closer than at epoch 8 and nearly as accurate as when both inputs
+agree (1.22 deg), while row three's two columns spread from 4.6 deg apart at epoch 6 to 14.5 deg
+apart at epoch 20.
 
 This inverts the architecture's intent. `z` is meant to be a body-independent latent action and
 `x_t` the context that says which body; the model uses them the other way round.
@@ -626,6 +629,12 @@ which mixture of training bodies the model's answer resembles (`scripts/morpholo
 shows the same thing from the output side: **0.883 of the weight sits on one training body**
 where the best possible mixture spreads to 0.697, and the segment scales its answer implies are
 (0.980, 0.975, 0.973) against an actual (0.80, 0.90, 0.90).
+
+By epoch 20 the concentration rises to **0.947**, and it has switched which body it copies, from
+`c10f10t10` to `c06f10t10`. The implied scales become (0.615, 0.991, 0.984), which is
+`c06f10t10`'s own (0.6, 1.0, 1.0) almost exactly. Switching which entry it returns, rather than
+converging on the answer, is what a lookup does. Held-out error over the same span goes 3.57 to
+3.88 deg.
 
 This is the mechanism behind every failure above. Coverage helps because it puts a closer code
 in the table, not because the model learned to infer morphology.
