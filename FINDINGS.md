@@ -685,22 +685,24 @@ tokens and never queried. That also explains why removing the body code from `z`
 ### F21. Removing the body code from the latent moves the channel but does not help
 
 `--lambda_adv 0.1` puts a gradient-reversal classifier on `z`. Against `m3d_bracketed`, which
-differs only in that flag, averaged over the first seven epochs:
+differs only in that flag, averaged over ten epochs:
 
 | | control | adversarial | change |
 |---|---|---|---|
-| held-out error | **0.101** | 0.124 | **1.23x worse** |
-| z-gap, `zero_z` over held-out | 27.2x | 5.9x | latent used 4.6x less |
-| x-gap, `zero_x` over held-out | 11.1x | 19.1x | **frame used 1.7x more** |
-| probe on `z` | 0.724 post hoc | 0.34 at epoch 4 | body code partly removed |
+| held-out error | **0.097** | 0.118 | **1.21x worse** |
+| z-gap, `zero_z` over held-out | 23.4x | 5.1x | latent used 4.6x less |
+| x-gap, `zero_x` over held-out | 10.7x | **21.8x** | **frame used 2.0x more** |
+| probe on `z` | 0.724 post hoc | plateau at **0.440** | body code partly removed |
 
 The intervention did what it was designed to do. The decoder moved off the latent and onto the
-frame, by a factor of 1.7 on the ablation that measures exactly that. **Transfer still got
-worse.**
+frame, by a factor of two on the ablation that measures exactly that, and the shift keeps growing
+-- x-gap climbs from 11.3x at epoch 1 to 31.9x at epoch 10, reaching 2.46x the control over the
+last five epochs. **Transfer never improved.** The harder the decoder is pushed onto the frame,
+the more clearly it fails to benefit.
 
-The probe then climbs back, 0.337 at epoch 4 to 0.457 at epoch 7, once the warmup reaches full
-strength: the ITM wins the game and the body code returns. Running longer would not change the
-answer.
+The probe settles at 0.440 from epoch 7 onward, well above the 0.200 chance level and no longer
+falling: the ITM and the classifier reach a standoff and the body code stops leaving. Running
+longer changes nothing.
 
 Read with F20 this is not ambiguous. Forcing the decoder onto the frame does not help because
 the decoder cannot extract morphology from the frame, while a linear probe on the same
