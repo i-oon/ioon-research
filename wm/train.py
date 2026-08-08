@@ -49,7 +49,14 @@ def encode_batch(encoder, batch):
     return dict(zip(VIEW_KEYS, embeddings.chunk(len(VIEW_KEYS))))
 
 
-def forward_step(models, encoder, batch, cfg, device):
+def adv_scale(cfg, epoch):
+    """Reversal strength for this epoch, ramped linearly over cfg.adv_warmup_epochs."""
+    if cfg.adv_warmup_epochs <= 0:
+        return 1.0
+    return min(1.0, epoch / cfg.adv_warmup_epochs)
+
+
+def forward_step(models, encoder, batch, cfg, device, scale=1.0):
     views = encode_batch(encoder, batch)
     action = batch["action"].to(device)
     # batches are single-embodiment by construction, so one head serves the whole batch
@@ -63,14 +70,14 @@ def forward_step(models, encoder, batch, cfg, device):
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
         if "adv" in models:
-            adv_logits = models["adv"](z)
+            adv_logits = models["adv"](z, scale)
         if "probe" in models:
             probe_logits = models["probe"](z)
     return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
                           adv_logits, morph_id, probe_logits)
 
 
-def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None):
+def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0):
     training = optimizer is not None
     for model in models.values():
         model.train(training)
@@ -79,7 +86,7 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None)
     for batch in loader:
         with torch.set_grad_enabled(training):
             with torch.amp.autocast("cuda", dtype=torch.float16):
-                loss, parts = forward_step(models, encoder, batch, cfg, device)
+                loss, parts = forward_step(models, encoder, batch, cfg, device, scale)
 
         if training:
             optimizer.zero_grad(set_to_none=True)
@@ -267,8 +274,9 @@ def main():
         train_set.set_epoch(epoch)
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
-        train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler)
-        val_metrics = run_epoch(models, encoder, val_loader, cfg, device)
+        scale = adv_scale(cfg, epoch)
+        train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler, scale)
+        val_metrics = run_epoch(models, encoder, val_loader, cfg, device, scale=scale)
         heldout = heldout_ablated = float("nan")
         if heldout_cache is not None:
             heldout, heldout_ablated = evaluate_heldout(
@@ -293,7 +301,7 @@ def main():
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
             f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
-            + (f" | adv {train_metrics['adv_accuracy']:.3f}"
+            + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"
                if "probe_accuracy" in train_metrics else "") + suffix

@@ -65,6 +65,11 @@ class Config:
     # full, so denying it that shortcut is the point; see wm/models/adversary.py.
     lambda_adv: float = 0.0
     adv_hidden: int = 128
+    # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while
+    # reconstruction is still falling steeply drives the classifier below chance, which means the
+    # latent is shuffling the body code faster than the classifier tracks it rather than dropping
+    # it: a 5-epoch smoke run reached 0.009 against a 0.200 chance level. 0 disables the ramp.
+    adv_warmup_epochs: int = 5
 
     batch_size: int = 8
     lr: float = 1e-4
