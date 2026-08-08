@@ -3,14 +3,18 @@
 **The short version.** A frozen video encoder carries robot morphology in a linearly decodable
 form that generalises to unseen bodies (F20). The world model trained on top of it ignores that
 and identifies the body from an 11-percent component of its own latent instead (F18, F19), which
-is a lookup and does not extend past the bodies it saw. Removing the shortcut moves the decoder
-onto the frame but does not help, because it cannot read morphology there (F21). More training
-bodies is the only intervention that improves anything, and only inside their hull (F16, F17).
+is a lookup and does not extend past the bodies it saw. Four decoder-side interventions fail to
+change this (F4b, F21, F22); more training bodies is the only one that helps, and only inside
+their hull (F16, F17).
+
+Underneath all of it: **the reconstruction loss, which is supposed to make the latent an action,
+contributes 3 to 7 percent of the forward model's accuracy while taking 99 percent of the
+gradient** (F23). The latent is therefore shaped almost entirely by the motion loss, on one
+percent of the training signal, and a body code is the cheapest thing that satisfies it. No
+change to the decoder can repair a latent that nothing constrained.
 
 Two datasets. F1 to F14 use `data/ik_walk_100_framed`, two training bodies differing in one
-parameter. F15 to F19 use `data/ik_walk_8body`, five training bodies differing in three, and
-carry the mechanism: the decoder identifies the body from a small component of the latent
-rather than from the frame, which is a lookup and does not extend to a body it has no entry for.
+parameter. F15 onward use `data/ik_walk_8body`, five training bodies differing in three.
 
 Measured on `data/ik_walk_100_framed` (100 expert episodes x 3 leg-length bodies x 66 frames,
 19,800 frames, 0 clipped). Architecture: frozen V-JEPA2 ViT-g/16 encoder, ITM -> `z` in R^64,
@@ -722,6 +726,119 @@ Below-chance classifier accuracy is a failure mode worth naming: with five bodie
 requires information, so it means the latent is rotating the code faster than the classifier
 tracks it, not that the code is gone.
 
+### F22. Giving the decoder direct access to the frame makes it use the frame less
+
+F20 showed a ridge probe on mean-pooled `e_t` recovers a held-out body's segment scales to 0.05,
+while the decoder does not. `--md_head pooled` gives the decoder that exact view: the mean over
+patch tokens, projected and added as a residual straight onto the action. It is initialised to
+zero, so training starts bit-identical to the `mlp` decoder, and unlike a concatenated input a
+residual on the output cannot be down-weighted away.
+
+An earlier concatenation design was tried first and the fusion layer suppressed the new path --
+the frame-ablation gap fell from 12.5x to 7.1x on the smoke set. The residual form was adopted
+to remove that escape route.
+
+Against `m3d_bracketed`, differing only in `md_head`, over eleven epochs:
+
+| | control | pooled | change |
+|---|---|---|---|
+| held-out error | 0.098 | 0.099 | **1.01x, identical** |
+| z-gap | 21.1x | 29.6x | latent used 1.4x more |
+| **x-gap** | **10.9x** | **1.4x** | **frame used 7.6x less** |
+
+The frame ablation is the result. With the control, removing the frame costs a factor of eleven;
+with the direct pooled path available, it costs a factor of 1.4, steady across the last five
+epochs. **The decoder was handed the view that works and responded by relying on the frame
+almost not at all**, holding transfer exactly level by leaning harder on `z`.
+
+The residual can also be read directly rather than by ablation, and it says the same thing more
+sharply. On the full run at epoch 6, where held-out error is at its best:
+
+| | smoke, 975 pairs | full, 9,425 pairs |
+|---|---|---|
+| residual magnitude | 1.5-1.9 deg | **0.24-0.28 deg** |
+| spread across bodies | 1.87 deg | 0.27 deg |
+| spread across frames of one body | 2.80 deg | 0.84 deg |
+| **ratio between / within** | 0.67 | **0.32** |
+
+It is not a learned constant -- it sits 0.92 to 1.10 deg from what a zeroed frame produces -- but
+it varies three times more with where the legs are than with how long they are, and it is
+**0.9 percent** of the 28.6 deg that separates two training bodies. More data made it smaller and
+the ratio worse, which is the same direction the frame ablation moved.
+
+Crossing the inputs confirms it. At epoch 6, against the control at the same epoch:
+
+| frame from | latent from | control, RMSE vs the latent's body | pooled |
+|---|---|---|---|
+| A | B | 2.74 | 4.24 |
+| B | A | 16.52 | **3.42** |
+
+In the second row the pooled decoder follows the latent **more** faithfully than the control
+does, not less: a frame belonging to a body 28.63 deg away moves its answer by 3.42 deg, an
+influence of 12 percent.
+
+This closes the access explanation. Five interventions have now been tried:
+
+| Intervention | Result |
+|---|---|
+| rescale the motion target (F9) | no change |
+| shrink the decoder head (F4b) | 1.4 to 2.1x worse |
+| remove the body code from `z` (F21) | frame used 2x more, transfer 1.21x worse |
+| **give the decoder the pooled view (F22)** | **frame used 7.6x less, transfer level** |
+| more training bodies (F16, F17) | **3.1x better, the only one that worked** |
+
+What survives is the objective. `L_motion` asks for the right joint command on bodies the model
+can see during training, and a lookup over five body codes in `z` satisfies that at lower cost
+than reading leg geometry off pixels -- whatever route to the pixels is provided. Nothing in the
+loss ever requires the mapping from appearance to morphology that transfer needs.
+
+### F23. The reconstruction loss barely uses the latent, and it is 99 percent of the gradient
+
+The latent is supposed to be an action because `L_recon` cannot predict the next frame without
+it. That premise had never been checked. `L_recon` is an MSE on unnormalised V-JEPA2 embeddings,
+so its value carries no meaning on its own and needs baselines.
+
+Held-out body, `m3d_bracketed` epoch 20 and `stage1_100ep_framed_runB` epoch 20:
+
+| horizon | FTM | copy `e_t` | FTM with `z` zeroed | **`z` helps** | FTM vs copy |
+|---|---|---|---|---|---|
+| 1 | 1.452 | 2.116 | 1.549 | **1.07x** | 1.46x |
+| 2 | 1.778 | 2.756 | 1.910 | 1.07x | 1.55x |
+| 5 | 2.494 | 3.646 | 2.620 | 1.05x | 1.46x |
+| 10 | 3.187 | 4.431 | 3.294 | **1.03x** | 1.39x |
+
+The forward model works -- it beats predicting that the frame does not change by 39 to 55
+percent -- but **removing the latent costs it 3 to 7 percent**. Against the Motion Decoder, where
+removing the latent costs 2,000 to 3,700 percent, the forward model is barely conditioned on it
+at all.
+
+This is not specific to the five-body run: the two-body run gives 1.04x at horizon 1. It is not
+fixed by looking further ahead either; the contribution *falls* to 1.03x at horizon 10, because
+by then the frame is unpredictable enough that the model falls back on an average, which needs
+no action. One step of a small gait is largely predictable from the current pose, and ten steps
+are largely not, and neither regime requires knowing what the action was.
+
+Now weight it. With `lambda_recon = lambda_motion = 1.0`, recon sits at 1.6 and motion at 0.01:
+
+> **99 percent of the gradient goes to a loss that does not need `z`, and 1 percent to the loss
+> that does.**
+
+So `z` is shaped almost entirely by `L_motion`, on one percent of the training signal, and
+`L_motion` is the term that a lookup satisfies (F19). The latent is not a latent action in the
+sense the architecture intends; it is whatever compresses enough to predict commands for five
+known bodies, and a body code is the cheapest thing that does.
+
+This sits underneath every earlier finding. The decoder keys off a body code in `z` (F18) because
+nothing shaped `z` into anything else, and no change to the decoder -- capacity, access, or
+adversarial pressure -- can repair a latent the objective never constrained.
+
+Two untested consequences, both one config value and no new data:
+
+| change | question it answers |
+|---|---|
+| `lambda_motion` raised to ~100 | with a comparable gradient budget, does `L_motion` still settle for a lookup |
+| `lambda_recon` set to 0 | does dropping a term that contributes 3 to 7 percent help or hurt the latent |
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
@@ -744,17 +861,20 @@ tracks it, not that the code is gone.
 7. **Do not select on the held-out curve.** F14. Fix the budget in advance and report the final
    checkpoint, or report the whole curve.
 
-Three interventions have been tried and none worked: rescaling the motion target (F9),
-shrinking the decoder head (F4b), and removing the body code from the latent (F21). The last one
-is the informative failure -- it moved the decoder onto the frame by 1.7x and transfer still got
-worse, because F20 shows the decoder has no mechanism for reading morphology out of the frame
-even though a linear probe on the same embeddings does.
+Four interventions have been tried on the model and none worked (F9, F4b, F21, F22). The last
+two are the informative failures: removing the body code from the latent pushed the decoder onto
+the frame and made transfer worse, and handing it the frame directly made it use the frame 7.6x
+less while transfer stayed level. Access is not the constraint and neither is capacity.
 
-That points the next change at how the decoder reaches the frame, not at how much capacity it
-has or what the latent contains. It sees patch tokens only through cross-attention with `z` as
-the query; the probe that works sees their mean directly. Giving the decoder that same
-mean-pooled view alongside the attention path is the smallest change consistent with the
-evidence, and it is not yet tested.
+That leaves the objective, and F23 locates the problem inside it. `L_recon`, the term that is
+supposed to make `z` an action, contributes 3 to 7 percent of the forward model's accuracy while
+taking 99 percent of the gradient; `L_motion`, the term that actually needs `z`, gets the
+remaining 1 percent and is satisfied by a lookup. No change to the decoder can repair a latent
+that nothing shaped.
+
+Three untested directions, none needing new data: reweight the two terms, drop `L_recon`, or
+require the same latent to decode correctly against a *different* body's frame (`lambda_cross`,
+which the shared expert episodes make possible).
 
 ## What this enables
 

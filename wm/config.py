@@ -60,9 +60,16 @@ class Config:
     lambda_recon: float = 1.0
     lambda_motion: float = 1.0
 
-    # Gradient-reversal head that removes body identity from z. Off by default. The decoder
-    # takes the body from z rather than from the frame even though the frame carries it in
-    # full, so denying it that shortcut is the point; see wm/models/adversary.py.
+    # Decode one body's latent against a different body's frame, supervised by that body's
+    # command. Every body walks the same expert episodes, so at a given timestep they share the
+    # intent and differ only in geometry. Reading the body out of z gives the wrong answer here,
+    # which is the point: the loss finally asks for the appearance-to-morphology mapping that
+    # transfer needs, rather than merely permitting it. Off by default. See OPEN_QUESTION.md Q7.
+    lambda_cross: float = 0.0
+
+    # Gradient-reversal head that removes body identity from z. Off by default, and superseded
+    # by lambda_cross: stripping the code moved the decoder onto the frame and made transfer
+    # worse, because it has no reason to read morphology there. See wm/models/adversary.py.
     lambda_adv: float = 0.0
     adv_hidden: int = 128
     # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while

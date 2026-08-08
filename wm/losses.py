@@ -9,11 +9,18 @@ import torch.nn.functional as F
 
 
 def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
-                   adv_logits=None, morph_id=None, probe_logits=None):
+                   adv_logits=None, morph_id=None, probe_logits=None,
+                   cross_action=None, cross_target=None):
     recon = F.mse_loss(pred_next, target_next)
     motion = F.mse_loss(pred_action, target_action)
     total = cfg.lambda_recon * recon + cfg.lambda_motion * motion
     parts = {"recon": recon.item(), "motion": motion.item()}
+
+    if cross_action is not None and cross_target is not None and cfg.lambda_cross > 0:
+        # same latent, another body's frame, that body's command as the target
+        cross = F.mse_loss(cross_action, cross_target)
+        total = total + cfg.lambda_cross * cross
+        parts["cross"] = cross.item()
 
     if adv_logits is not None and morph_id is not None and cfg.lambda_adv > 0:
         adv = F.cross_entropy(adv_logits, morph_id)

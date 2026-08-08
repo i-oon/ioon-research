@@ -66,6 +66,12 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0):
     pred_next = models["ftm"](views["view2_t"], z)
     pred_action = models["md"](views["view1_t"], z, embodiment)
 
+    cross_pred = cross_target = None
+    if "cross_x_t" in batch and cfg.lambda_cross > 0:
+        cross_views = encoder.encode(list(batch["cross_x_t"].numpy())).float()
+        cross_pred = models["md"](cross_views, z, embodiment)
+        cross_target = batch["cross_action"].to(device)
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -74,7 +80,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0):
         if "probe" in models:
             probe_logits = models["probe"](z)
     return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
-                          adv_logits, morph_id, probe_logits)
+                          adv_logits, morph_id, probe_logits, cross_pred, cross_target)
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0):
@@ -311,6 +317,8 @@ def main():
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
             f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
+            + (f" | cross {train_metrics['cross']:.4f}"
+               if "cross" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"

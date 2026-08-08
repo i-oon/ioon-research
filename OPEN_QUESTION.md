@@ -60,6 +60,29 @@ proprioception *can't*."
    shared model across incomparable bodies; vision can.
 5. **Ablation**: latent-action vs raw-command vs obs-only.
 
+## Q0. What Stage 2 can and cannot claim, given Stage 1 (new, 2026-08-09)
+
+Stage 1 found that the decoder identifies the body from a code in `z` and looks up, rather than
+inferring morphology from the frame (FINDINGS F18-F22). Two claims were being run together and
+have to be separated, because Stage 1 supports one and predicts the other will fail.
+
+**Claim A — vision forms a shared model across incomparable joint spaces, proprioception cannot.**
+Survives, and Stage 1 supports it. One model reconstructs five bodies to 0.5 deg with morphology
+never supplied. This is a statement about a shared representation existing, not about
+generalisation. An 18-DOF hexapod and a 12-DOF quadruped cannot be fed to one proprioceptive
+model at all, so the asymmetry does not depend on transfer succeeding.
+
+**Claim B — that model transfers to an unseen embodiment.** Stage 1 predicts failure. Training on
+hexapod + B1 and testing on a 4-leg insect is two training points, which is the configuration F5
+and F17 show does not work, and a third embodiment cannot be generated the way extra bodies were.
+
+**Step 3's sample-efficiency framing is not claim B.** Pretrain, fine-tune on N clips of the new
+embodiment, compare against from-scratch: the shared backbone carries gait phase and visual
+processing, so it can start ahead even when zero-shot fails. Untested and not contradicted.
+
+Practical consequence: report claim A as the result, claim B as a measured limit with its
+mechanism, and treat sample efficiency as the transfer claim actually being made.
+
 ## Q1. Which cross-embodiment framing? (the main open choice)
 
 - **(A) 6-leg → B1** — feasible **now** with data in hand. Pretrain hexapod, test
@@ -151,20 +174,65 @@ it. The body code in `z` was a symptom.
 **This closes the invariance question.** Forcing invariance neither helps nor is required; what
 it does is expose that the decoder cannot use the frame. The open question moved to Q6.
 
-## Q6. Can the decoder be given the view that works? (open, next)
+## Q6. Can the decoder be given the view that works? (ANSWERED: yes, and it uses it less)
 
-The probe that recovers morphology sees the mean of all 256 patch tokens. The decoder sees those
-tokens only through cross-attention with `z` as the query. The smallest change consistent with
-F20 is to feed the decoder the mean-pooled embedding directly alongside the attention path, so
-the morphology signal is reachable without `z` having to ask for it.
+`--md_head pooled` adds the mean over patch tokens as a zero-initialised residual straight onto
+the action, which is the exact view a ridge probe uses to recover a held-out body's segment
+scales to 0.05 (FINDINGS F20). Against `m3d_bracketed` over eleven epochs:
 
-| outcome | reading |
+| | control | pooled |
+|---|---|---|
+| held-out error | 0.098 | 0.099 (identical) |
+| z-gap | 21.1x | 29.6x |
+| **x-gap** | **10.9x** | **1.4x** |
+
+Handed the working view, the decoder relied on the frame **7.6x less** and held transfer level by
+leaning harder on `z`. Measured directly on a smoke checkpoint, the residual varies more across
+frames of one body (2.80 deg) than across bodies (1.87 deg) -- it tracks gait phase, not leg
+length -- and is 1.5 to 1.9 deg against the 28.6 deg that separates two training bodies.
+
+**Five interventions, one worked.** Rescaling the target (F9), shrinking the head (F4b),
+stripping the body code from `z` (F21) and handing over the pooled view (F22) all failed;
+only more training bodies helped (F16, F17). Capacity, access and latent content are all ruled
+out.
+
+## Q7. Is the objective the constraint? (open — and F23 locates where)
+
+**FINDINGS F23 narrows this.** `L_recon` is supposed to make `z` an action by making the next
+frame unpredictable without it. Measured: removing `z` costs the forward model **3 to 7 percent**
+at every horizon from 1 to 10, in both the two-body and five-body runs, while the Motion Decoder
+loses 2,000 to 3,700 percent without it. And with `lambda_recon = lambda_motion = 1.0`, recon
+sits at 1.6 against motion's 0.01, so **99 percent of the gradient goes to the term that does not
+need `z`**.
+
+The latent is shaped by `L_motion` alone, on one percent of the signal, and `L_motion` is
+satisfied by a lookup. That is why no decoder-side change worked.
+
+Two experiments that cost one config value and no new data, neither run:
+
+| change | question |
 |---|---|
-| held-out error drops toward the 0.18 deg linear-mixture ceiling | the access path was the bottleneck |
-| unchanged | the decoder can reach it and still will not use it, which points at the objective rather than the architecture |
-| training-body error rises | the mean-pooled path is competing with the attention path rather than adding to it |
+| `--lambda_motion 100` | given a comparable gradient budget, does `L_motion` still settle for a lookup |
+| `--lambda_recon 0` | does dropping a term worth 3 to 7 percent help the latent or hurt it |
 
-Cheap: no new data, one architecture flag, one run against `m3d_bracketed`.
+The cross-body objective below is the third option and is orthogonal to both.
+
+
+`L_motion` asks for the right joint command on bodies visible during training. A lookup over
+five body codes in `z` satisfies that at lower cost than reading geometry off pixels, by every
+route we have opened. Nothing in the loss requires the appearance-to-morphology mapping that
+transfer needs, so no architectural change should be expected to produce it.
+
+Candidate changes, none tested:
+
+| change | what it would force |
+|---|---|
+| decode `z` from body A with the frame of body B, supervised by B's command | the latent cannot carry body identity and the frame must supply it |
+| predict the body's segment scales as an auxiliary target | morphology becomes something the loss asks for, not a shortcut it tolerates |
+| predict the Cartesian foot trajectory, shared across bodies by construction, and convert with the observed geometry | separates the body-independent intent from the body-specific mapping explicitly |
+
+The first is closest to a control: it uses data we already have, since every body walks the same
+expert episodes, so frames and commands are aligned across bodies at each timestep.
 
 ---
 

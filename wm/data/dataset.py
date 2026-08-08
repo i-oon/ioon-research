@@ -101,6 +101,14 @@ class IKWalkPairs(Dataset):
         self.morphs = sorted({clip["morph"] for clip in self.clips})
         self.morph_index = {name: i for i, name in enumerate(self.morphs)}
 
+        # Every body walks the same expert episodes, so at a given episode and timestep all of
+        # them are at the same point of the same shared Cartesian foot trajectory and differ only
+        # in geometry. That makes it possible to decode one body's latent against another body's
+        # frame and know what the answer should be, which is what cfg.lambda_cross trains on.
+        self.partners = {}
+        for i, clip in enumerate(self.clips):
+            self.partners.setdefault(clip["episode"], {}).setdefault(clip["morph"], i)
+
         start, stop = frame_range or (0, 0)
         self.index = [
             (i, t)
@@ -128,7 +136,7 @@ class IKWalkPairs(Dataset):
         a2 = sample_params(rng, height, width)
 
         action = (clip["actions"][t] - self.mean) / self.std
-        return {
+        sample = {
             "view1_t": apply(frame_t, a1),
             "view1_next": apply(frame_next, a1),
             "view2_t": apply(frame_t, a2),
@@ -136,6 +144,18 @@ class IKWalkPairs(Dataset):
             "action": action.astype(np.float32),
             "morph_id": self.morph_index[clip["morph"]],
         }
+
+        # a different body at the same episode and timestep: same intent, different geometry.
+        # Its own augmentation, so the two frames share no nuisance factor the model could match
+        # on instead of reading the body.
+        others = [m for m in self.partners[clip["episode"]] if m != clip["morph"]]
+        if others:
+            partner = self.clips[self.partners[clip["episode"]][others[rng.integers(len(others))]]]
+            a3 = sample_params(rng, height, width)
+            sample["cross_x_t"] = apply(partner["frames"][t], a3)
+            sample["cross_action"] = ((partner["actions"][t] - self.mean) / self.std).astype(np.float32)
+            sample["cross_morph_id"] = self.morph_index[partner["morph"]]
+        return sample
 
 
 def embodiment_split(specs, val_fraction, root=""):

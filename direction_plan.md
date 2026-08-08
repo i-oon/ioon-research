@@ -552,7 +552,7 @@ volume rather than a line and a held-out body can be a combination no training b
 > numbers place the held-out body to 0.20 deg, which is the ceiling this task allows.
 
 ### Step 2.6 — Why it still copies
-**Status** mechanism identified, intervention running.
+**Status** done. Mechanism identified, four interventions tried, one hypothesis left.
 
 > Crossing the decoder's two inputs shows it takes the body from **`z`, not from the frame**:
 > body A's frame with body B's latent yields body B's commands to within **3.48 deg**, where the
@@ -562,9 +562,21 @@ volume rather than a line and a held-out body can be a combination no training b
 > sits on one training body.
 >
 > A lookup over five body codes is cheaper than reading leg geometry from 256x1408 tokens, and it
-> has no entry for an unseen body. `--lambda_adv` removes the code with a gradient-reversal head;
-> `heldout/motion_zero_x` and `scripts/swap_pathway.py` say whether the decoder then turns to the
-> frame. See OPEN_QUESTION.md Q5.
+> has no entry for an unseen body.
+>
+> **The information is in the frame and the decoder still will not use it.** A ridge probe on
+> mean-pooled `e_t`, fitted on the five training bodies, recovers the held-out body's segment
+> scales to 0.050, 0.039 and 0.002 — better than the 5.2M-parameter decoder, which implies
+> (0.98, 0.98, 0.97) against a true (0.80, 0.90, 0.90).
+>
+> **Four interventions, none worked.** Rescaling the motion target: no change. Shrinking the
+> decoder head: 1.4–2.1x worse. Removing the body code from `z` with gradient reversal: the
+> decoder moved onto the frame by 2x and transfer got 1.21x worse. Handing it the pooled view as
+> a zero-initialised residual: it used the frame **7.6x less** and transfer stayed level.
+>
+> Capacity, access and latent content are ruled out. What is left is the objective — `L_motion`
+> never asks for the appearance-to-morphology mapping that transfer needs. See OPEN_QUESTION.md
+> Q5 and Q6 (both answered) and **Q7** (open).
 
 ### Step 3 — Extrapolation
 **Status** measured once, out of proposal scope for the write-up.
