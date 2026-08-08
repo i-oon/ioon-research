@@ -35,7 +35,7 @@ from wm.data.embodiment import REGISTRY  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
-from wm.models.adversary import MorphAdversary  # noqa: E402
+from wm.models.adversary import MorphAdversary, MorphProbe  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
 VIEW_KEYS = ("view1_t", "view1_next", "view2_t", "view2_next")
@@ -59,12 +59,15 @@ def forward_step(models, encoder, batch, cfg, device):
     pred_next = models["ftm"](views["view2_t"], z)
     pred_action = models["md"](views["view1_t"], z, embodiment)
 
-    adv_logits = morph_id = None
-    if "adv" in models and "morph_id" in batch:
+    adv_logits = probe_logits = morph_id = None
+    if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
-        adv_logits = models["adv"](z)
+        if "adv" in models:
+            adv_logits = models["adv"](z)
+        if "probe" in models:
+            probe_logits = models["probe"](z)
     return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
-                          adv_logits, morph_id)
+                          adv_logits, morph_id, probe_logits)
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None):
@@ -149,10 +152,13 @@ def build_models(cfg, device, heads=None, n_bodies=0):
         "ftm": ForwardTransitionModel(cfg).to(device),
         "md": MotionDecoder(cfg, heads=heads).to(device),
     }
-    if cfg.lambda_adv > 0:
-        if n_bodies < 2:
-            raise ValueError("lambda_adv needs at least two training bodies to discriminate")
-        models["adv"] = MorphAdversary(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)
+    if n_bodies >= 2:
+        # always on: a pure read-out of how decodable the body is from z, costing one small MLP
+        models["probe"] = MorphProbe(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)
+        if cfg.lambda_adv > 0:
+            models["adv"] = MorphAdversary(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)
+    elif cfg.lambda_adv > 0:
+        raise ValueError("lambda_adv needs at least two training bodies to discriminate")
     return models
 
 
@@ -287,8 +293,10 @@ def main():
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
             f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
-            + (f" | adv acc {train_metrics['adv_accuracy']:.3f}"
-               if "adv_accuracy" in train_metrics else "") + suffix
+            + (f" | adv {train_metrics['adv_accuracy']:.3f}"
+               if "adv_accuracy" in train_metrics else "")
+            + (f" probe {train_metrics['probe_accuracy']:.3f}"
+               if "probe_accuracy" in train_metrics else "") + suffix
         )
 
         for key, filename in (("total", "best.pt"), ("motion", "best_motion.pt")):

@@ -58,3 +58,28 @@ class MorphAdversary(nn.Module):
         if z.dim() == 3:
             z = z.squeeze(1)
         return self.net(GradientReversal.apply(z, scale))
+
+
+class MorphProbe(nn.Module):
+    """Measures how decodable the body still is from z, without touching training.
+
+    Needed because the adversary's own accuracy is ambiguous: near chance can mean the
+    reversal removed the body, or that the classifier fighting a reversed gradient never got
+    good enough to find it. This one reads a detached z, so it trains freely and sends nothing
+    back. Its accuracy is a read-out, and it is logged whether or not lambda_adv is set, which
+    gives the control run its baseline for free.
+    """
+
+    def __init__(self, z_dim, n_bodies, hidden=128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.LayerNorm(z_dim),
+            nn.Linear(z_dim, hidden),
+            nn.GELU(),
+            nn.Linear(hidden, n_bodies),
+        )
+
+    def forward(self, z):
+        if z.dim() == 3:
+            z = z.squeeze(1)
+        return self.net(z.detach())
