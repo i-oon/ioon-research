@@ -96,6 +96,11 @@ class IKWalkPairs(Dataset):
             mean, std = action_stats(self.clips, within_body_std)
         self.mean, self.std = mean.astype(np.float32), std.astype(np.float32)
 
+        # stable body index for the adversarial head; sorted so a resumed or re-split run
+        # assigns the same label to the same body
+        self.morphs = sorted({clip["morph"] for clip in self.clips})
+        self.morph_index = {name: i for i, name in enumerate(self.morphs)}
+
         start, stop = frame_range or (0, 0)
         self.index = [
             (i, t)
@@ -129,6 +134,7 @@ class IKWalkPairs(Dataset):
             "view2_t": apply(frame_t, a2),
             "view2_next": apply(frame_next, a2),
             "action": action.astype(np.float32),
+            "morph_id": self.morph_index[clip["morph"]],
         }
 
 

@@ -142,12 +142,29 @@ to a near-affine problem, so its win here may not survive a morphology space wit
 segment scaling. Scaling the three segments separately and repeating this table is the
 experiment that settles it, and both outcomes are reportable.
 
-**Every readout in these tables was fitted post hoc on a frozen `z`.** Training end to end with
-a smaller head changes what the ITM learns, in either direction: a linear head puts all the
-pressure to be decodable on `z`, which could sharpen it or could starve it. The `md_head`
-setting in `wm/config.py` exists to run that experiment; until it has been run, the tables above
-say what a readout can extract from this latent, not what a differently-shaped model would
-learn.
+**Every readout in these tables was fitted post hoc on a frozen `z`, and training end to end
+with a smaller head does not reproduce the result.** `head_linear` keeps the cross-attention
+backbone and replaces the two-layer output head with a single projection, 272,914 parameters
+down to 10,258. Against `fix_norm`, which differs only in that head, over the first ten epochs
+on held-out `medium`:
+
+| | mlp head | linear head |
+|---|---|---|
+| best held-out | **0.522** | 1.121 |
+| mean held-out, epochs 1-10 | **1.031** | 1.649 |
+| mean held-out, epochs 6-10 | **1.201** | 1.735 |
+| mean validation, epochs 6-10 | **0.0110** | 0.0131 |
+| mean z-ablation gap | 4.2x | 4.2x |
+
+The linear head is 1.4 to 2.1 times worse and is worse in all ten epochs, which is outside the
+run-to-run spread. The likely reason is that it removes only 5 percent of the decoder and
+leaves the cross-attention block (3.15M of 5.23M) untouched, while forcing the backbone to make
+its features linearly separable on its own.
+
+This closes the capacity hypothesis as a fix. What made the ridge probe look good was the
+latent the original training produced, not the shape of the readout; change the readout during
+training and the latent changes with it. Coverage remains the only intervention that has
+improved anything.
 
 The probe reads only `z` while the Motion Decoder also reads `e_t`, so capacity and input access
 are confounded in that table. Fitting both model classes on all three input sets separates them,

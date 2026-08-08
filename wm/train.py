@@ -35,6 +35,7 @@ from wm.data.embodiment import REGISTRY  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
+from wm.models.adversary import MorphAdversary  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
 VIEW_KEYS = ("view1_t", "view1_next", "view2_t", "view2_next")
@@ -57,7 +58,13 @@ def forward_step(models, encoder, batch, cfg, device):
     z = models["itm"](views["view1_t"], views["view1_next"])
     pred_next = models["ftm"](views["view2_t"], z)
     pred_action = models["md"](views["view1_t"], z, embodiment)
-    return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg)
+
+    adv_logits = morph_id = None
+    if "adv" in models and "morph_id" in batch:
+        morph_id = batch["morph_id"].to(device)
+        adv_logits = models["adv"](z)
+    return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
+                          adv_logits, morph_id)
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None):
@@ -136,12 +143,17 @@ def evaluate_heldout(models, cache, mean, std, device, chunk=8):
     return float(np.mean(errors)), float(np.mean(ablated))
 
 
-def build_models(cfg, device, heads=None):
-    return {
+def build_models(cfg, device, heads=None, n_bodies=0):
+    models = {
         "itm": InverseTransitionModel(cfg).to(device),
         "ftm": ForwardTransitionModel(cfg).to(device),
         "md": MotionDecoder(cfg, heads=heads).to(device),
     }
+    if cfg.lambda_adv > 0:
+        if n_bodies < 2:
+            raise ValueError("lambda_adv needs at least two training bodies to discriminate")
+        models["adv"] = MorphAdversary(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)
+    return models
 
 
 def build_cross_embodiment(cfg, root):
@@ -206,7 +218,10 @@ def main():
         val_loader = DataLoader(val_set, shuffle=False, **loader_args)
 
     encoder = VJEPA2FrameEncoder(device=str(device))
-    models = build_models(cfg, device, heads=heads)
+    n_bodies = len(getattr(train_set, "morphs", []) or [])
+    models = build_models(cfg, device, heads=heads, n_bodies=n_bodies)
+    if "adv" in models:
+        print(f"adversary on z: {n_bodies} bodies {train_set.morphs}, lambda_adv {cfg.lambda_adv}")
     parameters = [p for model in models.values() for p in model.parameters()]
     optimizer = torch.optim.AdamW(parameters, lr=cfg.lr, weight_decay=cfg.weight_decay)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
@@ -271,7 +286,9 @@ def main():
             f"epoch {epoch:3d} | train {train_metrics['total']:.4f} "
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
-            f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})" + suffix
+            f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
+            + (f" | adv acc {train_metrics['adv_accuracy']:.3f}"
+               if "adv_accuracy" in train_metrics else "") + suffix
         )
 
         for key, filename in (("total", "best.pt"), ("motion", "best_motion.pt")):

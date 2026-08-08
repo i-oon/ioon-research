@@ -60,6 +60,12 @@ class Config:
     lambda_recon: float = 1.0
     lambda_motion: float = 1.0
 
+    # Gradient-reversal head that removes body identity from z. Off by default. The decoder
+    # takes the body from z rather than from the frame even though the frame carries it in
+    # full, so denying it that shortcut is the point; see wm/models/adversary.py.
+    lambda_adv: float = 0.0
+    adv_hidden: int = 128
+
     batch_size: int = 8
     lr: float = 1e-4
     weight_decay: float = 0.01
