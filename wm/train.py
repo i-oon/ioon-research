@@ -132,14 +132,21 @@ def cache_heldout(encoder, data_dir, cfg, device):
 
 @torch.no_grad()
 def evaluate_heldout(models, cache, mean, std, device, chunk=8):
-    """Motion error on the held-out body, with the latent ablated as a reference.
+    """Motion error on the held-out body, with each of the decoder's two inputs ablated.
+
+    Both ablations are needed because they answer different questions. Zeroing z removes the
+    gait phase along with anything else it carries, so a larger gap says the decoder needs z,
+    not that z carries the body. Zeroing the frame is the one that tracks whether the decoder
+    reads morphology from pixels: crossing the two inputs shows it currently takes the body
+    from z and ignores the frame, and an intervention meant to reverse that should show up
+    here as the frame becoming harder to do without.
 
     Chunked: a whole clip at once would run 512-token attention over ~65 transitions, which
     does not fit alongside the training step's own allocations.
     """
     mean_t = torch.tensor(mean, device=device)
     std_t = torch.tensor(std, device=device)
-    errors, ablated = [], []
+    errors, no_z, no_x = [], [], []
     for embeddings, actions in zip(cache["embeddings"], cache["actions"]):
         target = (actions - mean_t) / std_t
         total = len(embeddings) - 1
@@ -149,8 +156,9 @@ def evaluate_heldout(models, cache, mean, std, device, chunk=8):
             expected = target[start:stop]
             z = models["itm"](e_t, e_next)
             errors.append(((models["md"](e_t, z) - expected) ** 2).mean().item())
-            ablated.append(((models["md"](e_t, torch.zeros_like(z)) - expected) ** 2).mean().item())
-    return float(np.mean(errors)), float(np.mean(ablated))
+            no_z.append(((models["md"](e_t, torch.zeros_like(z)) - expected) ** 2).mean().item())
+            no_x.append(((models["md"](torch.zeros_like(e_t), z) - expected) ** 2).mean().item())
+    return float(np.mean(errors)), float(np.mean(no_z)), float(np.mean(no_x))
 
 
 def build_models(cfg, device, heads=None, n_bodies=0):
@@ -277,9 +285,9 @@ def main():
         scale = adv_scale(cfg, epoch)
         train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler, scale)
         val_metrics = run_epoch(models, encoder, val_loader, cfg, device, scale=scale)
-        heldout = heldout_ablated = float("nan")
+        heldout = heldout_no_z = heldout_no_x = float("nan")
         if heldout_cache is not None:
-            heldout, heldout_ablated = evaluate_heldout(
+            heldout, heldout_no_z, heldout_no_x = evaluate_heldout(
                 models, heldout_cache, train_set.mean, train_set.std, device
             )
         schedule.step()
@@ -290,11 +298,13 @@ def main():
             writer.add_scalar(f"val/{key}", value, epoch)
         if heldout_cache is not None:
             writer.add_scalar("heldout/motion", heldout, epoch)
-            writer.add_scalar("heldout/motion_zero_z", heldout_ablated, epoch)
+            writer.add_scalar("heldout/motion_zero_z", heldout_no_z, epoch)
+            writer.add_scalar("heldout/motion_zero_x", heldout_no_x, epoch)
         writer.add_scalar("lr", schedule.get_last_lr()[0], epoch)
         suffix = (
             "" if heldout_cache is None
-            else f" | heldout {cfg.heldout_morph} {heldout:.4f} (zero_z {heldout_ablated:.4f})"
+            else (f" | heldout {cfg.heldout_morph} {heldout:.4f} "
+                  f"(zero_z {heldout_no_z:.4f} zero_x {heldout_no_x:.4f})")
         )
         print(
             f"epoch {epoch:3d} | train {train_metrics['total']:.4f} "

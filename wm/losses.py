@@ -21,12 +21,15 @@ def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
         parts["adv"] = adv.item()
         parts["adv_accuracy"] = (adv_logits.argmax(dim=-1) == morph_id).float().mean().item()
 
+    # reported before the probe is added: the probe is an instrument, and letting its loss into
+    # the number that selects best.pt would pick checkpoints for how badly the probe is doing
+    parts["total"] = total.item()
+
     if probe_logits is not None and morph_id is not None:
-        # reads a detached z, so adding its loss trains only the probe and leaves the world
-        # model's gradients untouched
+        # reads a detached z, so this trains only the probe and leaves the world model untouched
         probe = F.cross_entropy(probe_logits, morph_id)
         total = total + probe
+        parts["probe_loss"] = probe.item()
         parts["probe_accuracy"] = (probe_logits.argmax(dim=-1) == morph_id).float().mean().item()
 
-    parts["total"] = total.item()
     return total, parts
