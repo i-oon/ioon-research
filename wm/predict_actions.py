@@ -52,6 +52,8 @@ def main():
     parser.add_argument("--morph", default="", help="body to reconstruct; defaults to the held-out body")
     parser.add_argument("--clips", type=int, default=3, help="how many clips of that body")
     parser.add_argument("--chunk", type=int, default=2, help="frames per encoder forward")
+    parser.add_argument("--encode_device", default="",
+                        help="where to run V-JEPA2; set to cpu when a training run holds the GPU")
     parser.add_argument("--out", default="")
     args = parser.parse_args()
 
@@ -65,7 +67,8 @@ def main():
     if not paths:
         raise SystemExit(f"no clips for morph '{morph}' in {data_dir}")
 
-    encoder = VJEPA2FrameEncoder(device=str(device))
+    encoder = VJEPA2FrameEncoder(device=args.encode_device or str(device),
+                                 dtype=torch.float32 if args.encode_device == "cpu" else torch.float16)
     start, stop = cfg.frame_start, cfg.frame_stop
     out = {"pred": [], "gt": [], "forces": [], "clip": [], "lengths": []}
     for path in paths:

@@ -49,6 +49,12 @@ class Config:
     itm_cross_blocks: int = 2
     ftm_blocks: int = 8
     z_tokens: int = 1
+
+    # How much capacity sits between the latent and the joint command: "mlp" is the original
+    # decoder, "linear" keeps the cross-attention backbone with a single output projection,
+    # "probe" removes the backbone entirely and linearly maps mean-pooled tokens plus z.
+    # Capacity helps on the training bodies and hurts on a held-out one (FINDINGS.md F4b).
+    md_head: str = "mlp"
     md_pool: int = 2
 
     lambda_recon: float = 1.0

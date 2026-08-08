@@ -36,6 +36,7 @@ def capture(sim, cam):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--scene", required=True)
     ap.add_argument("--traj", required=True)
     ap.add_argument("--out", default="")
@@ -52,7 +53,7 @@ def main():
     base_pos, base_quat, jpos = T["base_pos"], T["base_quat"], T["joint_pos"]
     n = len(base_pos)
 
-    c = RemoteAPIClient("localhost", port=23000)
+    c = RemoteAPIClient("localhost", port=args.port)
     sim = c.require("sim")
     settle(sim)
     sim.loadScene(os.path.abspath(args.scene))

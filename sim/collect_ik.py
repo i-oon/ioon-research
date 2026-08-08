@@ -209,10 +209,28 @@ def main():
                     help="if >0: STOP mode — hold the stance for this many frames (no stepping)")
     ap.add_argument("--turn_bias", type=float, default=0.0,
                     help="legacy asymmetric ThC offset (rad) added left/subtracted right")
+    ap.add_argument("--morphs", type=str, nargs="+", default=None, metavar="NAME=SCENE",
+                    help="bodies to record, e.g. c10f06t10=medauroidea_c10f06t10.ttt. Scene paths "
+                         "are relative to sim/env. Names must not contain '_' because "
+                         "wm/data/dataset.py reads the body from the filename prefix. "
+                         "Defaults to the three uniform-scale bodies.")
     ap.add_argument("--out", type=str, required=True)
     args = ap.parse_args()
 
     episodes = [int(x) for x in args.episodes.split(",")]
+    global SCENES
+    if args.morphs:
+        SCENES = []
+        for spec in args.morphs:
+            name, _, scene = spec.partition("=")
+            if not scene:
+                raise SystemExit(f"--morphs wants NAME=SCENE, got {spec!r}")
+            if "_" in name:
+                raise SystemExit(f"body name {name!r} must not contain '_'")
+            if not os.path.exists(os.path.join(ENV, scene)):
+                raise SystemExit(f"scene not found: {os.path.join(ENV, scene)}")
+            SCENES.append((name, scene))
+        print("bodies: " + ", ".join(f"{n} <- {s}" for n, s in SCENES))
     os.makedirs(args.out, exist_ok=True)
     df = pd.read_csv(CSV)
     c = RemoteAPIClient("localhost", port=args.port)

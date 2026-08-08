@@ -441,10 +441,9 @@ require variance well above machine epsilon.
 ---
 
 ### Step 1 — Train the pretraining pipeline
-**Status** done, three runs; see `results/wm/README.md`.
+**Status** done. Six runs; per-run metrics in `results/wm/README.md`, analysis in
+[FINDINGS.md](FINDINGS.md).
 **Goal**: train ITM + FTM + Motion Decoder on short + long leg
-
-**Blocked on Step 0.5.** Training on bit-identical `a_t` produces a result that cannot be defended.
 
 | Task | Train on short + long leg data, cross-augmentation on, LoRA off |
 |---|---|
@@ -467,31 +466,40 @@ require variance well above machine epsilon.
 | Pass | clusters by behavior, not morphology → proceed to Step 2 |
 | Fail | clusters by morphology → fallback to **UniSkill** (see below — *not* HiLAM, which was the wrong fallback) |
 
-> **Result — the two sides came apart, and that is the finding.**
-> Across three runs differing in every respect (6 vs 100 episodes, clipped vs clean frames,
-> 9.7k vs 31k steps), morphology stays **~99% decodable from `z`** every time. Its *dominance*
-> falls (silhouette 0.034→0.015, between-class variance 8.1%→4.7%) but its *presence* never does.
+> **Result — morphology stays in `z`, and transfer to a new body does not work.**
+> Full evidence with reproduction commands in **[FINDINGS.md](FINDINGS.md)**; the short version:
 >
-> **Structural cause, not a training failure:** no term in the objective removes body identity.
+> **Body identity is ~99% decodable from `z`** in every run. Its *dominance* falls (silhouette
+> 0.034→0.015) but its *presence* never does. This is structural rather than a training failure:
 > `L_recon` and `L_motion` both condition on `x_t`, which already carries morphology, so neither
-> penalises `z` for carrying it too. Cross-augmentation blocks a *different* shortcut. This is
-> almost certainly true of LAC-WM as well — they report only UMAP pictures, never a probe.
+> penalises `z` for carrying it too. Cross-augmentation blocks a *different* shortcut. LAC-WM
+> report only UMAP pictures, never a probe, so the same is likely true there.
 >
-> **Yet transfer works anyway:** `z` predicts an unseen body's joint commands at 0.18 vs 1.67
-> with the latent ablated, and beats raw `e_t` on cross-body behaviour transfer by +0.11 to +0.22.
+> **What the model does achieve** is body identification from pixels with no morphology label:
+> on bodies it trained on it emits the right body's joint offsets to within **0.03–0.06 deg**,
+> across bodies whose postures differ by **33.8 deg (CF)** and **50.1 deg (FT)**.
 >
-> So **invariance and transferability are separable** — the field assumes you need the first to
-> get the second; our data says you do not. This is currently the most novel thing the project has.
-> It is a hypothesis, not a conclusion: only 3 bodies, all sharing 18-D, and we have **not** tested
-> *forcing* invariance. That test (Step 1e′) is the decisive one, and every possible outcome is
-> publishable — transfer unchanged (invariance unnecessary), improved (we found the fix), or
-> degraded (body information in `z` is actively useful).
+> **What it does not achieve** is generalisation. Shown a held-out body, it moves only
+> **~45%** of the required distance along the morphology axis (outputs 0.15 where 0.36 is
+> correct, on a 0 = `long` to 1 = `short` scale). Tracing the signal: `e_t` places the body at
+> **0.465** — the encoder preserves it — and it is lost in ITM (0.301) and the decoder (0.15).
+> Cause: the motion loss sees exactly **two** bodies, and two points cannot define a curve.
+> Confirmed by correcting the loss weighting (`within_body_std`), after which the model moves
+> along the axis but overshoots to 0.61 by epoch 18 instead of converging on 0.36.
 >
-> **Also settled:** standard validation cannot see cross-body failure. In `stage1_100ep_clean`,
-> `val_motion` improved **9.3×** (0.0122 → 0.0013) from epoch 2 to 20 while held-out-body error
-> did not improve at all. Validation splits by episode within the *training bodies*; a new body is
-> a different distribution, not a held-out sample. `wm/train.py` now logs `heldout/motion` per
-> epoch and snapshots checkpoints so this is visible rather than inferred.
+> **Trivial baselines currently win.** Averaging the two training bodies' commands scores
+> **6.68 deg** on held-out `medium` against the model's **10.95 deg**. On fold 2 (`short` held
+> out) the model scores 7.00, statistically identical to copying the nearest training body
+> (6.96), and loses to linear extrapolation (1.91) by 3.7×. The cause is data design: the shared
+> Cartesian foot trajectory makes the three bodies' joint commands **92–99% a constant offset**
+> apart. The opening is that the leg-scale to joint-offset map is *nonlinear* — `medium` at leg
+> scale 0.75 sits at 0.5 on the scale axis but 0.30–0.36 on the offset axis — so no linear
+> baseline can be right, and enough bodies to express that curve would beat all of them.
+>
+> **Also settled:** standard validation cannot see cross-body failure. Validation motion improves
+> **10–11×** over training while the held-out body does not move. And held-out scores need error
+> bars: identical config and `seed: 0` on two different GPUs land within 0.3% in-distribution but
+> up to **2.1× apart** on the held-out body.
 
 > Note: failure mode = z_t encoding body-shape visual features instead of motion.
 > In LAC-WM this was viewpoint clustering. In our work it would be morphology clustering.
@@ -499,7 +507,10 @@ require variance well above machine epsilon.
 ---
 
 ### Step 2 — Transfer to an unseen morphology
-**Status** open.
+**Status** open, and blocked on collecting more bodies. Zero-shot transfer measured first and
+does not currently beat trivial baselines ([FINDINGS.md](FINDINGS.md) F6), so a fine-tuning
+sample-efficiency curve measured now would be against a broken starting point. Collect ~30
+episodes each across 6–8 bodies before running this.
 **Goal**: prove pretrained World Model reduces data needed for medium leg
 
 | Task | Fine-tune ITM + FTM on N medium leg episodes using LoRA rank 2 |
@@ -517,10 +528,14 @@ require variance well above machine epsilon.
 ---
 
 ### Step 3 — Extrapolation
-**Status** open, out of proposal scope.
+**Status** measured once, out of proposal scope for the write-up.
 **Goal**: test morphology outside training range
 
-> Out of pre-proposal scope. Good future direction if Steps 1-2 succeed.
+> Fold 2 (`--train_morphs long medium --heldout_morph short`) is extrapolation: leg scale 0.5
+> sits outside the 0.75–1.0 training range. Held-out error was **flat at 6.93–7.07 across 28
+> epochs** while validation improved 8×, and the model scored the same as copying the nearest
+> training body. Same failure as interpolation, same cause (two training bodies), so extrapolation
+> is not a separate open question until the body count goes up.
 
 ---
 
