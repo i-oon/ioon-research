@@ -1,0 +1,112 @@
+run:
+  name: sysid_real/with_ideal_gain/base_1.7hz_sym
+  task: Isaac-Velocity-Flat-Unitree-B1-v0
+  num_envs: 4096
+  seed: 42
+  max_iterations: 800
+  resume: null
+  reset_noise: null
+  lr_anneal_start: null
+  lr_anneal_end: null
+  lr_anneal_floor: null
+  airtime_threshold: 0.15
+  airtime_weight: 10.0
+  contact_threshold: 0.15
+  contact_weight: 8.0
+  delay_max_steps: 2.0
+  delay_jitter: 1.5
+  vx_max: 0.5
+  vy_max: 0.4
+  wz_max: 0.6
+  rear_thigh_dev_weight: -0.6
+  duty_balance_weight: -0.6
+  action_rate_weight: -0.03
+  biased_hip_dev_weight: -1.0
+  gait_phase_weight: 1.0
+  gait_freq: 1.7
+  duty_target: 0.62
+  timestamp: '2026-08-04T12:52:34.078721'
+  git_commit: 42a3171
+actuator:
+  mode: ideal_pd
+  gain_mode: ideal
+  sysid_param: real_30seeds_full
+  no_actuator_dr: true
+  sysid_gain_dr: false
+  extra_env_dr: false
+  no_dr: false
+  delay_range:
+  - 0.0
+  - 2.0
+  zero_encoder_bias: false
+  physics_scale: 1.0
+env_knobs:
+  DIAGONAL_PAIR_WEIGHT: 0.0
+  DUTY_TARGET: 0.62
+  BASE_HEIGHT_TARGET: 0.556
+  REAL_TRUNK_MASS_DELTA: -4.9
+  ZERO_ENCODER_BIAS: false
+  THIGH_DEV_WEIGHT: '-0.5'
+  DOF_TORQUES_WEIGHT: (per-sysid default)
+  STANDING_FRAC: 0.2
+  STANDING_WEIGHT: -0.5
+  MUST_MOVE_GRADIENT: false
+  EFFORT:
+  - 91.0
+  - 93.3
+  - 140.0
+rewards:
+  action_rate_l2: -0.03
+  air_time_variance: -5.0
+  ang_vel_xy_l2: -0.05
+  base_height_l2: -50.0
+  biased_hip_deviation_l1: -1.0
+  calf_contact_penalty: -2.0
+  diagonal_pair_contact: 0.0
+  dof_acc_l2: -1.25e-07
+  dof_pos_limits: -0.5
+  dof_torques_l2: -2.0e-05
+  duty_balance: -0.6
+  duty_factor_target: -1.0
+  excessive_air_time: null
+  excessive_contact_time: -1.0
+  feet_air_time: 10.0
+  feet_contact_time: 8.0
+  feet_slide: -0.1
+  flat_orientation_l2: -1.5
+  gait_phase_tracking: 1.0
+  hip_deviation_l1: 0.0
+  joint_lr_symmetry: -0.05
+  lin_vel_z_l2: -2.0
+  must_move: -3.0
+  pitch_penalty: -2.0
+  rear_thigh_deviation_l1: -0.6
+  stationary: -5.0
+  stationary_hold: -0.5
+  thigh_deviation_l1: -0.5
+  track_ang_vel_z_exp: 1.5
+  track_lin_vel_xy_exp: 2.5
+  undesired_contacts: null
+  yaw_stability: -1.0
+commands:
+  lin_vel_x:
+  - -0.5
+  - 0.5
+  lin_vel_y:
+  - -0.4
+  - 0.4
+  ang_vel_z:
+  - -0.6
+  - 0.6
+  rel_standing_envs: 0.2
+  heading_command: true
+ppo:
+  learning_rate: 0.001
+  num_steps_per_env: 24
+  num_mini_batches: 4
+  num_learning_epochs: 5
+  gamma: 0.99
+  lam: 0.95
+  entropy_coef: 0.005
+  clip_param: 0.2
+  desired_kl: 0.01

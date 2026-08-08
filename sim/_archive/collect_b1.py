@@ -34,8 +34,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 # ---------------------------------------------------------------------------
 # Constants ported from deploy_mujoco.py (must match training exactly)
 # ---------------------------------------------------------------------------
-CKPT = ("/home/aria/Sim2Real-B1/ppo_policy/logs/ppo_b1/sysid_real/"
-        "with_ideal_gain/base_gait3/model_600.pt")
+CKPT = ("/home/aria/ioon-research/sim/assets/policy/base_gait3/model_600.pt")
 
 # IsaacLab articulation order is TYPE-MAJOR:
 #   FL_hip FR_hip RL_hip RR_hip  FL_thigh ...  FL_calf ...

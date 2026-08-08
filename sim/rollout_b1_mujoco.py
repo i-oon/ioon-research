@@ -29,7 +29,7 @@ DEFAULT_IL = np.array([0.061, -0.066, 0.058, -0.054,
                       -1.914, -1.935, -1.914, -1.913])
 ACTION_SCALE = 0.25
 DECIMATION = 4
-GAIT_FREQ = 2.0
+GAIT_FREQ = 2.0        # base_gait3; base_1.7hz_sym was trained at 1.7, pass --gait_freq
 FOOT_FORCE_THRESH = 1.0
 SPAWN_Z = 0.50
 _TOUCH_SDK_TO_IL_LEG = [1, 0, 3, 2]
@@ -68,6 +68,10 @@ def main():
     ap.add_argument("--vx", type=float, default=0.4)
     ap.add_argument("--vy", type=float, default=0.0)
     ap.add_argument("--wz", type=float, default=0.0)
+    ap.add_argument("--gait_freq", type=float, default=GAIT_FREQ,
+                    help="clock frequency in the observation. Must match the value the policy "
+                         "was trained with (train_config.yaml: run.gait_freq) or the gait phase "
+                         "the policy is tracking drifts against the one it is told about.")
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--warmup", type=int, default=25, help="hold DEFAULT pose (settle) before policy")
     ap.add_argument("--policy_warmup", type=int, default=45,
@@ -111,7 +115,7 @@ def main():
         obs = np.concatenate([lin, ang, grav, cmd, jpos, jvel, last, foot]).astype(np.float32)
         if use_clock:
             t = step_i * DECIMATION * m.opt.timestep
-            phi = 2 * np.pi * GAIT_FREQ * t + np.array([0., np.pi, np.pi, 0.])
+            phi = 2 * np.pi * args.gait_freq * t + np.array([0., np.pi, np.pi, 0.])
             obs = np.concatenate([obs, np.sin(phi), np.cos(phi)]).astype(np.float32)
 
         with torch.no_grad():
