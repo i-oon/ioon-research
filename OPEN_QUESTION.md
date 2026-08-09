@@ -196,7 +196,7 @@ stripping the body code from `z` (F21) and handing over the pooled view (F22) al
 only more training bodies helped (F16, F17). Capacity, access and latent content are all ruled
 out.
 
-## Q7. Is the objective the constraint? (open — and F23 locates where)
+## Q7. Is the objective the constraint? (ANSWERED: yes — changing it is what worked)
 
 **FINDINGS F23 narrows this.** `L_recon` is supposed to make `z` an action by making the next
 frame unpredictable without it. Measured: removing `z` costs the forward model **3 to 7 percent**
@@ -215,24 +215,61 @@ Two experiments that cost one config value and no new data, neither run:
 | `--lambda_motion 100` | given a comparable gradient budget, does `L_motion` still settle for a lookup |
 | `--lambda_recon 0` | does dropping a term worth 3 to 7 percent help the latent or hurt it |
 
-The cross-body objective below is the third option and is orthogonal to both.
+**Both were run and neither helped** (smoke, 8 epochs, against a matched control at 0.1084
+held-out / 14.1x x-gap):
 
+| | held-out | x-gap | probe |
+|---|---|---|---|
+| control | 0.1084 | 14.1x | 0.568 |
+| `lambda_motion 100` | 0.1084 | **8.3x** | 0.526 |
+| `lambda_recon 0` | 0.1132 | 12.1x | 0.607 |
+| **`lambda_cross 0.5`** | **0.0813** | **47.6x** | **0.297** |
 
-`L_motion` asks for the right joint command on bodies visible during training. A lookup over
-five body codes in `z` satisfies that at lower cost than reading geometry off pixels, by every
-route we have opened. Nothing in the loss requires the appearance-to-morphology mapping that
-transfer needs, so no architectural change should be expected to produce it.
+Reweighting the terms changes nothing because the problem is not the budget, it is that
+`L_motion` is a question a lookup answers. Giving a wrong question more gradient does not make
+the answer right.
 
-Candidate changes, none tested:
+**The cross-body term is what worked** (FINDINGS F24): held-out error 23 to 26 percent better
+over 25 epochs, the swap test inverting so the answer follows the frame to within 0.01 deg,
+copying dropping from 0.947 concentration to 0.540, and the first run that does not decay with
+training. It changes the question rather than the weighting: decode body A's latent against body
+B's frame, supervised by B's command, and a lookup is wrong by construction.
 
-| change | what it would force |
-|---|---|
-| decode `z` from body A with the frame of body B, supervised by B's command | the latent cannot carry body identity and the frame must supply it |
-| predict the body's segment scales as an auxiliary target | morphology becomes something the loss asks for, not a shortcut it tolerates |
-| predict the Cartesian foot trajectory, shared across bodies by construction, and convert with the observed geometry | separates the body-independent intent from the body-specific mapping explicitly |
+## Q8. What is the latent still for? (ANSWERED: gait, and only gait)
 
-The first is closest to a control: it uses data we already have, since every body walks the same
-expert episodes, so frames and commands are aligned across bodies at each timestep.
+`lambda_cross` drives the decoder onto the frame so completely that removing `z` costs only
+**2.2-3.2x** against the control's 21x. The worry that raised this question is that the latent has
+been hollowed out, which would undercut Stage 2 -- Stage 2 rests entirely on `z` transferring
+behaviour across embodiments.
+
+It has not been hollowed out. Measured on the same clips, `z` decoded for foot-contact pattern
+(8 classes, majority 0.144) and for body identity (5 classes, chance 0.200), with the variance of
+`z` split by what explains it:
+
+| | control epoch 20 | cross epoch 8 | cross epoch 27 |
+|---|---|---|---|
+| **contact pattern from `z`** | 0.757 | 0.744 | **0.787** |
+| body from `z` | 0.707 | 0.638 | 0.665 |
+| **variance: gait phase** | 64.5% | **88.7%** | **83.4%** |
+| **variance: body** | 8.8% | **1.2%** | **1.2%** |
+| variance: interaction | 26.8% | 10.1% | 15.4% |
+
+Behaviour survives at or above the control. The body's share of the variance falls by a factor of
+seven and gait rises to 83-89 percent. `z` did not shrink, it **specialised** -- which is what the
+architecture wanted from it and what the adversarial head (Q5) failed to produce.
+
+That also explains the small ablation. Most of the control's 21x was the loss of the body code,
+not the loss of gait; with the body now read from the frame, removing `z` costs only the gait, and
+a single frame already reveals much of the leg configuration. Recorded as F26.
+
+**Consequence for Stage 2:** the premise holds. `z` is a body-independent gait representation, and
+body-independence is now measured rather than assumed. What remains untested is whether it stays
+body-independent across a *topology* change, where the contact pattern itself has a different
+number of feet -- that is Q0's claim B and can only be settled by running it.
+
+**Still open from this thread:** the forward model still does not need `z` (1.03x), because
+`L_recon`'s target is 4.39x more augmentation noise than signal (F25). That is a separate defect
+and does not affect the answer above.
 
 ---
 

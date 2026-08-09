@@ -552,7 +552,7 @@ volume rather than a line and a held-out body can be a combination no training b
 > numbers place the held-out body to 0.20 deg, which is the ceiling this task allows.
 
 ### Step 2.6 — Why it still copies
-**Status** done. Mechanism identified, four interventions tried, one hypothesis left.
+**Status** done. Mechanism identified and fixed in Step 2.7.
 
 > Crossing the decoder's two inputs shows it takes the body from **`z`, not from the frame**:
 > body A's frame with body B's latent yields body B's commands to within **3.48 deg**, where the
@@ -576,7 +576,42 @@ volume rather than a line and a held-out body can be a combination no training b
 >
 > Capacity, access and latent content are ruled out. What is left is the objective — `L_motion`
 > never asks for the appearance-to-morphology mapping that transfer needs. See OPEN_QUESTION.md
-> Q5 and Q6 (both answered) and **Q7** (open).
+> Q5 and Q6, both answered.
+
+### Step 2.7 — Asking the loss for the mapping
+**Status** done. `lambda_cross 0.5` is the fix; the forward model's defect is untouched.
+**Goal**: make the objective require what transfer needs, instead of merely permitting it
+
+> **The change**: decode body A's latent against body B's frame, supervised by B's command. Every
+> body walks the same expert episodes, so at a given timestep they share the intent and differ
+> only in geometry — a lookup in `z` is wrong by construction. No new data. `config.lambda_cross`.
+>
+> Against the matched control `m3d_bracketed`, held out `c08f09t09`:
+>
+> | | control | `lambda_cross 0.5` |
+> |---|---|---|
+> | held-out MSE, epochs 1-10 | 0.0992 | **0.0760** |
+> | best checkpoint, degrees | 3.57 | **2.91** |
+> | mixture weight on one training body | 0.947 | **0.540** |
+> | latent ablation (z-gap) | 21x | 2.2-3.2x |
+> | frame ablation (x-gap) | 10.7x | **40-69x** |
+>
+> First run to beat copy-nearest (3.47 deg) and the first that does not degrade with training. The
+> swap test inverts fully: body A's frame with body B's latent now yields **A's** command to 1.18
+> deg, against 1.17 when both agree. Stopped at epoch 27, plateaued; best is epoch 8.
+>
+> **The latent was purified, not emptied.** Contact-pattern decodability from `z` holds at
+> 0.744-0.787 against the control's 0.757 (8 patterns, majority 0.144), while the body's share of
+> `z`'s variance falls **8.8% to 1.2%** and gait rises 64.5% to 88.7%. The small z-gap is `z`
+> shedding the body code. This is what the adversarial head was built for and could not do.
+> OPEN_QUESTION.md Q8.
+>
+> **What is not fixed**: the forward model still does not need `z` (1.03x), because `L_recon`'s
+> target is **4.39x more augmentation noise than signal**. Splitting the augmentation shows no
+> strength setting recovers it — photometric jitter alone, which moves nothing in the image, is
+> still 2.10x the signal, so the frozen encoder is not invariant in the way cross-augmentation
+> assumes. Untested options: drop cross-augmentation and rely on the 64-d against 359,000-d
+> bottleneck, or augment in embedding space. FINDINGS.md F25.
 
 ### Step 3 — Extrapolation
 **Status** measured once, out of proposal scope for the write-up.

@@ -4,8 +4,14 @@
 form that generalises to unseen bodies (F20). The world model trained on top of it ignores that
 and identifies the body from an 11-percent component of its own latent instead (F18, F19), which
 is a lookup and does not extend past the bodies it saw. Four decoder-side interventions fail to
-change this (F4b, F21, F22); more training bodies is the only one that helps, and only inside
-their hull (F16, F17).
+change this (F4b, F21, F22) and more training bodies helps only inside their hull (F16, F17).
+
+**What fixes it is changing the question, not the architecture.** Decoding one body's latent
+against another body's frame, supervised by that body's command, makes the lookup wrong by
+construction. Held-out error improves 23 to 26 percent, the decoder switches to reading the body
+from the frame (frame ablation 10.7x to 54x, and a crossed swap test now follows the frame to
+within 0.01 deg), copying stops, and for the first time performance does not decay with training
+(F24).
 
 Underneath all of it: **the reconstruction loss, which is supposed to make the latent an action,
 contributes 3 to 7 percent of the forward model's accuracy while taking 99 percent of the
@@ -74,7 +80,7 @@ fails, the model knows where in the gait cycle it is.
 
 ### F4. Transfer to an unseen body covers about half the required distance
 
-![Morphology signal through the pipeline](results/wm/morphology_axis.png)
+![Morphology signal through the pipeline](results/wm/figures/morphology_axis.png)
 
 *Left: the body's position between the two training bodies survives the encoder (0.465) and is
 lost in the ITM and decoder. Right: correcting the loss weighting makes the model move along the
@@ -253,17 +259,17 @@ and looks the steadier of the two; that is the decoder's straightest clip and th
 Across three clips the decoder's heading errors are +25.2, -37.5 and +64.8 deg. Report all
 clips, or the wrong predictor wins.
 
-![Gait, decoder](results/wm/gait/gait_stage1_100ep_framed_runB_epoch020_medium_clip0.png)
+![Gait, decoder](results/wm/figures/gait_stage1_100ep_framed_runB_epoch020_medium_clip0.png)
 
 *Decoder-driven gait above, ground truth below. Black is stance. The stance blocks fragment and
 the left and right tripods stop alternating.*
 
-![Gait, probe](results/wm/gait/gait_probe_ridge_runB_medium_clip0.png)
+![Gait, probe](results/wm/figures/gait_probe_ridge_runB_medium_clip0.png)
 
 *Probe-driven gait above, ground truth below, same axes. Stance blocks keep roughly the right
 length and phase.*
 
-Videos: `results/wm/gait/replay_*.mp4`, predicted on the left, ground truth on the right.
+Videos: `results/wm/replay/replay_*.mp4`, predicted on the left, ground truth on the right.
 
 ### F4d. Interpolation and extrapolation fail at different stages
 
@@ -271,7 +277,7 @@ Fold 2 holds out `short` (leg scale 0.5) while training on `long` (1.0) and `med
 the test body lies outside the training range rather than between the training bodies. Axis
 here runs 0 = `long`, 1 = `medium`, and the correct position for `short` is 2.803 (CF).
 
-![Both folds](results/wm/axis_both_folds.png)
+![Both folds](results/wm/figures/axis_both_folds.png)
 
 | Stage | fold 1, held-out medium (bracketed) | fold 2, held-out short (outside), epoch 6 | fold 2, epoch 20 |
 |---|---|---|---|
@@ -338,7 +344,7 @@ drifting through it, because nothing in the objective marks where the right answ
 
 ### F6. Trivial baselines beat the model on this task
 
-![Interpolation failure](results/wm/interpolation_failure.png)
+![Interpolation failure](results/wm/figures/interpolation_failure.png)
 
 *Left: both training bodies are reconstructed to under 1.2 deg per joint while the held-out body
 is not. Right: shown the medium body, the model's output is closer to a training body's geometry
@@ -395,7 +401,7 @@ every baseline in F6 -- but two training bodies can only express a straight line
 
 ### F8. Aggregate error hides which joints transferred
 
-![Per-joint traces on the held-out body](results/wm/action_trace_stage1_100ep_framed_runB_epoch020_medium.png)
+![Per-joint traces on the held-out body](results/wm/figures/action_trace_stage1_100ep_framed_runB_epoch020_medium.png)
 
 *Predicted (red, dashed) against IK ground truth (black) for all 18 joints on the held-out body.
 Left column is TC and tracks exactly; the CF and FT columns are over-amplified and out of phase.
@@ -445,7 +451,7 @@ must use the held-out body's own baseline. `wm.evaluate` reports both as
 
 ### F11. Validation on held-out episodes cannot detect cross-body failure
 
-![Validation against held-out body](results/wm/heldout_sweep_two_seeds.png)
+![Validation against held-out body](results/wm/figures/heldout_sweep_two_seeds.png)
 
 *Same configuration and same `seed: 0` on two different GPUs. Left: validation on unseen episodes
 of the training bodies improves by an order of magnitude. Right: the held-out body does not, and
@@ -491,7 +497,7 @@ episodes is wasted; spend it on bodies.
 
 ### F14. Peak transfer arrives in the first tenth of training
 
-![Held-out sweep](results/wm/heldout_sweep_runB.png)
+![Held-out sweep](results/wm/figures/heldout_sweep_runB.png)
 
 *Every snapshot re-scored on 2,600 identical cached held-out pairs. The dotted line at 1.0 is
 predicting the mean; the grey curve is the same model with the latent zeroed.*
@@ -511,7 +517,7 @@ head height falls to 0.03 m against 0.111 m for the rest. Five bodies train; `c0
 (0.8, 0.9, 0.9) is held out and lies inside their convex hull; `c06f06t06` is held out in a
 second run and lies outside it.
 
-![The nine bodies](results/wm/morphology_bodies.png)
+![The nine bodies](results/wm/figures/morphology_bodies.png)
 
 ### F15. The morphology space is three parameters but two dimensions
 
@@ -839,6 +845,156 @@ Two untested consequences, both one config value and no new data:
 | `lambda_motion` raised to ~100 | with a comparable gradient budget, does `L_motion` still settle for a lookup |
 | `lambda_recon` set to 0 | does dropping a term that contributes 3 to 7 percent help or hurt the latent |
 
+### F25. Cross-augmentation makes the reconstruction target almost entirely noise
+
+F23 found `L_recon` barely uses the latent while taking 99 percent of the gradient. This is why.
+
+The FTM predicts view 2's next frame from view 2's current frame and a latent computed from
+view 1. The two views carry independently sampled crops and brightness jitter, so part of the
+target is noise no latent could predict. Measured on 40 frames of one clip, in the same units as
+`L_recon`:
+
+| | value |
+|---|---|
+| **augmentation noise** -- one frame, two views | **8.51** |
+| **signal** -- consecutive frames, no augmentation | **1.97** |
+| what the FTM is actually asked to close | 8.43 |
+| an augmented view against the clean frame | 8.13 |
+
+Splitting the augmentation shows no setting of it recovers the signal:
+
+| augmentation | noise | noise / signal |
+|---|---|---|
+| crop 85-100% + jitter (current) | 8.42 | 4.39 |
+| crop 85-100% only | 8.56 | 4.47 |
+| crop 95-100% only | 6.76 | 3.53 |
+| **jitter only, no crop** | **4.02** | **2.10** |
+| crop 95-100% + jitter | 7.02 | 3.66 |
+
+Crop is the larger term, but tightening it from 85 to 95 percent removes only 21 percent of the
+noise, and photometric jitter **alone** -- which moves nothing in the image -- still produces
+twice the signal. The frozen encoder is not invariant to brightness and contrast changes, which
+is the assumption cross-augmentation rests on. Weakening the augmentation cannot fix this; the
+best available setting still leaves noise at twice the signal.
+
+**Noise is 4.33 times the signal**, and the augmentation accounts for 101 percent of the target
+the FTM is trained on. The motion `z` could explain is at most 23 percent of `L_recon`; the
+measured contribution is 3 to 7 percent.
+
+So the latent is not useless to the forward model, it is buried. Ninety-nine percent of the
+gradient goes to a term whose target is dominated by an unpredictable nuisance, and the one
+percent that remains is `L_motion`, which a lookup satisfies (F19). **`z` was never under
+pressure to become an action.**
+
+Cross-augmentation exists for a reason -- without it the ITM can satisfy `L_recon` by copying
+`x_{t+1}` into `z` instead of encoding the transition. The cost of that protection had simply
+never been measured. Three ways to keep the protection and recover the signal, none tested:
+
+One option can be ruled out immediately. Making the FTM's target a **clean** frame would make
+the shortcut *more* attractive, not less: the protection comes from the target being randomly
+augmented, so that no fixed content in `z` can predict it. A deterministic target is exactly what
+a copy could hit.
+
+What remains, none tested:
+
+| change | risk |
+|---|---|
+| drop cross-augmentation and rely on the dimensional bottleneck | `z` is 64-d against `e_{t+1}`'s 359,000, so a literal copy is already impossible by a factor of 5,600 |
+| augment in embedding space rather than pixel space | needs designing; the noise becomes controllable |
+| much weaker jitter, brightness +/-0.05 | may still not be enough, given +/-0.2 alone gives 2.10 |
+
+The first is the one the numbers point at. The shortcut is worth 8.51 against the 8.43 the FTM
+already achieves without `z`, so it buys almost nothing even now, while the bottleneck blocks the
+literal version outright. Whether it returns once the noise is gone can only be settled by
+running it.
+
+## What fixes it
+
+### F24. Asking the loss for the mapping is what works
+
+`--lambda_cross` adds one term: decode body A's latent against body B's **frame**, supervised by
+body B's command. Every body walks the same expert episodes, so at a given timestep they share
+the intent and differ only in geometry, which makes the target well defined with no new data.
+Reading the body out of `z` gives the wrong answer here by construction.
+
+Against `m3d_bracketed`, differing only in that flag, over 25 epochs:
+
+| | control | cross | |
+|---|---|---|---|
+| held-out error, mean epochs 1-10 | 0.0992 | **0.0760** | 23% better |
+| held-out error, mean epochs 11+ | 0.0965 | **0.0715** | 26% better |
+| best | 0.0764 | **0.0572** | |
+| best, in degrees | 3.57 | **2.91** | |
+| **x-gap** | 10.7x | **40-69x** | frame used 5x more |
+| **z-gap** | 21x | **2.2-3.2x** | latent barely used |
+| probe on `z` | 0.724 | 0.306 rising to 0.659 | |
+
+Four independent measurements agree, and this is the first intervention where they all move the
+same way rather than trading against each other.
+
+**The swap test inverts completely.** At epoch 8, between two bodies whose commands differ by
+28.63 deg:
+
+| frame from | latent from | RMSE vs A | RMSE vs B |
+|---|---|---|---|
+| A | A | 1.17 | 28.70 |
+| **A** | **B** | **1.18** | 28.70 |
+| **B** | **A** | 28.49 | **1.49** |
+| B | B | 28.45 | 1.57 |
+
+Given body A's frame and body B's latent, the answer is body A's command to within **1.18 deg**,
+against 1.17 when both inputs agree -- a difference of 0.01 deg. The latent no longer decides the
+body; the frame does. In the control the same crossing produced the latent's body to 2.74 deg.
+
+**It stops copying.** Mixture concentration on a single training body falls from 0.883 (control
+epoch 6) and 0.947 (control epoch 20) to **0.540**, below the 0.697 that the best possible
+mixture uses. Implied coxa scale moves from 0.615 to **0.784** against a true 0.80. And for the
+first time the model beats copy-nearest-body: **2.91 deg against 3.47**.
+
+**It does not degrade with training.** Every earlier run peaked by epoch 8 and then flattened or
+worsened (F14). Here epochs 11-25 average **better** than 1-10, 0.0715 against 0.0760.
+
+Two things to report honestly:
+
+- **`z` is now barely used.** z-gap falls to 2.2-3.2x against the control's 21x. The decoder
+  reads the body and most of the command from the frame. That is the intended direction taken far
+  enough to raise a question about what the latent is still for.
+- **The forward model is unchanged.** Removing `z` costs it 1.03x here against 1.07x in the
+  control, so F23's finding stands: `L_recon` still does not constrain the latent. The cross term
+  fixed the decoder's behaviour without repairing the term that was supposed to shape `z`.
+
+Why this worked where four architectural changes did not: they all altered *how* the decoder
+could reach the frame while leaving the question it was asked unchanged, and a lookup answered
+that question at lower cost every time. This changes the question. A lookup over the training
+bodies is now wrong by construction, and reading geometry from the frame is the only thing that
+is right.
+
+### F26. `lambda_cross` purifies the latent rather than emptying it
+
+The concern the low `z` ablation raises is that the latent has been hollowed out: if the decoder
+reads everything off the frame, `z` may carry nothing, which would undercut Stage 2. It has not.
+
+| | control epoch 20 | cross epoch 8 | cross epoch 27 |
+|---|---|---|---|
+| **foot-contact pattern decodable from `z`** | 0.757 | 0.744 | **0.787** |
+| body decodable from `z` | 0.707 | 0.638 | 0.665 |
+| **variance of `z`: gait phase** | 64.5% | **88.7%** | **83.4%** |
+| **variance of `z`: body** | 8.8% | **1.2%** | **1.2%** |
+| variance of `z`: interaction | 26.8% | 10.1% | 15.4% |
+
+Eight contact patterns, majority class 0.144.
+
+Behaviour is decoded from `z` as well as before or better. What changed is what else is in there:
+the body's share of the variance falls **from 8.8 to 1.2 percent**, a factor of seven, and the
+gait's share rises to 83-89 percent. `lambda_cross` achieves what the adversarial head was built
+for and failed at (F21) -- and it does so as a by-product of a well-posed task rather than by
+fighting the latent, so the gait information survives intact.
+
+That also explains the low `z` ablation. In the control, most of the 21x cost of removing `z` was
+the loss of the body code, not the loss of gait; with the body now read from the frame, removing
+`z` costs only the gait, and a single frame already says a good deal about where the legs are.
+**A z-gap of 2.2x is `z` no longer carrying work that was never its own, not `z` being empty.**
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
@@ -919,11 +1075,11 @@ proprioception is not.
 - `scripts/morphology_mix.py` -- which mixture of training bodies an answer resembles (F19)
 - `scripts/morphology_axis.py` -- where each stage places a held-out body (F4, F4d)
 - `sim/make_leg_morphology.py` -- generate a body by scaling segments independently
-- `results/wm/morphology_bodies.png` -- the nine bodies
-- `results/wm/z_by_body.npz` -- latents behind the variance decomposition in F19
+- `results/wm/figures/morphology_bodies.png` -- the nine bodies
+- `results/wm/cache/z_by_body.npz` -- latents behind the variance decomposition in F19
 - `scripts/plot_action_trace.py` -- per-joint predicted against ground truth, with R^2
 - `wm/sweep_checkpoints.py` -- re-score every snapshot on identical cached embeddings
-- `results/wm/interpolation_failure.png` -- F4 and F6 in one figure
-- `results/wm/heldout_sweep_two_seeds.png` -- F11 and F12
-- `results/wm/axis_embeddings.npz` -- embeddings behind the axis positions in F4
+- `results/wm/figures/interpolation_failure.png` -- F4 and F6 in one figure
+- `results/wm/figures/heldout_sweep_two_seeds.png` -- F11 and F12
+- `results/wm/cache/axis_embeddings.npz` -- embeddings behind the axis positions in F4
 - `results/wm/README.md` -- per-run metrics
