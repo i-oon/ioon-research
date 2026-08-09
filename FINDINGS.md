@@ -922,6 +922,14 @@ the second and not the first.
 the range the training bodies span. On `c06f06t06`, whose morphology axis the training set never
 demonstrates, the same flag makes transfer **1.35x worse** than the control.
 
+**Scope against the source method.** LAC-WM has no term like this; the shared latent space is
+meant to emerge from sharing the modules across embodiments. Its setting probably does not need
+one: the shortcut this term closes -- recognise the body, recall its commands -- only pays when
+knowing the body tells you the command, and in LAC-WM's data one robot performs thousands of
+different manipulations. In ours each body performs exactly one behaviour, so body identity is
+nearly the whole answer. This is an addition for the **cross-morphology** regime, not a correction
+to the method.
+
 `--lambda_cross` adds one term: decode body A's latent against body B's **frame**, supervised by
 body B's command. Every body walks the same expert episodes, so at a given timestep they share
 the intent and differ only in geometry, which makes the target well defined with no new data.
@@ -1264,16 +1272,64 @@ and the margin decays with horizon, from 1.47x at three steps to 1.20x at ten. T
 in are the true ones, which isolates the forward model correctly but is easier than a rollout
 where the latents would also have to be chosen.
 
-**This matches what the source paper actually does with the module.** In LAC-WM the Motion
-Decoder is an auxiliary regulariser; the deployed system predicts future *embeddings*, rolls
-them out for eight steps, and selects actions by comparing predicted futures against a subgoal
-image. The action decoder is not the output of the system. Measuring the forward model by
-whether it improves action reconstruction was measuring it against a task the original method
-never assigns it.
+**This matches what the source paper does with the module.** In LAC-WM the Motion Decoder is an
+auxiliary regulariser; the deployed system predicts future *embeddings*, rolls them out for eight
+steps, and selects actions by comparing predicted futures against a subgoal image. The action
+decoder is not the output of the system. Measuring the forward model by whether it improves action
+reconstruction was measuring it against a task the method never assigns it -- our framing error,
+not theirs.
 
 The correct statement is therefore narrower than F30 suggested: **the forward-prediction term is
 not needed for action reconstruction on this data, and is not evidence that the world model is
 inert.** Evaluating it requires rollout quality and, ultimately, planning success.
+
+### F33. Signal and noise are two separate dials, and only turning both works
+
+F25 measured the forward model's target as 8.4 of augmentation noise against 1.97 of signal, and
+concluded that no augmentation setting recovers it -- the best available, photometric jitter with
+no crop, still leaves noise at 2.10x the signal. That was correct and incomplete, because it only
+turned one dial. **The signal is small because consecutive frames at 20 Hz barely differ**, and
+that can be changed independently.
+
+Embedding distance between frames a fixed number of steps apart, same clips, same encoder, against
+an augmentation noise floor of 8.39:
+
+| frames apart | real change | signal / noise |
+|---|---|---|
+| 1 (current) | 2.01 | **0.24x** |
+| 3 | 3.09 | 0.37x |
+| **5 (the source paper's stride)** | **3.58** | **0.43x** |
+| 10 | 4.35 | 0.52x |
+| 16 | 4.89 | 0.58x |
+
+Widening the gap nearly doubles the signal at five steps, and then **saturates**: from five to
+sixteen steps it gains only 3.58 to 4.89. The gait is periodic, so beyond half a cycle the frames
+start returning to a similar pose, and the largest distance available is bounded by the diameter
+of the cycle in embedding space.
+
+Neither dial is enough alone. Together they are:
+
+| gap + augmentation | signal | noise | ratio |
+|---|---|---|---|
+| **1 step, current augmentation** | 2.01 | 8.42 | **0.24x** |
+| 5 steps, current augmentation | 3.58 | 8.42 | 0.43x |
+| 5 steps, crop 95-100% + jitter | 3.58 | 7.02 | 0.51x |
+| **5 steps, photometric jitter only** | 3.58 | 4.02 | **0.89x** |
+| 10 steps, jitter only | 4.35 | 4.02 | **1.08x** |
+| **16 steps, jitter only** | 4.89 | 4.02 | **1.22x** |
+
+**0.24x to 0.89x is a 3.7x improvement, and at ten steps the signal exceeds the noise for the
+first time.** This is the first configuration in which the forward model would be asked to predict
+something mostly real.
+
+It also gives the source paper's five-step action chunking a reason we can state: it is not only
+about downsampling observation frequency, it is what makes the reconstruction target carry signal.
+
+**The risk it reopens.** Weakening the augmentation restores the copying shortcut, and under
+`action_lag 1` that shortcut pays into both loss terms at once. The counter-argument is that at
+five to ten steps the latent would have to carry a frame 250 to 500 ms away through a 64-dimensional
+bottleneck, which is a much harder thing to copy than a nearly identical neighbouring frame. That
+is a hypothesis, not a measurement; the test is a probe from `z` to the future frame's content.
 
 ## The setup this points to
 

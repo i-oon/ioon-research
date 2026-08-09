@@ -346,8 +346,12 @@ directly.
 
 - Should Stage 2's headline metric be **rollout quality and planning success** rather than
   per-joint reconstruction error?
-- The source method also groups actions into **five-step chunks**, stating this improves world
-  model learning; we use single steps. Worth adopting?
+- The source method groups actions into **five-step chunks**, stating this improves world model
+  learning. We measured why that matters: at one step the forward model's target is 76 percent
+  augmentation noise, because consecutive frames at 20 Hz barely differ. Widening the gap to five
+  steps and dropping the crop from the augmentation moves the signal-to-noise ratio **from 0.24 to
+  0.89**, and at ten steps the signal exceeds the noise for the first time. Is it worth rebuilding
+  Stage 1's main comparison at that setting? It would make every number so far incomparable.
 - One structural fact remains regardless: our data is forward walking at one speed, and we
   measured that a single frame predicts the joint command at every horizon out to 32 frames.
   Is it worth collecting varying speed, turning, or disturbance so the imagined futures are
@@ -365,14 +369,17 @@ frame is a **wrong label**, not just a noisy one. There is also no physically co
 answer to what "the same phase" means between a six-leg tripod and a four-leg trot.
 
 Reading the source paper changes the shape of this question. **It has no cross-embodiment pairing
-term at all** — the shared latent space is claimed to emerge from sharing the model weights across
-embodiments, evidenced by overlapping UMAP clusters and one qualitative example. So the pairing
-mechanism is **our addition**, and Stage 2 can follow the paper without it.
+term** — the shared latent space emerges from sharing the model weights across embodiments. So the
+pairing mechanism is **our addition**, and Stage 2 can follow the paper without it.
 
-The question is therefore whether to. Without it, Stage 1's failure mode — the latent becoming a
-code for which body it is — is what we measured happening. With it, we need a pairing definition
-that does not exist yet. Our measurements of body-independence are quantitative where the paper's
-are not, which is an argument for keeping the term and solving the pairing.
+Their setting likely does not need one. The shortcut we measured only pays when knowing which body
+you are looking at tells you the command, and in our data each body does exactly one thing. In
+theirs, one robot performs thousands of different manipulations, so body identity says almost
+nothing. **We are applying the method to a regime it was not tested in** — bodies that differ
+slightly, one behaviour — and that regime is where the shortcut appears.
+
+The question is therefore whether to keep our term. Without it, Stage 1's failure mode is what we
+measured happening. With it, we need a pairing definition that does not exist yet.
 
 Also worth noting: the paper's transfer is **not zero-shot**. It is a three-stage LoRA finetune on
 7,265 trajectories of the target robot. The sample-efficiency framing is the comparable claim.

@@ -148,17 +148,38 @@ after the `action_lag` correction, the action's time index. Four differences rem
 
 | | paper | ours | worth acting on |
 |---|---|---|---|
-| **action chunking** | actions grouped into **5-step** sequences, stated to improve world-model learning | one step | **yes** -- a stated design choice we skipped, and it directly increases how much changes between observations |
+| **action chunking** | actions grouped into **5-step** sequences, stated to improve world-model learning | one step | **yes, and now quantified** -- F33: widening the gap to five steps nearly doubles the reconstruction target's real signal, and combined with dropping the crop it moves the signal-to-noise ratio from 0.24x to 0.89x |
 | latent dimension | 512 | 64 | maybe; ours is 8x tighter |
 | module size | ITM 47M, FTM 94M | about 5M each | probably not at this data scale |
 | behavioural diversity | 3 datasets, 150k trajectories, 22 object categories, a deliberate left-or-right choice in the task, 80 percent failures | one gait, one speed, forward only | this is the F31 constraint, restated |
 
 **One difference removes a risk rather than adding one.** The paper has **no cross-embodiment
-pairing term at all**: the shared latent space is claimed to emerge from sharing the ITM, FTM and
-MD weights across embodiments, and is evidenced only by overlapping UMAP clusters plus one
-qualitative rollout. So `lambda_cross` is **our addition, not theirs**, and Stage 2 can follow the
-paper without solving the pairing problem in Q0. Whether it should is a separate question: our
-measurements of body-independence are quantitative where theirs are not.
+pairing term**: the shared latent space emerges from sharing the ITM, FTM and MD weights across
+embodiments. So `lambda_cross` is **our addition**, and Stage 2 can follow the paper without
+solving the pairing problem in Q0.
+
+**Their setting probably does not need it, and that is the point.** The shortcut we measured is
+"recognise which body this is and recall its commands", and it only pays when knowing the body
+tells you the command. In our data each body does exactly one thing, so body identity is nearly
+the whole answer. In theirs, one embodiment performs thousands of different manipulations across
+22 object categories, with a deliberate left-or-right choice and 80 percent failures, so knowing
+it is a Franka arm says almost nothing about what to do next -- the shortcut buys little and the
+model has to read the scene regardless. Their Motion Decoder is also auxiliary rather than the
+system's output, so a shortcut there costs them less than it costs us.
+
+**We therefore cannot claim their method has this problem, and should not.** We have not run in
+their regime. What we can say is scoped: LAC-WM is tested across embodiments that differ radically
+with behaviourally rich data; applied to **cross-morphology** -- bodies that differ slightly, one
+behaviour -- the auxiliary motion loss admits a shortcut that defeats transfer, and `lambda_cross`
+closes it. That is a regime the paper does not test, so this is an extension, not a correction.
+
+**The concrete proposal this points to**, to put to the professor rather than decide alone: rebuild
+the main experiment with a five-step gap and photometric jitter only, which is the first setting in
+which the forward model's target is mostly signal rather than augmentation noise (F33). Cost: the
+Motion Decoder outputs 5 x 18 = 90 dimensions instead of 18, every number becomes incomparable with
+the runs recorded so far, and the copying shortcut the augmentation was there to block has to be
+re-measured rather than assumed away. That is a rebuild of Stage 1's main comparison, so it should
+be decided before Stage 2 starts, not during.
 
 **And the paper's transfer is not zero-shot.** Adapting to the unseen embodiment is a three-stage
 LoRA finetune on 7,265 trajectories of the target robot. Q0's claim B, tested as zero-shot, is
