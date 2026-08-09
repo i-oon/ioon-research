@@ -1012,7 +1012,7 @@ that question at lower cost every time. This changes the question. A lookup over
 bodies is now wrong by construction, and reading geometry from the frame is the only thing that
 is right.
 
-### F26. `lambda_cross` purifies the latent rather than emptying it
+### F26. `lambda_cross` purifies the latent rather than emptying it, on bodies it trained on
 
 The concern the low `z` ablation raises is that the latent has been hollowed out: if the decoder
 reads everything off the frame, `z` may carry nothing, which would undercut Stage 2. It has not.
@@ -1451,6 +1451,48 @@ have been selected to fit the outcome -- but three points establish an ordering,
 It also does not need the open question in F20 resolved. Whether a large probe error means the
 encoder lacks the information or means five fitting bodies cannot reach that far, the error
 predicts the outcome either way.
+
+### F36. The latent's purification does not extend to bodies the model has not seen
+
+F26 measured the latent's variance split on the five **training** bodies, because a balanced
+body-by-phase grid needs every body present at every timestep of the shared expert episode. The
+two held-out bodies also walk those episodes, so the same grid can be built from them alone. Two
+rows is not five, so all ten **pairs** of training bodies give a like-for-like reference at
+matching group size (`scripts/z_body_share.py`).
+
+| body's share of the latent's variance | control ep 6 | cross ep 8 |
+|---|---|---|
+| all 5 training bodies | 11.3% | **1.2%** |
+| pairs of training bodies | 7.2%, range 0.0-10.8 | **0.8%, range 0.0-1.3** |
+| **the 2 held-out bodies** | 6.8% | **10.6%** |
+
+**Under the cross-body loss every training pair lies between 0.0 and 1.3 percent and the held-out
+pair is 10.6 -- eight times above the top of that range.** The group-size explanation is ruled
+out by the pairwise reference, and "those two bodies are unusually different from each other" is
+ruled out by the control, which sits at 6.8 percent on the *same* two bodies, comfortably inside
+its own training-pair range.
+
+The mechanism follows from what the term actually constrains. `lambda_cross` requires that body
+A's latent decoded against body B's frame yields B's command, **for the pairs present in
+training**. A body outside that set produces a latent no constraint ever touched, so it is free to
+carry whatever the encoder hands it, including apparent size.
+
+This bounds F26, which should be read as measured on training bodies throughout.
+
+**It is the same boundary as F28 and F34, found from a third direction.** Everything the model
+learned holds within the span of its training bodies and does not extend past it:
+
+| measurement | inside the training range | outside it |
+|---|---|---|
+| decoder's joint commands | 2.91 deg, beats copy-nearest | 25.60-27.68 deg, loses to a constant |
+| encoder probe on segment scales | 0.030 | 0.155-0.172 |
+| **latent's body content** | **1.2%** | **10.6%** |
+
+Consequence for Stage 2: transferring to an unseen embodiment requires body-independence on a body
+never trained on, and this is direct evidence that the mechanism does not provide it there.
+
+Caveat: one contrast between two bodies. The pairwise control makes the comparison sound, but a
+third held-out body would make it solid.
 
 ## The setup this points to
 
