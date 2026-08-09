@@ -1168,7 +1168,7 @@ ablation rises from 21x to 24-62x while the frame ablation falls from 10.7x to 2
 This does not carry over to `action_lag 1` and has to be re-asked there, because `z` now has work
 to do and `L_recon` may shape it differently.
 
-### F31. One frame determines the command at every horizon, so there is no future to predict
+### F31. One frame nearly determines the command at every horizon
 
 Ridge regression from a single frame's pooled embedding to the joint command at various offsets.
 Six clips of `c10f10t10`, fitted on four, tested on two. The commands' own spread is 11.33 deg.
@@ -1188,9 +1188,28 @@ periodic with a period near 22 frames, so a distant offset wraps back to a simil
 frame fixes the phase. The error never rises above 5.33 against a signal of 11.33 at any horizon
 tested.
 
-**No choice of target makes the transition necessary**, because the data contains no
-unpredictable future. This bounds F29: moving the target one step forward was the causally correct
-thing to do, and it changes nothing, because `a_{t+1}` is as visible from `e_t` as `a_t` was.
+The transition is not worth *nothing*, and it is worth asking what it is worth, because the
+obvious objection is that direction of travel cannot be read from a still image -- a leg at
+mid-stroke looks the same going forward and going back. Measured directly, on the command
+difference, which is pure direction:
+
+| predict | frame `t` only | frames `t` and `t+1` | gain |
+|---|---|---|---|
+| `a_{t+1}`, the whole command | 5.02 | 4.54 | 1.11x |
+| **`a_{t+1} - a_t`, the change** | **2.61** | **2.40** | **1.09x** |
+| which feet are swinging | 0.815 | 0.840 | (accuracy, chance 0.5) |
+
+The change has a standard deviation of 4.78 deg, so **one frame already explains 70 percent of its
+variance**, and one frame identifies which feet are off the ground at 0.815 against a chance of
+0.5. The ambiguity is real for a single leg and disappears for six coordinated ones: the
+configuration of all 18 joints fixes the phase, because the other five legs say which half of the
+cycle the ambiguous one is in.
+
+So the second frame is worth 9 percent linearly and 19 percent to the trained model, not nothing
+and not much. **No choice of target makes the transition necessary**, because what it adds is a
+small correction to something already determined. This bounds F29: moving the target one step
+forward was the causally correct thing to do and changes nothing, because `a_{t+1}` is nearly as
+visible from `e_t` as `a_t` was.
 
 Confirmed directly. `lag1_ctrl` against `m3d_bracketed`, identical but for `action_lag`:
 
@@ -1206,8 +1225,9 @@ more -- the opposite of what the correction was supposed to produce, and exactly
 deterministic gait predicts.
 
 **The constraint is the dataset, not the objective, the architecture or the target.** Every insect
-clip is forward walking at one speed. A forward model earns its place only when the future is not
-determined by the present: varying speed, turning, terrain, or disturbance. The B1 data already
+clip is forward walking at one speed, and a coordinated hexapod gait is close to a closed loop in
+configuration space: knowing where you are on it tells you where you are going. A forward model
+earns its place only when the present leaves the future genuinely open: varying speed, turning, terrain, or disturbance. The B1 data already
 has this -- two policies at 2.0 and 1.7 Hz across seven speeds -- and the insect data does not.
 
 The consequence for the write-up is that this pipeline is a **latent action model**, in the sense
