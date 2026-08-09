@@ -995,6 +995,43 @@ the loss of the body code, not the loss of gait; with the body now read from the
 `z` costs only the gait, and a single frame already says a good deal about where the legs are.
 **A z-gap of 2.2x is `z` no longer carrying work that was never its own, not `z` being empty.**
 
+### F27. The fix improves the pose, not the distance
+
+Physical replay of `m3d_cross` epoch 8 against its matched control `m3d_bracketed` epoch 6, both
+on the held-out body `c08f09t09`, same three clips, same scene, same physics, open loop.
+
+| | control ep 6 | cross ep 8 |
+|---|---|---|
+| mean R2 over 18 joints | 0.832 | **0.868** |
+| mean RMSE | 3.40 deg | **2.75 deg** |
+| duty-factor error against IK, 6 legs x 3 clips | 0.076 | **0.044** |
+| commands outside the range this body ever uses | 7.7% | **5.4%** |
+| **worst excursion outside that range** | **20.2 deg** | **5.5 deg** |
+| forward distance as a fraction of IK | **93%** | 89% |
+
+Per clip, forward distance in metres against an IK ground truth of 0.617, 0.600 and 0.594:
+control 0.535, 0.565, 0.569; cross 0.521, 0.556, 0.529.
+
+Two things to state plainly. **The distance did not improve** -- the control walks 93 percent of
+the way and the cross model 89, despite 1.2x better joint accuracy. And the earlier result that
+transfer covered *less than half* the required distance came from the **two-body** dataset; on
+five bodies both runs reach 84 to 96 percent, so **coverage is what fixed the distance, not
+`lambda_cross`**.
+
+What `lambda_cross` fixed is the **quality of the pose**. The control commands the legs up to
+20.2 deg outside any configuration this body adopts; the cross model's worst excursion is 5.5.
+Its tripod index on clip 2 is -0.30 against an IK -0.34, where the control gives -0.09, which is
+barely a tripod at all. Commands outside the reachable range are what make legs fold into the
+abdomen once error accumulates, so this is the term that matters for closed-loop deployment even
+though it does not show up in distance walked.
+
+The 3 to 4 point distance difference is smaller than the spread across clips within the cross
+model itself (84 to 93 percent), so it does not establish that the cross model walks less far.
+Settling that needs more than three clips.
+
+Figures: `results/wm/action_trace_*_c08f09t09.png`, `results/wm/gait/gait_*.png`, and the
+side-by-side videos `results/wm/gait/replay_*.mp4`.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);

@@ -29,6 +29,18 @@ from collect_ik import SCENES, drive_and_record  # noqa: E402
 SCENE_BY_MORPH = dict(SCENES)
 
 
+def scene_for(morph):
+    """The three leg-scale bodies are named in collect_ik; the segment-scale bodies are not,
+    because they were recorded by passing --morphs NAME=SCENE explicitly. They follow one
+    convention, so derive it rather than duplicating the table."""
+    if morph in SCENE_BY_MORPH:
+        return SCENE_BY_MORPH[morph]
+    derived = f"medauroidea_{morph}.ttt"
+    if os.path.exists(os.path.join(ROOT, "sim", "env", derived)):
+        return derived
+    raise SystemExit(f"no scene for body {morph!r}; looked for sim/env/{derived}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=23000)
@@ -38,9 +50,10 @@ def main():
     ap.add_argument("--travel", type=float, default=0.0,
                     help="0 replays every step; a positive value stops once the robot has "
                          "covered that many metres, matching the collector's framing gate")
-    ap.add_argument("--cam_dx", type=float, default=-0.6)
+    ap.add_argument("--cam_dx", type=float, default=0.0)
     ap.add_argument("--cam_dy", type=float, default=0.0)
     ap.add_argument("--spawn", type=float, nargs=2, default=[0.0, 0.0], metavar=("X", "Y"))
+    ap.add_argument("--scene", default="", help="override the .ttt; defaults to the body's own")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -51,7 +64,7 @@ def main():
     start = int(np.sum(lengths[:args.clip]))
     stop = start + int(lengths[args.clip])
     morph = str(data["morph"])
-    scene = SCENE_BY_MORPH[morph]
+    scene = args.scene or scene_for(morph)
 
     sequences = {"predicted": data["pred"][start:stop], "ground_truth": data["gt"][start:stop]}
     print(f"body '{morph}' ({'held out' if bool(data['held_out']) else 'seen in training'}), "

@@ -68,8 +68,14 @@ def joint_limits(morph):
     the body's own range, so it also applies to a body with no expert data and across
     embodiments.
     """
-    pattern = os.path.join(ROOT, "data", "ik_walk_100_framed", f"{morph}_*.npz")
-    actions = np.concatenate([np.degrees(np.load(p)["actions"]) for p in sorted(glob.glob(pattern))])
+    paths = []
+    for d in ("ik_walk_100_framed", "ik_walk_8body"):
+        paths = sorted(glob.glob(os.path.join(ROOT, "data", d, f"{morph}_*.npz")))
+        if paths:
+            break
+    if not paths:
+        raise SystemExit(f"no clips of body {morph!r} under data/ to take a joint range from")
+    actions = np.concatenate([np.degrees(np.load(p)["actions"]) for p in paths])
     return actions.min(axis=0), actions.max(axis=0)
 
 
