@@ -80,8 +80,89 @@ and F17 show does not work, and a third embodiment cannot be generated the way e
 embodiment, compare against from-scratch: the shared backbone carries gait phase and visual
 processing, so it can start ahead even when zero-shot fails. Untested and not contradicted.
 
+**The mechanism that worked in Stage 1 does not port to Stage 2 as written.** `lambda_cross`
+decodes body A's latent against body B's frame supervised by B's command, and it is well defined
+only because every insect body walks the same expert episodes: `dataset.py` pairs on
+`clip["episode"]`, so at a given timestep two bodies share the intent exactly and differ only in
+geometry. **The hexapod and B1 share no episodes.** B1's clips come from MuJoCo rollouts under
+different policies, so `self.partners` would be empty and `L_cross` would never be computed.
+
+Without it, Stage 2 gets `lag1_ctrl`'s behaviour: body identity decodable from `z` at 0.638
+against 0.470 with the term on, the decoder leaning on `z` rather than the frame (z-gap 11.3x
+against x-gap 3.6x), and 1.65x worse reconstruction. **`z` becoming an embodiment code is exactly
+what Stage 2 must not allow**, since that code has no entry for a third embodiment.
+
+Pairing does not actually require shared episodes -- it requires knowing that two frames show the
+same intent. Two measurable stands-in, both available:
+
+| pair on | needs | cost |
+|---|---|---|
+| body velocity alone | simulator positions | phase mismatched, so the target command is wrong |
+| velocity + gait phase from foot forces | force sensors, at training time only | most accurate; privileged data |
+| **velocity + gait phase estimated from the frame** | **nothing extra** | phase wrong ~18% of the time |
+
+Force sensors would be used to **build the pairs**, never as model input, so vision-only inference
+is unaffected -- the same standing as the ground-truth commands already used as targets. And the
+third row is available regardless: one frame identifies which feet are swinging at 0.815 against a
+chance of 0.5 (F31).
+
+**The real risk is not the sensor, it is that mis-paired frames are wrong labels**, not merely
+noisy ones. Stage 1's pairing is exact; part of why `L_cross` works may be that exactness. Across
+embodiments no pairing can be exact, and what counts as "the same phase" for a six-leg tripod and
+a four-leg trot has no physically correct answer -- it is a design decision that has to be stated
+and defended. **This is the largest untested risk in Stage 2 and there is currently no plan for
+it.**
+
 Practical consequence: report claim A as the result, claim B as a measured limit with its
 mechanism, and treat sample efficiency as the transfer claim actually being made.
+
+## Q10. Is the forward model worth keeping? (ANSWERED: yes, and we were testing it wrongly)
+
+Every measurement of the forward model up to F30 asked whether it improves action
+reconstruction. It does not. That was read as the module being inert.
+
+Rolling it forward on its own output, with the true latents supplied so the module is isolated,
+it beats a frozen world at **1.38x at one step, 1.47x at three, and 1.20x at ten** on the
+held-out body, and beats constant velocity by two orders of magnitude (F32). It learned dynamics.
+It simply cannot show that through a loss that never needed it.
+
+**The source paper agrees.** In LAC-WM the Motion Decoder is an auxiliary regulariser. The
+deployed system predicts future embeddings, rolls them out eight steps, and selects actions by
+comparing predicted futures against a subgoal image. **The action decoder is not the output of
+the system.** We had made the auxiliary term the entire evaluation.
+
+Consequences:
+
+- The world-model framing stands. Drop "the forward model is inert" everywhere.
+- Evaluation has to include rollout quality, and eventually planning success, not only per-joint
+  reconstruction error.
+- `L_recon` still takes 99 percent of the gradient against a target that is 4.39x augmentation
+  noise (F25). That is now a question about **how well** the forward model could roll out if its
+  target were cleaner, not about whether it does anything.
+
+## Q11. What else differs from the source paper, and does it matter? (open)
+
+Read against the paper, the reimplementation matches on the things that define the method --
+frozen V-JEPA2, the ITM/FTM/MD decomposition, cross-augmentation and its stated purpose, and,
+after the `action_lag` correction, the action's time index. Four differences remain:
+
+| | paper | ours | worth acting on |
+|---|---|---|---|
+| **action chunking** | actions grouped into **5-step** sequences, stated to improve world-model learning | one step | **yes** -- a stated design choice we skipped, and it directly increases how much changes between observations |
+| latent dimension | 512 | 64 | maybe; ours is 8x tighter |
+| module size | ITM 47M, FTM 94M | about 5M each | probably not at this data scale |
+| behavioural diversity | 3 datasets, 150k trajectories, 22 object categories, a deliberate left-or-right choice in the task, 80 percent failures | one gait, one speed, forward only | this is the F31 constraint, restated |
+
+**One difference removes a risk rather than adding one.** The paper has **no cross-embodiment
+pairing term at all**: the shared latent space is claimed to emerge from sharing the ITM, FTM and
+MD weights across embodiments, and is evidenced only by overlapping UMAP clusters plus one
+qualitative rollout. So `lambda_cross` is **our addition, not theirs**, and Stage 2 can follow the
+paper without solving the pairing problem in Q0. Whether it should is a separate question: our
+measurements of body-independence are quantitative where theirs are not.
+
+**And the paper's transfer is not zero-shot.** Adapting to the unseen embodiment is a three-stage
+LoRA finetune on 7,265 trajectories of the target robot. Q0's claim B, tested as zero-shot, is
+stricter than what the method claims. The sample-efficiency framing in Step 3 is the comparable one.
 
 ## Q1. Which cross-embodiment framing? (the main open choice)
 

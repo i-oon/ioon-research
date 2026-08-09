@@ -1142,7 +1142,7 @@ whichever command is wanted, one of the two frames shows it. What makes the diff
 **decoder's** input being `e_t` alone. Consecutive commands differ by 3.44 deg on average, and no
 function of `e_t` can recover that difference.
 
-### F30. Deleting the forward model entirely costs nothing
+### F30. Deleting the forward model costs nothing *for action reconstruction*
 
 `lambda_recon 0` on the five-body dataset, against `m3d_bracketed` differing only in that flag.
 Both under the original target (`action_lag 0`), so they are directly comparable.
@@ -1165,8 +1165,9 @@ ablation rises from 21x to 24-62x while the frame ablation falls from 10.7x to 2
 `L_recon` was pushing the decoder toward the pixels -- the direction F19 wanted -- while taking
 99 percent of the gradient and buying no accuracy for it.
 
-This does not carry over to `action_lag 1` and has to be re-asked there, because `z` now has work
-to do and `L_recon` may shape it differently.
+Bounded by F32: this says the forward-prediction term does not help the action decoder. It does
+**not** say the forward model learned nothing -- rolled forward on its own output it beats a
+frozen world at every horizon out to ten steps.
 
 ### F31. One frame nearly determines the command at every horizon
 
@@ -1224,15 +1225,55 @@ By epoch 2 the held-out error is the same to three decimals and the latent is ne
 more -- the opposite of what the correction was supposed to produce, and exactly what a
 deterministic gait predicts.
 
-**The constraint is the dataset, not the objective, the architecture or the target.** Every insect
+**No target on this data can make the transition necessary for the action decoder.** Every insect
 clip is forward walking at one speed, and a coordinated hexapod gait is close to a closed loop in
-configuration space: knowing where you are on it tells you where you are going. A forward model
-earns its place only when the present leaves the future genuinely open: varying speed, turning, terrain, or disturbance. The B1 data already
-has this -- two policies at 2.0 and 1.7 Hz across seven speeds -- and the insect data does not.
+configuration space: knowing where you are on it tells you where you are going.
 
-The consequence for the write-up is that this pipeline is a **latent action model**, in the sense
-of LAPA and UniSkill, not a world model. The forward model is inert here and F23, F25 and F30 each
-measured a different face of the same fact.
+What this bounds is the **action-decoding** path, and only that. It says the joint command can be
+read off one frame, so the latent cannot earn its place there. It says nothing about the forward
+model's own competence, which F32 measures separately and finds intact. The right conclusion is
+not "the world model is inert" but "**the action decoder was never the place to look for it**".
+
+### F32. The forward model did learn dynamics; it was being measured at the wrong task
+
+F23 and F30 established that the forward-prediction term does not improve action
+reconstruction: removing it leaves the held-out error unchanged. That was read as the forward
+model having learned nothing. **The reading was wrong, because reconstruction is not what a
+forward model is for.**
+
+Closing the forward model on its own output and rolling it forward, with the real latents
+supplied by the ITM so the forward model is isolated, on un-augmented frames of the held-out
+body, 162 rollouts across three clips:
+
+| steps ahead | forward model | hold `e_t` still | constant velocity | vs hold |
+|---|---|---|---|---|
+| 1 | 1.53 | 2.11 | 5.78 | **1.38x** |
+| 2 | 1.83 | 2.68 | 14.6 | **1.47x** |
+| 3 | 2.07 | 3.05 | 27.6 | **1.47x** |
+| 5 | 2.54 | 3.57 | 66.0 | **1.41x** |
+| 8 | 3.21 | 4.12 | 155.8 | **1.28x** |
+| 10 | 3.63 | 4.36 | 236.5 | **1.20x** |
+
+It beats a frozen world at every horizon out to ten steps, and beats constant velocity by two
+orders of magnitude at the far end. **The forward model can roll the world forward.** What it
+cannot do is make `L_motion` easier -- and nothing ever asked it to, because the joint command
+was already recoverable from `e_t` (F29, F31).
+
+Two caveats. Holding `e_t` still is a weak baseline, and 1.2 to 1.5x over it is real but modest;
+and the margin decays with horizon, from 1.47x at three steps to 1.20x at ten. The latents fed
+in are the true ones, which isolates the forward model correctly but is easier than a rollout
+where the latents would also have to be chosen.
+
+**This matches what the source paper actually does with the module.** In LAC-WM the Motion
+Decoder is an auxiliary regulariser; the deployed system predicts future *embeddings*, rolls
+them out for eight steps, and selects actions by comparing predicted futures against a subgoal
+image. The action decoder is not the output of the system. Measuring the forward model by
+whether it improves action reconstruction was measuring it against a task the original method
+never assigns it.
+
+The correct statement is therefore narrower than F30 suggested: **the forward-prediction term is
+not needed for action reconstruction on this data, and is not evidence that the world model is
+inert.** Evaluating it requires rollout quality and, ultimately, planning success.
 
 ## The setup this points to
 
