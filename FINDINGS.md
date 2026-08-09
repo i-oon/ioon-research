@@ -910,7 +910,11 @@ running it.
 
 ## What fixes it
 
-### F24. Asking the loss for the mapping is what works
+### F24. Asking the loss for the mapping is what works, inside the range the data covers
+
+**Scope, established after the fact by F28**: everything below holds for a held-out body inside
+the range the training bodies span. On `c06f06t06`, whose morphology axis the training set never
+demonstrates, the same flag makes transfer **1.35x worse** than the control.
 
 `--lambda_cross` adds one term: decode body A's latent against body B's **frame**, supervised by
 body B's command. Every body walks the same expert episodes, so at a given timestep they share
@@ -1031,6 +1035,60 @@ Settling that needs more than three clips.
 
 Figures: `results/wm/action_trace_*_c08f09t09.png`, `results/wm/gait/gait_*.png`, and the
 side-by-side videos `results/wm/gait/replay_*.mp4`.
+
+### F28. The model reads apparent size, not the ratios the commands depend on
+
+`c06f06t06` was recorded as the extrapolation test, held out because it sits outside the convex
+hull of the training bodies. **In command space it is not outside anything.** It is
+`c10f10t10` with every segment scaled by 0.6, and the collector scales the IK foot targets by leg
+length, so the two bodies are geometrically similar and their joint trajectories are identical to
+**0.07 deg**. The body is physically smaller -- 0.084 m tall against 0.128, covering 0.371 m
+against 0.569 -- but the correct answer for it is to copy a training body verbatim.
+
+Neither model, evaluated on it without retraining (both had it held out already):
+
+| predictor | RMSE deg | mean R2 |
+|---|---|---|
+| copy `c10f10t10` -- the correct answer | **0.07** | -- |
+| predict this body's own mean | 12.73 | 0.00 |
+| control `m3d_bracketed` epoch 6 | 13.92 | **-2.01** |
+| **cross `m3d_cross` epoch 8** | **18.82** | **-4.63** |
+
+Both are worse than the trivial predictor, on 12 of 18 joints with negative R2. The swing joint
+(TC) survives at 0.69-0.93; the joints that set leg extension and height (CF, FT) collapse to
+RMSE 2.4-3.6x the ground truth's own standard deviation.
+
+**`lambda_cross` makes it worse, and the mixture analysis says exactly why.** The correct implied
+scale here is (1.0, 1.0, 1.0), because scaling every segment together leaves the angles unchanged:
+
+| | coxa | femur | tibia |
+|---|---|---|---|
+| correct in command space | **1.000** | **1.000** | **1.000** |
+| control implies | 0.794 | 0.806 | 0.793 |
+| **cross implies** | 0.909 | **0.691** | **0.671** |
+| true geometry | 0.60 | 0.60 | 0.60 |
+
+The cross model reads off the image that the femur and tibia are short -- and it reads it *well*,
+0.691 and 0.671 against a true 0.60 -- then applies the command change that shortening those
+segments *relative to the others* would require. Here nothing was relative: everything shrank
+together and no command change was needed. The control, which reads the frame less, is wrong by
+less. **`lambda_cross` did precisely what it was built to do, and that is what broke it.**
+
+None of the five training bodies scales all three segments together (`c10f10t10 c06f10t10
+c10f10t06 c06f10t06 c10f06t06`), so uniform scale is a direction the data never demonstrates. The
+model treats each segment's apparent size independently and extrapolates, when the quantity that
+actually determines the commands is the **ratio** between them.
+
+This bounds F24. `lambda_cross` improves transfer to a body **inside** the range the training
+bodies span, and the mechanism measurements (swap test, x-gap, mixture concentration) are real.
+But what it learned is an interpolation across the bodies it saw, not a reading of geometry that
+holds outside them -- and reading harder is worse where the data does not cover the direction.
+
+Two consequences. The earlier record of `m3d_outside` as an extrapolation result (held-out MSE
+1.71-2.61 against the bracketed body's 0.0992) measured a body whose answer was a training body,
+so it understates nothing -- it is a failure on the easiest possible case. And the fix this points
+to is a data fix, not a loss fix: include a uniform-scale family so the model can learn that
+overall size does not change the commands.
 
 ## The setup this points to
 
