@@ -1142,6 +1142,32 @@ whichever command is wanted, one of the two frames shows it. What makes the diff
 **decoder's** input being `e_t` alone. Consecutive commands differ by 3.44 deg on average, and no
 function of `e_t` can recover that difference.
 
+### F30. Deleting the forward model entirely costs nothing
+
+`lambda_recon 0` on the five-body dataset, against `m3d_bracketed` differing only in that flag.
+Both under the original target (`action_lag 0`), so they are directly comparable.
+
+| | control | `lambda_recon 0` |
+|---|---|---|
+| `recon` | 1.6, falling | **9.40, flat across all 7 epochs** |
+| held-out error | 0.0992 (epochs 1-10) | **0.1025** (epochs 1-7) |
+| z-gap | 21x | **24-62x** |
+| x-gap | 10.7x | **2.5-6.8x** |
+
+The FTM learns nothing at all -- `recon` does not move from its initial 9.40 -- and the action
+reconstruction is unchanged, 0.1025 against 0.0992. This confirms on real data what the 975-pair
+smoke run suggested. **In the original pipeline the forward model contributed nothing**, which
+follows directly from F29: with the target already visible in `e_t`, there was nothing for it to
+supply.
+
+One thing it did do. Removing it moves the decoder **onto `z` and off the frame**: the latent
+ablation rises from 21x to 24-62x while the frame ablation falls from 10.7x to 2.5-6.8x. So
+`L_recon` was pushing the decoder toward the pixels -- the direction F19 wanted -- while taking
+99 percent of the gradient and buying no accuracy for it.
+
+This does not carry over to `action_lag 1` and has to be re-asked there, because `z` now has work
+to do and `L_recon` may shape it differently.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
