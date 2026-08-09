@@ -67,6 +67,13 @@ class Config:
     # transfer needs, rather than merely permitting it. Off by default. See OPEN_QUESTION.md Q7.
     lambda_cross: float = 0.0
 
+    # Two independently augmented views of each pair, which is what stops the ITM smuggling
+    # x_{t+1} into z. Measured cost: the FTM's target becomes 4.39x more augmentation noise than
+    # signal, so L_recon takes 99% of the gradient while chasing something unpredictable, and z
+    # is never pressured to become an action. False falls back to the dimensional bottleneck,
+    # z at 64 numbers against e_{t+1}'s 359,000. See FINDINGS.md F25.
+    cross_augment: bool = True
+
     # Gradient-reversal head that removes body identity from z. Off by default, and superseded
     # by lambda_cross: stripping the code moved the decoder onto the frame and made transfer
     # worse, because it has no reason to read morphology there. See wm/models/adversary.py.

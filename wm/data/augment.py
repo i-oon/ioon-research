@@ -34,6 +34,15 @@ def sample_params(rng, height, width, min_scale=0.85):
     )
 
 
+def identity_params(height, width):
+    """The augmentation that changes nothing: full frame, no photometric shift.
+
+    Used when cross-augmentation is switched off. It keeps every call site identical so the
+    only difference between an augmented and an un-augmented run is what the encoder sees.
+    """
+    return AugmentParams(y0=0, x0=0, size=min(height, width), brightness=0.0, contrast=1.0)
+
+
 def apply(frame, params):
     height, width = frame.shape[:2]
     crop = frame[params.y0:params.y0 + params.size, params.x0:params.x0 + params.size]

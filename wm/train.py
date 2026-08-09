@@ -187,10 +187,22 @@ def build_cross_embodiment(cfg, root):
     """Datasets, sampler and decoder heads for training across embodiments."""
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
     train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root)
-    train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed)
-    val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed)
+    train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
+                                     cross_augment=cfg.cross_augment)
+    val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
+                                   cross_augment=cfg.cross_augment)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
+
+
+def _bool(text):
+    """argparse with type=bool turns any non-empty string into True, so "--flag false" would
+    silently switch the flag on. Every boolean field needs this instead."""
+    if text.lower() in ("true", "1", "yes"):
+        return True
+    if text.lower() in ("false", "0", "no"):
+        return False
+    raise argparse.ArgumentTypeError(f"expected true or false, got {text!r}")
 
 
 def parse_args(cfg):
@@ -198,6 +210,8 @@ def parse_args(cfg):
     for name, value in asdict(cfg).items():
         if isinstance(value, tuple):
             parser.add_argument(f"--{name}", nargs="+", default=list(value))
+        elif isinstance(value, bool):
+            parser.add_argument(f"--{name}", type=_bool, default=value)
         else:
             parser.add_argument(f"--{name}", type=type(value), default=value)
     parser.add_argument("--name", type=str, default="wm")
@@ -234,10 +248,12 @@ def main():
 
         frame_range = (cfg.frame_start, cfg.frame_stop)
         train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
-                                frame_range=frame_range, within_body_std=cfg.within_body_std)
+                                frame_range=frame_range, within_body_std=cfg.within_body_std,
+                                cross_augment=cfg.cross_augment)
         val_set = IKWalkPairs(
             data_dir, cfg.train_morphs, val_episodes,
             mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,
+            cross_augment=cfg.cross_augment,
         )
         print(f"train episodes {train_episodes} | val episodes {val_episodes}")
         loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)

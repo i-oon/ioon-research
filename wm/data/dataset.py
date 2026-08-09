@@ -10,7 +10,7 @@ import os
 import numpy as np
 from torch.utils.data import Dataset, Sampler
 
-from .augment import apply, sample_params
+from .augment import apply, identity_params, sample_params
 from .embodiment import REGISTRY
 from .embodiment import load as load_embodiment
 
@@ -84,7 +84,7 @@ class IKWalkPairs(Dataset):
     action sequence and near-identical frames, so holding one out measures nothing."""
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
-                 frame_range=None, within_body_std=True):
+                 frame_range=None, within_body_std=True, cross_augment=True):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if episodes is not None:
             keep = set(episodes)
@@ -117,6 +117,10 @@ class IKWalkPairs(Dataset):
         ]
         self.seed = seed
         self.epoch = 0
+        # False gives the ITM and FTM the same un-augmented frames. What stops the ITM copying
+        # x_{t+1} into z is then the dimensional bottleneck alone: z is 64 numbers against
+        # e_{t+1}'s 359,000. See FINDINGS.md F25 for why the augmentation had to go.
+        self.cross_augment = cross_augment
 
     def set_epoch(self, epoch):
         """Fresh augmentations each epoch while keeping the run reproducible."""
@@ -132,8 +136,11 @@ class IKWalkPairs(Dataset):
 
         rng = np.random.default_rng((self.seed, self.epoch, i))
         height, width = frame_t.shape[:2]
-        a1 = sample_params(rng, height, width)
-        a2 = sample_params(rng, height, width)
+        if self.cross_augment:
+            a1 = sample_params(rng, height, width)
+            a2 = sample_params(rng, height, width)
+        else:
+            a1 = a2 = identity_params(height, width)
 
         action = (clip["actions"][t] - self.mean) / self.std
         sample = {
@@ -151,7 +158,8 @@ class IKWalkPairs(Dataset):
         others = [m for m in self.partners[clip["episode"]] if m != clip["morph"]]
         if others:
             partner = self.clips[self.partners[clip["episode"]][others[rng.integers(len(others))]]]
-            a3 = sample_params(rng, height, width)
+            a3 = sample_params(rng, height, width) if self.cross_augment \
+                else identity_params(height, width)
             sample["cross_x_t"] = apply(partner["frames"][t], a3)
             sample["cross_action"] = ((partner["actions"][t] - self.mean) / self.std).astype(np.float32)
             sample["cross_morph_id"] = self.morph_index[partner["morph"]]
@@ -186,7 +194,7 @@ class MultiEmbodimentPairs(Dataset):
     quadruped joint targets share no units or correspondence.
     """
 
-    def __init__(self, sources, stats=None, seed=0):
+    def __init__(self, sources, stats=None, seed=0, cross_augment=True):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -207,6 +215,10 @@ class MultiEmbodimentPairs(Dataset):
         ]
         self.seed = seed
         self.epoch = 0
+        # False gives the ITM and FTM the same un-augmented frames. What stops the ITM copying
+        # x_{t+1} into z is then the dimensional bottleneck alone: z is 64 numbers against
+        # e_{t+1}'s 359,000. See FINDINGS.md F25 for why the augmentation had to go.
+        self.cross_augment = cross_augment
 
     def set_epoch(self, epoch):
         self.epoch = epoch
@@ -227,8 +239,11 @@ class MultiEmbodimentPairs(Dataset):
 
         rng = np.random.default_rng((self.seed, self.epoch, i))
         height, width = frame_t.shape[:2]
-        a1 = sample_params(rng, height, width)
-        a2 = sample_params(rng, height, width)
+        if self.cross_augment:
+            a1 = sample_params(rng, height, width)
+            a2 = sample_params(rng, height, width)
+        else:
+            a1 = a2 = identity_params(height, width)
 
         mean, std = self.stats[clip["embodiment"]]
         return {
