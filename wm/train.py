@@ -129,7 +129,10 @@ def cache_heldout(encoder, data_dir, cfg, device):
         frames = clip["frames"][start:stop or None]
         parts = [encoder.encode(list(frames[i:i + 8])).float() for i in range(0, len(frames), 8)]
         embeddings.append(torch.cat(parts))
-        actions.append(clip["actions"][start:stop or None][:-1])
+        # keep every command: with action_lag 1 the target for the last usable transition is
+        # the final command, and dropping it here left the last chunk empty, which broadcast
+        # silently and turned the whole held-out metric into nan
+        actions.append(clip["actions"][start:stop or None])
     return {
         "embeddings": [e.to(device) for e in embeddings],
         "actions": [torch.tensor(a, device=device) for a in actions],
@@ -155,11 +158,12 @@ def evaluate_heldout(models, cache, mean, std, device, chunk=8, action_lag=1):
     errors, no_z, no_x = [], [], []
     for embeddings, actions in zip(cache["embeddings"], cache["actions"]):
         target = (actions - mean_t) / std_t
-        total = len(embeddings) - max(1, action_lag)
+        total = min(len(embeddings) - 1, len(target) - action_lag)
         for start in range(0, total, chunk):
             stop = min(start + chunk, total)
             e_t, e_next = embeddings[start:stop], embeddings[start + 1:stop + 1]
             expected = target[start + action_lag:stop + action_lag]
+            assert len(expected) == stop - start, "held-out target and frames are misaligned"
             z = models["itm"](e_t, e_next)
             errors.append(((models["md"](e_t, z) - expected) ** 2).mean().item())
             no_z.append(((models["md"](e_t, torch.zeros_like(z)) - expected) ** 2).mean().item())
@@ -279,7 +283,8 @@ def main():
     heldout_cache = None if cross_embodiment else cache_heldout(encoder, data_dir, cfg, device)
     heldout_note = (
         "heldout n/a (cross-embodiment)" if cross_embodiment
-        else f"heldout '{cfg.heldout_morph}' {sum(len(a) for a in heldout_cache['actions'])} pairs"
+        else f"heldout '{cfg.heldout_morph}' "
+             f"{sum(len(a) - max(1, cfg.action_lag) for a in heldout_cache['actions'])} pairs"
     )
     print(f"train {len(train_set)} pairs | val {len(val_set)} pairs | "
           f"{heldout_note} | trainable {trainable/1e6:.1f}M")
