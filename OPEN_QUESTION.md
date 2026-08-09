@@ -271,6 +271,37 @@ number of feet -- that is Q0's claim B and can only be settled by running it.
 `L_recon`'s target is 4.39x more augmentation noise than signal (F25). That is a separate defect
 and does not affect the answer above.
 
+## Q9. Does the corrected target make the latent do its job? (open, the live question)
+
+The task never required the latent (F29): the command asked for was already visible in `e_t`,
+which the decoder receives, while `e_{t+1}` reaches it only through `z`. `action_lag 1` asks for
+the command that caused the transition instead, so `z` becomes the only route.
+
+What this predicts, and what would falsify it:
+
+| measurement | if the fix works | if it does not |
+|---|---|---|
+| latent ablation (z-gap) | rises far above the old 21x | stays near 21x, meaning another shortcut exists |
+| held-out error | gets **worse** -- the task is harder | unchanged, meaning nothing changed |
+| frame ablation (x-gap) | falls; one frame no longer answers | unchanged |
+| `z_dynamics.py` duplicate-frame test | collapses toward the zeroed-latent number | stays at 1.1-1.2x |
+
+The second row is the one to watch. Consecutive commands differ by **3.44 deg**, so if held-out
+error does not move, the model has found a way to answer without the transition and we have not
+finished.
+
+**The follow-on question, whichever way that goes**: does `z` become a compressed copy of
+`e_{t+1}` rather than a latent *action*? Cross-augmentation blocks a literal copy, not a copy of
+the visible pose. The test is a probe from `z` to the pose in frame `t+1`, against a probe from
+`z` to the command difference `a_{t+1} - a_t`. A latent action carries the second, not the first.
+If it turns out to be a copy, the remaining lever is a narrower bottleneck: 18 joint angles need
+roughly 18 dimensions, and `z_dim` is 64.
+
+**What this does not disturb**: F20 (the frozen encoder carries morphology linearly, recovering a
+held-out body's segment scales to 0.050/0.039/0.002) and F28 (what the decoder learns is
+interpolation between the bodies it saw, not a reading of geometry). Neither uses the transition,
+so both survive the change and both remain the contribution.
+
 ---
 
 ## Settled / obsolete (was Q1–Q4 in the old version)

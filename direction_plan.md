@@ -613,6 +613,50 @@ volume rather than a line and a held-out body can be a combination no training b
 > assumes. Untested options: drop cross-augmentation and rely on the 64-d against 359,000-d
 > bottleneck, or augment in embedding space. FINDINGS.md F25.
 
+### Step 2.8 — The target the decoder could already see
+**Status** cause found and fixed; the corrected baseline is training.
+**Goal**: make the task require the latent it is built around
+
+> `sim/collect_ik.py` applies `cmds[t]`, steps the simulator, and only then captures
+> `frames[t]`. So `frames[t]` is the **result** of `actions[t]`, and the command that caused
+> `frames[t] -> frames[t+1]` is `actions[t+1]`. Training asked for `actions[t]` from
+> `(e_t, e_{t+1})` -- and the Motion Decoder receives `e_t` directly while never seeing
+> `e_{t+1}`. **The answer was already in the decoder's own input.**
+>
+> Measured on the held-out body, replacing the second frame given to the ITM:
+>
+> | what the ITM is given as `e_{t+1}` | control | cross |
+> |---|---|---|
+> | the real next frame | 3.57 | 2.91 |
+> | **`e_t` again, no transition at all** | **3.96 (1.11x)** | **3.47 (1.19x)** |
+> | `e_{t-1}`, the transition backwards | 5.13 (1.44x) | 4.18 (1.44x) |
+> | the latent zeroed | 19.24 (5.39x) | 6.04 (2.08x) |
+>
+> Deleting the transition costs 11-19 percent, and running it **backwards** costs more than
+> having none at all -- the opposite of what a latent encoding direction of motion would do.
+> `z` was a pose code.
+>
+> **One fact explains every earlier finding.** The FTM not needing `z` (F23), the decoder doing a
+> lookup (F19), `z` being 83-89 percent gait phase (F26), the pose improving while the distance
+> did not (F27) -- all follow from the target never having to travel through `z`.
+> Confirmed independently: `lambda_recon 0` on real data leaves the reconstruction unchanged
+> (0.1025 against 0.0992) while the FTM's loss never moves from its initial value (F30).
+>
+> **The fix**: `cfg.action_lag`, now 1. The decoder is asked for the command that caused the
+> transition, which it cannot see, so the answer can only arrive through `z`. Consecutive
+> commands differ by 3.44 deg, which no function of `e_t` recovers. Every run recorded before
+> this reads back through `wm.config.from_checkpoint` with `action_lag 0`, so their numbers are
+> unchanged -- verified, `m3d_cross` epoch 8 still scores 2.91 deg.
+>
+> Cross-augmentation **stays on**. The earlier case for dropping it rested on `z` improving
+> `L_recon` by only 3-7 percent, measured while `z` had no job. Now compressing `e_{t+1}` into
+> `z` is the cheapest way to satisfy `L_motion`, and the same compression makes `L_recon`
+> trivial: one shortcut paying into both terms is exactly what the augmentation blocks.
+>
+> Running: `lag1_ctrl` and `lag1_cross`, matched on everything but `lambda_cross`. The number
+> that decides it is the latent ablation, 21x in the old control; it should rise sharply, and
+> the held-out error should get **worse**, because the task is genuinely harder now.
+
 ### Step 3 — Extrapolation
 **Status** measured once, out of proposal scope for the write-up.
 **Goal**: test morphology outside training range
