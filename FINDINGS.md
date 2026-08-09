@@ -895,20 +895,26 @@ the shortcut *more* attractive, not less: the protection comes from the target b
 augmented, so that no fixed content in `z` can predict it. A deterministic target is exactly what
 a copy could hit.
 
-What remains, none tested:
+**Dropping cross-augmentation is also ruled out, by F29.** The argument for dropping it was that
+the shortcut buys little, since `z` improves `L_recon` by only 3 to 7 percent. That number was
+measured while `z` had no job at all. Under `action_lag 1` the decoder can only reach `a_{t+1}`
+through `z`, so compressing `e_{t+1}` into `z` is the cheapest way to satisfy `L_motion` -- and
+the same compression makes `L_recon` trivial, because the FTM then only has to unpack it. One
+shortcut now pays into both terms, which is precisely the degenerate solution cross-augmentation
+exists to block. It stays on.
 
-| change | risk |
+What that leaves for the FTM, none tested:
+
+| change | what it would cost |
 |---|---|
-| drop cross-augmentation and rely on the dimensional bottleneck | `z` is 64-d against `e_{t+1}`'s 359,000, so a literal copy is already impossible by a factor of 5,600 |
 | augment in embedding space rather than pixel space | needs designing; the noise becomes controllable |
-| much weaker jitter, brightness +/-0.05 | may still not be enough, given +/-0.2 alone gives 2.10 |
+| augment the FTM's input more weakly than the ITM's | asymmetric, so the ITM still cannot copy |
+| accept the FTM as inert and drop it | loses latent rollout, and with it deployment |
 
-The first is the one the numbers point at. The shortcut is worth 8.51 against the 8.43 the FTM
-already achieves without `z`, so it buys almost nothing even now, while the bottleneck blocks the
-literal version outright. Whether it returns once the noise is gone can only be settled by
-running it.
-
-## What fixes it
+The measurement that decides between these is whether `z` under `action_lag 1` becomes a
+compressed copy of `e_{t+1}` regardless: a probe from `z` back to the pose in frame `t+1`,
+against a probe from `z` to the command difference `a_{t+1} - a_t`. A latent action should carry
+the second and not the first.
 
 ### F24. Asking the loss for the mapping is what works, inside the range the data covers
 
@@ -1089,6 +1095,52 @@ Two consequences. The earlier record of `m3d_outside` as an extrapolation result
 so it understates nothing -- it is a failure on the easiest possible case. And the fix this points
 to is a data fix, not a loss fix: include a uniform-scale family so the model can learn that
 overall size does not change the commands.
+
+### F29. The task never required dynamics, because the answer was in the input
+
+The Motion Decoder takes `(e_t, z)` -- it never sees `e_{t+1}`. So the only reason `z` should
+exist is to carry what the second frame adds. Substituting the second frame given to the ITM
+measures whether it adds anything. Held-out body `c08f09t09`, 195 transitions:
+
+| what the ITM is given as `e_{t+1}` | control ep 6 | cross ep 8 |
+|---|---|---|
+| the real next frame | 3.57 | 2.91 |
+| **`e_t` again, no transition at all** | **3.96 (1.11x)** | **3.47 (1.19x)** |
+| a real frame from a random other time | 9.65 (2.70x) | 6.10 (2.10x) |
+| `e_{t-1}`, the transition backwards | 5.13 (1.44x) | 4.18 (1.44x) |
+| the latent zeroed entirely | 19.24 (5.39x) | 6.04 (2.08x) |
+
+**Deleting the transition costs 11 to 19 percent.** The commands move by 2.3 to 3.2 percent of
+their own scale. And running the transition *backwards* costs more (1.44x, identically in both
+runs) than having no transition at all -- if `z` encoded direction of motion, reversing it should
+be worse than removing it, not the other way round. `z` is a **pose** code: where in the gait
+cycle the two frames sit, which one frame already shows.
+
+**The cause is in the collector, not the model.** `sim/collect_ik.py` applies `cmds[t]`, steps the
+simulator, and only then captures `frames[t]`. So `frames[t]` is the *result* of `actions[t]`, and
+the command that caused `frames[t] -> frames[t+1]` is `actions[t+1]`. Training asked for
+`actions[t]` from `(e_t, e_{t+1})`: **the target was already visible in `e_t`**, which the decoder
+gets directly. Nothing forced anything through `z`.
+
+This is one finding that explains every earlier one:
+
+| earlier finding | why |
+|---|---|
+| F23: the FTM does not need `z` (1.03x) | there is nothing `z` must supply |
+| F19: the decoder does a lookup | `e_t` already answers the question; `z` only has to name the body |
+| F26: `z` is 83-89% gait phase | gait phase is what `e_t` and `e_{t+1}` share |
+| F27: pose improves but distance does not | the model was never asked about motion |
+
+**The fix is `action_lag`, now 1 by default.** The decoder is asked for the command that caused
+the transition, and since it never sees `e_{t+1}`, that answer can only arrive through `z`. Runs
+recorded before 2026-08-09 are read back with `action_lag 0` by `wm.config.from_checkpoint`, so
+their numbers are unchanged.
+
+Moving the target one step is not enough by itself if the model can see both frames -- a ridge
+probe on `[e_t, e_{t+1}]` gains the same 1.15x whether it is asked for `a_t` or `a_{t+1}`, because
+whichever command is wanted, one of the two frames shows it. What makes the difference here is the
+**decoder's** input being `e_t` alone. Consecutive commands differ by 3.44 deg on average, and no
+function of `e_t` can recover that difference.
 
 ## The setup this points to
 

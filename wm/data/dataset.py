@@ -84,7 +84,7 @@ class IKWalkPairs(Dataset):
     action sequence and near-identical frames, so holding one out measures nothing."""
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
-                 frame_range=None, within_body_std=True, cross_augment=True):
+                 frame_range=None, within_body_std=True, cross_augment=True, action_lag=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if episodes is not None:
             keep = set(episodes)
@@ -109,11 +109,15 @@ class IKWalkPairs(Dataset):
         for i, clip in enumerate(self.clips):
             self.partners.setdefault(clip["episode"], {}).setdefault(clip["morph"], i)
 
+        # The target sits action_lag steps past t, so a transition is only usable when that
+        # index exists: t+1 for the frames and t+action_lag for the command.
+        self.action_lag = action_lag
+        reach = max(1, action_lag)
         start, stop = frame_range or (0, 0)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(start, (stop or len(clip["frames"])) - 1)
+            for t in range(start, (stop or len(clip["frames"])) - reach)
         ]
         self.seed = seed
         self.epoch = 0
@@ -142,7 +146,7 @@ class IKWalkPairs(Dataset):
         else:
             a1 = a2 = identity_params(height, width)
 
-        action = (clip["actions"][t] - self.mean) / self.std
+        action = (clip["actions"][t + self.action_lag] - self.mean) / self.std
         sample = {
             "view1_t": apply(frame_t, a1),
             "view1_next": apply(frame_next, a1),
@@ -161,7 +165,8 @@ class IKWalkPairs(Dataset):
             a3 = sample_params(rng, height, width) if self.cross_augment \
                 else identity_params(height, width)
             sample["cross_x_t"] = apply(partner["frames"][t], a3)
-            sample["cross_action"] = ((partner["actions"][t] - self.mean) / self.std).astype(np.float32)
+            sample["cross_action"] = (
+                (partner["actions"][t + self.action_lag] - self.mean) / self.std).astype(np.float32)
             sample["cross_morph_id"] = self.morph_index[partner["morph"]]
         return sample
 
@@ -194,7 +199,7 @@ class MultiEmbodimentPairs(Dataset):
     quadruped joint targets share no units or correspondence.
     """
 
-    def __init__(self, sources, stats=None, seed=0, cross_augment=True):
+    def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -208,10 +213,12 @@ class MultiEmbodimentPairs(Dataset):
                 self.stats[name] = (actions.mean(0), np.maximum(actions.std(0), 1e-6))
             self.clips.extend(clips)
 
+        self.action_lag = action_lag
+        reach = max(1, action_lag)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(len(clip["frames"]) - 1)
+            for t in range(len(clip["frames"]) - reach)
         ]
         self.seed = seed
         self.epoch = 0
@@ -251,7 +258,7 @@ class MultiEmbodimentPairs(Dataset):
             "view1_next": apply(frame_next, a1),
             "view2_t": apply(frame_t, a2),
             "view2_next": apply(frame_next, a2),
-            "action": ((clip["actions"][t] - mean) / std).astype(np.float32),
+            "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
         }
 
@@ -288,15 +295,17 @@ class EmbodimentBatchSampler(Sampler):
 class IKWalkFrames(Dataset):
     """Un-augmented frames for evaluation and probing."""
 
-    def __init__(self, data_dir, morphs, mean=None, std=None):
+    def __init__(self, data_dir, morphs, mean=None, std=None, action_lag=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if mean is None or std is None:
             mean, std = action_stats(self.clips)
         self.mean, self.std = mean.astype(np.float32), std.astype(np.float32)
+        self.action_lag = action_lag
+        reach = max(1, action_lag)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(len(clip["frames"]) - 1)
+            for t in range(len(clip["frames"]) - reach)
         ]
 
     def __len__(self):
@@ -305,12 +314,12 @@ class IKWalkFrames(Dataset):
     def __getitem__(self, i):
         clip_idx, t = self.index[i]
         clip = self.clips[clip_idx]
-        action = (clip["actions"][t] - self.mean) / self.std
+        action = (clip["actions"][t + self.action_lag] - self.mean) / self.std
         return {
             "frame_t": clip["frames"][t],
             "frame_next": clip["frames"][t + 1],
             "action": action.astype(np.float32),
-            "raw_action": clip["actions"][t],
+            "raw_action": clip["actions"][t + self.action_lag],
             "contact": contact_labels(clip["forces"][t]),
             "morph": clip["morph"],
             "episode": clip["episode"],

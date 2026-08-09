@@ -30,7 +30,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from wm.config import Config  # noqa: E402
+from wm.config import Config, from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths  # noqa: E402
 from wm.evaluate import (behaviour_labels, collect, decode_accuracy,  # noqa: E402
                          structure, upgrade_decoder_state)
@@ -66,7 +66,7 @@ def main():
 
     checkpoint = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     known = {f.name for f in fields(Config)}
-    cfg = Config(**{k: v for k, v in checkpoint["config"].items() if k in known})
+    cfg = from_checkpoint(checkpoint["config"])
     cfg.train_morphs = tuple(cfg.train_morphs)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

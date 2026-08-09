@@ -3,7 +3,32 @@
 Architecture values follow LAC-WM (Table 4 / Section 3.1). Optimisation values are
 scaled down for a single 2080 Ti; the paper used 64 H200s with batch size 512.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+
+
+def from_checkpoint(saved):
+    """Rebuild a Config from a checkpoint, keeping the behaviour that checkpoint was trained with.
+
+    A field added after a run was recorded must fall back to what that run actually did, not to
+    the current default, or the checkpoint gets scored against a target it never saw.
+    """
+    known = {f.name for f in fields(Config)}
+    cfg = Config(**{k: v for k, v in saved.items() if k in known})
+    for name, before in LEGACY_DEFAULTS.items():
+        if name not in saved:
+            setattr(cfg, name, before)
+    cfg.train_morphs = tuple(cfg.train_morphs)
+    return cfg
+
+
+# What each field did before it existed, for runs recorded without it.
+LEGACY_DEFAULTS = {
+    "action_lag": 0,
+    "cross_augment": True,
+    "within_body_std": False,
+    "lambda_cross": 0.0,
+    "lambda_adv": 0.0,
+}
 
 
 @dataclass
@@ -66,6 +91,19 @@ class Config:
     # which is the point: the loss finally asks for the appearance-to-morphology mapping that
     # transfer needs, rather than merely permitting it. Off by default. See OPEN_QUESTION.md Q7.
     lambda_cross: float = 0.0
+
+    # Which joint command the Motion Decoder is asked for, counted from frame t.
+    #
+    # The collector applies cmds[t], steps the simulator, and only then captures frames[t], so
+    # frames[t] is the *result* of actions[t] and the transition frames[t] -> frames[t+1] is
+    # caused by actions[t+1]. With action_lag 0 the target is therefore already visible in the
+    # decoder's own input, e_t, and z has nothing left to supply: measured, giving the ITM two
+    # copies of e_t instead of a real transition costs only 1.11-1.19x (FINDINGS.md F29).
+    #
+    # action_lag 1 asks for the action that caused the transition, which is what z is defined to
+    # represent. The decoder never sees e_{t+1}, so that answer can only arrive through z.
+    # 0 reproduces every run recorded before 2026-08-09.
+    action_lag: int = 1
 
     # Two independently augmented views of each pair, which is what stops the ITM smuggling
     # x_{t+1} into z. Measured cost: the FTM's target becomes 4.39x more augmentation noise than

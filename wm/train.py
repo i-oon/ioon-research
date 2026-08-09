@@ -137,7 +137,7 @@ def cache_heldout(encoder, data_dir, cfg, device):
 
 
 @torch.no_grad()
-def evaluate_heldout(models, cache, mean, std, device, chunk=8):
+def evaluate_heldout(models, cache, mean, std, device, chunk=8, action_lag=1):
     """Motion error on the held-out body, with each of the decoder's two inputs ablated.
 
     Both ablations are needed because they answer different questions. Zeroing z removes the
@@ -155,11 +155,11 @@ def evaluate_heldout(models, cache, mean, std, device, chunk=8):
     errors, no_z, no_x = [], [], []
     for embeddings, actions in zip(cache["embeddings"], cache["actions"]):
         target = (actions - mean_t) / std_t
-        total = len(embeddings) - 1
+        total = len(embeddings) - max(1, action_lag)
         for start in range(0, total, chunk):
             stop = min(start + chunk, total)
             e_t, e_next = embeddings[start:stop], embeddings[start + 1:stop + 1]
-            expected = target[start:stop]
+            expected = target[start + action_lag:stop + action_lag]
             z = models["itm"](e_t, e_next)
             errors.append(((models["md"](e_t, z) - expected) ** 2).mean().item())
             no_z.append(((models["md"](e_t, torch.zeros_like(z)) - expected) ** 2).mean().item())
@@ -188,9 +188,9 @@ def build_cross_embodiment(cfg, root):
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
     train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root)
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
-                                     cross_augment=cfg.cross_augment)
+                                     cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
-                                   cross_augment=cfg.cross_augment)
+                                   cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -249,11 +249,11 @@ def main():
         frame_range = (cfg.frame_start, cfg.frame_stop)
         train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
                                 frame_range=frame_range, within_body_std=cfg.within_body_std,
-                                cross_augment=cfg.cross_augment)
+                                cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
         val_set = IKWalkPairs(
             data_dir, cfg.train_morphs, val_episodes,
             mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,
-            cross_augment=cfg.cross_augment,
+            cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
         )
         print(f"train episodes {train_episodes} | val episodes {val_episodes}")
         loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)
@@ -310,7 +310,8 @@ def main():
         heldout = heldout_no_z = heldout_no_x = float("nan")
         if heldout_cache is not None:
             heldout, heldout_no_z, heldout_no_x = evaluate_heldout(
-                models, heldout_cache, train_set.mean, train_set.std, device
+                models, heldout_cache, train_set.mean, train_set.std, device,
+                action_lag=cfg.action_lag,
             )
         schedule.step()
 

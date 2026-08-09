@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from wm.config import Config  # noqa: E402
+from wm.config import Config, from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths, load_clip  # noqa: E402
 from wm.evaluate import upgrade_decoder_state  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -34,7 +34,7 @@ from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
 def load_config(state):
     known = {f.name for f in fields(Config)}
-    cfg = Config(**{k: v for k, v in state["config"].items() if k in known})
+    cfg = from_checkpoint(state["config"])
     cfg.train_morphs = tuple(cfg.train_morphs)
     return cfg
 

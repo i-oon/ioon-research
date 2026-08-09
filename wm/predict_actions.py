@@ -1,8 +1,12 @@
 """Reconstruct joint commands for a body the model never trained on.
 
-The world model is an inverse model: z_t = ITM(e_t, e_{t+1}) and a_t = MD(e_t, z_t).
+The world model is an inverse model: z_t = ITM(e_t, e_{t+1}) and a_hat = MD(e_t, z_t).
 Both frames are ground truth, so this is action *reconstruction* from video, not a
 controller -- nothing here chooses what the robot should do, it reads off what it did.
+
+Which command a_hat is compared against follows cfg.action_lag. The collector captures
+frames[t] after applying actions[t], so the command that caused frames[t] -> frames[t+1] is
+actions[t+1], and that is what a latent describing the transition should decode to.
 
 Predictions come back in radians (the checkpoint's action_mean/std undo the
 standardisation) so they can be replayed in CoppeliaSim and compared against the IK
@@ -23,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from wm.config import Config  # noqa: E402
+from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths, load_clip  # noqa: E402
 from wm.evaluate import decode, encode_clip, latents, upgrade_decoder_state  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -36,9 +40,7 @@ JOINT_NAMES = [f"{leg}_{seg}" for leg in LEGS for seg in SEG]
 
 def load_model(ckpt_path, device):
     checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    known = {f.name for f in fields(Config)}
-    cfg = Config(**{k: v for k, v in checkpoint["config"].items() if k in known})
-    cfg.train_morphs = tuple(cfg.train_morphs)
+    cfg = from_checkpoint(checkpoint["config"])
     itm = InverseTransitionModel(cfg).to(device).eval()
     md = MotionDecoder(cfg).to(device).eval()
     itm.load_state_dict(checkpoint["itm"])
@@ -78,14 +80,14 @@ def main():
         forces = clip["forces"][start:stop or None]
 
         embeddings = encode_clip(encoder, frames, args.chunk).to(device)
-        z = latents(itm, embeddings, args.chunk)
-        # the action at t is what carried the robot from frame t to t+1, so the last
-        # frame has no action to predict
-        pred = decode(md, embeddings[:-1], z, args.chunk) * std + mean
+        lag = max(1, cfg.action_lag)
+        n = len(embeddings) - lag
+        z = latents(itm, embeddings, args.chunk)[:n]
+        pred = decode(md, embeddings[:n], z, args.chunk) * std + mean
 
         out["pred"].append(pred.astype(np.float32))
-        out["gt"].append(actions[:-1])
-        out["forces"].append(forces[:-1])
+        out["gt"].append(actions[cfg.action_lag:cfg.action_lag + n])
+        out["forces"].append(forces[cfg.action_lag:cfg.action_lag + n])
         out["clip"].append(os.path.basename(path))
         out["lengths"].append(len(pred))
 

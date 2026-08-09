@@ -26,7 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from wm.config import Config  # noqa: E402
+from wm.config import Config, from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths, contact_labels, load_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
@@ -70,7 +70,8 @@ def decode(md, embeddings, z, chunk):
 
 
 @torch.no_grad()
-def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_range=(0, 0)):
+def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_range=(0, 0),
+            action_lag=1):
     """Latents, motion predictions and probe features for every transition in `paths`.
 
     Alongside the real prediction, the decoder is also run with a zeroed and a shuffled
@@ -91,9 +92,9 @@ def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_r
         actions = clip["actions"][start:stop or None]
         forces = clip["forces"][start:stop or None]
         embeddings = encode_clip(encoder, frames, chunk).to(device)
-        e_t = embeddings[:-1]
+        e_t = embeddings[:len(embeddings) - max(1, action_lag)]
 
-        z = latents(itm, embeddings, chunk)
+        z = latents(itm, embeddings, chunk)[:len(e_t)]
         permutation = torch.randperm(len(z), generator=generator).to(device)
 
         records["pred"].append(decode(md, e_t, z, chunk))
@@ -101,8 +102,11 @@ def collect(encoder, itm, md, paths, mean, std, device, chunk=8, seed=0, frame_r
         records["pred_shuffled"].append(decode(md, e_t, z[permutation], chunk))
         records["e"].append(e_t.mean(dim=1).cpu().numpy())
         records["z"].append(z.cpu().numpy())
-        records["target"].append((actions[:-1] - mean) / std)
-        records["contact"].append(contact_labels(forces[:-1]))
+        # the command that caused the transition sits action_lag steps past t; z is defined as
+        # that transition, so this is what the decoder is asked to recover
+        n = len(embeddings) - max(1, action_lag)
+        records["target"].append((actions[action_lag:action_lag + n] - mean) / std)
+        records["contact"].append(contact_labels(forces[action_lag:action_lag + n]))
         records["morph"] += [clip["morph"]] * len(z)
 
     out = {key: np.concatenate(records[key]) for key in keys}
@@ -186,7 +190,7 @@ def main():
 
     checkpoint = torch.load(args.ckpt, map_location="cpu", weights_only=False)
     known = {f.name for f in fields(Config)}
-    cfg = Config(**{k: v for k, v in checkpoint["config"].items() if k in known})
+    cfg = from_checkpoint(checkpoint["config"])
     cfg.train_morphs = tuple(cfg.train_morphs)
     device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
 
