@@ -354,8 +354,14 @@ directly.
   Stage 1's main comparison at that setting? It would make every number so far incomparable.
 - One structural fact remains regardless: our data is forward walking at one speed, and we
   measured that a single frame predicts the joint command at every horizon out to 32 frames.
-  Is it worth collecting varying speed, turning, or disturbance so the imagined futures are
-  genuinely uncertain?
+  The commands come from inverse kinematics, which is open loop -- knowing the gait phase fixes
+  everything that follows.
+- **We already have an alternative asset**: AMP reinforcement-learning policies trained on three
+  leg-scale bodies, 200 checkpoints each across training, so distinctly different gaits, speeds
+  and body heights. A closed-loop policy's command depends on the robot's velocity and foot
+  forces, which a still frame does not show, so a single frame should stop determining the
+  future. Cost: a rollout-and-render pipeline, and only three morphologies on one axis, against
+  the seven bodies on three axes we have now. **Is it worth building a dataset from these?**
 
 **2. How should cross-embodiment training pairs be defined for Stage 2?**
 

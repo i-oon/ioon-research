@@ -1,0 +1,54 @@
+{
+  "trained_on": [
+    "long",
+    "short"
+  ],
+  "held_out": "medium",
+  "motion_mse": {
+    "long": {
+      "with_z": 0.0009584571816958487,
+      "zero_z": 3.000084638595581,
+      "shuffled_z": 0.7374981045722961,
+      "predict_mean": 0.8797134757041931
+    },
+    "short": {
+      "with_z": 0.0013542098458856344,
+      "zero_z": 0.6614600419998169,
+      "shuffled_z": 1.3989840745925903,
+      "predict_mean": 1.3050090074539185
+    },
+    "medium": {
+      "with_z": 0.17884588241577148,
+      "zero_z": 1.6754387617111206,
+      "shuffled_z": 1.0712722539901733,
+      "predict_mean": 0.5132649540901184
+    }
+  },
+  "morphology_structure": {
+    "from_e": {
+      "decode": 0.9986666666666667,
+      "silhouette": 0.06396270543336868,
+      "between_class_variance": 0.16886568107587907
+    },
+    "from_z": {
+      "decode": 0.9996666666666667,
+      "silhouette": 0.04026685655117035,
+      "between_class_variance": 0.09233458165372355
+    },
+    "decode_chance": 0.3333333333333333
+  },
+  "behaviour_transfer_macro_f1": {
+    "long": {
+      "from_e": 0.3858723734815137,
+      "from_z": 0.3917864814300087
+    },
+    "short": {
+      "from_e": 0.301732848661912,
+      "from_z": 0.42453797489675416
+    },
+    "medium": {
+      "from_e": 0.434773376375442,
+      "from_z": 0.564970967195763
+    }
+  }
+}
