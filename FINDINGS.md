@@ -1378,12 +1378,14 @@ predicting this body's own mean costs **15.99 deg**, the best non-negative mixtu
 bodies costs **20.31**, copying the nearest costs **20.34**. Below 15.7 would mean the geometry is
 being read; above 18 would mean interpolation.
 
-| predictor | RMSE deg |
-|---|---|
-| predict this body's own mean | 15.99 |
-| best possible mixture of training bodies | 20.31 |
-| copy the nearest training body | 20.34 |
-| **model, `lambda_cross 0.5`, epoch 4 of 10** | **27.68** |
+Both bodies of that family were held out. Neither appears in training:
+
+| predictor | `c10f10t06` | `c06f10t06` |
+|---|---|---|
+| predict this body's own mean | 16.01 | 15.75 |
+| best possible mixture of training bodies | 19.58 | 18.43 |
+| copy the nearest training body | 20.37 | 19.12 |
+| **model, `lambda_cross 0.5`, best checkpoint** | **27.68** | **25.60** |
 
 **What it implies about the geometry is the finding.**
 
@@ -1402,16 +1404,19 @@ Two readings that must not be merged. **No interpolation can pass this test**: t
 at 20.31 loses to predicting a constant pose at 15.99. And **the model is a further 1.36x worse
 than that ceiling**, so it is not even interpolating optimally.
 
-The matched control without the cross-body term sits at the same level (held-out MSE 9.0-9.6
-against the cross run's 9.6-10.6, both flat across epochs), so this is a property of the setup
-rather than of that term. It also repeats F28's pattern: outside the range the training bodies
-span, `lambda_cross` does not help and is slightly worse.
+The matched control without the cross-body term, ten epochs, is **1.11x better**: mean 9.41
+against 10.47, best 8.98 against 9.55, and equally flat -- its best epoch is the first one. This
+repeats F28's pattern, that outside the range the training bodies span the cross term does not
+help and is slightly worse, and it establishes that the failure belongs to the split rather than
+to that term. The control's probe on `z` climbs from 0.519 to 0.762 over training, and its latent
+ablation from 1.00x to 1.93x: with nothing opposing it the latent returns to being a body code.
 
 **This is compositional generalisation, and it points at a data fix, not a loss or architecture
 fix.** Bodies in which the femur and tibia differ can be generated with `sim/make_leg_morphology.py`.
 
-Provisional: epoch 4 of 10. The held-out error has moved 10.53 to 9.55 across those epochs, so the
-final number will not approach 15.7.
+Complete, ten epochs. The held-out error never moves: 10.53 at epoch 1, 10.47 mean, best 9.55 at
+epoch 4, drifting back to 10.71 by epoch 10, while training and validation both fall steadily.
+The latent ablation averages 1.06x -- removing `z` changes nothing at all on this body.
 
 ### F35. The probe predicts which held-out bodies will transfer, before any training
 
@@ -1423,7 +1428,8 @@ three correctly.
 |---|---|---|---|---|---|
 | `c08f09t09` | **yes, exactly** | **0.030** | **2.91** | copy nearest 3.47 | **beats it** |
 | `c06f06t06` | no, 0.283 away | **0.155** | 18.82 | own mean 12.73 | loses |
-| `c10f10t06` | no, 0.283 away | **0.172** | 27.68 | own mean 15.99 | loses |
+| `c10f10t06` | no, 0.283 away | **0.172** | 27.68 | own mean 16.01 | loses |
+| `c06f10t06` | no, 0.283 away | **0.172** | 25.60 | own mean 15.75 | loses |
 
 The second column is pure geometry: the distance from the held-out body's segment scales to the
 nearest non-negative mixture of the training bodies' scales. It needs no encoder, no model and no

@@ -112,15 +112,28 @@ seen. Nothing supervises the encoder to do this. **This is the premise the proje
   against a true (0.80, 0.90, 0.90) — worse than the 4,227-parameter probe, with 5.2M trained
   parameters.
 
-![signal arrives intact and is lost at the decoder](../results/wm/figures/morphology_axis.png)
+![the encoder places the unseen body correctly, the decoder does not](../results/wm/figures/encoder_vs_decoder.png)
 
-**Left**: where each stage places the held-out body on the axis between two training bodies;
-0.30-0.36 is correct. The frame and the encoder are at 0.500, the latent at 0.335 — both correct.
-The decoder's output collapses to 0.188, **sliding the answer back toward a training body**.
+**This figure is from the earlier three-body dataset** — train on a long and a short body, hold out
+a medium one — because an axis only draws cleanly with two training bodies. It shows on three
+bodies what the table above measures on seven.
 
-**Right**: more trained capacity means lower error on the bodies it saw (0.63 deg) and higher
-error on the one it did not (11.04 deg). The 29k-parameter probe is the only predictor below the
-no-learning baseline on both.
+**Left.** Everything is placed on one line: 0 is the long training body, 1 is the short one, and
+the position is measured **in joint-command space**, so all three rows are directly comparable.
+
+| | position |
+|---|---|
+| where the held-out body's true commands sit | **0.30 - 0.36** |
+| the 29k-parameter probe on the frozen encoder | **0.34** |
+| the 5.2M-parameter trained decoder | **0.18 - 0.19** |
+
+The held-out body is not at 0.5 because leg length and joint angle are not linearly related — its
+commands genuinely sit nearer the long body's. The probe lands inside the correct band. The
+decoder lands well short of it, **pulled back toward the training body it is nearest**.
+
+**Right.** More trained capacity buys lower error on the bodies it saw and higher error on the one
+it did not. The 29k-parameter probe is the only predictor that stays below the no-learning
+baseline on both.
 
 **Reading**: the decoder learned to recognise which of the five training bodies it is looking at
 and recall that body's commands. There is no entry for a body it has not seen.
@@ -232,12 +245,14 @@ The third row is the important one. **No combination of the bodies it saw can se
 femur from the tibia**, because in all of them the two move together. The model's answer and
 the best available answer make the same mistake.
 
-| Predictor | Error, deg |
-|---|---|
-| Just predict this body's average pose | 15.99 |
-| Best possible mixture of training bodies | 20.31 |
-| Copy the nearest training body | 20.34 |
-| **The model** | **27.68** |
+Two bodies were held out, both from this family. Neither was trained on:
+
+| Predictor | `c10f10t06` | `c06f10t06` |
+|---|---|---|
+| Just predict this body's average pose | 16.01 | 15.75 |
+| Best possible mixture of training bodies | 19.58 | 18.43 |
+| Copy the nearest training body | 20.37 | 19.12 |
+| **The model** | **27.68** | **25.60** |
 
 ![per-joint reconstruction on the tibia-short body](../results/wm/action_trace_tib_cross_epoch004_c10f10t06.png)
 
@@ -247,10 +262,10 @@ other held-out body, have collapsed here.
 
 Two separate readings:
 
-- **No interpolation can pass this test.** Even the best possible mixture (20.31) loses to
-  predicting a constant pose (15.99). The threshold for "actually reads the geometry" was set
-  at 15.7 deg **before running it**.
-- **The model does worse than that ceiling**, by a further 1.36x.
+- **No interpolation can pass this test.** On both bodies the best possible mixture (19.58, 18.43)
+  loses to predicting a constant pose (16.01, 15.75). The threshold for "actually reads the
+  geometry" was set at **15.7 deg before running it**.
+- **The model does worse than that ceiling**, by 1.4x on both.
 
 **This is compositional generalisation, and the failure is precisely the shape of the gap in
 the data.** The model learned to slide along the axis its training bodies span; it did not
@@ -269,9 +284,19 @@ necessarily at fault — a readout fitted on four or five points cannot reach pa
 encoder holds. What matters practically is that the condition is checkable in advance, which is
 the next slide.
 
-Speaker note: provisional, from epoch 4 of 10; the held-out error has barely moved across
-epochs so the final number will not be close to the threshold. The matched control without the
-cross-body loss is at the same level, so this is a property of the setup, not of that one term.
+Both runs are complete, ten epochs each, and **neither improves on the held-out body at any point
+in training** while training and validation error fall steadily:
+
+| | epoch 1 | mean over 10 | best | latent ablation |
+|---|---|---|---|---|
+| with the cross-body loss | 10.53 | 10.47 | 9.55 | 1.06x |
+| matched control, no cross term | 8.98 | **9.41** | 8.98 | 1.66x |
+
+Speaker note: the control is 1.11x better here, repeating what we saw on the other out-of-range
+body — outside the span of the training bodies the cross-body term does not help and is slightly
+worse. **This is a property of the split, not of that term.** Note also the control's probe on the
+latent climbing 0.519 to 0.762 across training: with nothing stopping it, the latent goes back to
+being a code for which body this is.
 
 **And it says what to do about it**: add training bodies where the femur and tibia differ. The
 scene generator already supports it. This is a data gap, not a loss or architecture problem.
@@ -287,11 +312,12 @@ trained models actually did, it turns out to predict the outcome every time.
 |---|---|---|---|---|---|
 | `c08f09t09` | **yes, exactly** | **0.030** | **2.91** | copy nearest, 3.47 | **beats it** |
 | `c06f06t06` | no, off by 0.283 | **0.155** | 18.82 | own mean, 12.73 | loses |
-| `c10f10t06` | no, off by 0.283 | **0.172** | 27.68 | own mean, 15.99 | loses |
+| `c10f10t06` | no, off by 0.283 | **0.172** | 27.68 | own mean, 16.01 | loses |
+| `c06f10t06` | no, off by 0.283 | **0.172** | 25.60 | own mean, 15.75 | loses |
 
 The second column is pure geometry — the distance from the held-out body's segment scales to the
-nearest mixture of the training bodies' — and needs no encoder, no model and no data at all. The
-two failures are the same distance outside, and both fail.
+nearest mixture of the training bodies' — and needs no encoder, no model and no data at all. Every
+body that cannot be mixed from the training set fails, and the one that can, succeeds.
 
 - The probe separation is clean and the gap is a factor of five. Nothing else we measured orders
   the three cases correctly: the best-mixture ceiling in *command* space calls `c06f06t06`
