@@ -86,18 +86,10 @@ whose own spread is about 11.7 deg.
 
 ---
 
-## Slide 7 — The encoder already knows the body's shape
+## Slide 7 — The geometry is in the frame, and the model does not use it
 
-- Fit a linear probe from the **frozen** encoder's output to the three segment scales,
-  using five training bodies. Apply it to a body it has never seen.
-- True scale (0.80, 0.90, 0.90). Predicted **(0.85, 0.94, 0.90)** — errors of 0.05, 0.04
-  and 0.002 on a 0-to-1 scale.
-- The probe has **4,227 parameters** and nothing supervises the encoder to do this.
-- **This is the premise the whole project rests on**: vision carries body geometry in a
-  form that is directly usable, and it generalises to a new body.
-
-**Evidence** — linear probe on the frozen encoder, fitted on five bodies, applied to the
-sixth:
+**The information is there.** Fit a linear probe from the **frozen** encoder's output to the three
+segment scales, using the five training bodies, and apply it to a body it has never seen.
 
 | Body | | coxa pred / true | femur | tibia |
 |---|---|---|---|---|
@@ -107,41 +99,35 @@ sixth:
 | c06f10t06 | train | 0.633 / 0.60 | 0.998 / 1.00 | 0.601 / 0.60 |
 | c10f06t06 | train | 0.996 / 1.00 | 0.606 / 0.60 | 0.602 / 0.60 |
 | **c08f09t09** | **held out** | **0.850 / 0.80** | **0.939 / 0.90** | **0.898 / 0.90** |
-| c06f06t06 | held out, outside the range | 0.872 / 0.60 | 0.683 / 0.60 | 0.710 / 0.60 |
 
-The last row is the warning: for a body **outside** the range the probe was fitted on, the
-same readout is off by 0.11 to 0.27. **The encoder's generalisation is interpolation too.**
-Slide 12 is what that costs.
+Errors of **0.05, 0.04 and 0.002** on a 0-to-1 scale, from **4,227 parameters**, on a body never
+seen. Nothing supervises the encoder to do this. **This is the premise the project rests on.**
 
----
+**The model trained on top does not use it.**
 
-## Slide 8 — The model we trained ignores it
+- **Swap test**: give the Motion Decoder body A's frame together with body B's latent. The two
+  bodies' commands differ by 28.6 deg. It answers with **body B's** command, to within 3.5 deg —
+  it followed the latent and ignored the frame it was holding.
+- Asked what geometry it thinks the held-out body has, its answer implies **(0.98, 0.98, 0.97)**
+  against a true (0.80, 0.90, 0.90) — worse than the 4,227-parameter probe, with 5.2M trained
+  parameters.
 
-- The Motion Decoder holds `e_t` in its hand. It does not read the geometry from it.
-- **Swap test**: give the decoder body A's frame together with body B's latent. The two
-  bodies' commands differ by 28.6 deg. The decoder answers with **body B's** command, to
-  within 3.5 deg. It followed the latent and ignored the frame.
-- Asked what geometry it thinks the held-out body has, its answer implies
-  **(0.98, 0.98, 0.97)** against a true (0.80, 0.90, 0.90) — worse than the 4,227-parameter
-  probe, with 5.2M trained parameters.
 ![signal arrives intact and is lost at the decoder](../results/wm/figures/morphology_axis.png)
 
-**Left panel**: where each stage of the pipeline places the held-out body on the axis
-between two training bodies. 0.30-0.36 is correct. The input frame and the encoder are at
-0.500 (they see it correctly); the latent is at 0.335 (correct); the decoder's output
-collapses to 0.188 — **it slides the answer back toward a training body.**
+**Left**: where each stage places the held-out body on the axis between two training bodies;
+0.30-0.36 is correct. The frame and the encoder are at 0.500, the latent at 0.335 — both correct.
+The decoder's output collapses to 0.188, **sliding the answer back toward a training body**.
 
-**Right panel**: more trained capacity gives lower error on the bodies it saw (0.63 deg)
-and higher error on the one it did not (11.04 deg). The 29k-parameter ridge probe is the
-only predictor that stays below the no-learning baseline on both.
+**Right**: more trained capacity means lower error on the bodies it saw (0.63 deg) and higher
+error on the one it did not (11.04 deg). The 29k-parameter probe is the only predictor below the
+no-learning baseline on both.
 
-- Reading: the decoder learned to **recognise which of the five training bodies it is
-  looking at** and recall that body's commands. There is no entry for a body it has not
-  seen.
+**Reading**: the decoder learned to recognise which of the five training bodies it is looking at
+and recall that body's commands. There is no entry for a body it has not seen.
 
 ---
 
-## Slide 9 — Four changes to the model that did not help
+## Slide 8 — Four changes to the model that did not help
 
 | What we changed | Result |
 |---|---|
@@ -156,7 +142,7 @@ only predictor that stays below the no-learning baseline on both.
 
 ---
 
-## Slide 10 — What worked: change what the loss asks for
+## Slide 9 — What worked: change what the loss asks for
 
 **The idea.** Every body walks the same expert episodes, so at a given timestep two
 bodies share the intent and differ only in geometry. So: take body A's latent, decode it
@@ -188,7 +174,7 @@ was looking at, because it now reads that from the frame.
 
 ---
 
-## Slide 11 — The commands actually walk
+## Slide 10 — The commands actually walk
 
 Predicted commands driven open-loop through the same physics used to collect the data,
 on a body never trained on.
@@ -219,44 +205,109 @@ Video, side by side with distance travelled stamped on each frame:
 
 ---
 
-## Slide 12 — The limit: it interpolates, it does not measure
+## Slide 11 — The limit: it interpolates, it does not measure
 
-Tested on a body **outside** the range of the training bodies: every segment scaled to
-0.6. Because all three segments shrank together, this body is geometrically similar to a
-training body, and **its correct joint commands are identical to that body's, to 0.07 deg.**
-The right answer is to copy a body the model has already seen.
+The clean test. In every training body, **the femur and the tibia are scaled by the same
+amount** — it happens to be true of all four:
 
-| Predictor | Error, deg |
-|---|---|
-| Copy the correct training body (the right answer) | 0.07 |
-| Just predict this body's average pose | 12.7 |
-| Control model | 13.9 |
-| With the cross-body loss | 18.8 |
+| Training body | coxa | femur | tibia |
+|---|---|---|---|
+| c10f10t10 | 1.0 | **1.0** | **1.0** |
+| c06f10t10 | 0.6 | **1.0** | **1.0** |
+| c10f06t06 | 1.0 | **0.6** | **0.6** |
+| c08f09t09 | 0.8 | **0.9** | **0.9** |
 
-- Both models lose to the trivial baseline, and the cross-body loss is **worse**.
-- Why: the model reads **absolute segment size** off the image — and reads it accurately.
-  But joint commands depend only on the **proportions** between segments. Everything
-  shrank together, so no command change was needed, and the model applied one anyway.
-![per-joint reconstruction on the outside body](../results/wm/action_trace_m3d_cross_epoch008_c06f06t06.png)
+The held-out body is `c10f10t06`: femur 1.0, tibia 0.6. **The first time the two come
+apart.** Nothing in training ever showed them moving independently.
 
-Red is the model, black is ground truth, over three clips. The fore-aft swing joints (TC,
-left column) still track. The joints that set leg lift and extension (CF and FT) are
-inverted or flat — **12 of 18 joints have negative R-squared**, meaning worse than
-predicting a constant.
+**The model answers that they are equal.**
 
 | Implied segment scale | coxa | femur | tibia |
 |---|---|---|---|
-| Correct answer in command space | 1.00 | 1.00 | 1.00 |
-| What the model implies | 0.91 | 0.69 | 0.67 |
-| The body's true geometry | 0.60 | 0.60 | 0.60 |
+| The truth | 1.00 | **1.00** | **0.60** |
+| What the model says | 0.93 | **0.70** | **0.70** |
+| The best any mixture of training bodies could say | 0.99 | **0.62** | **0.62** |
 
-It read the shortened femur and tibia off the image, and read them **accurately**. Then it
-applied the command change that shortening those segments *relative to the others* would
-require. Nothing was relative here.
+The third row is the important one. **No combination of the bodies it saw can separate the
+femur from the tibia**, because in all of them the two move together. The model's answer and
+the best available answer make the same mistake.
 
-- No training body scales all three segments together, so that direction was never
-  demonstrated. **The model learned to interpolate between the bodies it saw, not to
-  measure geometry.**
+| Predictor | Error, deg |
+|---|---|
+| Just predict this body's average pose | 15.99 |
+| Best possible mixture of training bodies | 20.31 |
+| Copy the nearest training body | 20.34 |
+| **The model** | **27.68** |
+
+![per-joint reconstruction on the tibia-short body](../results/wm/action_trace_tib_cross_epoch004_c10f10t06.png)
+
+Red is the model, black is ground truth. **All 18 joints have negative R-squared** — every one
+is worse than predicting a constant. Even the fore-aft swing joints, which survive on every
+other held-out body, have collapsed here.
+
+Two separate readings:
+
+- **No interpolation can pass this test.** Even the best possible mixture (20.31) loses to
+  predicting a constant pose (15.99). The threshold for "actually reads the geometry" was set
+  at 15.7 deg **before running it**.
+- **The model does worse than that ceiling**, by a further 1.36x.
+
+**This is compositional generalisation, and the failure is precisely the shape of the gap in
+the data.** The model learned to slide along the axis its training bodies span; it did not
+learn to measure a leg.
+
+**The encoder's probe fails in the same direction.** Refitted on this run's four training bodies
+and applied to the held-out one, it predicts (0.88, 0.78, 0.78) against a true (1.00, 1.00, 0.60)
+— the same tied femur and tibia, error 0.172 against the 0.030 it achieves on a body inside the
+range. So the condition on slide 7's result is:
+
+> **The probe predicts a new body to within 0.03 only if that body can be made by mixing the
+> bodies it was fitted on. If it cannot, the error jumps to 0.16-0.17.**
+
+Capacity is not what is missing: an MLP on the same bodies is no better. Neither is the encoder
+necessarily at fault — a readout fitted on four or five points cannot reach past them whatever the
+encoder holds. What matters practically is that the condition is checkable in advance, which is
+the next slide.
+
+Speaker note: provisional, from epoch 4 of 10; the held-out error has barely moved across
+epochs so the final number will not be close to the threshold. The matched control without the
+cross-body loss is at the same level, so this is a property of the setup, not of that one term.
+
+**And it says what to do about it**: add training bodies where the femur and tibia differ. The
+scene generator already supports it. This is a data gap, not a loss or architecture problem.
+
+---
+
+## Slide 12 — The same measurement predicts, before training, which bodies will transfer
+
+The probe from slide 7 was built to answer a different question. Compared against what the
+trained models actually did, it turns out to predict the outcome every time.
+
+| Held-out body | **Can it be mixed from the training bodies?** | **Probe error** | Model, deg | Baseline to beat | Outcome |
+|---|---|---|---|---|---|
+| `c08f09t09` | **yes, exactly** | **0.030** | **2.91** | copy nearest, 3.47 | **beats it** |
+| `c06f06t06` | no, off by 0.283 | **0.155** | 18.82 | own mean, 12.73 | loses |
+| `c10f10t06` | no, off by 0.283 | **0.172** | 27.68 | own mean, 15.99 | loses |
+
+The second column is pure geometry — the distance from the held-out body's segment scales to the
+nearest mixture of the training bodies' — and needs no encoder, no model and no data at all. The
+two failures are the same distance outside, and both fail.
+
+- The probe separation is clean and the gap is a factor of five. Nothing else we measured orders
+  the three cases correctly: the best-mixture ceiling in *command* space calls `c06f06t06`
+  trivially easy (0.07 deg) and the model still fails on it.
+- **Cost of the probe: a few minutes on CPU, no training at all.** Cost of finding out by
+  training: about four hours of GPU per body.
+
+**This turns the limitation into a tool.** Before committing to a train/held-out split, fit the
+probe on the training bodies and read off how well it recovers the held-out one. A large error
+says the split is asking for a direction the data does not span, and the run will not answer the
+question you meant to ask.
+
+Speaker note, and this is the honest version: this was not designed as a diagnostic. It was three
+measurements made for other reasons that happened to line up. That is worth more than a planned
+result, because the measurement could not have been chosen to fit the outcome — but three points
+is not enough to set a numeric threshold, only to establish the ordering.
 
 ---
 
@@ -311,6 +362,9 @@ module is isolated, on the held-out body, 162 rollouts:
   **auxiliary regulariser**. The deployed system predicts future embeddings, rolls them eight
   steps, and picks actions by comparing predicted futures to a goal image. The action decoder is
   not the system's output. **We had made the auxiliary term the whole evaluation.**
+- **The cross-body loss costs nothing here.** The control scores 1.36x, 1.47x, 1.42x and 1.23x at
+  the same horizons — identical within noise. The term that fixed morphology reading leaves the
+  world model's own competence untouched, which makes sense: it never touches the prediction loss.
 - Honest limits: holding still is a weak baseline, 1.2-1.5x over it is real but modest, and the
   margin decays with horizon.
 
@@ -329,9 +383,10 @@ than "the world model does nothing". Those are different claims and only the fir
 | Forward model | Does not help action reconstruction, but **does roll the world forward**: 1.2-1.5x better than a frozen world out to ten steps. It was being measured against a task the method never assigns it. |
 | Physical replay | Commands walk, stay inside the body's joint range, and do not veer more than the IK reference. |
 
-**The through-line**: the information transfer needs is present in vision and readable.
-Every failure we found came from the model not being *required* to use it, and from the
-data not covering the direction being asked about. Both are now measured, not guessed.
+**The through-line**: the information transfer needs is readable from vision. Every failure we
+found came from the model not being *required* to use it, or from the data not covering the
+direction we were asking about. Both are now measured rather than guessed — and the second one we
+can now check before spending the training run.
 
 ---
 

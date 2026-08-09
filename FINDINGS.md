@@ -692,8 +692,33 @@ predicting three numbers.
 
 Two secondary readings. The coxa is the worst-predicted segment (0.161 against 0.061 and 0.056),
 matching F15: it barely changes the joint commands and it barely changes the image. And the
-unbracketed body fails here too -- 0.872 predicted against 0.60 actual -- so the encoder does not
-extrapolate either, which is F4d arriving from a third direction.
+unbracketed body is recovered far less well -- 0.872 predicted against 0.60 actual. The condition
+on the result is exact and computable in advance:
+
+> **The probe predicts a new body to within 0.03 only if that body can be made by mixing the
+> bodies it was fitted on. If it cannot, the error jumps to 0.16-0.17.**
+
+Solving for the closest reachable mixture in segment-scale space, with non-negative weights
+summing to one:
+
+| body | true scales | closest mixture of the training bodies | distance |
+|---|---|---|---|
+| **c08f09t09** | (0.80, 0.90, 0.90) | **(0.80, 0.90, 0.90)** | **0** |
+| c06f06t06 | (0.60, 0.60, 0.60) | (0.80, 0.80, 0.60) | 0.283 |
+| c10f10t06 | (1.00, 1.00, 0.60) | (1.00, 0.80, 0.80) | 0.283 |
+
+`c06f06t06` is unreachable because driving the femur to 0.6 requires all the weight on
+`c10f06t06`, which forces the coxa to 1.0; taking weight off it to lower the coxa pushes the femur
+back up. `c10f10t06` fails the mirror of this: the only body with a short tibia also has a short
+femur, so the two cannot be separated.
+
+**This does not settle whether the encoder carries the information.** A readout fitted on five
+points cannot reach past them regardless of what the encoder holds, and the observed pattern --
+all three scales pulled toward the middle of the training data -- is what any regressor does
+outside its fitting range. Capacity is not the issue: an MLP on the same five bodies is no better
+(held-out mean absolute error 0.130/0.115/0.121 against ridge's 0.161/0.061/0.056, and worse on
+the bracketed body). What the measurement supports is the conditional above, which is enough to
+use it -- see F35.
 
 **Why the decoder cannot do what the probe can.** The probe sees the mean over all 256 patch
 tokens. The decoder sees those tokens through cross-attention with `z` as the query, so it only
@@ -1330,6 +1355,96 @@ about downsampling observation frequency, it is what makes the reconstruction ta
 five to ten steps the latent would have to carry a frame 250 to 500 ms away through a 64-dimensional
 bottleneck, which is a much harder thing to copy than a nearly identical neighbouring frame. That
 is a hypothesis, not a measurement; the test is a probe from `z` to the future frame's content.
+
+### F34. The clean extrapolation test: the model reproduces the gap in its own training data
+
+`c06f06t06` was a degenerate extrapolation test (F28): its correct commands are a training body's,
+to 0.07 deg. The properly designed one holds out the **tibia-short family**. Training on
+`c10f10t10 c06f10t10 c10f06t06 c08f09t09`, held out `c10f10t06`.
+
+**In every training body the femur and the tibia carry the same scale:**
+
+| training body | coxa | femur | tibia |
+|---|---|---|---|
+| c10f10t10 | 1.0 | **1.0** | **1.0** |
+| c06f10t10 | 0.6 | **1.0** | **1.0** |
+| c10f06t06 | 1.0 | **0.6** | **0.6** |
+| c08f09t09 | 0.8 | **0.9** | **0.9** |
+
+The held-out body is the first in which they come apart: femur 1.0, tibia 0.6.
+
+The thresholds were fixed before the run, from baselines computed directly on the commands:
+predicting this body's own mean costs **15.99 deg**, the best non-negative mixture of the training
+bodies costs **20.31**, copying the nearest costs **20.34**. Below 15.7 would mean the geometry is
+being read; above 18 would mean interpolation.
+
+| predictor | RMSE deg |
+|---|---|
+| predict this body's own mean | 15.99 |
+| best possible mixture of training bodies | 20.31 |
+| copy the nearest training body | 20.34 |
+| **model, `lambda_cross 0.5`, epoch 4 of 10** | **27.68** |
+
+**What it implies about the geometry is the finding.**
+
+| implied segment scale | coxa | femur | tibia |
+|---|---|---|---|
+| the truth | 1.00 | **1.00** | **0.60** |
+| what the model says | 0.93 | **0.70** | **0.70** |
+| the best any mixture could say | 0.99 | **0.62** | **0.62** |
+
+The model ties the femur to the tibia -- and so does the best available mixture, because no
+combination of bodies in which the two always move together can separate them. **The model's
+error has the same shape as the gap in the data.** All 18 joints score negative R-squared; even
+the fore-aft swing joints, which survive on every other held-out body, collapse here.
+
+Two readings that must not be merged. **No interpolation can pass this test**: the best mixture
+at 20.31 loses to predicting a constant pose at 15.99. And **the model is a further 1.36x worse
+than that ceiling**, so it is not even interpolating optimally.
+
+The matched control without the cross-body term sits at the same level (held-out MSE 9.0-9.6
+against the cross run's 9.6-10.6, both flat across epochs), so this is a property of the setup
+rather than of that term. It also repeats F28's pattern: outside the range the training bodies
+span, `lambda_cross` does not help and is slightly worse.
+
+**This is compositional generalisation, and it points at a data fix, not a loss or architecture
+fix.** Bodies in which the femur and tibia differ can be generated with `sim/make_leg_morphology.py`.
+
+Provisional: epoch 4 of 10. The held-out error has moved 10.53 to 9.55 across those epochs, so the
+final number will not approach 15.7.
+
+### F35. The probe predicts which held-out bodies will transfer, before any training
+
+The segment-scale probe (F20) was built to ask whether the frozen encoder carries morphology.
+Set against what the trained models then did on three different held-out bodies, it ranks all
+three correctly.
+
+| held out | reachable by mixing the training bodies | probe error | trained model, deg | baseline to beat | outcome |
+|---|---|---|---|---|---|
+| `c08f09t09` | **yes, exactly** | **0.030** | **2.91** | copy nearest 3.47 | **beats it** |
+| `c06f06t06` | no, 0.283 away | **0.155** | 18.82 | own mean 12.73 | loses |
+| `c10f10t06` | no, 0.283 away | **0.172** | 27.68 | own mean 15.99 | loses |
+
+The second column is pure geometry: the distance from the held-out body's segment scales to the
+nearest non-negative mixture of the training bodies' scales. It needs no encoder, no model and no
+run. Both failures sit the same distance outside, and both fail.
+
+Each probe is fitted only on that run's own training bodies. The separation is a factor of five,
+and **nothing else measured here orders the three correctly**: the best-mixture ceiling calls
+`c06f06t06` trivially easy at 0.07 deg, and the model fails on it anyway.
+
+The probe costs minutes on CPU with no training. Finding out by training costs roughly four GPU
+hours per body. **Fitting it before choosing a train/held-out split says whether the split asks
+for a direction the data spans**, and therefore whether the run will answer the intended question
+at all.
+
+Stated honestly: this was not designed as a diagnostic. Three measurements made for other reasons
+happened to line up, which is stronger evidence than a planned result -- the measurement could not
+have been selected to fit the outcome -- but three points establish an ordering, not a threshold.
+
+It also does not need the open question in F20 resolved. Whether a large probe error means the
+encoder lacks the information or means five fitting bodies cannot reach that far, the error
+predicts the outcome either way.
 
 ## The setup this points to
 
