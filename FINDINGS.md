@@ -1168,6 +1168,52 @@ ablation rises from 21x to 24-62x while the frame ablation falls from 10.7x to 2
 This does not carry over to `action_lag 1` and has to be re-asked there, because `z` now has work
 to do and `L_recon` may shape it differently.
 
+### F31. One frame determines the command at every horizon, so there is no future to predict
+
+Ridge regression from a single frame's pooled embedding to the joint command at various offsets.
+Six clips of `c10f10t10`, fitted on four, tested on two. The commands' own spread is 11.33 deg.
+
+| target | RMSE deg |
+|---|---|
+| `a_t` | 4.61 |
+| `a_{t+1}` | 4.89 |
+| `a_{t+2}` | 5.17 |
+| `a_{t+4}` | 5.33 |
+| `a_{t+8}` | 5.23 |
+| `a_{t+16}` | 5.03 |
+| **`a_{t+32}`** | **4.45** |
+
+**Predicting 32 frames ahead is as accurate as predicting the current command.** The gait is
+periodic with a period near 22 frames, so a distant offset wraps back to a similar phase, and one
+frame fixes the phase. The error never rises above 5.33 against a signal of 11.33 at any horizon
+tested.
+
+**No choice of target makes the transition necessary**, because the data contains no
+unpredictable future. This bounds F29: moving the target one step forward was the causally correct
+thing to do, and it changes nothing, because `a_{t+1}` is as visible from `e_t` as `a_t` was.
+
+Confirmed directly. `lag1_ctrl` against `m3d_bracketed`, identical but for `action_lag`:
+
+| epoch | | held-out | z-gap |
+|---|---|---|---|
+| 1 | `action_lag 0` | 0.0925 | 34.0x |
+| 1 | `action_lag 1` | 0.1429 | 13.0x |
+| 2 | `action_lag 0` | 0.1219 | 24.9x |
+| 2 | **`action_lag 1`** | **0.1215** | **11.3x** |
+
+By epoch 2 the held-out error is the same to three decimals and the latent is needed *less*, not
+more -- the opposite of what the correction was supposed to produce, and exactly what a
+deterministic gait predicts.
+
+**The constraint is the dataset, not the objective, the architecture or the target.** Every insect
+clip is forward walking at one speed. A forward model earns its place only when the future is not
+determined by the present: varying speed, turning, terrain, or disturbance. The B1 data already
+has this -- two policies at 2.0 and 1.7 Hz across seven speeds -- and the insect data does not.
+
+The consequence for the write-up is that this pipeline is a **latent action model**, in the sense
+of LAPA and UniSkill, not a world model. The forward model is inert here and F23, F25 and F30 each
+measured a different face of the same fact.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);

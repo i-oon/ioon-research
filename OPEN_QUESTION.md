@@ -271,7 +271,7 @@ number of feet -- that is Q0's claim B and can only be settled by running it.
 `L_recon`'s target is 4.39x more augmentation noise than signal (F25). That is a separate defect
 and does not affect the answer above.
 
-## Q9. Does the corrected target make the latent do its job? (open, the live question)
+## Q9. Does the corrected target make the latent do its job? (ANSWERED: no, and the reason is the data)
 
 The task never required the latent (F29): the command asked for was already visible in `e_t`,
 which the decoder receives, while `e_{t+1}` reaches it only through `z`. `action_lag 1` asks for
@@ -286,16 +286,30 @@ What this predicts, and what would falsify it:
 | frame ablation (x-gap) | falls; one frame no longer answers | unchanged |
 | `z_dynamics.py` duplicate-frame test | collapses toward the zeroed-latent number | stays at 1.1-1.2x |
 
-The second row is the one to watch. Consecutive commands differ by **3.44 deg**, so if held-out
-error does not move, the model has found a way to answer without the transition and we have not
-finished.
+**Answered by epoch 2: held-out error did not move** (0.1215 against 0.1219) and the latent is
+needed *less* (z-gap 11.3x against 24.9x). F31 says why. One frame predicts the command at
+**every** horizon tested -- `a_{t+32}` at 4.45 deg against `a_t` at 4.61, on a signal of 11.33 --
+because the gait is periodic and one frame fixes the phase. `a_{t+1}` is as visible from `e_t` as
+`a_t` was, so moving the target could not have helped.
 
-**The follow-on question, whichever way that goes**: does `z` become a compressed copy of
+The correction was still right to make: it is what the architecture means, and it removes an
+error from the pipeline. It simply is not sufficient. **The constraint is the dataset.** Every
+insect clip is forward walking at one speed, so there is no future to predict, and no objective
+or architecture can create one.
+
+**Superseded**: the question of whether `z` becomes a compressed copy of
 `e_{t+1}` rather than a latent *action*? Cross-augmentation blocks a literal copy, not a copy of
 the visible pose. The test is a probe from `z` to the pose in frame `t+1`, against a probe from
 `z` to the command difference `a_{t+1} - a_t`. A latent action carries the second, not the first.
 If it turns out to be a copy, the remaining lever is a narrower bottleneck: 18 joint angles need
-roughly 18 dimensions, and `z_dim` is 64.
+roughly 18 dimensions, and `z_dim` is 64. Worth measuring, but no longer decisive: with a
+deterministic gait, a latent that copies and a latent that carries the action are hard to tell
+apart, because the two are the same thing here.
+
+**What would make a forward model necessary**, none of it available in the current insect data:
+varying walking speed, turning, terrain, or an external disturbance. The B1 data already has the
+first -- two policies at 2.0 and 1.7 Hz across seven speeds. Adding it on the insect side is a
+data-collection round, not a code change, and that cost is the decision to weigh.
 
 **What this does not disturb**: F20 (the frozen encoder carries morphology linearly, recovering a
 held-out body's segment scales to 0.050/0.039/0.002) and F28 (what the decoder learns is
