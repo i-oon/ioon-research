@@ -91,6 +91,47 @@ def segment_lengths(sim, suffix):
     return spans
 
 
+# Measured from the base scene: the femur and tibia lengths, and the closest the collector's
+# foot targets ever come to the shoulder joint. The closest approach was minimised over all 30
+# expert episodes the dataset uses, at the collector's default --scale 0.5; the spread across
+# episodes is 92.5 to 93.7 mm, so it is a property of the gait rather than of one episode.
+BASE_FEMUR_M = 0.3429
+BASE_TIBIA_M = 0.4139
+CLOSEST_TARGET_M = 0.0925
+REFERENCE_SCALE = 0.5
+
+
+def check_reachable(factors, target_scale, force):
+    """Refuse to generate a body whose foot cannot reach the trajectory it will be asked to walk.
+
+    A two-link chain reaches only distances between |femur - tibia| and femur + tibia -- the
+    triangle inequality, since those two links and the shoulder-to-foot distance are the three
+    sides. Below |femur - tibia| the knee would have to fold past straight, so the IK gives up and
+    settles wherever it can: bodies 40 mm past the limit lost a quarter of their targets and
+    returned residuals of 350 to 810 mm, against under 20 mm for every body inside it.
+
+    The limit is not a safety margin, it is a step: the closest target sits at 92.5 mm, so a body
+    at 94.6 mm misses 0.3 percent of them and still walks, while one at 132.5 mm misses 24 percent
+    and does not.
+    """
+    femur = BASE_FEMUR_M * factors["femur"]
+    tibia = BASE_TIBIA_M * factors["tibia"]
+    dead_zone = abs(femur - tibia)
+    # the targets scale with the collector's --scale, so the limit does too
+    limit = CLOSEST_TARGET_M * (target_scale / REFERENCE_SCALE)
+    margin = limit - dead_zone
+    print(f"reach check: femur {femur*1000:.1f} mm, tibia {tibia*1000:.1f} mm, "
+          f"dead zone {dead_zone*1000:.1f} mm against a closest target of {limit*1000:.1f} mm "
+          f"-> {margin*1000:+.1f} mm")
+    if margin < 0:
+        message = (f"this body cannot reach {abs(margin)*1000:.1f} mm inside its own dead zone; "
+                   f"the IK will not solve and the body will not walk. Bring the femur and tibia "
+                   f"scales closer together, or pass --force.")
+        if not force:
+            raise SystemExit("refusing to generate: " + message)
+        print("WARNING, --force given: " + message)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--factor", type=float,
@@ -100,6 +141,10 @@ def main():
     ap.add_argument("--tibia", type=float, help="scale the tibia only")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--out", type=str, required=True)
+    ap.add_argument("--target_scale", type=float, default=0.5,
+                    help="the collector's --scale; the reach check depends on it")
+    ap.add_argument("--force", action="store_true",
+                    help="generate even if the body cannot reach the collector's foot targets")
     args = ap.parse_args()
 
     if args.factor is None and args.coxa is args.femur is args.tibia is None:
@@ -108,6 +153,7 @@ def main():
     factors = {"coxa": args.coxa if args.coxa is not None else base,
                "femur": args.femur if args.femur is not None else base,
                "tibia": args.tibia if args.tibia is not None else base}
+    check_reachable(factors, args.target_scale, args.force)
 
     sim = RemoteAPIClient("localhost", port=args.port).require("sim")
     sim.loadScene(BASE_SCENE)

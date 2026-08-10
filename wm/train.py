@@ -236,7 +236,8 @@ def main():
 
     if cross_embodiment:
         train_set, val_set, heads = build_cross_embodiment(cfg, ROOT)
-        train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed)
+        train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed,
+                                       balance=cfg.balance_embodiments)
         val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, False, cfg.seed)
         train_loader = DataLoader(train_set, batch_sampler=train_sampler, num_workers=cfg.num_workers)
         val_loader = DataLoader(val_set, batch_sampler=val_sampler, num_workers=cfg.num_workers)

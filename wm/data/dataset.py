@@ -264,27 +264,51 @@ class MultiEmbodimentPairs(Dataset):
 
 
 class EmbodimentBatchSampler(Sampler):
-    """One embodiment per batch, so action tensors stay rectangular. Batches are drawn in
-    proportion to each embodiment's size, then shuffled together."""
+    """One embodiment per batch, so action tensors stay rectangular.
 
-    def __init__(self, dataset, batch_size, shuffle=True, seed=0):
+    `balance` decides how much of each epoch each embodiment gets. Proportional draws batches in
+    proportion to dataset size, which on the insect-plus-B1 pairing gives the quadruped 1,062 of
+    16,817 pairs -- 6.3 percent of the gradient steps. A shared trunk trained that way is a
+    hexapod model with a quadruped footnote, and any claim about a *shared* latent space would be
+    confounded by the imbalance rather than measuring it.
+
+    Balanced repeats the smaller embodiment until every embodiment contributes the same number of
+    batches. The cost is that each B1 transition is seen roughly fifteen times per epoch, so B1
+    overfitting has to be watched rather than assumed away.
+    """
+
+    def __init__(self, dataset, batch_size, shuffle=True, seed=0, balance=True):
         self.groups = dataset.embodiment_indices()
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.seed = seed
+        self.balance = balance
         self.epoch = 0
 
     def set_epoch(self, epoch):
         self.epoch = epoch
 
+    def _batches_per_group(self):
+        counts = {name: -(-len(v) // self.batch_size) for name, v in self.groups.items()}
+        if self.balance:
+            most = max(counts.values())
+            return {name: most for name in counts}
+        return counts
+
     def __len__(self):
-        return sum(-(-len(v) // self.batch_size) for v in self.groups.values())
+        return sum(self._batches_per_group().values())
 
     def __iter__(self):
         rng = np.random.default_rng((self.seed, self.epoch))
+        wanted = self._batches_per_group()
         batches = []
-        for indices in self.groups.values():
-            order = rng.permutation(indices) if self.shuffle else np.array(indices)
+        for name, indices in self.groups.items():
+            need = wanted[name] * self.batch_size
+            order = []
+            while len(order) < need:
+                pool = rng.permutation(indices) if self.shuffle else np.array(indices)
+                order.extend(pool.tolist())
+            order = np.array(order[:need])
             batches += [order[i:i + self.batch_size].tolist()
                         for i in range(0, len(order), self.batch_size)]
         if self.shuffle:

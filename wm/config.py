@@ -60,6 +60,12 @@ class Config:
     sources: tuple = ()
     val_fraction: float = 0.1
 
+    # Give every embodiment the same number of batches per epoch by repeating the smaller ones.
+    # Proportional sampling hands the insect-plus-B1 pairing 6.3% of its gradient steps to the
+    # quadruped, which would confound any claim about a shared latent space. False restores
+    # proportional draws. See EmbodimentBatchSampler.
+    balance_embodiments: bool = True
+
     token_dim: int = 1408
     grid: int = 16
     action_dim: int = 18
