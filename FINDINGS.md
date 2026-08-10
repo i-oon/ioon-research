@@ -1144,10 +1144,17 @@ measures whether it adds anything. Held-out body `c08f09t09`, 195 transitions:
 | the latent zeroed entirely | 19.24 (5.39x) | 6.04 (2.08x) |
 
 **Deleting the transition costs 11 to 19 percent.** The commands move by 2.3 to 3.2 percent of
-their own scale. And running the transition *backwards* costs more (1.44x, identically in both
-runs) than having no transition at all -- if `z` encoded direction of motion, reversing it should
-be worse than removing it, not the other way round. `z` is a **pose** code: where in the gait
-cycle the two frames sit, which one frame already shows.
+their own scale. Feeding a *wrong* transition costs more than feeding none -- `e_{t-1}` at 1.44x
+and a random other frame at 2.10-2.70x, against the duplicate's 1.11-1.19x -- so the latent is
+genuinely sensitive to the second frame. What the duplicate condition establishes is not that the
+latent ignores the transition, but that **having the transition is worth only 11 to 19 percent**:
+most of what the decoder needs is already in `e_t`.
+
+**Re-measured on the corrected target** (`lag1_ctrl` ep 12 and `lag1_cross` ep 5), the duplicate
+frame costs 1.36x and 1.23x against the original 1.11x and 1.19x. The correction roughly triples
+the transition's contribution in the control and raises it slightly with the cross term, so it did
+what it was designed to do; it simply was not what transfer was short of. `lag1_cross` also gives
+the lowest reconstruction of any checkpoint at 2.82 deg.
 
 **The cause is in the collector, not the model.** `sim/collect_ik.py` applies `cmds[t]`, steps the
 simulator, and only then captures `frames[t]`. So `frames[t]` is the *result* of `actions[t]`, and
@@ -1452,7 +1459,7 @@ It also does not need the open question in F20 resolved. Whether a large probe e
 encoder lacks the information or means five fitting bodies cannot reach that far, the error
 predicts the outcome either way.
 
-### F36. The latent's purification does not extend to bodies the model has not seen
+### F36. The purification does not survive a held-out pair that includes an out-of-range body
 
 F26 measured the latent's variance split on the five **training** bodies, because a balanced
 body-by-phase grid needs every body present at every timestep of the shared expert episode. The
@@ -1460,17 +1467,44 @@ two held-out bodies also walk those episodes, so the same grid can be built from
 rows is not five, so all ten **pairs** of training bodies give a like-for-like reference at
 matching group size (`scripts/z_body_share.py`).
 
-| body's share of the latent's variance | control ep 6 | cross ep 8 |
-|---|---|---|
-| all 5 training bodies | 11.3% | **1.2%** |
-| pairs of training bodies | 7.2%, range 0.0-10.8 | **0.8%, range 0.0-1.3** |
-| **the 2 held-out bodies** | 6.8% | **10.6%** |
+| body's share of the latent's variance | training bodies | training pairs | **held out** |
+|---|---|---|---|
+| old target, no cross (`m3d_bracketed` ep 6) | 11.3% | 7.2%, range 0.0-10.8 | 6.8% |
+| corrected target, no cross (`lag1_ctrl` ep 12) | 10.4% | 6.7%, range 0.0-9.2 | 11.7% |
+| old target, with cross (`m3d_cross` ep 8) | 1.2% | 0.8%, range 0.0-1.3 | 10.6% |
+| **corrected target, with cross** (`lag1_cross` ep 5) | **0.8%** | **0.5%, range 0.0-0.8** | 8.6% |
 
-**Under the cross-body loss every training pair lies between 0.0 and 1.3 percent and the held-out
-pair is 10.6 -- eight times above the top of that range.** The group-size explanation is ruled
-out by the pairwise reference, and "those two bodies are unusually different from each other" is
-ruled out by the control, which sits at 6.8 percent on the *same* two bodies, comfortably inside
-its own training-pair range.
+The full two-by-two separates the two changes. **The corrected target alone moves the body share
+by less than a percentage point** (11.3 to 10.4); **the cross term moves it by an order of
+magnitude** (11.3 to 1.2); and the two compound, reaching 0.8 percent with the tightest spread
+across the ten pairs. That ordering matches every other measure -- `lag1_cross` is the best run
+by held-out error (0.0698) and produces the lowest reconstruction of any checkpoint (2.82 deg).
+
+**The held-out column resists all four configurations**: 6.8, 11.7, 10.6, 8.6, with the plain
+control the best of them.
+
+**Scope, and it is narrower than it first appears.** The decomposition needs at least two bodies --
+with one there is no between-body variance to decompose -- so the held-out column is computed on
+`c08f09t09` **and** `c06f06t06` together. Those two are not the same kind of body: `c08f09t09` is
+reachable exactly by mixing the training bodies, `c06f06t06` is 0.283 away from anything reachable.
+**The 8.6 percent could be driven entirely by the out-of-range one, and this measurement cannot
+separate them.**
+
+The defensible claim is therefore: *the purification does not survive a held-out pair one of whose
+members lies outside the training range.* That is consistent with F28, F34 and F35 rather than
+being an independent limit on the mechanism, and it is a good deal less surprising.
+
+Separating the two needs **two held-out bodies that are both inside the hull**, and `c08f09t09` is
+the only in-hull body in the set -- every other body is a corner of the 0.6/1.0 grid, so any pair
+necessarily includes an outside one. Generating intermediate bodies would supply the missing case:
+if the body share stays near 1 percent on two in-hull held-out bodies, this finding folds into the
+coverage story; if it jumps anyway, it is a genuine separate limit.
+
+**Under the best configuration every training pair lies between 0.0 and 0.8 percent and the
+held-out pair is 8.6 -- an order of magnitude above the top of that range.** The group-size
+explanation is ruled out by the pairwise column, and "those two bodies are unusually different
+from each other" is ruled out by the controls, which sit at 6.8 and 11.7 percent on the *same*
+two bodies, inside their own training-pair ranges.
 
 The mechanism follows from what the term actually constrains. `lambda_cross` requires that body
 A's latent decoded against body B's frame yields B's command, **for the pairs present in
@@ -1491,8 +1525,8 @@ learned holds within the span of its training bodies and does not extend past it
 Consequence for Stage 2: transferring to an unseen embodiment requires body-independence on a body
 never trained on, and this is direct evidence that the mechanism does not provide it there.
 
-Caveat: one contrast between two bodies. The pairwise control makes the comparison sound, but a
-third held-out body would make it solid.
+Caveat: one contrast between two bodies. The pairwise column and the four-configuration sweep make
+the comparison sound, but a third held-out body would make it solid.
 
 ## The setup this points to
 

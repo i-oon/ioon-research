@@ -632,9 +632,10 @@ volume rather than a line and a held-out body can be a combination no training b
 > | `e_{t-1}`, the transition backwards | 5.13 (1.44x) | 4.18 (1.44x) |
 > | the latent zeroed | 19.24 (5.39x) | 6.04 (2.08x) |
 >
-> Deleting the transition costs 11-19 percent, and running it **backwards** costs more than
-> having none at all -- the opposite of what a latent encoding direction of motion would do.
-> `z` was a pose code.
+> Deleting the transition costs 11-19 percent. Feeding a *wrong* transition costs more than
+> feeding none (1.44x for `e_{t-1}`, 2.10-2.70x for a random other frame), so the latent is
+> sensitive to the second frame -- having it is simply worth only 11 to 19 percent, because most
+> of what the decoder needs is already in `e_t`.
 >
 > **One fact explains every earlier finding.** The FTM not needing `z` (F23), the decoder doing a
 > lookup (F19), `z` being 83-89 percent gait phase (F26), the pose improving while the distance

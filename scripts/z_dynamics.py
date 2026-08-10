@@ -9,6 +9,9 @@ The test replaces e_{t+1} with something that carries no information about the r
 frame and measures how much the reconstructed command moves:
 
   real        z = ITM(e_t, e_{t+1})           the model as trained
+
+The command compared against follows the checkpoint's own cfg.action_lag, so a run trained on the
+corrected target is scored on the corrected target.
   duplicate   z = ITM(e_t, e_t)               no transition at all
   shuffled    z = ITM(e_t, e_{t+k})           a real frame from the wrong time
   reversed    z = ITM(e_t, e_{t-1})           the transition backwards
@@ -75,7 +78,10 @@ def main():
         frames = clip["frames"][cfg.frame_start:cfg.frame_stop or None]
         actions = clip["actions"][cfg.frame_start:cfg.frame_stop or None]
         e = encode_clip(encoder, frames, args.chunk).to(device)
-        n = len(e) - 1
+        # the command asked for sits action_lag steps past t, so a transition is usable only
+        # while both the next frame and that command exist
+        lag = cfg.action_lag
+        n = min(len(e) - 1, len(actions) - lag)
         e_t = e[:n]
 
         # e_{t-1}, with the first transition left pointing at itself since it has no past
@@ -94,7 +100,7 @@ def main():
             collected[name].append(decode(md, e_t, z, args.chunk) * std + mean)
         z0 = torch.zeros_like(latents_from(itm, e_t[:1], e_t[:1], 1)).repeat(n, 1)
         collected["zero"].append(decode(md, e_t, z0, args.chunk) * std + mean)
-        truth.append(actions[:n])
+        truth.append(actions[lag:lag + n])
 
     gt = np.concatenate(truth)
     real = np.concatenate(collected["real"])

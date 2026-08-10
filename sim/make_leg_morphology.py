@@ -134,7 +134,11 @@ def main():
     if worst > 0.01:
         print("WARNING: a segment did not scale as asked; the chain mapping may be wrong")
 
-    sim.saveScene(args.out)
+    # CoppeliaSim resolves a relative path against its own working directory, not ours, so a
+    # scene asked for as sim/env/x.ttt silently lands under the simulator's install tree
+    out = os.path.abspath(args.out)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    sim.saveScene(out)
     print(f"saved: {args.out}")
 
 

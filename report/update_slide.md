@@ -257,16 +257,30 @@ every body present at every timestep of the shared episode. Repeating it on the 
 bodies, with all ten *pairs* of training bodies as a like-for-like reference at the same group
 size:
 
-| body's share of the latent | control | with the cross-body loss |
-|---|---|---|
-| all 5 training bodies | 11.3% | **1.2%** |
-| pairs of training bodies | 7.2% (range 0.0-10.8) | **0.8% (range 0.0-1.3)** |
-| **the 2 held-out bodies** | 6.8% | **10.6%** |
+| body's share of the latent's variance | training bodies | training pairs | **held-out bodies** |
+|---|---|---|---|
+| old target, no cross term | 11.3% | 7.2% | 6.8% |
+| corrected target, no cross term | 10.4% | 6.7% | 11.7% |
+| old target, with cross term | 1.2% | 0.8% | 10.6% |
+| **corrected target, with cross term** | **0.8%** | **0.5%** | 8.6% |
 
-**The purification does not extend to bodies it has not seen.** Every training pair under the
-cross-body loss falls between 0.0 and 1.3 percent; the held-out pair is 10.6, eight times above
-that. The control on those *same two bodies* sits at 6.8, inside its own training-pair range, so
-this is not those two bodies being unusual — it is specific to the model that was purified.
+Reading down the first column: the corrected target alone moves it by less than a percentage
+point, 11.3 to 10.4. **The cross term moves it by an order of magnitude**, and the two together
+reach 0.8 percent — the best cell, with the tightest spread across the ten pairs (0.0-0.8 against
+0.0-1.3). That matches the best configuration also being the best run overall and producing the
+lowest reconstruction error of any checkpoint, 2.82 deg.
+
+**The last column resists all four.** 6.8, 11.7, 10.6, 8.6 — and the best configuration is not
+even the best cell there. Every training pair under the cross term sits between 0.0 and 0.8
+percent while the held-out pair is 8.6, an order of magnitude above.
+
+**One caveat, stated because it matters.** The decomposition needs at least two bodies, and the
+only two held out here are `c08f09t09`, which is reachable by mixing the training bodies, and
+`c06f06t06`, which is not. **The 8.6 percent could be coming entirely from the out-of-range one**,
+and this measurement cannot separate them. So the claim is not "the latent stays dirty on unseen
+bodies" but the narrower "on a pair that includes an out-of-range body" — which is the same
+coverage boundary as slide 8, not a new one. Separating them needs two held-out bodies both inside
+the range, which the current body set cannot supply.
 
 The mechanism is straightforward: the cross-body term constrains "decode A's latent against B's
 frame" only for the pairs that exist in training. For an unseen body the latent was never subject
@@ -412,11 +426,25 @@ The data collector applies a command, steps the simulator, and only then capture
 frame. So the frame is the *result* of that command, and the command was being asked for
 from a frame that already shows it. The latent never had to carry anything.
 
-- Replace the second frame given to the ITM with a copy of the first, removing the
-  transition entirely: costs only **11-19%**.
-- Running the transition **backwards** costs *more* than deleting it — the opposite of
-  what a latent encoding direction of motion would do.
-- Corrected, and the corrected target is now the default.
+Substituting the second frame the ITM is given, on the held-out body, 195 transitions:
+
+| what the ITM is given as `e_{t+1}` | old target | corrected target |
+|---|---|---|
+| the real next frame | 3.57 / 2.91 deg | 3.53 / **2.82 deg** |
+| **a copy of `e_t`, no transition at all** | **1.11x / 1.19x** | **1.36x / 1.23x** |
+| `e_{t-1}`, a wrong transition | 1.44x / 1.44x | 1.65x / 1.44x |
+| a frame from a random other time | 2.70x / 2.10x | 2.96x / 1.91x |
+| the latent zeroed entirely | 5.39x / 2.08x | 3.97x / 2.61x |
+
+Each cell is control / with-the-cross-term. Read the rows in pairs first: **wrong transitions hurt
+more than missing ones**, and nonsense hurts most, so the latent is genuinely sensitive to what
+the second frame contains.
+
+Then the second row, which carries the conclusion. On the old target, **removing the transition
+entirely cost 11 to 19 percent** — almost everything the decoder needed was already in `e_t`,
+which is exactly what the collector's ordering guaranteed. The correction raises that to 23 to 36
+percent, so it did what it was designed to do. It did not improve transfer, because the transition
+was never what transfer was short of.
 
 **Two. One frame nearly determines the command at any horizon.**
 
