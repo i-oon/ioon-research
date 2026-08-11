@@ -229,7 +229,9 @@ def build_models(cfg, device, heads=None, n_bodies=0):
 def build_cross_embodiment(cfg, root):
     """Datasets, sampler and decoder heads for training across embodiments."""
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
-    train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root)
+    train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
+                                                  heldout_bodies=tuple(cfg.heldout_bodies),
+                                                  clips_per_body=tuple(cfg.clips_per_body))
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,

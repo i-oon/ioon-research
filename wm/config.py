@@ -30,6 +30,8 @@ LEGACY_DEFAULTS = {
     "lambda_adv": 0.0,
     "ftm_embodiment_channel": False,
     "center_embeddings": False,
+    "heldout_bodies": (),
+    "clips_per_body": (),
 }
 
 
@@ -61,6 +63,28 @@ class Config:
     # from one embodiment at a time and routed to that embodiment's decoder head.
     sources: tuple = ()
     val_fraction: float = 0.1
+
+    # Bodies withheld from cross-embodiment training, so Stage 2 has a generalisation test at all.
+    # Two embodiments cannot hold each other out -- removing one leaves one -- and `sources` takes
+    # a directory and globs it, so without this every body is trained on and the only things
+    # measurable are the latent's composition and a validation split of 67 B1 transitions.
+    # Names must match the clip prefix, e.g. c08f09t09. Score them afterwards with
+    # scripts/score_body.py, which needs no retraining.
+    heldout_bodies: tuple = ()
+
+    # Cap clips per body, as "embodiment=N". Without it the hexapod brings 6 bodies x 27 clips
+    # = 10,530 transitions against the B1's 1,003, and `balance_embodiments` papers over the
+    # 10:1 gap by repeating the B1 data ten times an epoch -- about 126 passes over the same
+    # 1,003 pairs across 12 epochs, on a validation split too small to detect the memorisation
+    # that invites. Balancing the *sampler* is not balancing the *data*.
+    #
+    # F13 says the hexapod side loses little: sixteen times more episodes of the same bodies
+    # changed nothing, because what matters is how many bodies there are, not how many episodes
+    # each walks. So the cap costs episodes, which are flat, and keeps bodies, which are not.
+    #
+    # hexapod=4 gives 6 bodies x 3 training clips x 65 = 1,170 transitions against the B1's
+    # 1,003, a ratio of 1.17:1.
+    clips_per_body: tuple = ()
 
     # Give every embodiment the same number of batches per epoch by repeating the smaller ones.
     # Proportional sampling hands the insect-plus-B1 pairing 6.3% of its gradient steps to the

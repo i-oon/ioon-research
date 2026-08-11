@@ -74,6 +74,37 @@ def leg_length(sim, leg="FL"):
     return float(sum(np.linalg.norm(b - a) for a, b in zip(xyz[:-1], xyz[1:])))
 
 
+# forward > 0.30 m and lateral < 0.20 m per episode; every sound body in ik_walk_8body clears
+# both, the two that collapse fail forward, the two that veer fail lateral
+WALK_FORWARD_M = 0.30
+WALK_LATERAL_M = 0.20
+
+
+def walk_check(head):
+    """Signed forward travel and lateral drift, reported separately.
+
+    Never collapse these into one distance. The earlier check used
+    `norm(head[-1,:2] - head[0,:2])`, which is unsigned, and a body that tipped over and rotated
+    on the spot read a healthy 0.46 m -- two such bodies reached the dataset and trained into
+    every Stage 2 run before anyone looked at the frames (FINDINGS.md F42). A body can also
+    travel a long way forward while crabbing just as far sideways, which one number hides.
+
+    A pass here still is not proof. No statistic distinguishes "walks oddly" from "fell over and
+    is now spinning"; watch the clip.
+    """
+    if not len(head):
+        return 0.0, 0.0, "EMPTY"
+    forward = float(head[-1, 0] - head[0, 0])
+    lateral = float(abs(head[-1, 1] - head[0, 1]))
+    if forward < WALK_FORWARD_M:
+        verdict = "FAILS forward" + (" (BACKWARDS)" if forward < 0 else "")
+    elif lateral > WALK_LATERAL_M:
+        verdict = "FAILS lateral, veering"
+    else:
+        verdict = "ok"
+    return forward, lateral, verdict
+
+
 def body_rel_via_fk(sim, df, rows):
     """Shared foot path in the abdomen frame (base body FK on expert motor_pos)."""
     sim.loadScene(f"{ENV}/{REFERENCE_SCENE}")
@@ -261,9 +292,11 @@ def main():
                                     foot_order=np.array(LEGS), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=-1, repeat=rep, scale=args.scale,
                                     behavior="stop")
-                dist = float(np.linalg.norm(h[-1, :2] - h[0, :2])) if len(h) else 0.0
-                man.append(dict(tag=tag, morph=morph, ep=-1, rep=rep, n=len(f), dist=dist))
-                print(f"  {tag:16s} frames={f.shape} moved={dist:.2f}m")
+                fwd, lat, verdict = walk_check(h)
+                man.append(dict(tag=tag, morph=morph, ep=-1, rep=rep, n=len(f),
+                                forward=fwd, lateral=lat, verdict=verdict))
+                print(f"  {tag:16s} frames={f.shape} forward={fwd:+.2f}m "
+                      f"lateral={lat:.2f}m  {verdict}")
         np.save(os.path.join(args.out, "manifest_stop.npy"), man, allow_pickle=True)
         print(f"\n{len(man)} stop clips -> {args.out}")
         return
@@ -292,9 +325,11 @@ def main():
                                     foot_order=np.array(LEGS), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=ep, repeat=rep, scale=args.scale,
                                     behavior=args.behavior)
-                dist = float(np.linalg.norm(h[-1, :2] - h[0, :2])) if len(h) else 0.0
-                manifest.append(dict(tag=tag, morph=morph, ep=ep, rep=rep, n=len(f), dist=dist))
-                print(f"  {tag:16s} frames={f.shape} moved={dist:.2f}m")
+                fwd, lat, verdict = walk_check(h)
+                manifest.append(dict(tag=tag, morph=morph, ep=ep, rep=rep, n=len(f),
+                                     forward=fwd, lateral=lat, verdict=verdict))
+                print(f"  {tag:16s} frames={f.shape} forward={fwd:+.2f}m "
+                      f"lateral={lat:.2f}m  {verdict}")
 
     np.save(os.path.join(args.out, "manifest.npy"), manifest, allow_pickle=True)
     tot = sum(m["n"] for m in manifest)

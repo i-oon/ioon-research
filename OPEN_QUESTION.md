@@ -10,6 +10,59 @@ which are now settled (see bottom). Updated 2026-08-08.
 Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
 this file carries only what is still undecided.
 
+## Q12. Which bodies belong in the dataset at all? (new, 2026-08-11 — blocking)
+
+Measured in **F42**: two of the nine bodies in `data/ik_walk_8body` do not walk — one moves 0.057 m
+in an episode, the other **walks backwards** — and two more crab sideways 2 to 6 times more than
+any sound body. Every Stage 2 run globs the whole directory, so about a fifth of the hexapod
+gradient went to a robot that does not locomote.
+
+The cause is the reach limit: a two-link leg cannot get closer to its shoulder than
+`|femur − tibia|`, and the closest commanded target is at 92.5 mm. Ratio alone is harmless —
+bodies at 1.04–1.10 with dead zones of 12–26 mm walk normally.
+
+Open, in the order they have to be decided:
+
+1. ~~**Exclude the two non-walking bodies.**~~ **Done** — `EXCLUDED_BODIES` in
+   `wm/data/dataset.py`, applied wherever clips are globbed. Stage 2's hexapod pairs drop from
+   15,755 to 12,285. The reruns are the remaining work.
+2. **Keep the two 94.6 mm veering bodies — decided, keep.** They walk; the gait differs but it is
+   locomotion, not a collapse. Not raised in the current deck. Revisit only if there is time to
+   retrain, and note that dropping them would leave three bodies all at ratio 0.83, which ties
+   femur to tibia perfectly and destroys the very coverage slide 8 is about.
+3. **How to get femur/tibia diversity without leaving the sound range.** The coxa is the answer:
+   it positions the shoulder without entering `|femur − tibia|`, and it is behaviourally almost
+   free — ARI +0.038 with the gait split, and a 40% coxa change leaves contact patterns agreeing
+   at 0.984. Rescaling the foot trajectory per body would work geometrically and **must not be
+   done**: `lambda_cross` is well defined only because every body walks identical expert episodes,
+   so per-body targets turn a shared intent into a wrong label.
+4. **Whether ratio > 1 is admissible at all.** The base insect is 0.83, tibia longer. Femur-longer
+   legs exist in insects but not in Phasmatodea. If the thesis frames this as stick insects, the
+   honest range is ratio ≤ 1.
+
+Until 1 is done, no absolute Stage 2 number should be quoted — including F38's 33.0%. Comparisons
+*between* Stage 2 runs are unaffected, since they share identical data.
+
+**Numbers stay as they are until the clean retrain.** Deliberate: the deck keeps its current
+figures rather than being patched twice. What is known is the *direction*, and it is favourable
+everywhere it has been checked — the veering bodies were making our own claims look worse, not
+better:
+
+| measured on | with the veering bodies | sound bodies only |
+|---|---|---|
+| body share in `z`, control | 11.3% | **5.8%** |
+| body share in `z`, cross loss | 1.2% | **0.2%** |
+| gait phase share, cross loss | 88.6% | **94.7%** |
+| held-out error, `tib_cross` | 27.8 deg, R² −3.16 | **11–13 deg, R² −0.42 to −1.07** |
+
+So cleaning the data should *strengthen* Stage 1's claims and only Stage 2's absolute numbers are
+at risk. Re-measure after the retrain rather than editing figures now.
+
+**Loose end to settle at the same time**: `z_content.py` reports the control's body share as 8.8%
+and `z_body_share.py` reports 11.3% for the same checkpoint, while both agree on 1.2% for the
+cross-loss run. Two of our own scripts disagree by 28% on a figure that is in the deck. Trace it
+when the numbers are being redone, not before.
+
 ## Q0. What Stage 2 can and cannot claim, given Stage 1 (new, 2026-08-09)
 
 Stage 1 found that the decoder identifies the body from a code in `z` and looks up, rather than

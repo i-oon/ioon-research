@@ -30,6 +30,7 @@ training log itself; these go deeper.
 | `morphology_mix.py` | What mixture of training bodies does the model's answer look like — is it interpolating or copying one? |
 | `morphology_axis.py` | Where a held-out body lands between two training bodies, at each stage of the pipeline. |
 | `plot_action_trace.py` | Predicted against ground-truth joint commands, per joint. Aggregate error hides which joints failed. |
+| `score_body.py` | One checkpoint against several held-out bodies, with both constant baselines and R^2. Use instead of retraining per test body. |
 
 **What the latent contains**
 
@@ -73,6 +74,8 @@ training log itself; these go deeper.
 | `audit_ik_dataset.py` | Audit an IK dataset for cross-morphology correspondence. |
 | `make_ik_equal_windows.py` | Build equal-length clips from longer sources. |
 | `plot_ik_walk_gait.py` | Gait and contact diagrams for the IK forward-walk dataset. |
+| `plot_gait_quality.py` | Contact raster and duty factor per body, plus the raw forces against the 0.27 N cut. Use before trusting any stance-derived label. |
+| `compare_ratio_gaits.py` | Side-by-side video and contact diagram across the femur/tibia boundary, from recorded frames. |
 | `render_lock_check.py` | Render-lock check: is the camera and scene identical across bodies? |
 | `inspect_coppelia_scene_objects.py` | Compact object summary for a CoppeliaSim scene. |
 
@@ -135,6 +138,24 @@ Each was hit at least once and cost real time.
 - **One direction is not a subspace.** Delete the probe's weight vector and the probe refits onto
   correlated axes. Peel directions off one at a time until accuracy reaches chance, and if it
   never does, the signal is distributed and no adversary can excise it.
+- **Do not retrain to change a *test* body — but you must retrain to change a *training* set.**
+  A held-out body is never trained on, so any body absent from `train_morphs` already tests an
+  existing checkpoint, and retraining for it changes the weights as well as the test: doing that
+  once produced a "the frame is actively harmful, 1.34x" result the original checkpoint does not
+  show. **This only holds when the training set is already sound.** `tib_cross` qualifies — its
+  four bodies are all ratio 0.83 with 42-71 mm dead zones. `m3d_cross` does not: two of its five
+  training bodies veer, so removing those is a different model and needs a run. Ask which half of
+  the experiment is changing before deciding.
+- **Say which constant baseline.** Beating the *training* mean pose only says the model noticed
+  this is not an average body. R^2 is defined against the *held-out body's own* mean, and a model
+  can beat the first while losing badly to the second — here, by 16.16 against 2.45.
+- **A generated body is not a valid body until you watch it walk.** Two in `ik_walk_8body`
+  collapse and rotate on the spot; they passed a walk check that used unsigned displacement, which
+  reads a healthy 0.46 m for something tumbling. Check forward displacement and lateral drift
+  separately, signed, and look at the frames.
+- **Do not score an animal's gait against a textbook template.** The expert here is a real stick
+  insect walking a variable wave, so tripod separation sits at chance for every body and that is
+  correct. Judge the labels instead: is the contact threshold in a gap.
 - **How you pool the patch tokens is part of the measurement.** Mean-pooling suits quantities
   spread across the frame and buries ones confined to a few patches, and it also preserves a large
   constant offset between datasets that a fitted readout absorbs and then mis-applies. It turned a

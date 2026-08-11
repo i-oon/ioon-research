@@ -1,0 +1,16 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+wm/runs/tib_cross/best.pt  epoch 10
+trained on ['c10f10t10', 'c06f10t10', 'c10f06t06', 'c08f09t09'], action_lag 1, lambda_cross 0.5
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8582.01it/s]
+body             deg    model  train mean  own mean     R2   zero_z   zero_x
+c10f10t06      27.76   10.209      16.158     2.451  -3.16   11.717   15.116
+c10f10t08      13.49    2.617       3.930     1.263  -1.07    3.174    2.575
+c10f09t07      12.52    1.866       5.446     1.313  -0.42    3.007    3.606
+c10f08t06      11.39    2.044       7.833     1.389  -0.47    4.256    5.426
+
+'train mean' is what predicting the training mean pose scores; beating it only says
+the model noticed this is not an average body. 'own mean' is this body's own per-joint
+mean, the baseline R2 is defined against -- a negative R2 means worse than someone who
+saw the body once and memorised its average posture. 'zero_x' below 'model' means the
+frame is actively harmful.

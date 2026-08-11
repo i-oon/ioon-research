@@ -375,8 +375,26 @@ Capacity is not the missing ingredient — an MLP in place of the ridge is no be
 ![per-joint reconstruction on the tibia-short body](../results/wm/action_trace_tib_cross_epoch004_c10f10t06.png)
 
 Red is the model, black is ground truth, across three clips. **All 18 joints have negative
-R-squared** — every one is worse than predicting a constant. Even the fore-aft swing joints, which
-hold up on every other held-out body, have collapsed.
+R-squared** — every one is worse than predicting that body's own average posture.
+
+**But this body is also the worst-behaved one we have**, so the same checkpoint was scored on
+three more held-out bodies that walk straight. Same weights, only the test body changes:
+
+| held out | femur/tibia | deg per joint | **R²** |
+|---|---|---|---|
+| **c10f10t06** — the body above, veers off course | 1.38 | **27.76** | **−3.16** |
+| c10f10t08 | 1.04 | 13.49 | **−1.07** |
+| c10f09t07 | 1.07 | 12.52 | **−0.42** |
+| c10f08t06 | 1.10 | 11.39 | **−0.47** |
+
+**The failure is real and it is not about one body: R² is negative on all four**, so on every
+unseen femur/tibia ratio the model does worse than someone who saw the body once and memorised its
+average posture.
+
+**And the headline body overstates it by 3 to 7 times.** On bodies that walk cleanly the error is
+11–13 degrees per joint rather than 27.8, and R² is −0.4 to −1.1 rather than −3.2. The commands'
+own spread is 11.7 degrees per joint, so the honest statement is *comparable to the signal*, not
+*four times it*.
 
 **The fix this points to is more bodies where the femur and tibia differ.** The scene generator
 already supports it. A data gap, not a loss or architecture problem — and no regularizer touches
@@ -423,6 +441,13 @@ convergence issue.
 
 **Coverage was a real cause and is not the whole cause.** That is a sharper result than a clean
 pass would have been, and it is what the next question is built on.
+
+**One thing to know about both numbers.** Both sides of this comparison hold out the same body,
+`c10f10t06`, so the before/after is matched and the 1.7x is real. But slide 8 showed that body
+scores 3 to 7 times worse than held-out bodies which walk cleanly, so **27.68 and 16.10 are both
+inflated in absolute terms** — the ratio between them is the trustworthy part, not their size.
+Repeating this on a sound held-out body needs a new run, because the three mild-ratio bodies are
+all inside the seven-body training set and so cannot serve as its test.
 
 ---
 

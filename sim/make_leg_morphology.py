@@ -8,6 +8,77 @@ only resizes geometry, it does not reposition children automatically.
 Usage:
   python sim/make_leg_morphology.py --factor 0.7 --out sim/env/medauroidea_stick_insect_short.ttt
   python sim/make_leg_morphology.py --factor 0.85 --out sim/env/medauroidea_stick_insect_medium.ttt
+
+
+CHOOSING PROPORTIONS
+====================
+
+Read this before picking scales. Two bodies already in `data/ik_walk_8body` collapse and rotate
+on the spot rather than walking, and two more veer 0.40 m off course, all because of the one
+constraint below. See FINDINGS.md F42.
+
+1. The hard constraint: the leg must reach its own trajectory
+------------------------------------------------------------
+A two-link chain (femur + tibia) reaches only distances between `|femur - tibia|` and
+`femur + tibia` — the triangle inequality. Closer than `|femur - tibia|` the knee would have to
+fold past straight, so the IK gives up and settles wherever it can.
+
+    |femur - tibia|  <  92.5 mm          the closest commanded target, at collector --scale 0.5
+    femur + tibia    >  farthest target   not yet measured; worth recording
+
+`|femur - tibia|` is the **dead zone**. What was measured, per body, on recorded episodes:
+
+    12 - 71 mm    walks normally
+    94.6 mm       walks but yaws steadily, ending 0.40 m off course
+    208 mm        tips over within ~12 frames and rotates on the spot
+
+The boundary is a step, not a safety margin: 94.6 mm misses 0.3% of its targets, 132.5 mm misses
+24%. `check_reachable` below enforces it.
+
+2. What that leaves you
+-----------------------
+Base segments are femur 342.9 mm, tibia 413.9 mm — ratio 0.83, **tibia longer**, which is the
+real stick insect proportion. Holding the femur at 1.0 and moving the tibia:
+
+    tibia scale 0.61 - 1.05   ratio 0.79 - 1.37    reaches its targets
+    tibia scale 0.83 - 1.05   ratio 0.79 - 1.00    also plausible as a stick insect
+
+**The usable band is about 0.2 wide.** That is why every body in the dataset has the femur and
+tibia effectively tied together — a geometric constraint, not an oversight in dataset design, and
+the direct cause of the extrapolation limit in FINDINGS.md F33.
+
+Ratio above 1.0 is not itself a defect: bodies at 1.04, 1.07 and 1.10 walk normally. It only
+becomes one by pushing the dead zone past 92.5 mm. But femur longer than tibia inverts the
+animal's own proportion, so a body above 1.0 is a robot morphology, not a stick insect.
+
+3. The coxa is the free parameter — use it
+------------------------------------------
+The coxa does not appear in `|femur - tibia|`; it positions the shoulder. Lengthening it moves
+the shoulder away from the foot targets, so a larger dead zone becomes reachable. And it is
+behaviourally almost free: coxa explains the gait grouping at ARI +0.038, and c10f10t10 against
+c06f10t10 — a 40% coxa change — have contact patterns agreeing at 0.984. **40% of coxa buys 1.6%
+of gait.**
+
+Still to measure: how many mm of dead-zone headroom one mm of coxa buys. Readable from the scene
+geometry, no simulation needed.
+
+4. Never rescale the foot trajectory per body
+---------------------------------------------
+It would relieve the constraint and it must not be done. `lambda_cross` is well defined only
+because every body walks identical expert episodes: pairing body A's latent with body B's frame
+at the same instant means something because the *intent* is shared. Per-body targets turn that
+pairing into a wrong label, not a noisy one.
+
+5. Verify after generating — the check above is necessary, not sufficient
+------------------------------------------------------------------------
+    signed forward displacement    > 0.3 m per episode
+    lateral drift, measured apart  < 0.2 m per episode
+    watch the video
+
+Use the signed forward component, never `norm(head[-1,:2] - head[0,:2])`. That unsigned form is
+how a body that tumbles in place passed inspection: it reads a healthy 0.46 m. And no number
+distinguishes "walks oddly" from "fell over and is now spinning" — look at the frames.
+`scripts/compare_ratio_gaits.py` and `scripts/plot_gait_quality.py` do both.
 """
 import argparse
 import os

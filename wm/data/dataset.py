@@ -18,6 +18,12 @@ CONTACT_THRESHOLD = 0.27
 
 
 def clip_paths(data_dir, morphs):
+    # named explicitly here rather than globbed, so a non-walking body can only arrive by being
+    # asked for; say so rather than silently obeying
+    named = set(morphs) & set(EXCLUDED_BODIES)
+    if named:
+        print(f"WARNING: {sorted(named)} do not walk -- they collapse and rotate on the spot. "
+              f"See FINDINGS.md F42.")
     paths = []
     for path in sorted(glob.glob(os.path.join(data_dir, "*.npz"))):
         if os.path.basename(path).split("_")[0] in morphs:
@@ -171,24 +177,106 @@ class IKWalkPairs(Dataset):
         return sample
 
 
-def embodiment_split(specs, val_fraction, root=""):
+# Bodies whose recorded episodes show them collapsing rather than walking. A two-link leg cannot
+# reach closer to its shoulder than |femur - tibia|, and the closest commanded target sits at
+# 92.5 mm; both of these have a 208.2 mm dead zone, so the IK never solves and the insect tips onto
+# its side within about a dozen frames and rotates on the spot for the rest of the episode.
+#
+# They predate `sim/make_leg_morphology.py`'s reach check -- which was written using them as its
+# evidence -- and survived the walk check because it measured `norm(head[-1,:2] - head[0,:2])`,
+# unsigned, which reads a healthy 0.46 m for a body that is tumbling. Excluded by name because
+# Stage 2 takes a directory and globs it, so nothing else selects bodies at all.
+#
+# This is not a judgement about morphology. Every other body in the set locomotes; these two are
+# recordings of a robot falling over. See FINDINGS.md F42.
+EXCLUDED_BODIES = ("c06f06t10", "c10f06t10")
+
+
+def usable_clips(paths, excluded=EXCLUDED_BODIES):
+    """Drop clips belonging to bodies that do not walk, reporting what went."""
+    kept = [p for p in paths if os.path.basename(p).split("_")[0] not in excluded]
+    dropped = len(paths) - len(kept)
+    if dropped:
+        names = sorted({os.path.basename(p).split("_")[0] for p in paths}
+                       & set(excluded))
+        print(f"excluding {dropped} clips from non-walking bodies {names} "
+              f"({len(kept)} clips remain)")
+    return kept
+
+
+def evenly(items, keep):
+    """`keep` items spread across the list, not the first `keep`.
+
+    Clips are sorted by episode, so taking a prefix would take consecutive expert episodes and
+    the behavioural range would narrow along with the count.
+    """
+    if keep >= len(items):
+        return items
+    idx = np.linspace(0, len(items) - 1, keep).round().astype(int)
+    return [items[i] for i in dict.fromkeys(idx)]
+
+
+def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=(),
+                     clips_per_body=()):
     """Split each embodiment's clips into train and validation source lists.
 
     Splitting is by clip rather than by expert episode because embodiments other than the
     hexapod have no episode structure to split on. The held-out amount is a fraction, not a
     count: embodiments differ by orders of magnitude in clip count, so a fixed count would
     take a negligible slice from one and half the data from another.
+
+    **Stratified by body.** An earlier version took the last `val_fraction` of the sorted path
+    list, and sorted paths group by body, so the tail was one body: validation consisted entirely
+    of `c10f10t10` while that same body kept only 12 of its 30 clips for training. Every Stage 2
+    run before 2026-08-11 has that split -- one body under-represented in training and the
+    validation metric blind to the other five. Taking the fraction from each body separately
+    fixes both.
     """
+    caps = dict(s.split("=") for s in clips_per_body) if clips_per_body else {}
+    caps = {k: int(v) for k, v in caps.items()}
     train, val = [], []
     for name, data_dir in specs:
         directory = data_dir if os.path.isabs(data_dir) else os.path.join(root, data_dir)
         paths = sorted(glob.glob(os.path.join(directory, "*.npz")))
-        n_val = max(1, round(len(paths) * val_fraction)) if val_fraction else 0
-        if len(paths) - n_val < 1:
+        if exclude:
+            paths = usable_clips(paths)
+        if heldout_bodies:
+            # A body kept out of training entirely, so cross-embodiment training has at least one
+            # generalisation test. Without it Stage 2 globs every body and can only measure what
+            # is *inside* the latent, never whether anything transfers -- the two embodiments
+            # cannot serve as each other's held-out set, since holding one out leaves one.
+            kept = [p for p in paths
+                    if os.path.basename(p).split("_")[0] not in heldout_bodies]
+            if len(kept) < len(paths):
+                print(f"{name}: holding out {sorted(set(heldout_bodies))} "
+                      f"({len(paths) - len(kept)} clips withheld from training)")
+            paths = kept
+        if not val_fraction:
+            train.append((paths, name))
+            continue
+
+        by_body = {}
+        for p in paths:
+            by_body.setdefault(os.path.basename(p).split("_")[0], []).append(p)
+        if name in caps:
+            before = sum(len(v) for v in by_body.values())
+            by_body = {b: evenly(sorted(c), caps[name]) for b, c in by_body.items()}
+            after = sum(len(v) for v in by_body.values())
+            print(f"{name}: capped at {caps[name]} clips per body, {before} -> {after} clips")
+        tr, va = [], []
+        for body, clips in sorted(by_body.items()):
+            n_val = max(1, round(len(clips) * val_fraction))
+            if len(clips) - n_val < 1:
+                raise ValueError(f"{name}/{body}: {len(clips)} clips is too few to split")
+            tr.extend(clips[:len(clips) - n_val])
+            va.extend(clips[len(clips) - n_val:])
+        if not tr:
             raise ValueError(f"{name}: {len(paths)} clips is too few to split")
-        train.append((paths[:len(paths) - n_val] if n_val else paths, name))
-        if n_val:
-            val.append((paths[len(paths) - n_val:], name))
+        train.append((tr, name))
+        if va:
+            val.append((va, name))
+            print(f"{name}: {len(tr)} train / {len(va)} val clips, "
+                  f"stratified over {len(by_body)} bod{'y' if len(by_body) == 1 else 'ies'}")
     return train, val
 
 

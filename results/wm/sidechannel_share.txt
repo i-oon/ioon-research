@@ -1,0 +1,17 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  89%|████████▉ | 749/843 [00:00<00:00, 7479.36it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7395.91it/s]
+wm/runs/stage2_sidechannel/epoch012.pt  epoch 12
+  b1       1129 latents, stance fraction 0.533
+  hexapod  975 latents, stance fraction 0.513
+
+variance of the latent, 6 phase bins, 6 latents per cell
+  gait phase         29.5%
+  which embodiment   38.9%
+  interaction        31.6%
+
+  embodiment decodable from the latent at 1.000 (chance 0.500)
+  clusters sit 0.94x the within-cluster spread apart
+
+Compare against the insect-only figures: with the cross-body loss the *body* share is 0.8-1.2%
+on training bodies. A large embodiment share here means the latent is a code for which robot
+this is, which is what Stage 2 needs it not to be.

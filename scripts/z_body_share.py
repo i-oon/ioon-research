@@ -22,11 +22,33 @@ from wm.models.itm import InverseTransitionModel
 
 TRAIN = ['c10f10t10','c06f10t10','c10f10t06','c06f10t06','c10f06t06']
 HELD  = ['c08f09t09','c06f06t06']
+# Two of the five training bodies veer: a 94.6 mm dead zone against a 92.5 mm closest target
+# leaves them yawing 0.35-0.38 m off course, where every sound body stays under 0.17 m (F42).
+# They stay in the headline row because the before/after comparison is matched on them, but the
+# split is also reported on the three sound bodies alone, since a body with a distinct gait adds
+# between-body variance and would inflate exactly the term being claimed as small.
+VEERING = ['c10f10t06','c06f10t06']
+SOUND = [b for b in TRAIN if b not in VEERING]
 EPS = [6, 20, 22]
 
-enc = VJEPA2FrameEncoder(device='cpu', dtype=torch.float32)
-E = {b: [encode_clip(enc, load_clip(f'{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz')['frames'], 2)
-         for e in EPS] for b in TRAIN + HELD}
+CACHE = f'{ROOT}/results/wm/cache/stage2_embeddings.pt'
+cache = torch.load(CACHE, map_location='cpu') if os.path.exists(CACHE) else {}
+enc, fresh = None, False
+E = {}
+for b in TRAIN + HELD:
+    clips = []
+    for e in EPS:
+        path = f'{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz'
+        if path not in cache:
+            if enc is None:
+                enc = VJEPA2FrameEncoder(device='cpu', dtype=torch.float32)
+            cache[path] = encode_clip(enc, load_clip(path)['frames'], 2)
+            fresh = True
+        clips.append(cache[path])
+    E[b] = clips
+if fresh:
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    torch.save(cache, CACHE)
 del enc
 print('encoded', flush=True)
 
@@ -57,6 +79,10 @@ for tag, ck in (('control m3d_bracketed ep6', 'm3d_bracketed/epoch006.pt'),
                 ('cross   m3d_cross ep8',     'm3d_cross/epoch008.pt')):
     g, b, r = split(ck, TRAIN)
     print(f'{tag:<28} all 5 training bodies     gait {g:5.1f}%   body {b:5.1f}%   rest {r:5.1f}%')
+    g, b, r = split(ck, SOUND)
+    print(f'{tag:<28} the 3 SOUND bodies        gait {g:5.1f}%   body {b:5.1f}%   rest {r:5.1f}%')
+    g, b, r = split(ck, VEERING)
+    print(f'{tag:<28} the 2 VEERING bodies      gait {g:5.1f}%   body {b:5.1f}%   rest {r:5.1f}%')
     pairs = [split(ck, list(p)) for p in combinations(TRAIN, 2)]
     import numpy as _np
     m = _np.array(pairs).mean(0); lo = _np.array(pairs)[:,1].min(); hi = _np.array(pairs)[:,1].max()

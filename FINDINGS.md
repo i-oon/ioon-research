@@ -1791,6 +1791,133 @@ paying.
 Reproduce all six cells with `--features {mean,bands,max}` and `--normalize` on
 `scripts/cross_embodiment_probe.py`, from one cached encoder pass.
 
+### F42. Two bodies in the dataset do not walk, and two more crab sideways. UNRESOLVED
+
+Found by asking why the learned latent splits the hexapod frames into two clean groups. It does,
+perfectly, by whether the femur is longer than the tibia -- and chasing that down turned up a data
+problem that touches results already reported.
+
+**The nine bodies in `data/ik_walk_8body`, measured on their own recorded head trajectories:**
+
+| body | ratio f/t | dead zone | forward (m) | sideways drift (m) | verdict |
+|---|---|---|---|---|---|
+| c06f06t06 | 0.83 | 42.6 mm | +0.371 | 0.088 | fine |
+| c10f06t06 | 0.83 | 42.6 mm | +0.664 | 0.062 | fine |
+| c08f09t09 | 0.83 | 63.9 mm | +0.596 | 0.117 | fine |
+| c06f10t10 | 0.83 | 71.0 mm | +0.579 | 0.149 | fine |
+| c10f10t10 | 0.83 | 71.0 mm | +0.571 | 0.174 | fine |
+| c06f10t06 | 1.38 | 94.6 mm | +0.368 | **0.353** | crabs sideways |
+| c10f10t06 | 1.38 | 94.6 mm | +0.480 | **0.380** | crabs sideways |
+| c06f06t10 | 0.50 | **208.2 mm** | **+0.057** | 0.328 | **does not walk** |
+| c10f06t10 | 0.50 | **208.2 mm** | **-0.369** | 0.281 | **walks backwards** |
+
+**The dead zone is the cause, not the ratio.** A two-link leg reaches nothing closer to its
+shoulder than `|femur - tibia|`, and the closest commanded target sits at 92.5 mm. The Track A
+bracket bodies settle which of the two matters: at ratios 1.04, 1.07 and 1.10 with dead zones of
+11.8, 18.9 and 26.0 mm they walk normally, forward 0.33-0.39 m on drifts of 0.08-0.16 m. Ratio
+alone is harmless; ratio is only dangerous because it drives the dead zone.
+
+**`c10f06t10` got in through a bug already recorded**: the walk check used
+`norm(h[-1,:2] - h[0,:2])`, which is unsigned, and reads 0.46 m for a body reversing away from the
+start. The fix is to check the forward component and the lateral drift separately.
+
+**Who is affected.**
+
+| run | bodies | contamination |
+|---|---|---|
+| `m3d_cross`, `m3d_bracketed`, `lag1_*` | 5 training | **2 of 5 are the 94.6 mm crab-walkers** |
+| `tib_cross` | 4 training, held out `c10f10t06` | training clean; **the held-out body is a crab-walker** |
+| `bracket_cross` | 7 training | one crab-walker, the rest sound |
+| **every Stage 2 run** | globs the whole directory | **both non-walking bodies included, ~22% of hexapod clips** |
+
+Stage 2 passes `hexapod=data/ik_walk_8body` and `embodiment_split` globs `*.npz`, so nothing
+selects bodies at all.
+
+**What this does not invalidate.** Comparisons between Stage 2 runs. `stage2_balanced`,
+`stage2_sidechannel` and `stage2_centered` share identical data, so the side-channel and centring
+contrasts remain clean.
+
+**What it does.** Every absolute Stage 2 number, including F38's 33.0% embodiment share, comes
+from a model that spent about a fifth of its hexapod gradient on a robot that does not walk.
+
+**And it bounds F33 / slide 8, measured rather than assumed.** `tib_cross` holds out `c10f10t06`,
+which veers 0.380 m sideways against 0.06-0.17 m for every body it trained on. Scoring the *same
+checkpoint* on three further held-out bodies that walk cleanly separates the geometry gap from the
+gait (`scripts/score_body.py`):
+
+| held out | ratio | dead zone | deg/joint | R^2 | frame ablation |
+|---|---|---|---|---|---|
+| **c10f10t06** | 1.38 | 94.6 mm | **27.76** | **-3.16** | frame helps |
+| c10f10t08 | 1.04 | 11.8 mm | 13.49 | -1.07 | -1.6%, noise |
+| c10f09t07 | 1.07 | 18.9 mm | 12.52 | **-0.42** | frame helps |
+| c10f08t06 | 1.10 | 26.0 mm | 11.39 | **-0.47** | frame helps |
+
+**R^2 is negative on all four**, so the femur/tibia gap is real and not an artefact of one body:
+on every unseen ratio the model does worse than memorising that body's own average posture. **But
+the headline body overstates it 3 to 7 times** -- 11-13 deg rather than 27.8, R^2 of -0.4 to -1.1
+rather than -3.2. Against a command spread of 11.7 deg per joint, the honest statement is
+"comparable to the signal", not "four times it".
+
+**Method note that cost a run.** The first attempt at this retrained with a different held-out
+body (`tib_sound`), which changed the weights as well as the test -- 18 clips per body instead of
+30 -- and produced a "the frame is actively harmful, 1.34x" signal that the original checkpoint
+does not show. One checkpoint against several held-out bodies isolates the body; retraining does
+not.
+
+**With the condition that makes it safe:** this works only because `tib_cross`'s *training* set is
+already sound -- four bodies, all ratio 0.83, dead zones 42-71 mm. Where the training set is what
+needs fixing, there is no way around a rerun: `m3d_cross` and `m3d_bracketed` carry two veering
+bodies out of five, and every Stage 2 run carried two that do not walk at all. Re-scoring answers
+"which body is being tested"; only retraining answers "which bodies it learned from".
+
+**Biological note, raised by the user and correct.** The base insect is femur 342.9 mm against
+tibia 413.9 mm, ratio 0.83. Ratio 1.38 inverts the proportion, which no stick insect has; femur
+longer than tibia occurs in insects, but in orthopteran jumping legs rather than in Phasmatodea.
+Those two bodies are not stick insects with short tibias.
+
+**The admission rule, agreed and now in code.** A body is usable when `|femur - tibia|` stays
+under the closest commanded target, 92.5 mm. Ratio is not the criterion:
+
+| body | ratio | dead zone | forward | sideways | |
+|---|---|---|---|---|---|
+| c10f10t10 | 0.83 | 71.0 mm | +0.592 | +0.058 | reference |
+| c10f10t08 | **1.04** | 11.8 mm | +0.467 | +0.117 | femur longer, walks straight |
+| c10f08t06 | **1.10** | 26.0 mm | +0.408 | +0.051 | femur longer, straighter than the reference |
+| c10f10t06 | 1.38 | **94.6 mm** | +0.396 | **-0.397** | veers off, yaws progressively |
+| c06f06t10, c10f06t10 | 0.50 | **208.2 mm** | ~0 | tumbles | collapses within ~12 frames |
+
+Femur longer than tibia is fine at 1.04 and 1.10. At 1.38 the body yaws steadily until it is
+0.40 m off course, because a subset of its foot targets fall inside the dead zone.
+
+**The contact labels are sound, checked because so much rests on them.** Stance fraction is the
+shared phase label in the cross-embodiment probe and the phase term in the latent decomposition.
+The force distribution is sharply bimodal -- a swing mode near 0.1 N, a stance mode near 6-10 N --
+and the 0.27 N cut sits in the empty valley with **1.8% of samples within +/-0.07 N** of it. Not a
+thresholding artefact. `scripts/plot_gait_quality.py`.
+
+**The expert gait is a real stick insect's, so it is a variable wave, not a tripod.** Per-leg
+contact periods on the reference come out at 6, 22, 18, 4, 9 and 20 frames, front-leg duty runs
+0.29-0.44 against 0.60-0.78 for the middle legs, and the tripod separation is near zero for every
+body. That is the expected reading for an animal and not a defect; every body inherits the same
+variability from the same targets, so comparisons stay fair. Worth one narrow note: `c10f10t06` is
+the only body with a **negative** separation, its legs grouping worse than arbitrary triples --
+one more mark against a body already known to veer.
+
+**Still to do, and nothing below is done yet:**
+
+1. Drop the two non-walking bodies from every Stage 2 source. `sources` selects a directory, so
+   this needs either body filtering in `embodiment_split` or a curated directory.
+2. Rerun Stage 2 once on clean bodies and re-measure the 33.0%.
+3. Fix the walk check to test forward displacement and lateral drift separately, signed.
+4. Decide whether the 94.6 mm crab-walkers stay. They walk, so they are usable, but they are the
+   bodies the extrapolation claim rests on and they are outside the animal's proportions.
+5. Reach ratio diversity through the **coxa**, not by rescaling the foot trajectory. The coxa
+   positions the shoulder without entering `|femur - tibia|`, and it is behaviourally almost free:
+   coxa agrees with the gait split at ARI +0.038, and c10f10t10 against c06f10t10 -- a 40% coxa
+   change -- have contact patterns agreeing at 0.984. Rescaling the trajectory per body would
+   instead break `lambda_cross`, which is well defined only because every body walks identical
+   expert episodes.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
@@ -1882,4 +2009,7 @@ proprioception is not.
 - `results/wm/cache/stage2_embeddings.pt` -- cached encoder pass behind F39, rebuilt on demand and
   gitignored: every patch token at full width is 2.9 GB
 - `scripts/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures
+- `scripts/compare_ratio_gaits.py` -- side-by-side video and contact diagram across the
+  femur/tibia boundary, from recorded frames (F42)
+- `results/wm/gait/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
 - `results/wm/README.md` -- per-run metrics

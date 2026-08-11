@@ -113,7 +113,9 @@ def main():
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
     Z, emb, stance = [], [], []
     for embodiment, frames, contact in clips(args.insect_dir, args.b1_dir):
-        e = encode_clip(encoder, frames, args.chunk)
+        # the encoder may run on the GPU for speed; the ITM is small and stays on the CPU, so
+        # bring the embeddings back rather than moving a 1B-parameter model around
+        e = encode_clip(encoder, frames, args.chunk).cpu()
         offset = offset_for(checkpoint, embodiment)
         if offset is not None:
             e = e - offset
