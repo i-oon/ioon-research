@@ -59,6 +59,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--morph", default="")
+    ap.add_argument("--embodiment", default="",
+                    help="required only for checkpoints trained with ftm_embodiment_channel")
     ap.add_argument("--clips", type=int, default=3)
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 2, 3, 5, 8, 10])
     ap.add_argument("--encode_device", default="cpu")
@@ -85,7 +87,8 @@ def main():
             predicted = e[start:start + 1]
             velocity = e[start] - e[start - 1]
             for step in range(1, max(horizons) + 1):
-                predicted = ftm(predicted, z[start + step - 1:start + step])
+                predicted = ftm(predicted, z[start + step - 1:start + step],
+                                args.embodiment or None)
                 if step in scores["rollout"]:
                     truth = e[start + step]
                     scores["rollout"][step].append(((predicted[0] - truth) ** 2).mean().item())

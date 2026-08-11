@@ -28,6 +28,7 @@ LEGACY_DEFAULTS = {
     "within_body_std": False,
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
+    "ftm_embodiment_channel": False,
 }
 
 
@@ -80,6 +81,19 @@ class Config:
     itm_cross_blocks: int = 2
     ftm_blocks: int = 8
     z_tokens: int = 1
+
+    # Hand the Forward Transition Model the embodiment identity directly, as an extra latent
+    # token, so z is not the only route by which it can know which robot it is looking at.
+    #
+    # Measured motivation: 33.0% of z's variance is the embodiment, and deleting the eight
+    # directions that carry it costs 1.69x against a random-direction control's 1.16x, so the
+    # identity in z is load-bearing rather than passive leakage (FINDINGS.md F39). Removing it
+    # with an adversary alone therefore breaks something the model depends on. The channel
+    # relieves the need first; only then does removing the ability cost nothing.
+    #
+    # Names come from cfg.sources, so any script rebuilding a model from a checkpoint's config
+    # gets the right embedding size without being told. A no-op in single-morphology mode.
+    ftm_embodiment_channel: bool = False
 
     # How much capacity sits between the latent and the joint command: "mlp" is the original
     # decoder, "linear" keeps the cross-attention backbone with a single output projection,

@@ -34,6 +34,11 @@ SEG = {"m1": "TC", "m2": "CF", "m3": "FT"}
 SCENES = [("long", "medauroidea_stick_insect.ttt"),
           ("medium", "medauroidea_stick_insect_medium.ttt"),
           ("short", "medauroidea_stick_insect_short.ttt")]
+# The reference body whose forward kinematics turn the expert's joint angles into the shared
+# Cartesian foot path. It must NOT follow --morphs: that flag replaces SCENES, so reading the
+# reference from SCENES[0] silently rebuilt the trajectory out of whichever body was listed
+# first, and every body then chased a path derived from something other than the base insect.
+REFERENCE_SCENE = "medauroidea_stick_insect.ttt"
 SENSOR = "vjepa_cam"
 TRACK = "/head"
 ROBOT_ROOT = "/abdomen"
@@ -71,7 +76,7 @@ def leg_length(sim, leg="FL"):
 
 def body_rel_via_fk(sim, df, rows):
     """Shared foot path in the abdomen frame (base body FK on expert motor_pos)."""
-    sim.loadScene(f"{ENV}/{SCENES[0][1]}")
+    sim.loadScene(f"{ENV}/{REFERENCE_SCENE}")
     abd = sim.getObjectParent(sim.getObject("/m1_FL"))
     jh = {(leg, jn): sim.getObject(f"/{jn}_{leg}") for leg in LEGS for jn in SEG}
     foot_h = {leg: sim.getObject(f"/foot_{leg}") for leg in LEGS}

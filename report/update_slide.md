@@ -1,8 +1,8 @@
 # Progress Update — Stage 1: Cross-Morphology Latent Action Model
 
 Stick insect (*Medauroidea extradentata*), simulated in CoppeliaSim. Stage 1 only: one 18-DOF
-topology, several leg geometries. Stage 2 (Unitree B1 quadruped) appears only in the closing
-questions. Thirteen slides.
+topology, several leg geometries. Stage 2 (Unitree B1 quadruped) appears once, on slide 14, because a first run
+of it turns the closing question from a risk into a number. Fifteen slides.
 
 Slides 1 to 3 are background already covered previously. The update starts at slide 4.
 
@@ -35,9 +35,9 @@ that separation happens at all, in the easy case where the joint spaces do match
 |---|---|
 | Slides 2-3 | what was built, the data, and how every number below is measured |
 | Slides 4-7 | the central result: the geometry is readable, the model ignores it, what fixed that, and what the fix did to the latent |
-| Slides 8-9 | where it stops working, why, and a test that predicts it in advance |
-| Slides 10-11 | two structural facts about the task itself, found last, that reframe the rest |
-| Slides 12-13 | status, and two decisions I need help with |
+| Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
+| Slides 11-12 | two structural facts about the task itself, found last, that reframe the rest |
+| Slides 13-15 | status, a first cross-embodiment run, and two decisions I need help with |
 
 ---
 
@@ -384,7 +384,49 @@ it, because the information was never present to begin with.
 
 ---
 
-## Slide 9 — The same measurement predicts, before training, which bodies will transfer
+## Slide 9 — Testing the diagnosis instead of asserting it
+
+Slide 8 ends with an explanation, and an explanation makes a prediction: **if the femur and tibia
+are tied because every training body ties them, then adding bodies where they differ should untie
+them.** Three such bodies were generated, checked to walk, and collected at the full 30 episodes.
+
+The run is **volume-matched** — seven bodies at 18 episodes gives 7,735 training pairs against the
+original four bodies' 7,540 — so a better result cannot be put down to more data.
+
+| | before, 4 bodies | after, 7 bodies |
+|---|---|---|
+| training pairs | 7,540 | 7,735 |
+| best possible mixture | 19.58 deg | **9.65 deg** |
+| copy the nearest training body | 20.37 deg | **10.63 deg** |
+| predict a constant pose | 16.01 deg | 16.01 deg |
+| **the model** | **27.68 deg** | **16.10 deg** |
+
+![the coverage experiment](../results/wm/figures/coverage_experiment.png)
+
+**A second prediction, costing no GPU at all.** Refit the encoder probe on the enlarged set and its
+error on the held-out body should fall. It did — **0.172 → 0.098** — and the specific thing the
+diagnosis named is what moved:
+
+| | coxa | femur | tibia |
+|---|---|---|---|
+| the truth | 1.00 | **1.00** | **0.60** |
+| probe fitted on the 4 old bodies | 0.88 | **0.78** | **0.78** |
+| probe fitted on all 7 | 0.95 | **0.89** | **0.73** |
+
+The gap between femur and tibia went from **0.000 to 0.157** against a true 0.400. The tying broke.
+
+**And the honest reading.** A 1.7x improvement from coverage alone, at matched data volume —
+the gap was real and filling it helped substantially. But 16.10 lands **exactly on the
+constant-pose baseline** and well short of the 10.63 that would show the model doing better than
+nearest-neighbour lookup. The run was flat across its last five epochs, so this is not a
+convergence issue.
+
+**Coverage was a real cause and is not the whole cause.** That is a sharper result than a clean
+pass would have been, and it is what the next question is built on.
+
+---
+
+## Slide 10 — The same measurement predicts, before training, which bodies will transfer
 
 The probe from slide 4 was built to answer a different question. Compared against what the
 trained models actually did, it turns out to predict the outcome every time.
@@ -418,7 +460,7 @@ is not enough to set a numeric threshold, only to establish the ordering.
 
 ---
 
-## Slide 10 — Two structural facts found last
+## Slide 11 — Two structural facts found last
 
 **One. The answer was already visible in the decoder's own input.**
 
@@ -458,11 +500,11 @@ was never what transfer was short of.
   identifies which feet are swinging with 81.5% accuracy, against 50% by chance.
 - Consequence: the joint command cannot be the place the latent earns its keep. Removing the
   forward-prediction term entirely leaves the action reconstruction unchanged.
-- **This bounds the action-decoding path only.** Slide 11 measures the forward model itself.
+- **This bounds the action-decoding path only.** Slide 12 measures the forward model itself.
 
 ---
 
-## Slide 11 — The forward model was being judged on the wrong task
+## Slide 12 — The forward model was being judged on the wrong task
 
 Every measurement above asks whether forward prediction helps **reconstruct the action**. It
 does not. That is not what a forward model is for.
@@ -495,13 +537,13 @@ than "the world model does nothing". Those are different claims and only the fir
 
 ---
 
-## Slide 12 — Where this leaves each piece
+## Slide 13 — Where this leaves each piece
 
 | Piece | Status |
 |---|---|
 | Frozen encoder | Carries body geometry in a directly readable, generalising form. Holds. |
-| Latent `z` | With the cross-body loss, 88.7% gait and 1.2% body — **on bodies it trained on**. On two held-out bodies the body share is 10.6%, against 0.0-1.3% for every training pair. The purification does not extend past the training range. |
-| Motion Decoder | Transfers within the range of bodies it saw. Does not extrapolate beyond it, and we can say precisely why. |
+| Latent `z` | With the cross-body loss, 88.7% gait and 1.2% body — **on bodies it trained on**. On two held-out bodies the body share is 10.6%, against 0.0-1.3% for every training pair. Across two *embodiments* it is **33.0%**. The purification does not extend past the training range. |
+| Motion Decoder | Transfers within the range of bodies it saw. Does not extrapolate beyond it, and we can say precisely why — and **filling the named gap moved it 27.68 to 16.10 deg at matched data volume**, which is most of the way to the constant-pose baseline and not past it. |
 | Forward model | Does not help action reconstruction, but **does roll the world forward**: 1.2-1.5x better than a frozen world out to ten steps. It was being measured against a task the method never assigns it. |
 | Physical replay | Commands walk, stay inside the body's joint range, and do not veer more than the IK reference. |
 
@@ -518,10 +560,12 @@ can now check before spending the training run.
 - Making the objective require the mapping fixes that, with four independent measurements moving
   together, and costs nothing in the world model's own competence — within the training range.
 - Transfer holds inside the range the training bodies span and fails outside it, and the failure
-  reproduces the exact shape of the gap in the data. **Three independent measurements agree on
+  reproduces the exact shape of the gap in the data. **Four independent measurements agree on
   where that boundary is**: the decoder's commands (2.91 deg inside, 25.6-27.7 outside), the
-  encoder probe (0.030 inside, 0.155-0.172 outside), and the latent's body content (1.2% inside,
-  10.6% outside).
+  encoder probe (0.030 inside, 0.155-0.172 outside), the latent's body content (1.2% inside,
+  10.6% outside), and across embodiments the latent's robot content (33.0%).
+- Filling a gap the diagnosis named improves the number without closing it: **27.68 to 16.10 deg**
+  at matched data volume, and the encoder probe **0.172 to 0.098** with no training at all.
 
 **What is not settled**
 
@@ -532,7 +576,74 @@ can now check before spending the training run.
 
 ---
 
-## Slide 13 — Two questions for the professor
+## Slide 14 — Stage 2, first look
+
+The cross-embodiment path had never been run. It works: one ITM, one forward model and one decoder
+backbone shared across an **18-DOF hexapod and a 12-DOF quadruped**, with a per-embodiment output
+head. No cross-embodiment term — the source method has none, and claims the shared latent emerges
+from weight sharing alone.
+
+**Before training, the frozen encoder does not hand over a shared space.** Fit a readout for stance
+fraction — the proportion of feet on the ground, defined for six legs and for four — on one
+embodiment and apply it to the other:
+
+| fitted on | tested on | error / the target's own spread |
+|---|---|---|
+| insect | insect | 0.88x |
+| B1 | B1 | 0.89x |
+| **insect** | **B1** | **4.72x** |
+| **B1** | **insect** | **3.00x** |
+
+Above 1.00 means worse than predicting the average. Both cross directions are **3 to 5x worse
+than that**.
+
+**After training, what the latent is made of:**
+
+| | share of variance |
+|---|---|
+| gait phase | 39.6% |
+| **which robot this is** | **33.0%** |
+| interaction | 27.4% |
+
+Against Stage 1's **1.2%** body share with the cross-body loss on. Embodiment decodes at **1.000**.
+
+![how much embodiment identity remains](../results/wm/figures/embodiment_axis.png)
+
+One axis, with the target marked — the same form as slide 4's left panel, and asking the mirror
+question. There we wanted the model to **keep** what the encoder carries about the body; here we
+want it to **remove** what the encoder carries about the robot. Same information, opposite goal.
+
+The conventional view of the same thing, for comparison against how this is usually shown:
+
+![cross-embodiment UMAP](../results/wm/figures/cross_embodiment_umap.png)
+
+**Weight sharing did most of the work and did not finish it.**
+
+| | frozen encoder `e_t` | learned latent `z` | |
+|---|---|---|---|
+| silhouette, how separated the two embodiments are | **+0.671** | **+0.140** | 4.8x less separated |
+| cluster separation, distance between means over within-cluster spread | **4.01x** | **0.77x** | means now closer than the spread |
+| embodiment recoverable by a linear probe | **1.000** | **1.000** | unchanged |
+| what the panels show | two far-apart masses | two tighter clusters | still two |
+
+The first two rows are a large, real compression and it is visible in the figure. The last two are
+why it is not enough: the identity is still perfectly recoverable, and still draws as two clusters.
+
+Worth saying about the figure itself: **the projection overstates the separation.** A
+representation whose cluster means sit closer than their own spread still draws as two clean
+blobs, because UMAP is built to find and sharpen structure. A picture cannot tell you how much
+embodiment identity remains, in either direction — which is why the decomposition sits beside it.
+
+**So the shared trunk produced a switch rather than a shared language**, and Stage 2 needs a
+mechanism that actively removes embodiment identity. That is question 2.
+
+Caveats, both real: validation for this run is unusable, since `val_fraction 0.1` on 14 B1 clips
+leaves **67 transitions** which balanced sampling then repeats to fill half of every validation
+batch. And the learning rate reached zero at epoch 6 while validation was still falling at 12.
+
+---
+
+## Slide 15 — Two questions for the professor
 
 **1. Our evaluation was aimed at the wrong module. What should Stage 2 be scored on?**
 
@@ -571,9 +682,20 @@ speed, or by gait phase estimated from the image, and both are inexact — and a
 frame is a **wrong label**, not just a noisy one. There is also no physically correct
 answer to what "the same phase" means between a six-leg tripod and a four-leg trot.
 
-Reading the source paper changes the shape of this question. **It has no cross-embodiment pairing
-term** — the shared latent space emerges from sharing the model weights across embodiments. So the
-pairing mechanism is **our addition**, and Stage 2 can follow the paper without it.
+**Slide 14 turns this from a risk into a measurement.** Weight sharing alone leaves **33.0% of the
+latent as embodiment identity**, decodable at 1.000, against 1.2% for the body within the insect
+family where the cross-body loss applies. So the pairing mechanism is **our addition**, and Stage 2
+can follow the paper without it — but the number says what that costs.
+
+**One concrete thing to try first, which does not need pairing at all.** Give the forward model an
+embodiment embedding, `FTM(e_t, z, id)`, so the module that wants the identity gets it directly and
+`z` has no reason to carry it. Same principle as the per-embodiment output heads: known,
+non-behavioural information should arrive through structure rather than through the latent. One
+code change and one run, tested by re-measuring the 33.0%.
+
+Adversarial removal is the fallback, and it is **newly viable**: it failed in Stage 1 (transfer 1.21x
+worse) only because the single shared head genuinely needed body identity, which a per-embodiment
+head now supplies.
 
 Their setting likely does not need one. The shortcut we measured only pays when knowing which body
 you are looking at tells you the command, and in our data each body does exactly one thing. In

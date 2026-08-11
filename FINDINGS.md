@@ -1,5 +1,9 @@
 # Stage 1 findings: why cross-morphology transfer fails, and what fixes part of it
 
+> **Role**: What is true, with the numbers.
+>
+> Append only. A later finding may bound or correct an earlier one -- it says so in place rather than the earlier one being edited, so the record of what was believed when stays intact. Open questions live in `OPEN_QUESTION.md`; the chronology lives in `PROGRESS.md`.
+
 **The short version.** A frozen video encoder carries robot morphology in a linearly decodable
 form that generalises to unseen bodies (F20). The world model trained on top of it ignores that
 and identifies the body from an 11-percent component of its own latent instead (F18, F19), which
@@ -1528,6 +1532,160 @@ never trained on, and this is direct evidence that the mechanism does not provid
 Caveat: one contrast between two bodies. The pairwise column and the four-configuration sweep make
 the comparison sound, but a third held-out body would make it solid.
 
+### F37. What the simulator will and will not let us generate
+
+Generating new morphologies turned out to be bounded, and the bound had not been noticed.
+
+A two-link leg cannot place its foot closer to its own shoulder than `|femur - tibia|` -- the
+triangle inequality, since the two links and the shoulder-to-foot distance are the three sides.
+Below that the knee would have to fold past straight. The collector pulls every foot target to
+**half** the hip-to-foot distance (`tgt = m1 + 0.5 * (expert_foot - m1)`), so the targets sit well
+inside, and the closest one across all 30 episodes the dataset uses is **92.5 mm** from the
+shoulder, with a spread of 92.5 to 93.7 mm across episodes.
+
+**It is a step, not a gradient**, which is what makes it easy to miss:
+
+| body | `\|femur - tibia\|` | targets inside the dead zone | IK residual |
+|---|---|---|---|
+| `c10f10t08` | 11.8 mm | 0.0% | 19 mm |
+| `c10f10t10` base | 71.0 mm | 0.0% | 32 mm |
+| **`c10f10t06`** | **94.6 mm** | **0.3%** | **2 mm** |
+| `c10f07t09` | 132.5 mm | 24.2% | **809 mm** |
+| `c10f08t10` | 139.6 mm | 27.3% | **349 mm** |
+
+A body 2 mm past the limit loses 0.3 percent of its targets and walks normally; one 40 mm past
+loses a quarter and does not. No body is ever *too far* -- 0.0% in every row -- so outer reach was
+never the constraint, and leg length does not sort the failures at all (`c10f08t10` at 703 mm
+fails while `c10f10t08` at 689 mm works).
+
+`sim/make_leg_morphology.py` now refuses to generate a violating body and prints the margin, with
+`--force` to override. Three of the first six bodies attempted were infeasible; the rule would
+have caught all three before any collection.
+
+**What it bounds for the project.** The decoupling axis is usable in both directions but not
+arbitrarily far. And `c10f10t06`, the held-out body of the tibia-short split, is itself 2 mm past
+the limit, so **no feasible body can bracket it exactly** in segment-scale space -- searching all
+182 bodies the rule permits on a 0.1 grid leaves a hull distance of 0.0707. What the experiment
+turns on is the floor in *command* space, which is unaffected.
+
+### F38. The shared trunk produces a switch, not a shared language
+
+Stage 2 trained for the first time: one ITM, one FTM and one decoder backbone shared across an
+18-DOF hexapod and a 12-DOF quadruped, with a per-embodiment output head. No cross-embodiment
+term -- the source method has none, and claims the shared latent emerges from weight sharing alone.
+
+Latent variance split by what explains it, using stance fraction as the phase label since the two
+embodiments share no episodes (`scripts/z_embodiment_share.py`, `best.pt`, epoch 12):
+
+| | share |
+|---|---|
+| gait phase | **39.6%** |
+| **which embodiment** | **33.0%** |
+| interaction | 27.4% |
+
+Against the insect-only figure, where `lambda_cross` holds the *body* share at **0.8-1.2%** on
+training bodies. **A third of the latent is a code for which robot this is**, and a linear probe
+separates the two at **1.000**.
+
+**Training did pull them together, and the picture shows it.** Between the frozen encoder and
+the learned latent (`scripts/cross_embodiment_umap.py`, 2,104 frames):
+
+| | embodiment probe | silhouette | cluster separation |
+|---|---|---|---|
+| frozen encoder `e_t` | 1.000 | **+0.671** | **4.01x** |
+| learned latent `z` | 1.000 | **+0.140** | **0.77x** |
+
+Weight sharing cut the silhouette by a factor of nearly five and brought the cluster means closer
+together than the average within-cluster spread. That is a real effect and it is visible in the
+projection: the encoder panel shows two clean, far-apart masses, the latent panel two much tighter
+ones.
+
+**But the latent panel still shows two separate clusters, and the probe is still 1.000.** A
+prediction registered before running it -- that a 0.77x separation would look intermingled in the
+projection -- was wrong. UMAP finds and sharpens cluster structure, so a representation that is
+only weakly separated in 64 dimensions still resolves into two clean blobs in two. **The picture
+overstates the separation relative to the full-space numbers**, which is the opposite of the
+failure mode usually warned about.
+
+**What this licenses about method, stated narrowly.** A UMAP cannot tell you how much embodiment
+identity a latent retains: here the projection reads as cleanly separated while the silhouette is
++0.140 and the means sit closer than the spread, and elsewhere the reverse could hold. **The
+decomposition and the probe have to be reported beside the figure**, because they are the only
+things that quantify what the picture gestures at. That is a claim about what this class of
+evidence can carry, not about anyone's result: our latent is not theirs, our setting is two
+embodiments against three and thousands of transitions against 150,000, and nothing here says
+LAC-WM's latent is or is not shared.
+
+This is F36's boundary arriving from a third direction. There, `lambda_cross` drove body identity
+out of the latent for bodies it trained on and failed to for bodies it had not seen. Here, with no
+equivalent term, embodiment identity simply stays.
+
+**Consequence for Stage 2**: the premise needs a mechanism that actively removes embodiment
+identity, not a shared trunk. `lambda_cross` is that mechanism for morphology and does not port,
+because it needs frames paired by shared intent and the two embodiments share no episodes (Q0).
+That question now has a measured number behind it rather than a prediction.
+
+Caveats, both real. The validation metric for this run is unusable -- `val_fraction 0.1` on 14 B1
+clips leaves **67 transitions**, which balanced sampling then repeats to fill half of every
+validation batch, which is why training loss reads nine times higher than validation. And the
+learning rate reached zero at epoch 6 while validation was still falling at epoch 12, so the
+schedule ran out before the model did.
+
+### F39. The embodiment identity in the latent is load-bearing, and it is smeared, not localised
+
+F38 established that 33.0% of the latent's variance is the embodiment and that a linear probe
+recovers it at 1.000. Both say identity is *present*; neither says anything *uses* it, and the
+difference decides the intervention. If nothing downstream reads it, the 33% is passive leakage
+from the frozen encoder and the fix is to remove the model's *ability* to carry it. If something
+does, that ability cannot be removed without first supplying the information elsewhere.
+
+The prior was passive, on structural grounds: the decoder's output head is *selected* by
+embodiment, so identity is handed to it for free, and the FTM sees `x_t`, which is a picture of
+the robot. Neither has to ask `z`. **That prior was wrong.**
+
+Tested without training anything (`scripts/z_identity_ablation.py`, `stage2_balanced/best.pt`
+epoch 12, 2,104 latents). Identity is linearly decodable, so peel the directions carrying it out
+of the 64-D latent, re-run the decoder on the crippled latent, and compare against the cost of
+deleting the same number of *random* orthogonal directions -- the floor for losing capacity with
+nothing meaningful removed:
+
+| latent | B1 | hexapod | mean vs intact |
+|---|---|---|---|
+| intact | 3.42 | 3.39 | 1.00x |
+| **identity removed, 8 directions** | 4.03 | **7.45** | **1.69x** |
+| random 8 directions removed | 3.79 | 4.13 | 1.16x |
+| `z` zeroed entirely | 29.34 | 18.82 | 7.07x |
+
+Degrees RMSE per joint, de-standardised per embodiment before converting, since MSE in
+standardised units is not comparable across two action spaces with different per-joint spreads.
+
+**1.69x against a 1.16x control: the identity is used.** And the cost is almost entirely one-sided
+-- the hexapod pays **2.20x** against random's 1.22x, while the B1 barely moves (1.18x against
+1.11x). The decoder reads "this is the hexapod" out of `z` despite its own head already encoding
+that fact.
+
+**Second result, which changes what the fix can look like.** Removing directions one at a time,
+refitting the probe after each, the embodiment does not clear:
+
+```
+1.000 -> 0.941 -> 0.895 -> 0.865 -> 0.849 -> 0.842 -> 0.836 -> 0.819 -> 0.806
+```
+
+Eight directions gone and identity still decodes at **0.806 against a 0.500 chance level**. It is
+not a subspace that can be excised; it is distributed across the latent. This retrospectively
+explains the adversary's failure mode: a 5-epoch run drove the body probe to 0.009 against a 0.200
+chance level, and below-chance means the code is being *rotated* faster than the classifier
+tracks, not dropped. With the signal smeared, gradient reversal has nothing local to delete, so
+scrambling is the only move available to it.
+
+**Consequence.** The two interventions are not alternatives, and their order is forced. A side
+channel alone relieves the *need* but leaves the *ability*, and nothing makes the model stop.
+An adversary alone removes the ability while something still depends on the information, which is
+what breaks. `cfg.ftm_embodiment_channel` supplies identity to the FTM as a separate latent token
+so `z` is free to stop carrying it; only with that in place does pressure on `z` cost nothing.
+
+The measurement to repeat after training with it is F38's 33.0%.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
@@ -1615,4 +1773,8 @@ proprioception is not.
 - `results/wm/figures/interpolation_failure.png` -- F4 and F6 in one figure
 - `results/wm/figures/heldout_sweep_two_seeds.png` -- F11 and F12
 - `results/wm/cache/axis_embeddings.npz` -- embeddings behind the axis positions in F4
+- `scripts/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39)
+- `results/wm/cache/stage2_embeddings.pt` -- cached encoder pass behind F39, rebuilt on demand and
+  gitignored: every patch token at full width is 2.9 GB
+- `scripts/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures
 - `results/wm/README.md` -- per-run metrics

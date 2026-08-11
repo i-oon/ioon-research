@@ -1,5 +1,25 @@
 # Research Direction — Cross-Morphology Locomotion via Latent Action World Models
 
+> **Role**: The plan as it stands today.
+>
+> Edited in place, never stacked with updates -- if a step changes, the old text is replaced. For how a step came to be what it is, read `PROGRESS.md`.
+
+## The problem
+
+A locomotion policy maps the robot's state to a joint command. It is tied to the body it was
+trained on: shorten a leg, redistribute the mass, or break a limb, and the policy no longer
+works. Retraining from scratch costs hours to days, every time.
+
+The question this project asks is whether a model can learn a **latent action** from video alone,
+with no morphology label and no kinematics given, that separates *what movement is happening* from
+*which body is doing it* -- so that the same latent drives a body it has never seen.
+
+**Why vision rather than proprioception.** The committee's question was why vision is worth the
+trouble. Three leg lengths cannot answer it: they share an 18-D joint space, so proprioception
+transfers between them too, and vision wins only on convenience. Answering it needs a body whose
+action space is **disjoint** -- a 12-DOF quadruped against an 18-DOF hexapod cannot be fed to one
+proprioceptive model at all, while one camera sees both. Hence the two stages.
+
 **Target**: Stage 1 (cross-morphology) then Stage 2 (cross-embodiment), then a
 deployment loop. See `PROGRESS.md` for the dated engineering log and `SIM_GUIDE.md` for how to run
 anything described here.
@@ -658,6 +678,56 @@ volume rather than a line and a held-out body can be a combination no training b
 > that decides it is the latent ablation, 21x in the old control; it should rise sharply, and
 > the held-out error should get **worse**, because the task is genuinely harder now.
 
+### Step 2.9 — Testing the diagnosis instead of asserting it
+**Status** in progress. Data collected; the training run is what remains.
+**Goal**: turn "the failure has the shape of a gap in the data" into a prediction that can fail
+
+> Step 2.8 ends with an explanation. This step makes it falsifiable. In all four bodies the
+> tibia-short split trains on, the femur and tibia carry the same scale, and the model answers
+> that they are equal for a held-out body where they are not. **If that is the cause, adding
+> bodies where they differ should remove the failure.**
+>
+> Three such bodies now exist and walk: `c10f10t08`, `c10f09t07`, `c10f08t06`, all decoupling the
+> two segments while staying inside the reach limit below. Collected at the full 30 episodes with
+> the same framing as every other body.
+>
+> **Registered before the run**, on the same held-out body that failed at 27.68 deg:
+>
+> | | before | after |
+> |---|---|---|
+> | interpolation floor | 19.58 deg | recompute on the real clips |
+> | threshold for "reads the geometry" | 15.7 deg | 15.7 deg |
+> | model | **27.68 deg** | **under 15.7 if the diagnosis holds** |
+>
+> The run is **volume-matched** -- seven bodies at 17 clips each against four at 30 -- so a
+> success cannot be attributed to more data. A second prediction costs minutes and no GPU: the
+> encoder probe's error on the held-out body should fall from 0.172 toward the 0.030 it reaches
+> on a bracketed body.
+>
+> If it fails, coverage is not the whole explanation, which is a sharper result than the one we
+> have rather than a weaker one.
+
+### Step 2.10 — What the simulator will and will not give us
+**Status** measured, and now enforced in the generator.
+
+> Generating morphologies is bounded by a constraint that had not been noticed. A two-link leg
+> cannot place its foot closer to its own shoulder than `|femur - tibia|`; below that the knee
+> would have to fold past straight. The collector pulls every foot target to half the hip-to-foot
+> distance, and the closest target across all 30 episodes sits at **92.5 mm**.
+>
+> So `|femur - tibia| < 92.5 mm` decides whether a body can walk at all, and it is a step rather
+> than a gradient: a body 2 mm past the line misses 0.3% of its targets and walks, one 40 mm past
+> misses 24% and returns IK residuals of 350 to 810 mm.
+>
+> `sim/make_leg_morphology.py` now refuses to generate a body that violates it, printing the
+> margin, with `--force` to override. Three of the first six bodies were infeasible; the rule
+> would have caught all three before any collection.
+>
+> **What this bounds**: the decoupling axis is usable in both directions but not arbitrarily far,
+> and `c10f10t06` -- the held-out body of the tibia-short split -- is itself 2 mm past the limit,
+> so no feasible body can bracket it exactly in segment-scale space. The command-space floor is
+> what the experiment turns on, and that is unaffected.
+
 ### Step 3 — Extrapolation
 **Status** measured once, out of proposal scope for the write-up.
 **Goal**: test morphology outside training range
@@ -806,10 +876,34 @@ misses longer behavioral structure" — a different problem than the one we fear
 
 ---
 
-## 8. Deployment (out of scope)
+## 8. Deployment (in scope, as a demonstration)
 
-Deployment is the eventual use: a policy that makes a new body walk. It is not part of this thesis, but
-several pretraining decisions are only correct or incorrect relative to it, so the target is recorded here.
+Deployment is the eventual use: a controller that makes a new body walk. **Brought into scope
+2026-08-11**, on the judgement that there is time to close the loop. Several pretraining decisions
+were already only correct or incorrect relative to it, so it was recorded here throughout.
+
+**What it can and cannot claim, decided in advance so the result is not over-read.**
+
+The forward model does roll the world forward -- 1.38x better than a frozen world at one step,
+1.47x at three, 1.20x at ten (F32) -- so candidate B has something to plan with. That was measured
+only after we noticed we had been scoring the module on action reconstruction, which is not its
+job (F30, F32).
+
+But **F31 makes planning easy on this data for the wrong reason**: one frame nearly determines the
+joint command at every horizon out to 32 frames, because the gait is periodic and a single frame
+fixes the phase. A selector choosing between candidate latents therefore faces an almost
+deterministic problem. **A working demonstration here shows the loop closes; it does not show that
+planning is what made it work.** Distinguishing those needs data whose future is genuinely open --
+varying speed, turning, terrain, disturbance -- which is exactly the gap F31 identifies and the
+AMP policies in `amp/logs/` are a candidate source for.
+
+Two further constraints carried over: match candidate rollouts in **z-space, not `e`-space**, since
+V-JEPA2 encodes morphology strongly and `e`-distances between bodies are confounded by shape; and
+the loop must be **closed**, because open-loop replay of a demo latent sequence desynchronises on a
+differently-timed body.
+
+So the deliverable is: **the loop runs end to end on a held-out body, and we state plainly what the
+data lets that mean.**
 
 ### What the execution loop requires
 

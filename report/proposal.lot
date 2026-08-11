@@ -1,7 +1,0 @@
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Positioning of cross-morphology / cross-embodiment methods. ``Transfers across bodies'' asks whether a single trained model is reused on a new body without per-body retraining.}}{15}{table.caption.12}%
-\addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Input/output specification of each block in the pipeline.}}{22}{table.caption.14}%
-\contentsline {table}{\numberline {3.2}{\ignorespaces Distance travelled under an identical command sequence, five episodes per morphology.}}{28}{table.caption.17}%
-\contentsline {table}{\numberline {3.3}{\ignorespaces Work plan. The core experiments (through Step F) target completion by the end of October, leaving November for analysis and writing.}}{33}{table.caption.21}%

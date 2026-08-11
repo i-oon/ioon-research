@@ -63,7 +63,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0):
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
 
     z = models["itm"](views["view1_t"], views["view1_next"])
-    pred_next = models["ftm"](views["view2_t"], z)
+    pred_next = models["ftm"](views["view2_t"], z, embodiment)
     pred_action = models["md"](views["view1_t"], z, embodiment)
 
     cross_pred = cross_target = None

@@ -1,0 +1,47 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  95%|█████████▍| 797/843 [00:00<00:00, 7946.14it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8004.14it/s]
+  encoded 1/29  c10f10t10_ep6.npz
+  encoded 2/29  c10f10t10_ep20.npz
+  encoded 3/29  c10f10t10_ep22.npz
+  encoded 4/29  c06f10t10_ep6.npz
+  encoded 5/29  c06f10t10_ep20.npz
+  encoded 6/29  c06f10t10_ep22.npz
+  encoded 7/29  c10f10t06_ep6.npz
+  encoded 8/29  c10f10t06_ep20.npz
+  encoded 9/29  c10f10t06_ep22.npz
+  encoded 10/29  c06f10t06_ep6.npz
+  encoded 11/29  c06f10t06_ep20.npz
+  encoded 12/29  c06f10t06_ep22.npz
+  encoded 13/29  c10f06t06_ep6.npz
+  encoded 14/29  c10f06t06_ep20.npz
+  encoded 15/29  c10f06t06_ep22.npz
+  encoded 16/29  p1_vx0.30.npz
+  encoded 17/29  p1_vx0.34.npz
+  encoded 18/29  p1_vx0.38.npz
+  encoded 19/29  p1_vx0.4.npz
+  encoded 20/29  p1_vx0.42.npz
+  encoded 21/29  p1_vx0.46.npz
+  encoded 22/29  p1_vx0.50.npz
+  encoded 23/29  p2_vx0.30.npz
+  encoded 24/29  p2_vx0.34.npz
+  encoded 25/29  p2_vx0.38.npz
+  encoded 26/29  p2_vx0.4.npz
+  encoded 27/29  p2_vx0.42.npz
+  encoded 28/29  p2_vx0.46.npz
+  encoded 29/29  p2_vx0.50.npz
+wm/runs/stage2_balanced/best.pt  epoch 12  action_lag 1
+2104 latents of dim 64: 975 hexapod, 1129 b1
+
+embodiment probe as directions are peeled off: 1.000 -> 0.941 -> 0.895 -> 0.865 -> 0.849 -> 0.842 -> 0.836 -> 0.819
+8 of 64 directions carry the embodiment; with them removed the probe reads 0.806 against a chance level of 0.500
+
+latent                           b1     hexapod    vs intact
+intact                        3.42u       3.39u        1.00x
+identity removed (8d)         4.03u       7.45u        1.69x
+random 8d removed             3.79u       4.13u        1.16x
+z zeroed                     29.34u      18.82u        7.07x
+
+Errors are RMSE per joint in degrees. Read the identity row against the random row:
+if deleting the embodiment subspace costs no more than deleting the same number of
+arbitrary directions, nothing downstream was using it, the 33% is leakage from the
+frozen encoder, and an FTM side channel has no pressure to relieve.
