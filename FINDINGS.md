@@ -1686,6 +1686,111 @@ so `z` is free to stop carrying it; only with that in place does pressure on `z`
 
 The measurement to repeat after training with it is F38's 33.0%.
 
+### F40. The vision path runs at 10.5 Hz, which puts it on the biological side of the trade-off
+
+Asked which architecture the system addresses -- "few sensors and fast" like a robot at 50 Hz, or
+"many sensors and slow" like an animal at 200 ms -- the answer needed a measured number rather
+than an estimate.
+
+V-JEPA2 ViT-g/16, 1B parameters and frozen, encoding a single frame with the frame-duplication
+trick on a 2080 Ti: **94.9 ms, or 10.5 Hz**, averaged over 20 calls after warm-up. The ITM,
+forward model and decoder together are a rounding error beside it.
+
+| | sensors | loop time |
+|---|---|---|
+| biological | ~10^6 nerve endings | 200 ms |
+| robot control | few | 20 ms, 50 Hz |
+| **this pipeline's vision path** | one camera | **94.9 ms, 10.5 Hz** |
+
+**We are nearer the animal than the robot, and that is not a defect to optimise away.** Vision is
+not here for bandwidth or latency; it is here because it is the only channel in which an 18-DOF
+hexapod and a 12-DOF quadruped are described in the same coordinates. They share no joint space,
+no sensor correspondence and no midpoint (F38's premise). That property costs 95 ms per frame.
+
+Consequence for deployment: the architecture is **two-rate by necessity**. Perception plans at
+~10 Hz and control stabilises at 50 Hz, which is also the answer to the objection that
+proprioception cannot be removed -- it is not being removed, it is doing the job vision cannot.
+The cross-embodiment stance-fraction probe puts a number on which job that is: within an
+embodiment the frozen encoder reads contact at 0.82-0.89x of the target's spread, across
+embodiments at 1.04-1.16x, at or past the point where looking at the image is worth nothing, and
+that is with pooling and appearance both controlled (F41).
+
+### F41. Most of the cross-embodiment probe failure was the pooling, not the encoder
+
+The frozen-encoder cross probe (F37) fitted a stance-fraction readout on one embodiment and applied
+it to the other, on **mean-pooled** patch tokens, and reported 4.72x and 3.00x of the target's own
+spread -- three to five times worse than predicting the average. That number is an artefact of the
+reduction, and the honest figure is much smaller.
+
+The encoder emits 256 patch tokens per frame, which have to be collapsed to one vector. Three
+reductions, identical in every other respect:
+
+| fitted -> tested | mean | bands (4 horizontal) | **max** |
+|---|---|---|---|
+| insect -> insect | 0.88x | 0.84x | 0.92x |
+| B1 -> B1 | 0.89x | 0.89x | 0.92x |
+| **insect -> B1** | **4.72x** | 2.74x | **1.32x** |
+| **B1 -> insect** | **3.00x** | 2.35x | **1.06x** |
+| embodiment cluster separation | 3.94x | 3.58x | **1.83x** |
+
+The diagonals barely move. The cross cells fall by a factor of three to four. **Max uses exactly as
+many features as mean, 1,408, so this is not capacity.**
+
+**The mechanism is the last row.** Mean-pooled, the two embodiments' frames sit 3.94x apart
+relative to their own spread -- a large constant offset, not a difference in how contact is
+encoded. A ridge fitted on insects absorbs that offset into its intercept; applied to a B1 every
+prediction shifts by it, and the error explodes. Max-pooling takes the strongest response per
+dimension, which discards the offset, and separation drops to 1.83x with the cross error following.
+
+**What survives.** Every cross cell is still at or above **1.00x**, so a readout fitted on one
+embodiment and applied to the other is no better than ignoring the image. The frozen encoder still
+hands over nothing usable across embodiments, and F38's premise stands. What does not survive is
+the *magnitude*: "actively misleading, three to five times worse than guessing" was the pooling.
+
+**Method consequence, and it generalises.** Mean-pooling is correct for quantities spread across
+the frame -- segment scale is recovered at 0.050 from pooled tokens (F20), embodiment identity at
+probe 1.000 -- and wrong for quantities confined to a few patches, since which feet are loaded
+occupies perhaps 6-12 of 256. **The reduction has to be chosen for the quantity and reported with
+the result.** A single-reduction number for a local quantity is not a property of the encoder.
+
+**The second nuisance is appearance, and removing it makes the number stable.** The insect renders
+orange and occupies about a quarter of the frame; the B1 renders grey and about three quarters.
+Neither is behaviour. Standardising each embodiment by its own mean and spread removes both, using
+only which dataset a frame came from and never the target -- standard unsupervised domain
+adaptation. Cross cells, raw against controlled:
+
+| cross cells | mean | bands | max |
+|---|---|---|---|
+| raw | **4.72x / 3.00x** | 2.74x / 2.35x | 1.32x / 1.06x |
+| **appearance controlled** | 1.57x / 1.07x | **1.16x / 1.04x** | 1.22x / 1.02x |
+
+Raw, the answer swings four-fold on the choice of pooling alone. Controlled, every reduction agrees
+within 1.02-1.57x. **Reported at band-pooled and controlled, 1.16x and 1.04x**, because that is the
+setting where the number is a property of the encoder rather than of our choices, and because the
+best-transferring readout is the fair test of whether the information is present at all.
+
+The claim is now its strong form: with colour, apparent size and pooling all controlled, the frozen
+encoder still gives nothing usable across embodiments, and that cannot be explained away by the two
+robots looking different.
+
+Limit worth stating: per-embodiment standardisation needs a batch of the new robot's frames, so
+this is domain adaptation rather than zero-shot. The setting already requires that, since a new
+embodiment needs a new output head fitted on some of its data regardless.
+
+**Where this does not transfer.** The same correction cannot be applied to F38's 33% embodiment
+share in `z`: that quantity *is* the between-group mean difference, so centring per embodiment
+would zero it by construction. Controlling appearance there means equalising it at render time --
+same material colour, camera distance matched so both robots occupy a similar fraction of the
+frame -- which is also what the 4-leg insect would need to separate leg count from appearance.
+
+An untried third option: standardise the encoder features per embodiment **during training**, so
+the constant appearance offset never reaches the ITM and `z` is never offered it as a code. Uses
+only the embodiment label, which training has, and costs nothing the setting was not already
+paying.
+
+Reproduce all six cells with `--features {mean,bands,max}` and `--normalize` on
+`scripts/cross_embodiment_probe.py`, from one cached encoder pass.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);

@@ -589,13 +589,46 @@ embodiment and apply it to the other:
 
 | fitted on | tested on | error / the target's own spread |
 |---|---|---|
-| insect | insect | 0.88x |
+| insect | insect | 0.82x |
 | B1 | B1 | 0.89x |
-| **insect** | **B1** | **4.72x** |
-| **B1** | **insect** | **3.00x** |
+| **insect** | **B1** | **1.16x** |
+| **B1** | **insect** | **1.04x** |
 
-Above 1.00 means worse than predicting the average. Both cross directions are **3 to 5x worse
-than that**.
+**1.00x is the line where looking at the image stops being worth anything.** Within an embodiment
+the readout beats guessing; across, it does not.
+
+
+**Two things that are not behaviour had to be controlled for first, and both moved the number a
+lot.** They are reported rather than buried, because either one alone would have made this
+measurement say whatever we wanted.
+
+*How the frame is reduced.* The encoder emits 256 patch tokens per frame, which must be collapsed
+to one vector. Which feet are loaded occupies perhaps 6–12 of those patches, so averaging all 256
+buries it — while faithfully preserving a large constant offset between insect frames and B1
+frames, which a fitted readout absorbs into its intercept and then mis-applies to the other robot.
+
+*How the two robots look.* The insect renders orange and occupies about a quarter of the frame; the
+B1 renders grey and occupies about three quarters. Neither is behaviour. Standardising each
+embodiment by its own statistics removes both, using only which dataset a frame came from and never
+the stance fraction being predicted.
+
+| cross cells | mean-pooled | band-pooled | max-pooled |
+|---|---|---|---|
+| raw | **4.72x / 3.00x** | 2.74x / 2.35x | 1.32x / 1.06x |
+| **appearance controlled** | 1.57x / 1.07x | **1.16x / 1.04x** | 1.22x / 1.02x |
+
+Raw, the answer swings by a factor of four depending on nothing but the pooling. Controlled, every
+reduction agrees within 1.02–1.57x. **The controlled row is the one that is a property of the
+encoder rather than of our choices**, so it is the one reported.
+
+The claim that survives is the flat one, and it is now the strong version of itself: **even with
+colour, apparent size and pooling all controlled, the frozen encoder gives nothing usable across
+embodiments.** Not that it is actively misleading — and not something that could be explained away
+by our two robots looking different.
+
+One honest limit: standardising per embodiment needs a batch of the new robot's frames to compute
+statistics from, so this is domain adaptation rather than zero-shot. That is already true of the
+setting, since a new embodiment needs a new output head fitted on some of its data regardless.
 
 **After training, what the latent is made of:**
 
@@ -687,21 +720,111 @@ latent as embodiment identity**, decodable at 1.000, against 1.2% for the body w
 family where the cross-body loss applies. So the pairing mechanism is **our addition**, and Stage 2
 can follow the paper without it — but the number says what that costs.
 
-**One concrete thing to try first, which does not need pairing at all.** Give the forward model an
-embodiment embedding, `FTM(e_t, z, id)`, so the module that wants the identity gets it directly and
-`z` has no reason to carry it. Same principle as the per-embodiment output heads: known,
-non-behavioural information should arrive through structure rather than through the latent. One
-code change and one run, tested by re-measuring the 33.0%.
+**One concrete thing being tried first, which does not need pairing at all.** Give the forward model
+an embodiment embedding, `FTM(e_t, z, id)`, so the module that wants the identity gets it directly
+and `z` has no reason to carry it. Same principle as the per-embodiment output heads: known,
+non-behavioural information should arrive through structure rather than through the latent.
 
-Adversarial removal is the fallback, and it is **newly viable**: it failed in Stage 1 (transfer 1.21x
-worse) only because the single shared head genuinely needed body identity, which a per-embodiment
-head now supplies.
+**Whether that is the right fix was tested before building it**, by asking whether the identity in
+`z` is used or merely present — two different things, and only the first justifies a side channel.
+Delete the directions carrying the embodiment and re-score the decoder, against the cost of
+deleting the same number of random directions:
+
+| latent | B1 | hexapod | mean vs intact |
+|---|---|---|---|
+| intact | 3.42 | 3.39 | 1.00x |
+| **embodiment identity removed** | 4.03 | **7.45** | **1.69x** |
+| random directions removed, same count | 3.79 | 4.13 | 1.16x |
+
+Degrees per joint. **1.69x against a 1.16x control: something reads the identity out of `z`**, and
+almost all of the cost is the hexapod, at 2.20x against random's 1.22x — even though its output
+head already encodes which robot it is.
+
+A second number changes what the fix can be. Peeling directions off one at a time, the embodiment
+still decodes at **0.806 against a 0.500 chance level** after eight of 64 directions are gone. The
+identity is **smeared across the latent, not localised**, so there is nothing for an adversary to
+excise — which is why Stage 1's adversary drove the probe *below* chance, scrambling the code
+rather than dropping it.
+
+So the two interventions are not alternatives and their order is forced: **the side channel
+relieves the need, and only then does removing the ability cost nothing.** Adversarial removal
+becomes the safe second step rather than the destructive one it was.
 
 Their setting likely does not need one. The shortcut we measured only pays when knowing which body
 you are looking at tells you the command, and in our data each body does exactly one thing. In
 theirs, one robot performs thousands of different manipulations, so body identity says almost
 nothing. **We are applying the method to a regime it was not tested in** — bodies that differ
 slightly, one behaviour — and that regime is where the shortcut appears.
+
+---
+
+## Slide 16 — Three questions left open in Week 11, now with answers
+
+### 1. "How is this different from Diffusion?"
+
+**The latent is inferred, not sampled.** A diffusion model starts from noise that is isotropic
+Gaussian *by construction* — structureless by design, because the structure is meant to come from
+the denoiser. Our `z` is produced by the ITM from an observed pair of frames, and there is no
+sampling anywhere at inference. The whole pipeline is deterministic.
+
+That difference is measurable rather than rhetorical, and we measured it. Ask what a latent is made
+of and a diffusion prior answers "nothing, by design". Ours answers:
+
+| | share of `z`'s variance |
+|---|---|
+| gait phase | **88.7%** |
+| which body | **1.2%** |
+| interaction | 10.1% |
+
+**The requirement on the latent is also different in kind.** A diffusion policy is trained for one
+robot and never has to satisfy a cross-body constraint. Ours must decode to *different joint values
+for different bodies from the same latent*, because the same intent is a different set of angles on
+different geometry — which is exactly what `lambda_cross` enforces and what the held-out body tests.
+
+**The part of the question that stands.** At the level of "a conditioned generator produces motion",
+the two are swappable, and swapping in a different generator would be a plumbing change rather than
+a contribution. The honest differentiator is not the architecture but the claim being tested:
+**transfer to a body, or an embodiment, that was never in the training set.** Diffusion policies,
+Sora and animation pipelines do not attempt that. It is also why our evaluation is a held-out body
+rather than sample quality — a generated video that looks right is not evidence of transfer.
+
+### 2. "Few sensors and fast, or many sensors and slow?"
+
+Measured, not estimated. V-JEPA2 ViT-g/16 is **1 billion parameters, frozen**, and encoding one
+frame on our 2080 Ti takes **94.9 ms — 10.5 Hz**.
+
+| | sensors | loop time |
+|---|---|---|
+| biological, his example | ~10^6 nerve endings | 200 ms |
+| robot control, his example | few | 20 ms, 50 Hz |
+| **our vision path** | one camera | **94.9 ms, 10.5 Hz** |
+
+**We sit on the biological side of the dichotomy, and that was not a mistake.** Vision here is not
+buying sensor bandwidth or speed — it is buying **commensurability**. An 18-DOF hexapod and a
+12-DOF quadruped have no shared joint space, no correspondence between their sensor vectors and no
+midpoint between them. A camera is the only channel in which both are described in the same
+coordinates. That property costs 95 ms per frame and is worth it, because no amount of
+proprioceptive bandwidth produces it.
+
+So the architecture is **two-rate by necessity**: perception plans at ~10 Hz, control stabilises at
+50 Hz. That is the role the camera was assigned in the same meeting — planner, not reflex.
+
+### 3. "Removing proprioception entirely is not possible"
+
+**Agreed, and our own measurement supports the objection.** Fit a readout for stance fraction — the
+proportion of feet on the ground — on the frozen encoder of one embodiment and apply it to the
+other. Within an embodiment it beats guessing, at **0.82x and 0.89x** of the target's own spread.
+Across embodiments it is **1.16x and 1.04x** — at or past the line where looking at the image is
+worth nothing — and that is *after* controlling for colour, apparent size and pooling, any of which
+would otherwise have flattered the result (slide 14).
+
+Vision does not read load transfer between bodies. The six-legs-minus-two weight-distribution
+argument is correct, and this is the number for it.
+
+**What that changes is the scope of the claim, not the claim.** The thesis is that vision is the
+only channel that can carry a skill *between* incomparable bodies. It is not that vision closes the
+balance loop. Those are different jobs at different rates, and the deployment loop uses both:
+the latent supplies **what to do**, proprioception supplies **how to stay up while doing it**.
 
 The question is therefore whether to keep our term. Without it, Stage 1's failure mode is what we
 measured happening. With it, we need a pairing definition that does not exist yet.

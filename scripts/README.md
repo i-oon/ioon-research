@@ -135,3 +135,7 @@ Each was hit at least once and cost real time.
 - **One direction is not a subspace.** Delete the probe's weight vector and the probe refits onto
   correlated axes. Peel directions off one at a time until accuracy reaches chance, and if it
   never does, the signal is distributed and no adversary can excise it.
+- **How you pool the patch tokens is part of the measurement.** Mean-pooling suits quantities
+  spread across the frame and buries ones confined to a few patches, and it also preserves a large
+  constant offset between datasets that a fitted readout absorbs and then mis-applies. It turned a
+  1.32x cross-embodiment result into 4.72x. Try more than one reduction and report the range.

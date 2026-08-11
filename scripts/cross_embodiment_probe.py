@@ -47,25 +47,86 @@ INSECT_BODIES = ["c10f10t10", "c06f10t10", "c10f10t06", "c10f06t06", "c08f09t09"
 INSECT_EPS = [6, 20, 22]
 
 
-def load_side(encoder, chunk):
-    """Embeddings and stance fraction for both embodiments, as parallel arrays."""
-    out = {}
+def features(tokens, mode, grid=16):
+    """Reduce [T, grid*grid, dim] patch tokens to one vector per frame.
 
-    frames, stance = [], []
+    Averaging every patch is linear, so it keeps whatever is spread across many patches and
+    drowns whatever lives in few. Segment scale spans the whole body and survives it (F20);
+    which feet are loaded occupies perhaps 6-12 patches of 256 and is diluted 20-40x. The mode
+    therefore has to be chosen for the quantity being read, and stated, since a weak result
+    under `mean` says as much about the reduction as about the encoder.
+
+      mean   average over all patches. The global-property default.
+      bands  average within each of four horizontal bands of the patch grid, concatenated.
+             Feet and ground sit in the lower bands, so contact is diluted 4x instead of 256x
+             while the feature count stays tractable at 4 x dim.
+      max    per-dimension maximum over patches: the strongest local response anywhere in the
+             frame, with position discarded.
+    """
+    if mode == "mean":
+        return tokens.mean(1).numpy()
+    if mode == "max":
+        return tokens.max(1).values.numpy()
+    if mode == "bands":
+        t = tokens.reshape(len(tokens), grid, grid, -1)
+        return t.reshape(len(tokens), 4, grid // 4 * grid, -1).mean(2).flatten(1).numpy()
+    raise ValueError(f"unknown feature mode {mode!r}")
+
+
+def load_side(encoder, chunk, mode, cache_path):
+    """Features and stance fraction for both embodiments, as parallel arrays.
+
+    Patch tokens are cached at full width and reduced afterwards, so trying another reduction
+    costs no encoder time.
+    """
+    cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
+    fresh = False
+
+    def tokens_for(path, frames):
+        nonlocal fresh
+        if path not in cache:
+            cache[path] = encode_clip(encoder, frames, chunk)
+            fresh = True
+        return cache[path]
+
+    out = {}
+    feats, stance = [], []
     for body in INSECT_BODIES:
         for ep in INSECT_EPS:
-            clip = np.load(f"{ROOT}/data/ik_walk_8body/{body}_ep{ep}.npz")
-            frames.append(encode_clip(encoder, clip["frames"], chunk).mean(1).numpy())
+            path = f"{ROOT}/data/ik_walk_8body/{body}_ep{ep}.npz"
+            clip = np.load(path)
+            feats.append(features(tokens_for(path, clip["frames"]), mode))
             stance.append((clip["forces"] > CONTACT_THRESHOLD).mean(axis=1))
-    out["insect"] = (np.concatenate(frames), np.concatenate(stance))
+    out["insect"] = (np.concatenate(feats), np.concatenate(stance))
 
-    frames, stance = [], []
+    feats, stance = [], []
     for path in sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz")):
         clip = np.load(path, allow_pickle=True)
-        frames.append(encode_clip(encoder, clip["frames"], chunk).mean(1).numpy())
+        feats.append(features(tokens_for(path, clip["frames"]), mode))
         stance.append(clip["foot_contact"].mean(axis=1))
-    out["b1"] = (np.concatenate(frames), np.concatenate(stance))
+    out["b1"] = (np.concatenate(feats), np.concatenate(stance))
+
+    if fresh:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        torch.save(cache, cache_path)
     return out
+
+
+def standardise_per_embodiment(data):
+    """Centre and scale each embodiment's features by its own statistics.
+
+    The two datasets differ in things that are not behaviour -- the insect renders orange and the
+    B1 grey, the B1's apparent size grows several-fold across a clip while the insect's does not,
+    the backgrounds differ. Those show up as a constant offset and a scale difference between the
+    two clouds, and a readout fitted on one absorbs them, then mis-applies them to the other.
+
+    This is standard unsupervised domain adaptation: it uses only *which dataset* a frame belongs
+    to, never the stance fraction being predicted, so it does not leak the target. It is honest to
+    report but it is not zero-shot -- it assumes a batch of the new embodiment's frames exists to
+    compute statistics from, which is true when adapting to a robot and false when seeing one
+    frame of it for the first time.
+    """
+    return {name: ((x - x.mean(0)) / (x.std(0) + 1e-6), y) for name, (x, y) in data.items()}
 
 
 def halves(x, y, seed=0):
@@ -85,11 +146,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--chunk", type=int, default=2)
+    ap.add_argument("--features", default="bands", choices=("mean", "bands", "max"))
+    ap.add_argument("--normalize", action="store_true",
+                    help="centre and scale each embodiment by its own statistics first")
+    ap.add_argument("--cache", default=os.path.join(ROOT, "results", "wm", "cache",
+                                                    "stage2_embeddings.pt"))
     args = ap.parse_args()
 
     encoder = VJEPA2FrameEncoder(device=args.device, dtype=torch.float32)
-    data = load_side(encoder, args.chunk)
+    data = load_side(encoder, args.chunk, args.features, args.cache)
     del encoder
+    print(f"features: {args.features}, {data['insect'][0].shape[1]} dimensions per frame"
+          f"{', per-embodiment standardised' if args.normalize else ''}\n")
+    if args.normalize:
+        data = standardise_per_embodiment(data)
 
     for name, (x, y) in data.items():
         print(f"{name:<8} {len(x)} frames, stance fraction mean {y.mean():.3f} "

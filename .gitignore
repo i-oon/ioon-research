@@ -12,10 +12,6 @@ sim/env/experttemp.csv
 # Large expert dataset (132 MB, exceeds GitHub's 100 MB limit) — keep on disk, not in git
 sim/env/expert_66k_aug3c_fcontact.csv
 
-# Encoder caches keeping every patch token: 29 clips x 66 frames x 256 tokens x 1408 dims of
-# float32 is 2.9 GB, well past GitHub's 100 MB per-file limit. Rebuilt by whichever script
-# wants them, so they are never worth committing. The small pooled .npz caches beside them are
-# tracked, since those are the ones findings cite.
 results/wm/cache/
 
 # Data artifacts (regenerable: encoded embeddings, episode npz, rendered videos, frames)

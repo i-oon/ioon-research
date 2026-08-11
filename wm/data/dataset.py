@@ -236,6 +236,15 @@ class MultiEmbodimentPairs(Dataset):
             groups.setdefault(self.clips[clip_idx]["embodiment"], []).append(i)
         return groups
 
+    def frame_at(self, i):
+        """The raw frame for pair `i`, with no augmentation applied.
+
+        Used to estimate the per-embodiment appearance offset, which is a property of how a robot
+        renders and should not be measured through a random crop.
+        """
+        clip_idx, t = self.index[i]
+        return self.clips[clip_idx]["frames"][t]
+
     def __len__(self):
         return len(self.index)
 

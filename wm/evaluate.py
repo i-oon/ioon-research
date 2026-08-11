@@ -53,6 +53,17 @@ def encode_clip(encoder, frames, chunk=16):
     return torch.cat(embeddings)
 
 
+def offset_for(checkpoint, embodiment):
+    """The appearance offset a `center_embeddings` run was trained with, or None.
+
+    A model trained on centred embeddings and then scored on raw ones sees a shifted input
+    distribution and reports quietly wrong numbers rather than failing, so every script that
+    encodes frames for a checkpoint has to ask for this.
+    """
+    offsets = checkpoint.get("embedding_offsets")
+    return offsets[embodiment] if offsets else None
+
+
 @torch.no_grad()
 def latents(itm, embeddings, chunk):
     total = len(embeddings) - 1

@@ -49,7 +49,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import encode_clip, upgrade_decoder_state  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
@@ -81,12 +81,17 @@ def embed(encoder, clips, chunk, cache_path):
 
 
 @torch.no_grad()
-def gather(embeddings, itm, clips, stats, action_lag):
+def gather(embeddings, itm, clips, stats, action_lag, checkpoint=None):
     """Per clip: embeddings, latents, standardised target commands, embodiment name."""
     out = []
     for name, path in clips:
         clip = load(path, REGISTRY[name])
         e = embeddings[path]
+        # the cache holds raw encoder output, so a centred checkpoint's offset is applied here
+        # rather than baked into the cache, which is shared across checkpoints
+        offset = offset_for(checkpoint, name) if checkpoint else None
+        if offset is not None:
+            e = e - offset
         actions = clip["actions"]
         n = min(len(e) - 1, len(actions) - action_lag)
         z = torch.cat([itm(e[s:min(s + 8, n)], e[s + 1:min(s + 8, n) + 1])
@@ -175,7 +180,7 @@ def main():
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
     embeddings = embed(encoder, clips, args.chunk, args.cache)
     del encoder
-    records = gather(embeddings, itm, clips, stats, cfg.action_lag)
+    records = gather(embeddings, itm, clips, stats, cfg.action_lag, checkpoint)
 
     Z = torch.cat([r["z"] for r in records]).numpy()
     label = np.concatenate([[r["embodiment"] == "b1"] * len(r["z"]) for r in records]).astype(int)

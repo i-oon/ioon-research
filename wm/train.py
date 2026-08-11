@@ -41,12 +41,45 @@ from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 VIEW_KEYS = ("view1_t", "view1_next", "view2_t", "view2_next")
 
 
-def encode_batch(encoder, batch):
+def encode_batch(encoder, batch, offset=None):
     frames = []
     for key in VIEW_KEYS:
         frames.extend(list(batch[key].numpy()))
     embeddings = encoder.encode(frames).float()
+    if offset is not None:
+        # broadcast over batch and patch tokens: one 1408-vector removed from every token, so the
+        # appearance offset goes and the spatial arrangement of the robot stays
+        embeddings = embeddings - offset
     return dict(zip(VIEW_KEYS, embeddings.chunk(len(VIEW_KEYS))))
+
+
+@torch.no_grad()
+def embedding_offsets(encoder, dataset, cfg, device):
+    """Per-embodiment mean of the encoder's output, one vector of `token_dim` per embodiment.
+
+    Estimated from un-augmented frames, since the offset being removed is a property of how a
+    robot renders rather than of any particular crop. Averaged over frames and over patch
+    positions, so what is subtracted is a global appearance shift and not a template of where the
+    robot usually sits in the frame -- subtracting per position would delete silhouette.
+    """
+    offsets = {}
+    for name, indices in dataset.embodiment_indices().items():
+        step = max(1, len(indices) // cfg.center_frames)
+        picked = indices[::step][:cfg.center_frames]
+        total, count = None, 0
+        for start in range(0, len(picked), 8):
+            frames = [dataset.frame_at(i) for i in picked[start:start + 8]]
+            e = encoder.encode(frames).float()
+            batch_sum = e.sum(dim=(0, 1))
+            total = batch_sum if total is None else total + batch_sum
+            count += e.shape[0] * e.shape[1]
+        offsets[name] = (total / count).to(device)
+        print(f"  {name}: mean over {len(picked)} frames, "
+              f"norm {offsets[name].norm().item():.3f}")
+    pair = list(offsets.values())
+    if len(pair) == 2:
+        print(f"  offset between the two embodiments: {(pair[0] - pair[1]).norm().item():.3f}")
+    return offsets
 
 
 def adv_scale(cfg, epoch):
@@ -56,11 +89,12 @@ def adv_scale(cfg, epoch):
     return min(1.0, epoch / cfg.adv_warmup_epochs)
 
 
-def forward_step(models, encoder, batch, cfg, device, scale=1.0):
-    views = encode_batch(encoder, batch)
-    action = batch["action"].to(device)
-    # batches are single-embodiment by construction, so one head serves the whole batch
+def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
+    # batches are single-embodiment by construction, so one head and one offset serve the batch
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
+    offset = offsets.get(embodiment) if offsets else None
+    views = encode_batch(encoder, batch, offset)
+    action = batch["action"].to(device)
 
     z = models["itm"](views["view1_t"], views["view1_next"])
     pred_next = models["ftm"](views["view2_t"], z, embodiment)
@@ -69,6 +103,10 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0):
     cross_pred = cross_target = None
     if "cross_x_t" in batch and cfg.lambda_cross > 0:
         cross_views = encoder.encode(list(batch["cross_x_t"].numpy())).float()
+        if offset is not None:
+            # the partner body is a different morphology of the same embodiment, so it shares
+            # this batch's offset
+            cross_views = cross_views - offset
         cross_pred = models["md"](cross_views, z, embodiment)
         cross_target = batch["cross_action"].to(device)
 
@@ -83,7 +121,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0):
                           adv_logits, morph_id, probe_logits, cross_pred, cross_target)
 
 
-def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0):
+def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0,
+              offsets=None):
     training = optimizer is not None
     for model in models.values():
         model.train(training)
@@ -92,7 +131,7 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
     for batch in loader:
         with torch.set_grad_enabled(training):
             with torch.amp.autocast("cuda", dtype=torch.float16):
-                loss, parts = forward_step(models, encoder, batch, cfg, device, scale)
+                loss, parts = forward_step(models, encoder, batch, cfg, device, scale, offsets)
 
         if training:
             optimizer.zero_grad(set_to_none=True)
@@ -290,6 +329,14 @@ def main():
     print(f"train {len(train_set)} pairs | val {len(val_set)} pairs | "
           f"{heldout_note} | trainable {trainable/1e6:.1f}M")
 
+    offsets = None
+    if cfg.center_embeddings:
+        if not cross_embodiment:
+            raise SystemExit("center_embeddings needs --sources: there is one embodiment here, "
+                             "and centring it removes a constant that changes nothing")
+        print("per-embodiment appearance offset, subtracted before anything is trained on it:")
+        offsets = embedding_offsets(encoder, train_set, cfg, device)
+
     def checkpoint(epoch):
         state = {
             "config": asdict(cfg),
@@ -301,6 +348,10 @@ def main():
         else:
             state["action_mean"] = train_set.mean
             state["action_std"] = train_set.std
+        if offsets is not None:
+            # stored because every downstream script has to subtract the same vector: feeding a
+            # centred model raw embeddings is a silent distribution shift, not an error
+            state["embedding_offsets"] = {k: v.cpu() for k, v in offsets.items()}
         return state
 
     # tracked separately: total is ~99% reconstruction, so selecting on it alone would
@@ -311,8 +362,10 @@ def main():
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
         scale = adv_scale(cfg, epoch)
-        train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler, scale)
-        val_metrics = run_epoch(models, encoder, val_loader, cfg, device, scale=scale)
+        train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler,
+                                  scale, offsets)
+        val_metrics = run_epoch(models, encoder, val_loader, cfg, device, scale=scale,
+                                offsets=offsets)
         heldout = heldout_no_z = heldout_no_x = float("nan")
         if heldout_cache is not None:
             heldout, heldout_no_z, heldout_no_x = evaluate_heldout(

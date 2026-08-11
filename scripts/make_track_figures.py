@@ -36,9 +36,26 @@ SHARES = [
     ('Stage 1\nacross insect bodies\nwith the cross-body loss', 88.7, 1.2, 10.1),
 ]
 
-# F37: stance-fraction readout on the frozen encoder, RMSE over the target's own spread
-PROBE = np.array([[0.88, 4.72],      # fitted on insect -> insect, B1
-                  [3.00, 0.89]])     # fitted on B1     -> insect, B1
+# F37 / F41: stance-fraction readout on the frozen encoder, RMSE over the target's own spread.
+#
+# Band-pooled patch tokens with each embodiment standardised by its own statistics -- the setting
+# that controls the most and transfers best, and therefore the fair test of whether the behaviour
+# is readable across bodies at all.
+#
+# Two nuisances had to be removed to get here. The reduction: mean-pooling over all 256 patches
+# buries a quantity living in the 6-12 patches near the feet, and preserves a large constant
+# offset between the two embodiments' frames which a fitted readout absorbs and then mis-applies.
+# The appearance: the insect renders orange and small in frame, the B1 grey and large, neither of
+# which is behaviour. Per-embodiment standardisation removes both, using only which dataset a
+# frame came from and never the stance fraction being predicted.
+#
+# Un-normalised, the cross cells swing from 1.06x to 4.72x depending purely on the reduction.
+# Normalised they sit in 1.02x-1.57x whichever reduction is used, which is why this is the number
+# reported: it is the one that is a property of the encoder rather than of the pooling.
+PROBE = np.array([[0.82, 1.16],      # fitted on insect -> insect, B1
+                  [1.04, 0.89]])     # fitted on B1     -> insect, B1
+PROBE_RANGE = ("band-pooled, each embodiment standardised by its own statistics\n"
+               "without that control the cross cells range 1.06x to 4.72x by reduction alone")
 
 
 def save(fig, name, dpi):
@@ -118,9 +135,11 @@ def variance_share(dpi):
 
 
 def probe_matrix(dpi):
-    fig, ax = plt.subplots(figsize=(6.4, 5.6))
-    # green below 1.0 (usable), amber to red above it (worse than predicting the average)
-    colours = [["#27ae60" if v < 1 else ("#e8b33c" if v < 3.5 else RED) for v in row]
+    fig, ax = plt.subplots(figsize=(6.8, 6.0))
+    # green below 1.0 (the readout beats guessing), amber to red above it. The boundary is the
+    # whole point of the figure, so the thresholds sit just above 1.00 rather than at round
+    # numbers chosen for looks.
+    colours = [["#27ae60" if v < 1 else ("#e8b33c" if v < 1.5 else RED) for v in row]
                for row in PROBE]
     for i in range(2):
         for j in range(2):
@@ -138,7 +157,8 @@ def probe_matrix(dpi):
         side.set_visible(False)
     ax.set_title("Frozen encoder, before any training\n"
                  "stance fraction: error over the target's own spread", fontsize=13)
-    ax.set_xlabel("above 1.00x means worse than predicting the average", fontsize=11, labelpad=10)
+    ax.set_xlabel("above 1.00x means no better than predicting the average\n"
+                  + PROBE_RANGE, fontsize=10, labelpad=10)
     save(fig, "encoder_probe_matrix.png", dpi)
 
 

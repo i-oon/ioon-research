@@ -29,6 +29,7 @@ LEGACY_DEFAULTS = {
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
     "ftm_embodiment_channel": False,
+    "center_embeddings": False,
 }
 
 
@@ -94,6 +95,30 @@ class Config:
     # Names come from cfg.sources, so any script rebuilding a model from a checkpoint's config
     # gets the right embedding size without being told. A no-op in single-morphology mode.
     ftm_embodiment_channel: bool = False
+
+    # Subtract a per-embodiment mean from the encoder's output before anything is trained on it,
+    # so the constant appearance difference between two robots never reaches the ITM.
+    #
+    # The two datasets differ in ways that are not behaviour: the insect renders orange and fills
+    # about a quarter of the frame, the B1 renders grey and fills about three quarters. Measured,
+    # that shows up as the two embodiments' pooled embeddings sitting 3.94x apart relative to
+    # their own spread, and it is enough on its own to make a stance-fraction readout fitted on
+    # one embodiment fail on the other at 4.72x -- an offset absorbed into the readout's
+    # intercept, not a difference in how contact is represented (FINDINGS.md F41).
+    #
+    # Centre only, never scale. The diagnosis was an offset; dividing each of the 1,408
+    # dimensions by its own spread would additionally reweight L_recon across dimensions, which
+    # changes what the forward model optimises and makes its loss incomparable to every run so
+    # far. One 1,408-vector per embodiment, subtracted from every patch token, so spatial
+    # structure is untouched.
+    #
+    # This attacks the same 33% as ftm_embodiment_channel from the other end: the channel removes
+    # the *need* for z to carry identity, this removes the *supply*. Run them one at a time or
+    # neither result is interpretable.
+    center_embeddings: bool = False
+    # Frames per embodiment used to estimate the mean. The offset is a global property of how a
+    # robot renders, not something that needs the whole dataset to pin down.
+    center_frames: int = 300
 
     # How much capacity sits between the latent and the joint command: "mlp" is the original
     # decoder, "linear" keeps the cross-attention backbone with a single output projection,

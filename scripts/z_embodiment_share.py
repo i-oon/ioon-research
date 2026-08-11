@@ -41,7 +41,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import CONTACT_THRESHOLD  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 INSECT_BODIES = ["c10f10t10", "c06f10t10", "c10f10t06", "c06f10t06", "c10f06t06"]
@@ -114,6 +114,9 @@ def main():
     Z, emb, stance = [], [], []
     for embodiment, frames, contact in clips(args.insect_dir, args.b1_dir):
         e = encode_clip(encoder, frames, args.chunk)
+        offset = offset_for(checkpoint, embodiment)
+        if offset is not None:
+            e = e - offset
         z = latents(itm, e)
         Z.append(z); emb += [embodiment] * len(z); stance.append(contact[:len(z)])
     del encoder
