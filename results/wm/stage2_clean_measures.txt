@@ -1,0 +1,71 @@
+=== HELD-OUT BODY c08f09t09 ===
+wm/runs/stage2_clean/best.pt  epoch 60
+cross-embodiment ['hexapod', 'b1'], scored through the 'hexapod' head, action_lag 1, lambda_cross 0.0
+
+[W812 02:52:14.597889808 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 35651584 bytes (free: 21626880, total: 11346182144).
+[W812 02:52:14.597985417 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 35651584 bytes (free: 21626880, total: 11346182144).
+Traceback (most recent call last):
+  File "/home/aria/ioon-research/scripts/score_body.py", line 166, in <module>
+    main()
+  File "/home/aria/ioon-research/scripts/score_body.py", line 141, in main
+    encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
+  File "/home/aria/ioon-research/scripts/vjepa2_encoder.py", line 18, in __init__
+    self.model = AutoModel.from_pretrained(MODEL_ID, dtype=dtype).to(self.device)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/transformers/modeling_utils.py", line 3761, in to
+    return super().to(*args, **kwargs)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1383, in to
+    return self._apply(convert)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  [Previous line repeated 2 more times]
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 964, in _apply
+    param_applied = fn(param)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1wm/runs/stage2_clean/best.pt  epoch 60
+  b1       1129 latents, stance fraction 0.533
+  hexapod  975 latents, stance fraction 0.513
+
+variance of the latent, 6 phase bins, 6 latents per cell
+  gait phase         34.9%
+  which embodiment   23.0%
+  interaction        42.2%
+
+  embodiment decodable from the latent at 0.990 (chance 0.500)
+  clusters sit 0.41x the within-cluster spread apart
+
+Compare against the insect-only figures: with the cross-body loss the *body* share is 0.8-1.2%
+on training bodies. A large embodiment share here means the latent is a code for which robot
+this is, which is what Stage 2 needs it not to be.
+ocs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+
+=== EMBODIMENT SHARE ===
+[W812 02:52:22.062522968 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 35651584 bytes (free: 27787264, total: 11346182144).
+[W812 02:52:22.062614069 CUDACachingAllocator.cpp:3933] memory allocation failed with OOM on device 0 while trying to allocate 35651584 bytes (free: 27787264, total: 11346182144).
+Traceback (most recent call last):
+  File "/home/aria/ioon-research/scripts/z_embodiment_share.py", line 155, in <module>
+    main()
+  File "/home/aria/ioon-research/scripts/z_embodiment_share.py", line 113, in main
+    encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
+  File "/home/aria/ioon-research/scripts/vjepa2_encoder.py", line 18, in __init__
+    self.model = AutoModel.from_pretrained(MODEL_ID, dtype=dtype).to(self.device)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/transformers/modeling_utils.py", line 3761, in to
+    return super().to(*args, **kwargs)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1383, in to
+    return self._apply(convert)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 933, in _apply
+    module._apply(fn)
+  [Previous line repeated 2 more times]
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 964, in _apply
+    param_applied = fn(param)
+  File "/home/aria/ioon-research/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1369, in convert
+    return t.to(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 34.00 MiB. GPU 0 has a total capacity of 10.57 GiB of which 26.50 MiB is free. Process 673082 has 4.85 GiB memory in use. Process 678593 has 4.58 GiB memory in use. Including non-PyTorch memory, this process has 866.00 MiB memory in use. Of the allocated memory 628.48 MiB is allocated by PyTorch, and 81.52 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+
+=== IDENTITY ABLATION ===

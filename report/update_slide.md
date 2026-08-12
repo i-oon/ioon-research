@@ -655,15 +655,46 @@ One honest limit: standardising per embodiment needs a batch of the new robot's 
 statistics from, so this is domain adaptation rather than zero-shot. That is already true of the
 setting, since a new embodiment needs a new output head fitted on some of its data regardless.
 
-**After training, what the latent is made of:**
+**The first run whose data is defensible.** Our first Stage 2 numbers came from a dataset
+containing two robots that collapse and rotate rather than walk, with the embodiments at 10.5:1
+balanced only by repeating the quadruped's data ten times an epoch. Found while measuring it, and
+fixed:
 
-| | share of variance |
-|---|---|
-| gait phase | 39.6% |
-| **which robot this is** | **33.0%** |
-| interaction | 27.4% |
+| | before | now |
+|---|---|---|
+| bodies that do not walk, in training | **2** | 0 |
+| hexapod : B1 | 10.5 : 1, faked by repetition | **1.04 : 1**, real |
+| validation | 67 B1 transitions, one hexapod body | 126 B1, **all four bodies** |
+| held-out body | **none** | **c08f09t09** |
 
-Against Stage 1's **1.2%** body share with the cross-body loss on. Embodiment decodes at **1.000**.
+**Stage 2 now has a generalisation test, and it passes.** Two runs, identical but for the seed:
+
+| held-out `c08f09t09` | seed 0 | seed 1 |
+|---|---|---|
+| deg per joint | 3.85 | 3.43 |
+| **R² against the body's own mean** | **+0.87** | **+0.90** |
+
+Positive on both, where **every Stage 1 held-out body scored negative** (−0.42 to −3.16). Stage 1
+scores 2.91 deg on this same body, so learning a quadruped alongside costs about 30% of hexapod
+accuracy and does not break it. It is an interpolation test — that body sits inside the training
+range — but it is the same one Stage 1 held out, which is what makes them comparable.
+
+**What the latent is made of, stated on the measurements that reproduce:**
+
+| | seed 0 | seed 1 |
+|---|---|---|
+| **embodiment decodable from `z`** | **0.994** | **0.992** |
+| **cost of deleting the embodiment from `z`** | **1.03x** | **1.04x** |
+| cost of deleting the same number of random directions | 1.18x | 1.14x |
+| cost of deleting `z` entirely | 7.63x | 8.29x |
+
+**The identity is fully present and nothing uses it.** Removing it costs *less* than removing
+arbitrary directions. Meanwhile `z` itself is doing real work — deleting it costs eight-fold.
+
+We previously reported this the other way round, from a variance decomposition reading 33.0%. That
+number is not reproducible: the decomposition balances its grid to the smallest cell, which holds
+six latents, so it rests on 72 points — and two seeds of one config give 12.0% and 6.7%. **The
+claim belongs on the probe and the ablation, which agree to three decimals.**
 
 ![how much embodiment identity remains](../results/wm/figures/embodiment_axis.png)
 
@@ -692,12 +723,19 @@ representation whose cluster means sit closer than their own spread still draws 
 blobs, because UMAP is built to find and sharpen structure. A picture cannot tell you how much
 embodiment identity remains, in either direction — which is why the decomposition sits beside it.
 
-**So the shared trunk produced a switch rather than a shared language**, and Stage 2 needs a
-mechanism that actively removes embodiment identity. That is question 2.
+**So the shared trunk leaves the identity fully readable — but it is inert.** Not a switch the
+decoder flips, and not a shared language either: leakage from the frozen encoder that no module
+consumes and no loss penalises. Whether that harms transfer to a genuinely *new* embodiment is
+untested, and **cannot be tested with two embodiments**. That is question 2.
 
-Caveats, both real: validation for this run is unusable, since `val_fraction 0.1` on 14 B1 clips
-leaves **67 transitions** which balanced sampling then repeats to fill half of every validation
-batch. And the learning rate reached zero at epoch 6 while validation was still falling at 12.
+The figure above predates the clean run and is being regenerated; the silhouette and separation
+rows are the ones to trust least, since cluster separation moved 0.39x to 0.24x between two seeds
+of the same config.
+
+One caveat carried over and one retired. Still true: with two embodiments there is no held-out
+embodiment, only a held-out body. No longer true: validation used to be 67 B1 transitions from a
+split that took one body's clips — it is now 126 transitions stratified across every body, and
+train and validation track each other to within 1% across 60 epochs.
 
 ---
 
@@ -750,30 +788,34 @@ an embodiment embedding, `FTM(e_t, z, id)`, so the module that wants the identit
 and `z` has no reason to carry it. Same principle as the per-embodiment output heads: known,
 non-behavioural information should arrive through structure rather than through the latent.
 
-**Whether that is the right fix was tested before building it**, by asking whether the identity in
-`z` is used or merely present — two different things, and only the first justifies a side channel.
-Delete the directions carrying the embodiment and re-score the decoder, against the cost of
-deleting the same number of random directions:
+**We built and ran that. It did nothing** — the embodiment share did not fall, and the identity
+stayed exactly as recoverable. The reason turned out to be more interesting than the fix:
 
-| latent | B1 | hexapod | mean vs intact |
+**there was no pressure to relieve.** Delete the directions carrying the embodiment from `z` and
+re-score the decoder, against the cost of deleting the same number of *random* directions:
+
+| | identity removed | random control | verdict |
 |---|---|---|---|
-| intact | 3.42 | 3.39 | 1.00x |
-| **embodiment identity removed** | 4.03 | **7.45** | **1.69x** |
-| random directions removed, same count | 3.79 | 4.13 | 1.16x |
+| our first measurement | 1.69x | 1.16x | load-bearing |
+| **clean data, seed 0** | **1.03x** | 1.18x | **passive** |
+| **clean data, seed 1** | **1.04x** | 1.14x | **passive** |
 
-Degrees per joint. **1.69x against a 1.16x control: something reads the identity out of `z`**, and
-almost all of the cost is the hexapod, at 2.20x against random's 1.22x — even though its output
-head already encodes which robot it is.
+Removing the identity costs **less** than removing arbitrary directions. Nothing downstream reads
+it — which makes sense once stated: the decoder's output head is *selected* by embodiment, and the
+forward model sees `x_t`, a picture of the robot. Neither has to ask `z`.
 
-A second number changes what the fix can be. Peeling directions off one at a time, the embodiment
-still decodes at **0.806 against a 0.500 chance level** after eight of 64 directions are gone. The
-identity is **smeared across the latent, not localised**, so there is nothing for an adversary to
-excise — which is why Stage 1's adversary drove the probe *below* chance, scrambling the code
-rather than dropping it.
+The first row was measured on the contaminated dataset, and is wrong. Two robots that fall over,
+plus a 10.5:1 imbalance, made a passive quantity look functional.
 
-So the two interventions are not alternatives and their order is forced: **the side channel
-relieves the need, and only then does removing the ability cost nothing.** Adversarial removal
-becomes the safe second step rather than the destructive one it was.
+**So the honest statement is not that the trunk built a switch.** The identity is leakage from the
+frozen encoder: fully readable, consumed by nothing, penalised by nothing. Whether that costs
+anything for a third embodiment is untested — and with two embodiments it is untestable.
+
+**The experiment now running** is adversarial removal, with a prediction attached: if the identity
+is inert, stripping it should be free. Early signs are against that — the adversary sits at 0.25
+against a 0.500 chance level, which is the *scrambling* failure rather than removal, while an
+independent probe still recovers the embodiment at 0.75. Thirteen epochs of sixty, so not yet a
+result.
 
 Their setting likely does not need one. The shortcut we measured only pays when knowing which body
 you are looking at tells you the command, and in our data each body does exactly one thing. In

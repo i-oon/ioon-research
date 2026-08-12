@@ -1,0 +1,35 @@
+### seed 0
+hexapod bodies (from the checkpoint's own config): ['c06f06t06', 'c06f10t10', 'c10f06t06', 'c10f10t10']
+wm/runs/stage2_clean/best.pt  epoch 60
+  b1       1129 latents, stance fraction 0.533
+  hexapod  780 latents, stance fraction 0.518
+
+variance of the latent, 6 phase bins, 6 latents per cell
+  gait phase         44.9%
+  which embodiment   12.0%
+  interaction        43.2%
+
+  embodiment decodable from the latent at 0.994 (chance 0.500)
+  clusters sit 0.39x the within-cluster spread apart
+
+Compare against the insect-only figures: with the cross-body loss the *body* share is 0.8-1.2%
+on training bodies. A large embodiment share here means the latent is a code for which robot
+this is, which is what Stage 2 needs it not to be.
+
+### seed 1
+hexapod bodies (from the checkpoint's own config): ['c06f06t06', 'c06f10t10', 'c10f06t06', 'c10f10t10']
+wm/runs/stage2_clean_s1/best.pt  epoch 60
+  b1       1129 latents, stance fraction 0.533
+  hexapod  780 latents, stance fraction 0.518
+
+variance of the latent, 6 phase bins, 6 latents per cell
+  gait phase         61.2%
+  which embodiment    6.7%
+  interaction        32.1%
+
+  embodiment decodable from the latent at 0.992 (chance 0.500)
+  clusters sit 0.24x the within-cluster spread apart
+
+Compare against the insect-only figures: with the cross-body loss the *body* share is 0.8-1.2%
+on training bodies. A large embodiment share here means the latent is a code for which robot
+this is, which is what Stage 2 needs it not to be.

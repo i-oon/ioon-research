@@ -44,19 +44,30 @@ from wm.data.dataset import CONTACT_THRESHOLD  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
-INSECT_BODIES = ["c10f10t10", "c06f10t10", "c10f10t06", "c06f10t06", "c10f06t06"]
+# The four bodies `stage2_clean` trains on. The earlier list included `c10f10t06` and
+# `c06f10t06`, which veer 0.35-0.40 m off course on a 94.6 mm dead zone, and the runs it was
+# written for also trained on two bodies that collapse outright (FINDINGS.md F42). Plotting a
+# latent over bodies the model never saw -- or saw only falling over -- describes neither.
+INSECT_BODIES = ["c06f06t06", "c10f06t06", "c06f10t10", "c10f10t10"]
 INSECT_EPS = [6, 20, 22]
+CACHE = f"{ROOT}/results/wm/cache/stage2_embeddings.pt"
 
 
-def gather(encoder, itm, chunk):
+def gather(encoder, itm, chunk, bodies, cache_path=CACHE):
     """Pooled encoder embeddings, latents, embodiment labels and stance fraction."""
+    cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
+    fresh = False
     E, Z, emb, stance = [], [], [], []
     clips = [("hexapod", f"{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz")
-             for b in INSECT_BODIES for e in INSECT_EPS]
+             for b in bodies for e in INSECT_EPS]
     clips += [("b1", p) for p in sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))]
     for name, path in clips:
         clip = np.load(path, allow_pickle=True)
-        e = encode_clip(encoder, clip["frames"], chunk)
+        if path not in cache:
+            # the encoder may sit on the GPU; everything downstream is small and stays on the CPU
+            cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu()
+            fresh = True
+        e = cache[path]
         n = len(e) - 1
         with torch.no_grad():
             z = torch.cat([itm(e[s:min(s + 8, n)], e[s + 1:min(s + 8, n) + 1])
@@ -65,6 +76,9 @@ def gather(encoder, itm, chunk):
                    else clip["foot_contact"].mean(axis=1))
         E.append(e[:n].mean(1).numpy()); Z.append(z)
         emb += [name] * n; stance.append(contact[:n])
+    if fresh:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        torch.save(cache, cache_path)
     return np.concatenate(E), np.concatenate(Z), np.array(emb), np.concatenate(stance)
 
 
@@ -84,6 +98,8 @@ def main():
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--encode_device", default="cpu")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--bodies", nargs="+", default=INSECT_BODIES,
+                    help="hexapod bodies to plot; default is what stage2_clean trains on")
     ap.add_argument("--out", default=os.path.join(ROOT, "results", "wm", "figures",
                                                   "cross_embodiment_umap.png"))
     args = ap.parse_args()
@@ -92,7 +108,7 @@ def main():
     itm = InverseTransitionModel(from_checkpoint(checkpoint["config"])).eval()
     itm.load_state_dict(checkpoint["itm"])
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
-    E, Z, emb, stance = gather(encoder, itm, args.chunk)
+    E, Z, emb, stance = gather(encoder, itm, args.chunk, args.bodies)
     del encoder
     print(f"{len(E)} frames: {(emb=='hexapod').sum()} hexapod, {(emb=='b1').sum()} b1", flush=True)
 

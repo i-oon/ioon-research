@@ -1,0 +1,18 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 9010.35it/s]
+wm/runs/stage2_clean_s1/best.pt  epoch 60  action_lag 1
+1909 latents of dim 64: 780 hexapod, 1129 b1
+
+embodiment probe as directions are peeled off: 0.992 -> 0.825 -> 0.791 -> 0.734 -> 0.694 -> 0.685 -> 0.688 -> 0.670
+8 of 64 directions carry the embodiment; with them removed the probe reads 0.659 against a chance level of 0.500
+
+latent                           b1     hexapod    vs intact
+intact                        2.96u       1.46u        1.00x
+identity removed (8d)         3.09u       1.50u        1.04x
+random 8d removed             3.29u       1.70u        1.14x
+z zeroed                     25.90u      11.44u        8.29x
+
+Errors are RMSE per joint in degrees. Read the identity row against the random row:
+if deleting the embodiment subspace costs no more than deleting the same number of
+arbitrary directions, nothing downstream was using it, the 33% is leakage from the
+frozen encoder, and an FTM side channel has no pressure to relieve.

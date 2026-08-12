@@ -41,17 +41,16 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import CONTACT_THRESHOLD  # noqa: E402
-from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, training_bodies  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
-INSECT_BODIES = ["c10f10t10", "c06f10t10", "c10f10t06", "c06f10t06", "c10f06t06"]
 INSECT_EPS = [6, 20, 22]
 
 
-def clips(insect_dir, b1_dir):
+def clips(insect_dir, b1_dir, bodies):
     """(embodiment, frames, stance fraction) per clip, for both sides."""
     out = []
-    for body in INSECT_BODIES:
+    for body in bodies:
         for ep in INSECT_EPS:
             path = f"{insect_dir}/{body}_ep{ep}.npz"
             if not os.path.exists(path):
@@ -101,6 +100,8 @@ def main():
     ap.add_argument("--insect_dir", default=os.path.join(ROOT, "data", "ik_walk_8body"))
     ap.add_argument("--b1_dir", default=os.path.join(ROOT, "data", "b1_framed"))
     ap.add_argument("--bins", type=int, default=6, help="phase bins from stance fraction")
+    ap.add_argument("--bodies", nargs="*", default=None,
+                    help="override; default is whatever this checkpoint trained on")
     ap.add_argument("--encode_device", default="cpu")
     ap.add_argument("--chunk", type=int, default=2)
     args = ap.parse_args()
@@ -112,7 +113,9 @@ def main():
 
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
     Z, emb, stance = [], [], []
-    for embodiment, frames, contact in clips(args.insect_dir, args.b1_dir):
+    bodies = args.bodies or training_bodies(cfg)
+    print(f"hexapod bodies (from the checkpoint's own config): {bodies}")
+    for embodiment, frames, contact in clips(args.insect_dir, args.b1_dir, bodies):
         # the encoder may run on the GPU for speed; the ITM is small and stays on the CPU, so
         # bring the embeddings back rather than moving a 1B-parameter model around
         e = encode_clip(encoder, frames, args.chunk).cpu()

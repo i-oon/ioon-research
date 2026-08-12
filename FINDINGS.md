@@ -1631,7 +1631,18 @@ validation batch, which is why training loss reads nine times higher than valida
 learning rate reached zero at epoch 6 while validation was still falling at epoch 12, so the
 schedule ran out before the model did.
 
-### F39. The embodiment identity in the latent is load-bearing, and it is smeared, not localised
+### F39. SUPERSEDED BY F43 -- this measurement was an artefact of contaminated data
+
+> Everything below was measured on `stage2_balanced`, which trained on two robots that collapse
+> and rotate rather than walk, with the embodiments at 10.5:1 balanced only by repeating the B1
+> data ten times an epoch (F42). Repeated on clean data, **the conclusion reverses**: removing the
+> embodiment identity costs *less* than removing random directions, on both seeds. The identity is
+> passive leakage, not load-bearing. See F43.
+>
+> Kept because the reasoning is sound and the reversal is the point: presence and use are
+> different questions, and a contaminated dataset can make a passive quantity look functional.
+
+### F39 (as measured, superseded). The embodiment identity in the latent is load-bearing, and it is smeared, not localised
 
 F38 established that 33.0% of the latent's variance is the embodiment and that a linear probe
 recovers it at 1.000. Both say identity is *present*; neither says anything *uses* it, and the
@@ -1918,6 +1929,84 @@ one more mark against a body already known to veer.
    instead break `lambda_cross`, which is well defined only because every body walks identical
    expert episodes.
 
+### F43. Stage 2 on clean data: transfer works, and the embodiment identity is passive
+
+The first Stage 2 whose data is defensible. Every training body walks, the embodiments are
+balanced by data rather than by repetition, validation is stratified across bodies, and a hexapod
+body is withheld. Two runs, identical but for the seed, 60 epochs, converged (val moved 0.0001 per
+epoch over the last six).
+
+    hexapod   4 bodies x 4 clips x 65   = 1,040 pairs
+    b1        2 policies x 6 clips      = 1,003 pairs     ratio 1.04:1
+    held out  c08f09t09                                   never trained on
+    excluded  c06f06t10, c10f06t10                        collapse and rotate (F42)
+    withheld  c06f10t06, c10f10t06                        veer 0.35-0.40 m off course
+
+**Stage 2 has a generalisation test for the first time.** With two embodiments neither can hold the
+other out, so a hexapod body was withheld instead (`scripts/score_body.py`, same weights, one
+unseen body):
+
+| | seed 0 | seed 1 |
+|---|---|---|
+| deg per joint | 3.85 | 3.43 |
+| **R^2 against the body's own mean** | **+0.87** | **+0.90** |
+| latent zeroed | 0.365 | 0.444 |
+| frame zeroed | 0.193 | 0.395 |
+
+**Positive on both seeds**, where every Stage 1 held-out body scored -0.42 to -3.16. Both inputs
+are used: zeroing the latent costs 5-7x, zeroing the frame 2.6-6.7x. Stage 1's `m3d_cross` scores
+2.91 deg on the same body, so **learning a quadruped alongside costs about 30% of hexapod accuracy
+and does not break it**.
+
+Two caveats. `c08f09t09` is coxa 0.8, femur 0.9, tibia 0.9 -- inside the training range on every
+axis, so this is interpolation, not the extrapolation F33 fails at. It was chosen because Stage 1
+held out the same body, which is what makes the stages comparable. And the `zero_x` figures differ
+2x between seeds, so every input-ablation ratio we report -- including the older z-gap and x-gap --
+deserves that scepticism.
+
+**The embodiment identity in `z` is passive, reversing F39.**
+
+| | identity removed | random control, same count |
+|---|---|---|
+| contaminated (F39) | 1.69x | 1.16x |
+| **clean, seed 0** | **1.03x** | 1.18x |
+| **clean, seed 1** | **1.04x** | 1.14x |
+
+Removing it costs *less* than removing arbitrary directions, on both seeds. Nothing downstream
+reads it. `z` itself is heavily used -- zeroing it costs 7.6-8.3x -- so the latent does real work
+and only its identity component is inert.
+
+This explains the side channel's null result: `ftm_embodiment_channel` was built to relieve a
+pressure that does not exist.
+
+**The variance decomposition is not a usable number.**
+
+| | seed 0 | seed 1 | spread |
+|---|---|---|---|
+| gait phase | 44.9% | 61.2% | 16.3 pts |
+| which embodiment | 12.0% | 6.7% | **5.3 pts, nearly 2x** |
+| interaction | 43.2% | 32.1% | 11.1 pts |
+| **probe** | **0.994** | **0.992** | 0.002 |
+| cluster separation | 0.39x | 0.24x | 0.15 |
+
+`two_way` balances its grid by subsampling every cell to the smallest, and the smallest holds six
+latents: the whole measurement rests on 2 embodiments x 6 phase bins x 6 latents = **72 points**.
+Two seeds of one config disagree by a factor of two. **F38's headline 33.0% rested on the same 72
+points.**
+
+The claim belongs on the probe and the ablation, which reproduce to three decimals:
+
+> The embodiment is fully decodable from the latent at 0.99, and nothing uses it -- removing it
+> costs less than removing random directions.
+
+Untried: `--bins 3` doubles the latents per cell, which would say whether the decomposition is
+under-sampled rather than unusable.
+
+**Method fix this forced.** Five diagnostics each carried a hardcoded `INSECT_BODIES`, in three
+different versions, and three of them silently scored a model on bodies it had never seen --
+`z_identity_ablation` read 15.99 deg where the trained bodies read 1.45.
+`wm/evaluate.py:training_bodies(cfg)` now derives the list from the checkpoint's own config.
+
 ## The setup this points to
 
 1. **Bodies, not episodes.** Sixteen times more episodes of two bodies changed nothing (F13);
@@ -2005,7 +2094,10 @@ proprioception is not.
 - `results/wm/figures/interpolation_failure.png` -- F4 and F6 in one figure
 - `results/wm/figures/heldout_sweep_two_seeds.png` -- F11 and F12
 - `results/wm/cache/axis_embeddings.npz` -- embeddings behind the axis positions in F4
-- `scripts/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39)
+- `scripts/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39, F43)
+- `scripts/score_body.py` -- one checkpoint against several held-out bodies, no retraining (F43)
+- `scripts/write_run_log.py` -- regenerate `results/wm/RUNS.md` before deleting any checkpoint
+- `results/wm/OVERNIGHT.md` -- the clean Stage 2 results in one place, with what is withdrawn
 - `results/wm/cache/stage2_embeddings.pt` -- cached encoder pass behind F39, rebuilt on demand and
   gitignored: every patch token at full width is 2.9 GB
 - `scripts/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures

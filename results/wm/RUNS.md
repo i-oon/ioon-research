@@ -45,29 +45,21 @@ this **before** deleting anything.
 - checkpoints on disk: best.pt, best_motion.pt, epoch008.pt, epoch020.pt, epoch027.pt
 - settings: `lambda_cross=0.5`, `lambda_adv=0.0`, `within_body_std=True`, `md_head=mlp`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
-## stage2_balanced
+## stage2_clean
 
-- **cross-embodiment**, reached epoch 12
+- **cross-embodiment**, reached epoch 60
 - data: `hexapod=data/ik_walk_8body, b1=data/b1_framed`
-- held out: none
-- checkpoints on disk: best.pt, best_motion.pt, epoch002.pt, epoch004.pt, epoch006.pt, epoch008.pt, epoch010.pt, epoch012.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `epochs=12`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## stage2_centered
-
-- **cross-embodiment**, reached epoch 1
-- data: `hexapod=data/ik_walk_8body, b1=data/b1_framed`
-- held out: none
+- held out: ['c08f09t09', 'c06f10t06', 'c10f10t06'] | capped: ['hexapod=5']
 - checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=True`, `epochs=12`, `batch_size=8`, `lr=0.0001`, `seed=0`
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
-## stage2_sidechannel
+## stage2_clean_s1
 
-- **cross-embodiment**, reached epoch 12
+- **cross-embodiment**, reached epoch 60
 - data: `hexapod=data/ik_walk_8body, b1=data/b1_framed`
-- held out: none
-- checkpoints on disk: best.pt, best_motion.pt, epoch012.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=True`, `epochs=12`, `batch_size=8`, `lr=0.0001`, `seed=0`
+- held out: ['c08f09t09', 'c06f10t06', 'c10f10t06'] | capped: ['hexapod=5']
+- checkpoints on disk: best.pt, best_motion.pt, epoch002.pt, epoch004.pt, epoch006.pt, epoch008.pt, epoch010.pt, epoch012.pt, epoch014.pt, epoch016.pt, epoch018.pt, epoch020.pt, epoch022.pt, epoch024.pt, epoch026.pt, epoch028.pt, epoch030.pt, epoch032.pt, epoch034.pt, epoch036.pt, epoch038.pt, epoch040.pt, epoch042.pt, epoch044.pt, epoch046.pt, epoch048.pt, epoch050.pt, epoch052.pt, epoch054.pt, epoch056.pt, epoch058.pt, epoch060.pt, last.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=1`
 
 ## tib_cross
 

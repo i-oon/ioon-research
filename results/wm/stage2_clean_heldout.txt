@@ -1,0 +1,14 @@
+=== HELD-OUT BODY c08f09t09 ===
+wm/runs/stage2_clean/best.pt  epoch 60
+cross-embodiment ['hexapod', 'b1'], scored through the 'hexapod' head, action_lag 1, lambda_cross 0.0
+
+body             deg    model  train mean  own mean     R2   zero_z   zero_x
+c08f09t09       3.85    0.073       0.581     0.571  +0.87    0.365    0.193
+
+'train mean' is what predicting the training mean pose scores; beating it only says
+the model noticed this is not an average body. 'own mean' is this body's own per-joint
+mean, the baseline R2 is defined against -- a negative R2 means worse than someone who
+saw the body once and memorised its average posture. 'zero_x' below 'model' means the
+frame is actively harmful.
+
+=== IDENTITY ABLATION ===

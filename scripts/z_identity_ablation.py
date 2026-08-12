@@ -53,7 +53,11 @@ from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: 
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
-INSECT_BODIES = ["c10f10t10", "c06f10t10", "c10f10t06", "c06f10t06", "c10f06t06"]
+# The four bodies `stage2_clean` trains on. The earlier list included `c10f10t06` and
+# `c06f10t06`, which that run holds out and which veer 0.35-0.40 m off course anyway -- scoring
+# an ablation partly on bodies the model never saw reads 15.99 deg where the trained ones read
+# under 4, and the ratio being measured is then a mix of two different questions.
+INSECT_BODIES = ["c06f06t06", "c10f06t06", "c06f10t10", "c10f10t10"]
 INSECT_EPS = [6, 20, 22]
 
 
@@ -72,7 +76,9 @@ def embed(encoder, clips, chunk, cache_path):
     missing = [(n, p) for n, p in clips if p not in cache]
     for i, (name, path) in enumerate(missing, 1):
         clip = load(path, REGISTRY[name])
-        cache[path] = encode_clip(encoder, clip["frames"], chunk)
+        # .cpu() matters: the encoder may run on the GPU while the ITM and decoder stay on the
+        # CPU, and a cached GPU tensor then fails at the first Linear rather than at the call site
+        cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu()
         print(f"  encoded {i}/{len(missing)}  {os.path.basename(path)}", flush=True)
     if missing:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)

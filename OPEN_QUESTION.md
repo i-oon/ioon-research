@@ -40,8 +40,21 @@ Open, in the order they have to be decided:
    legs exist in insects but not in Phasmatodea. If the thesis frames this as stick insects, the
    honest range is ratio ≤ 1.
 
-Until 1 is done, no absolute Stage 2 number should be quoted — including F38's 33.0%. Comparisons
-*between* Stage 2 runs are unaffected, since they share identical data.
+**Resolved 2026-08-12.** Items 1 and 3 are done and `stage2_clean` has been trained and measured
+on two seeds — see F43. The data questions are closed; what they uncovered is not:
+
+**Q13. Is the variance decomposition salvageable, or should it be dropped?**
+
+`two_way` balances its grid to the smallest cell, which holds six latents, so the whole
+measurement rests on 72 points. Two seeds of one config give **12.0% and 6.7%** for the embodiment
+share. F38's headline 33.0% rested on the same 72 points and is in the deck.
+
+- `--bins 3` doubles the latents per cell. Does that make the seeds agree? One command, decides
+  whether the measurement is under-sampled or unusable.
+- If it stays unstable, every claim moves to the probe (0.994 / 0.992) and the ablation
+  (1.03x / 1.04x), which reproduce to three decimals. That is a stronger claim anyway — presence
+  plus non-use, rather than a share of variance.
+- The same question applies to `z_body_share`'s Stage 1 numbers, which use the same machinery.
 
 **Numbers stay as they are until the clean retrain.** Deliberate: the deck keeps its current
 figures rather than being patched twice. What is known is the *direction*, and it is favourable

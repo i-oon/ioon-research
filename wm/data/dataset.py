@@ -301,6 +301,12 @@ class MultiEmbodimentPairs(Dataset):
                 self.stats[name] = (actions.mean(0), np.maximum(actions.std(0), 1e-6))
             self.clips.extend(clips)
 
+        # Labels for the adversary and probe. In the single-morphology setting these index the
+        # *body*; here they index the *embodiment*, because that is the identity Stage 2 needs the
+        # latent not to encode. The key stays `morph_id` so the training step is shared.
+        self.morphs = sorted({clip["embodiment"] for clip in self.clips})
+        self.morph_index = {name: i for i, name in enumerate(self.morphs)}
+
         self.action_lag = action_lag
         reach = max(1, action_lag)
         self.index = [
@@ -357,6 +363,7 @@ class MultiEmbodimentPairs(Dataset):
             "view2_next": apply(frame_next, a2),
             "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
+            "morph_id": self.morph_index[clip["embodiment"]],
         }
 
 

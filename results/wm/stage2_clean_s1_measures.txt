@@ -1,0 +1,31 @@
+=== SEED 1: held-out body ===
+wm/runs/stage2_clean_s1/best.pt  epoch 60
+cross-embodiment ['hexapod', 'b1'], scored through the 'hexapod' head, action_lag 1, lambda_cross 0.0
+
+body             deg    model  train mean  own mean     R2   zero_z   zero_x
+c08f09t09       3.43    0.059       0.581     0.571  +0.90    0.444    0.395
+
+'train mean' is what predicting the training mean pose scores; beating it only says
+the model noticed this is not an average body. 'own mean' is this body's own per-joint
+mean, the baseline R2 is defined against -- a negative R2 means worse than someone who
+saw the body once and memorised its average posture. 'zero_x' below 'model' means the
+frame is actively harmful.
+
+=== SEED 1: embodiment share ===
+wm/runs/stage2_clean_s1/best.pt  epoch 60
+  b1       1129 latents, stance fraction 0.533
+  hexapod  975 latents, stance fraction 0.513
+
+variance of the latent, 6 phase bins, 6 latents per cell
+  gait phase         31.5%
+  which embodiment   20.7%
+  interaction        47.9%
+
+  embodiment decodable from the latent at 0.991 (chance 0.500)
+  clusters sit 0.38x the within-cluster spread apart
+
+Compare against the insect-only figures: with the cross-body loss the *body* share is 0.8-1.2%
+on training bodies. A large embodiment share here means the latent is a code for which robot
+this is, which is what Stage 2 needs it not to be.
+
+=== SEED 1: identity ablation ===

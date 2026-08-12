@@ -14,6 +14,7 @@ from dataclasses import asdict
 
 import numpy as np
 import torch
+import yaml
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -80,6 +81,45 @@ def embedding_offsets(encoder, dataset, cfg, device):
     if len(pair) == 2:
         print(f"  offset between the two embodiments: {(pair[0] - pair[1]).norm().item():.3f}")
     return offsets
+
+
+def write_run_config(run_dir, cfg, name, train_set, val_set, cross_embodiment):
+    """Write `config.yaml` beside the checkpoints, at startup.
+
+    The config used to live only inside the checkpoint, so deleting a 370 MB file to free disk
+    also destroyed the only record of what the run was: nine run directories are now empty while
+    their numbers are still quoted in FINDINGS.md, unreproducible and undescribable. A few KB of
+    YAML written up front costs nothing and survives.
+
+    Written before training rather than after, so a run that crashes or is cancelled still leaves
+    a record of what it was attempting.
+    """
+    record = {"name": name, "config": asdict(cfg)}
+    if cross_embodiment:
+        counts = {k: len(v) for k, v in train_set.embodiment_indices().items()}
+        record["data"] = {
+            "train_pairs": counts,
+            "val_pairs": {k: len(v) for k, v in val_set.embodiment_indices().items()},
+            "train_clips_per_body": _clip_counts(train_set),
+            "val_clips_per_body": _clip_counts(val_set),
+            "balance_ratio": (f"{max(counts.values()) / max(min(counts.values()), 1):.2f}:1"
+                              if len(counts) > 1 else "n/a"),
+        }
+    else:
+        record["data"] = {"train_pairs": len(train_set), "val_pairs": len(val_set),
+                          "bodies": sorted(getattr(train_set, "morphs", []) or [])}
+    path = os.path.join(run_dir, "config.yaml")
+    with open(path, "w") as fh:
+        yaml.safe_dump(record, fh, sort_keys=False, default_flow_style=False)
+    print(f"config -> {path}")
+
+
+def _clip_counts(dataset):
+    counts = {}
+    for clip in getattr(dataset, "clips", []):
+        key = f"{clip.get('embodiment', 'default')}/{clip.get('body', '?')}"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def adv_scale(cfg, epoch):
@@ -260,12 +300,17 @@ def parse_args(cfg):
         else:
             parser.add_argument(f"--{name}", type=type(value), default=value)
     parser.add_argument("--name", type=str, default="wm")
+    parser.add_argument("--resume", type=str, default="", metavar="auto|PATH",
+                        help="continue from a run's last.pt. 'auto' looks in the run directory. "
+                             "The epoch count must match the interrupted run, since the cosine "
+                             "schedule anneals over the total.")
     return parser.parse_args()
 
 
 def main():
     args = parse_args(Config())
-    cfg = Config(**{k: v for k, v in vars(args).items() if k != "name"})
+    # --name and --resume are how the run is invoked, not part of what it is
+    cfg = Config(**{k: v for k, v in vars(args).items() if k not in ("name", "resume")})
     cfg.train_morphs = tuple(cfg.train_morphs)
 
     torch.manual_seed(cfg.seed)
@@ -318,6 +363,7 @@ def main():
 
     run_dir = os.path.join(ROOT, cfg.out_dir, args.name)
     os.makedirs(run_dir, exist_ok=True)
+    write_run_config(run_dir, cfg, args.name, train_set, val_set, cross_embodiment)
     writer = SummaryWriter(os.path.join(run_dir, "summary"))
     trainable = sum(p.numel() for p in parameters)
     # the held-out-body monitor is specific to the single-morphology setting; cross-embodiment
@@ -356,10 +402,43 @@ def main():
             state["embedding_offsets"] = {k: v.cpu() for k, v in offsets.items()}
         return state
 
+    def training_state(epoch, best):
+        """Everything needed to continue: weights plus the optimiser's momenta, the schedule's
+        position, the AMP scaler, and which epoch we reached.
+
+        Kept in its own `last.pt` and overwritten each epoch rather than added to every snapshot:
+        AdamW carries two moments per parameter, so including it would take each of the periodic
+        checkpoints from ~370 MB to over a gigabyte, and only the newest one is ever resumed from.
+        """
+        return {**checkpoint(epoch), "optimizer": optimizer.state_dict(),
+                "schedule": schedule.state_dict(), "scaler": scaler.state_dict(), "best": best}
+
     # tracked separately: total is ~99% reconstruction, so selecting on it alone would
     # ignore the motion term that grounds the latent in real joint commands
     best = {"total": float("inf"), "motion": float("inf")}
-    for epoch in range(1, cfg.epochs + 1):
+    start_epoch = 1
+    resume_path = os.path.join(run_dir, "last.pt") if args.resume == "auto" else args.resume
+    if resume_path and os.path.exists(resume_path):
+        saved = torch.load(resume_path, map_location=device, weights_only=False)
+        if saved["config"]["epochs"] != cfg.epochs:
+            raise SystemExit(
+                f"cannot resume: this run was {saved['config']['epochs']} epochs and you asked "
+                f"for {cfg.epochs}. The cosine schedule anneals over the total, so continuing "
+                f"with a different one restarts the learning rate partway through and the result "
+                f"is neither run. Start fresh under a new --name.")
+        for name, model in models.items():
+            model.load_state_dict(saved[name])
+        optimizer.load_state_dict(saved["optimizer"])
+        schedule.load_state_dict(saved["schedule"])
+        scaler.load_state_dict(saved["scaler"])
+        best = saved["best"]
+        start_epoch = saved["epoch"] + 1
+        print(f"resuming {resume_path} at epoch {start_epoch} of {cfg.epochs} "
+              f"(best so far total {best['total']:.4f}, motion {best['motion']:.4f})")
+    elif args.resume and args.resume != "auto":
+        raise SystemExit(f"--resume {args.resume}: not found")
+
+    for epoch in range(start_epoch, cfg.epochs + 1):
         train_set.set_epoch(epoch)
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
@@ -411,6 +490,8 @@ def main():
         # snapshots a good epoch cannot be recovered without retraining
         if cfg.checkpoint_every and epoch % cfg.checkpoint_every == 0:
             torch.save(checkpoint(epoch), os.path.join(run_dir, f"epoch{epoch:03d}.pt"))
+        # written every epoch, overwritten in place, so an interrupted run loses at most one
+        torch.save(training_state(epoch, best), os.path.join(run_dir, "last.pt"))
     writer.close()
     print(f"best val total {best['total']:.4f} | best val motion {best['motion']:.4f} -> {run_dir}")
 
