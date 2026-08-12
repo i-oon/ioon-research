@@ -52,9 +52,11 @@ def main():
     ap.add_argument("--data", type=str, default="data/step0")
     ap.add_argument("--fps", type=int, default=20)  # sim is 20 Hz -> real-time
     ap.add_argument("--pattern", type=str, default="*_ep*.npz")
+    ap.add_argument("--out", type=str, default=None,
+                    help="output directory; default is <data>/videos")
     args = ap.parse_args()
 
-    out = os.path.join(args.data, "videos")
+    out = args.out or os.path.join(args.data, "videos")
     os.makedirs(out, exist_ok=True)
     # clear stale mp4v/gif files from earlier attempts
     for old in glob.glob(os.path.join(out, "*.mp4")) + glob.glob(os.path.join(out, "*.gif")):
@@ -71,15 +73,23 @@ def main():
         write_mp4(p, gen, args.fps)
         print(f"  {tag:12s} {len(fr)} frames -> {p}  ({os.path.getsize(p)//1024} KB)")
 
-    # grid: one episode per morphology, side by side
+    # Grid overview.  Older datasets are long|medium|short, but newer inspection
+    # sets can contain a single body name such as middleloss_ep144.
     picks = {}
     for f in files:
         tag = os.path.basename(f).replace(".npz", "")
         m = morph_from_tag(tag)
         if m is not None:
             picks.setdefault(m, f)
-    order = [picks[m] for m in ["long", "medium", "short"] if m in picks]
-    labs = ["long 1.0x", "medium 0.75x", "short 0.5x"]
+    if picks:
+        order = [picks[m] for m in ["long", "medium", "short"] if m in picks]
+        labs = ["long 1.0x", "medium 0.75x", "short 0.5x"][:len(order)]
+    else:
+        order = files
+        labs = [os.path.basename(p).replace(".npz", "") for p in order]
+    if not order:
+        print(f"no files matched {os.path.join(args.data, args.pattern)}")
+        return
     arrs = [np.load(p)["frames"] for p in order]
     si = np.load(order[0])["step_idx"]
     n = min(len(a) for a in arrs)
@@ -91,7 +101,7 @@ def main():
 
     gp = os.path.join(out, "grid_overview.mp4")
     write_mp4(gp, grid_gen(), args.fps)
-    print(f"  grid (long|medium|short) -> {gp}  ({os.path.getsize(gp)//1024} KB)")
+    print(f"  grid overview -> {gp}  ({os.path.getsize(gp)//1024} KB)")
     print(f"\nH.264 videos in {out}/")
 
 

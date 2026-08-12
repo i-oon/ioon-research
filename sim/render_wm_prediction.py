@@ -54,6 +54,10 @@ def main():
     ap.add_argument("--cam_dy", type=float, default=0.0)
     ap.add_argument("--spawn", type=float, nargs=2, default=[0.0, 0.0], metavar=("X", "Y"))
     ap.add_argument("--scene", default="", help="override the .ttt; defaults to the body's own")
+    ap.add_argument("--active_legs", default="FL,ML,HL,FR,MR,HR",
+                    help="comma-separated legs represented by the command columns")
+    ap.add_argument("--remove_legs", default="",
+                    help="comma-separated legs to ghost-remove before replay, e.g. ML,MR")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -67,6 +71,8 @@ def main():
     scene = args.scene or scene_for(morph)
 
     sequences = {"predicted": data["pred"][start:stop], "ground_truth": data["gt"][start:stop]}
+    active_legs = [x for x in args.active_legs.split(",") if x]
+    remove_legs = [x for x in args.remove_legs.split(",") if x]
     print(f"body '{morph}' ({'held out' if bool(data['held_out']) else 'seen in training'}), "
           f"clip {str(data['clips'][args.clip])}, {stop - start} steps, scene {scene}")
 
@@ -76,6 +82,7 @@ def main():
         frames, actions, forces, heads = drive_and_record(
             sim, scene, np.asarray(cmds, np.float32), args.travel, args.warmup,
             cam_dx=args.cam_dx, cam_dy=args.cam_dy, spawn=tuple(args.spawn),
+            active_legs=active_legs, remove_legs=remove_legs,
         )
         step = heads[-1] - heads[0]
         # x is the walking direction and y is sideways; the magnitude alone would score a
@@ -86,7 +93,7 @@ def main():
         print(f"  {name:<13} {len(frames)} steps | forward {forward:+.3f} m | "
               f"lateral {lateral:+.3f} m | heading {heading:+.1f} deg | "
               f"body height {heads[-1][2]:.3f} m | mean feet down "
-              f"{(forces > 0.5).sum(axis=1).mean():.2f} of 6")
+              f"{(forces > 0.5).sum(axis=1).mean():.2f} of {len(active_legs)}")
 
     out = args.out or os.path.join(
         ROOT, "results", "wm", "replay",
@@ -104,6 +111,7 @@ def main():
         gt_actions=recorded["ground_truth"]["actions"],
         morph=morph, held_out=bool(data["held_out"]), epoch=int(data["epoch"]),
         clip=str(data["clips"][args.clip]), source=os.path.basename(args.pred),
+        active_legs=np.array(active_legs), remove_legs=np.array(remove_legs),
     )
     print(f"-> {out}")
 

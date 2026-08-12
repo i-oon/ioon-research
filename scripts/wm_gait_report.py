@@ -39,6 +39,8 @@ def contacts(forces):
 
 
 def tripod_score(down):
+    if down.shape[1] < 6:
+        return float("nan")
     a = down[:, TRIPOD_A].sum(axis=1).astype(float)
     b = down[:, TRIPOD_B].sum(axis=1).astype(float)
     if a.std() < 1e-9 or b.std() < 1e-9:
@@ -46,14 +48,14 @@ def tripod_score(down):
     return float(np.corrcoef(a, b)[0, 1])
 
 
-def draw(ax, down, title):
-    for i, leg in enumerate(LEGS):
+def draw(ax, down, title, legs):
+    for i, leg in enumerate(legs):
         stance = down[:, i]
         ax.fill_between(np.arange(len(stance)), i + 0.1, i + 0.9,
                         where=stance, step="post", color="black", linewidth=0)
-    ax.set_yticks(np.arange(6) + 0.5)
-    ax.set_yticklabels(LEGS, fontsize=9)
-    ax.set_ylim(0, 6)
+    ax.set_yticks(np.arange(len(legs)) + 0.5)
+    ax.set_yticklabels(legs, fontsize=9)
+    ax.set_ylim(0, len(legs))
     ax.set_xlim(0, len(down))
     ax.invert_yaxis()
     ax.set_title(title, fontsize=10)
@@ -69,7 +71,7 @@ def joint_limits(morph):
     embodiments.
     """
     paths = []
-    for d in ("ik_walk_100_framed", "ik_walk_8body"):
+    for d in ("ik_4leg_middleloss_clean9", "ik_walk_100_framed", "ik_walk_8body"):
         paths = sorted(glob.glob(os.path.join(ROOT, "data", d, f"{morph}_*.npz")))
         if paths:
             break
@@ -114,6 +116,7 @@ def main():
 
     data = np.load(args.replay, allow_pickle=True)
     morph, epoch = str(data["morph"]), int(data["epoch"])
+    legs = [str(x) for x in data["active_legs"]] if "active_legs" in data else LEGS
     tag = os.path.splitext(os.path.basename(args.replay))[0]
     out_dir = args.out_dir if os.path.isabs(args.out_dir) else os.path.join(ROOT, args.out_dir)
     os.makedirs(out_dir, exist_ok=True)
@@ -121,7 +124,9 @@ def main():
     down = {"predicted": contacts(data["pred_forces"]), "ground_truth": contacts(data["gt_forces"])}
     print(f"body '{morph}' ({'held out' if bool(data['held_out']) else 'trained on'}), "
           f"epoch {epoch}, clip {str(data['clip'])}")
-    print(f"{'':<14}" + "".join(f"{leg:>7}" for leg in LEGS) + f"{'tripod':>9}{'forward m':>11}")
+    metric_name = "tripod" if len(legs) == 6 else "coord"
+    print(f"{'':<14}" + "".join(f"{leg:>7}" for leg in legs)
+          + f"{metric_name:>9}{'forward m':>11}")
     for name in ("predicted", "ground_truth"):
         duty = down[name].mean(axis=0)
         heads = data["pred_heads" if name == "predicted" else "gt_heads"]
@@ -130,8 +135,8 @@ def main():
               + f"{tripod_score(down[name]):>9.2f}{travelled:>11.3f}")
 
     fig, axes = plt.subplots(2, 1, figsize=(11, 5.4), sharex=True)
-    draw(axes[0], down["predicted"], "driven by world-model predicted commands")
-    draw(axes[1], down["ground_truth"], "driven by IK ground-truth commands")
+    draw(axes[0], down["predicted"], "driven by world-model predicted commands", legs)
+    draw(axes[1], down["ground_truth"], "driven by IK ground-truth commands", legs)
     axes[1].set_xlabel("simulation step", fontsize=9)
     fig.suptitle(
         f"Gait on body '{morph}' -- {'held out' if bool(data['held_out']) else 'trained on'}, "

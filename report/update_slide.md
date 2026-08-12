@@ -1,8 +1,8 @@
 # Progress Update — Stage 1: Cross-Morphology Latent Action Model
 
-Stick insect (*Medauroidea extradentata*), simulated in CoppeliaSim. Stage 1 only: one 18-DOF
-topology, several leg geometries. Stage 2 (Unitree B1 quadruped) appears once, on slide 14, because a first run
-of it turns the closing question from a risk into a number. Fifteen slides.
+Stick insect (*Medauroidea extradentata*), simulated in CoppeliaSim. Stage 1: one 18-DOF
+topology, several leg geometries. Stage 2 now appears on slides 14-15: first the clean
+hexapod+B1 run, then a new 4-leg insect compositional held-out test. Seventeen slides.
 
 Slides 1 to 3 are background already covered previously. The update starts at slide 4.
 
@@ -20,9 +20,10 @@ a different height, or does not move. Every body needs its own commands for the 
 morphology label, no kinematics supplied — that separates *what movement is happening* from *which
 body is doing it*, and then turn that latent into the correct body-specific joint command?
 
-**The scope, stated precisely.** This is cross-**morphology**, not cross-embodiment. All bodies
-share one 18-D joint space, six legs times three joints; only the geometry differs. The quadruped
-appears only in the closing questions.
+**The scope, stated precisely.** Stage 1 is cross-**morphology**, not cross-embodiment. All Stage
+1 bodies share one 18-D joint space, six legs times three joints; only the geometry differs.
+Stage 2 extends the same question to cross-embodiment with a quadruped and a held-out 4-leg
+insect.
 
 **Why it matters for what comes after.** If the latent really separates behaviour from body, the
 same latent should drive a robot with a different number of legs, which no proprioceptive
@@ -37,7 +38,7 @@ that separation happens at all, in the easy case where the joint spaces do match
 | Slides 4-7 | the central result: the geometry is readable, the model ignores it, what fixed that, and what the fix did to the latent |
 | Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
 | Slides 11-12 | two structural facts about the task itself, found last, that reframe the rest |
-| Slides 13-15 | status, a first cross-embodiment run, and two decisions I need help with |
+| Slides 13-16 | status, a first cross-embodiment run, a 4-leg held-out test, and two decisions I need help with |
 
 ---
 
@@ -704,15 +705,15 @@ want it to **remove** what the encoder carries about the robot. Same information
 
 The conventional view of the same thing, for comparison against how this is usually shown:
 
-![cross-embodiment UMAP](../results/wm/figures/cross_embodiment_umap.png)
+![cross-embodiment UMAP](../results/wm/figures/cross_embodiment_umap_stage2_clean.png)
 
 **Weight sharing did most of the work and did not finish it.**
 
 | | frozen encoder `e_t` | learned latent `z` | |
 |---|---|---|---|
-| silhouette, how separated the two embodiments are | **+0.671** | **+0.140** | 4.8x less separated |
-| cluster separation, distance between means over within-cluster spread | **4.01x** | **0.77x** | means now closer than the spread |
-| embodiment recoverable by a linear probe | **1.000** | **1.000** | unchanged |
+| silhouette, how separated the two embodiments are | **+0.638** | **+0.051** | 12.5x less separated |
+| cluster separation, distance between means over within-cluster spread | **3.41x** | **0.39x** | means now closer than the spread |
+| embodiment recoverable by a linear probe | **1.000** | **0.994** | almost unchanged |
 | what the panels show | two far-apart masses | two tighter clusters | still two |
 
 The first two rows are a large, real compression and it is visible in the figure. The last two are
@@ -728,9 +729,10 @@ decoder flips, and not a shared language either: leakage from the frozen encoder
 consumes and no loss penalises. Whether that harms transfer to a genuinely *new* embodiment is
 untested, and **cannot be tested with two embodiments**. That is question 2.
 
-The figure above predates the clean run and is being regenerated; the silhouette and separation
-rows are the ones to trust least, since cluster separation moved 0.39x to 0.24x between two seeds
-of the same config.
+The figure above is regenerated from `stage2_clean` seed 0. The exact silhouette and separation
+rows should still be treated as illustrative rather than headline evidence, since seed 1 moves the
+latent separation again; the stable claim is the paired one: the latent compresses embodiment
+separation strongly, while identity remains linearly recoverable.
 
 One caveat carried over and one retired. Still true: with two embodiments there is no held-out
 embodiment, only a held-out body. No longer true: validation used to be 67 B1 transitions from a
@@ -739,7 +741,119 @@ train and validation track each other to within 1% across 60 epochs.
 
 ---
 
-## Slide 15 — Two questions for the professor
+## Slide 15 — New held-out embodiment: 4-leg insect with a new head
+
+This is the Stage 2 pivot made concrete. The model was trained on two embodiments:
+
+```text
+6-leg stick insect  -> 18-D output head
+Unitree B1          -> 12-D output head
+```
+
+The test body is neither of those: the same stick insect with the middle legs removed (`ML,MR`),
+leaving four active insect legs:
+
+```text
+FL, HL, FR, HR  -> 12-D insect output head
+```
+
+The dimensionality matches B1, but the semantics do not. So this is **not** a zero-shot B1-head
+test. The fair test is few-shot calibration:
+
+1. Freeze the Stage 2 encoder/ITM/decoder backbone.
+2. Add a new `middleloss` 12-D output head.
+3. Fit only that head on five 4-leg clips.
+4. Test on held-out 4-leg clips.
+5. Compare against the same new-head fit on a random backbone.
+
+**Result: the pretrained Stage 2 backbone makes the new 4-leg head much easier to fit.**
+
+![4-leg few-shot transfer and z ablation](../results/wm/figures/4leg_fewshot_and_z_ablation.png)
+
+Across three 5-train / 4-test splits:
+
+| | pretrained Stage 2 | random backbone |
+|---|---:|---:|
+| mean held-out error | **1.75 deg / joint** | 4.99 deg / joint |
+| gain | **2.86x lower error** | — |
+| R² range | **+0.96 to +0.97** | +0.72 to +0.77 |
+
+The same result holds as a few-shot curve. Each point averages three random train/test splits:
+
+![4-leg few-shot curve](../results/wm/figures/4leg_fewshot_curve.png)
+
+| clips used for the new head | pretrained Stage 2 | random backbone | gain |
+|---:|---:|---:|---:|
+| 1 | **2.56 ± 0.18 deg** | 6.68 ± 0.39 deg | 2.61x |
+| 3 | **1.97 ± 0.04 deg** | 5.35 ± 0.17 deg | 2.72x |
+| 5 | **1.75 ± 0.05 deg** | 5.09 ± 0.35 deg | 2.91x |
+| 7 | **1.71 ± 0.08 deg** | 4.78 ± 0.08 deg | 2.80x |
+
+So the claim is not only "better final accuracy"; it is **sample efficiency**. The pretrained
+backbone needs much less 4-leg data to calibrate a usable action head.
+
+**The commands also execute physically.** The predicted actions were replayed open-loop in
+CoppeliaSim with the middle legs ghost-removed, side-by-side with the IK ground truth:
+
+![4-leg replay stills](../results/wm/figures/4leg_replay_stills.png)
+
+The four clean held-out clips all walk stably and closely track the IK reference. Example numbers:
+
+| clip | predicted forward / side | IK forward / side |
+|---|---:|---:|
+| ep101 | +0.660 / -0.233 m | +0.701 / -0.239 m |
+| ep130 | +0.665 / -0.188 m | +0.694 / -0.181 m |
+| ep6 | +0.713 / -0.168 m | +0.692 / -0.277 m |
+| ep69 | +0.650 / -0.167 m | +0.655 / -0.273 m |
+
+**What this does and does not claim.**
+
+This is evidence for **few-shot transfer through a reusable visual-action backbone**, not direct
+zero-shot control. The model still needs a small output head for the new action coordinates.
+
+It is also not gait correction. When tested on deliberately bad/veering 4-leg clips, the model
+still decodes them far better than the random control:
+
+| bad/veering test set | test deg | R² |
+|---|---:|---:|
+| pretrained Stage 2 | **2.31** | **+0.94** |
+| random backbone | 6.75 | +0.53 |
+
+and replay generally veers too. Matching a bad demonstration means the decoder learned the
+visual/action correspondence; it does not mean the model knows the gait is undesirable.
+
+**The structural caveat from slides 11-12 is still real.** A single frame already carries strong
+gait phase information. The z-ablation quantifies how much:
+
+| clean 4-leg test | test deg |
+|---|---:|
+| real aligned `z` | **1.86** |
+| zero `z` | 2.49 |
+| shuffled `z` | 3.35 |
+| random backbone | 5.06 |
+
+So the current frame is doing real work, but aligned `z` is not redundant. The honest claim is:
+the 4-leg transfer uses both the current visual representation and an aligned transition latent.
+
+**Adversarial identity removal is promising, but not the main baseline yet.** A completed
+`stage2_clean_adv_warm10` run lowers the removable identity signal and slightly improves held-out
+and 4-leg scores, but it also makes `z` less load-bearing overall:
+
+![Stage2 clean vs adversarial warm10 summary](../results/wm/figures/stage2_clean_vs_adv_summary.png)
+
+| | clean | adv warm10 |
+|---|---:|---:|
+| held-out `c08f09t09` | 3.84 deg | **3.64 deg** |
+| 4-leg split-A real `z` | 1.86 deg | **1.66 deg** |
+| identity residual after removal | 0.738 | **0.598** |
+| cost of zeroing `z` | **7.63x** | 4.44x |
+
+So for this update I keep `stage2_clean` as the baseline and report `adv_warm10` as a useful
+ablation/candidate rather than a replacement.
+
+---
+
+## Slide 16 — Two questions for the professor
 
 **1. Our evaluation was aimed at the wrong module. What should Stage 2 be scored on?**
 
@@ -811,11 +925,12 @@ plus a 10.5:1 imbalance, made a passive quantity look functional.
 frozen encoder: fully readable, consumed by nothing, penalised by nothing. Whether that costs
 anything for a third embodiment is untested — and with two embodiments it is untestable.
 
-**The experiment now running** is adversarial removal, with a prediction attached: if the identity
-is inert, stripping it should be free. Early signs are against that — the adversary sits at 0.25
-against a 0.500 chance level, which is the *scrambling* failure rather than removal, while an
-independent probe still recovers the embodiment at 0.75. Thirteen epochs of sixty, so not yet a
-result.
+**The adversarial removal run is now complete.** With the corrected ten-epoch warmup it does reduce
+the identity subspace: after removing eight identity directions, the residual probe drops from
+0.738 in `stage2_clean` to 0.598 in `adv_warm10`, and deleting that subspace costs only 1.01x.
+Held-out `c08f09t09` also improves slightly, 3.84 to 3.64 deg. The caution is that zeroing `z`
+costs less too, 7.63x to 4.44x, so the adversary may make the model rely less on the latent
+overall. Useful ablation; not yet the headline model.
 
 Their setting likely does not need one. The shortcut we measured only pays when knowing which body
 you are looking at tells you the command, and in our data each body does exactly one thing. In
@@ -825,7 +940,7 @@ slightly, one behaviour — and that regime is where the shortcut appears.
 
 ---
 
-## Slide 16 — Three questions left open in Week 11, now with answers
+## Slide 17 — Three questions left open in Week 11, now with answers
 
 ### 1. "How is this different from Diffusion?"
 

@@ -44,6 +44,7 @@ TRACK = "/head"
 ROBOT_ROOT = "/abdomen"
 FORCE_NAMES = [f"/forceSensor_{leg}" for leg in LEGS]
 EP = 66
+CHAIN_NAMES = ("m1", "coxa", "m2", "femur", "m3", "tibia", "tibial", "forceSensor", "foot")
 
 
 def settle(sim):
@@ -58,12 +59,54 @@ def capture(sim, cam):
 
 
 def read_forces(sim, force_h):
-    out = np.zeros(6, np.float32)
+    out = np.zeros(len(force_h), np.float32)
     for i, h in enumerate(force_h):
         r = sim.readForceSensor(h)
         fv = r[1] if isinstance(r, (list, tuple)) and len(r) >= 2 else [0, 0, 0]
         out[i] = float(np.sqrt(fv[0] ** 2 + fv[1] ** 2 + fv[2] ** 2))
     return out
+
+
+def get_optional(sim, path):
+    try:
+        return sim.getObject(path)
+    except Exception:
+        return None
+
+
+def leg_subtree(sim, leg):
+    handles = []
+    root = get_optional(sim, f"/m1_{leg}")
+    if root is not None:
+        handles.extend(sim.getObjectsInTree(root, sim.handle_all, 1) + [root])
+    for name in CHAIN_NAMES:
+        h = get_optional(sim, f"/{name}_{leg}")
+        if h is not None and h not in handles:
+            handles.append(h)
+    return handles
+
+
+def ghost_remove_legs(sim, legs):
+    """Hide and de-respond selected legs without deleting handles the scene script may expect."""
+    disabled_shapes = 0
+    disabled_joints = 0
+    for leg in legs:
+        for h in leg_subtree(sim, leg):
+            typ = sim.getObjectType(h)
+            if typ == sim.object_shape_type:
+                sim.setObjectInt32Param(h, sim.objintparam_visibility_layer, 0)
+                try:
+                    sim.setObjectInt32Param(h, sim.shapeintparam_respondable, 0)
+                except Exception:
+                    pass
+                disabled_shapes += 1
+            elif typ == sim.object_joint_type:
+                try:
+                    sim.setJointTargetForce(h, 0.0)
+                except Exception:
+                    pass
+                disabled_joints += 1
+    return disabled_shapes, disabled_joints
 
 
 def leg_length(sim, leg="FL"):
@@ -158,7 +201,8 @@ def precompute_commands(sim, simIK, scene, brel, scale):
     return cmds, diagnostic
 
 
-def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None):
+def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None,
+                     active_legs=None, remove_legs=None):
     """Open-loop drive of cmds with the FIXED camera; returns frames/actions/forces/head.
 
     cam_dx/cam_dy shift the camera in the world plane on top of the scene's authored offset.
@@ -167,11 +211,25 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     """
     sim.loadScene(f"{ENV}/{scene}")
     settle(sim)
+    active_legs = active_legs or LEGS
+    remove_legs = remove_legs or []
+    if remove_legs:
+        ds, dj = ghost_remove_legs(sim, remove_legs)
+        print(f"    ghost-removed {','.join(remove_legs)}: shapes_off={ds}, joints_zero={dj}")
     cam = sim.getObject("/" + SENSOR)
     track = sim.getObject(TRACK)
 
     joints = [sim.getObject(f"/{jn}_{leg}") for leg in LEGS for jn in SEG]  # matches cmds order
-    force_h = [sim.getObject(n) for n in FORCE_NAMES]
+    active_cols = [LEGS.index(leg) * 3 + k for leg in active_legs for k in range(3)]
+    cmds = np.asarray(cmds, np.float32)
+    if cmds.shape[1] == len(active_cols):
+        expanded = np.zeros((len(cmds), len(LEGS) * len(SEG)), np.float32)
+        expanded[:, active_cols] = cmds
+        cmds = expanded
+    elif cmds.shape[1] != len(LEGS) * len(SEG):
+        raise ValueError(f"cmds has {cmds.shape[1]} columns; expected {len(active_cols)} "
+                         f"for active_legs={active_legs} or {len(LEGS) * len(SEG)} full joints")
+    force_h = [sim.getObject(f"/forceSensor_{leg}") for leg in active_legs]
 
     # authored camera offset (encodes RUNWAY_AIM); must be read BEFORE any respawn, or it
     # measures the camera against the moved robot instead of the authored framing
@@ -196,6 +254,12 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     for _ in range(warmup):
         for h, v in zip(joints, cmds[0]):
             sim.setJointTargetPosition(h, float(v))
+        for leg in remove_legs:
+            for jn in SEG:
+                try:
+                    sim.setJointTargetForce(sim.getObject(f"/{jn}_{leg}"), 0.0)
+                except Exception:
+                    pass
         sim.step()
 
     frames, actions, forces, heads = [], [], [], []
@@ -203,6 +267,12 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     for t in range(len(cmds)):
         for h, v in zip(joints, cmds[t]):
             sim.setJointTargetPosition(h, float(v))
+        for leg in remove_legs:
+            for jn in SEG:
+                try:
+                    sim.setJointTargetForce(sim.getObject(f"/{jn}_{leg}"), 0.0)
+                except Exception:
+                    pass
         sim.step()
         p = np.array(sim.getObjectPosition(track, sim.handle_world))
         if start_xy is None:
@@ -210,7 +280,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             sim.setObjectPosition(cam, sim.handle_world,
                                   [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
         frames.append(capture(sim, cam))
-        actions.append(cmds[t].copy())
+        actions.append(cmds[t, active_cols].copy())
         forces.append(read_forces(sim, force_h))
         heads.append(p)
         if travel > 0 and float(np.linalg.norm(p[:2] - start_xy)) >= travel:
@@ -250,10 +320,21 @@ def main():
                          "are relative to sim/env. Names must not contain '_' because "
                          "wm/data/dataset.py reads the body from the filename prefix. "
                          "Defaults to the three uniform-scale bodies.")
+    ap.add_argument("--active_legs", type=str, default=",".join(LEGS),
+                    help="comma-separated legs to save in actions/forces, leg-major order. "
+                         "Use FL,HL,FR,HR for the middle-loss 4-leg insect.")
+    ap.add_argument("--remove_legs", type=str, default="",
+                    help="comma-separated legs to ghost-remove at runtime, e.g. ML,MR. "
+                         "Handles stay present for scene scripts, but shapes are hidden/non-respondable.")
     ap.add_argument("--out", type=str, required=True)
     args = ap.parse_args()
 
     episodes = [int(x) for x in args.episodes.split(",")]
+    active_legs = [x for x in args.active_legs.split(",") if x]
+    remove_legs = [x for x in args.remove_legs.split(",") if x]
+    bad_legs = sorted((set(active_legs) | set(remove_legs)) - set(LEGS))
+    if bad_legs:
+        raise SystemExit(f"unknown leg(s): {bad_legs}; valid={LEGS}")
     global SCENES
     if args.morphs:
         SCENES = []
@@ -285,11 +366,13 @@ def main():
                   f"IK residual mean/max={ikdiag['residual_mean_mm']:.2f}/{ikdiag['residual_max_mm']:.2f}mm")
             stance = np.tile(cmds[0], (args.stop, 1))               # hold pose -> stand still
             for rep in range(args.repeats):
-                f, a, fc, h = drive_and_record(sim, scene, stance, 0.0, args.warmup, args.cam_dx, args.cam_dy, args.spawn)
+                f, a, fc, h = drive_and_record(
+                    sim, scene, stance, 0.0, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
+                    active_legs=active_legs, remove_legs=remove_legs)
                 tag = f"{morph}_stop_r{rep}" if args.repeats > 1 else f"{morph}_stop"
                 np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                     frames=f, actions=a, forces=fc, head=h,
-                                    foot_order=np.array(LEGS), step_idx=np.arange(len(f)),
+                                    foot_order=np.array(active_legs), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=-1, repeat=rep, scale=args.scale,
                                     behavior="stop")
                 fwd, lat, verdict = walk_check(h)
@@ -318,11 +401,13 @@ def main():
                 cmds = np.tile(cmds, (args.loops, 1))
             pre = "" if args.behavior == "walk" else f"{args.behavior}_"
             for rep in range(args.repeats):
-                f, a, fc, h = drive_and_record(sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn)  # fresh draw each
+                f, a, fc, h = drive_and_record(
+                    sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
+                    active_legs=active_legs, remove_legs=remove_legs)  # fresh draw each
                 tag = f"{morph}_{pre}ep{ep}_r{rep}" if args.repeats > 1 else f"{morph}_{pre}ep{ep}"
                 np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                     frames=f, actions=a, forces=fc, head=h,
-                                    foot_order=np.array(LEGS), step_idx=np.arange(len(f)),
+                                    foot_order=np.array(active_legs), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=ep, repeat=rep, scale=args.scale,
                                     behavior=args.behavior)
                 fwd, lat, verdict = walk_check(h)

@@ -1,0 +1,12 @@
+metric,stage2_clean,stage2_clean_adv_warm10,note
+heldout_c08f09t09_deg,3.84,3.64,lower better
+heldout_c08f09t09_R2,0.87,0.88,higher better
+identity_residual_probe,0.738,0.598,lower better
+identity_removed_cost_x,1.03,1.01,lower/no cost means identity inert
+z_zeroed_cost_x,7.63,4.44,higher means z more load-bearing
+4leg_splitA_real_z_deg,1.86,1.66,lower better
+4leg_splitA_zero_z_deg,2.49,2.08,lower better but indicates frame/backbone sufficiency
+fewshot_budget1_deg,2.56,2.60,lower better
+fewshot_budget3_deg,1.97,1.92,lower better
+fewshot_budget5_deg,1.75,1.66,lower better
+fewshot_budget7_deg,1.71,1.51,lower better
