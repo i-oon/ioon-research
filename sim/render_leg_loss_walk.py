@@ -4,6 +4,37 @@ This is intentionally a rough visual diagnostic. The original scene controller
 is still the six-leg open-loop gait, so the missing-leg bodies are expected to
 limp, drift, or fall. To avoid breaking the scene script, removed legs are kept
 as handles but their visible/respondable shapes are disabled ("ghost removal").
+
+WHAT THE PREVIEW SHOWED, AND WHAT A DATASET WOULD NEED
+======================================================
+
+`middle_loss` is the usable variant, and by more than expected: driven by the unchanged six-leg
+gait it stays upright and walks away much as the six-leg body does. `front_loss` tips and is lying
+diagonal by frame 55; `hind_loss` rears vertical at frame 27 and collapses. Strips in
+`results/wm/gait/leg_loss_strips.png`.
+
+Two things this settles about building a 4-leg dataset, both cheaper than the roadmap assumed:
+
+  - **No scene file is needed.** Legs are ghost-removed at runtime from
+    `medauroidea_stick_insect.ttt`, which is why `sim/env/` contains nothing 4-legged.
+  - **No policy is needed.** The four remaining legs are geometrically unchanged, so the IK
+    commands already computed for FL, HL, FR and HR still apply. Dropping the six middle columns
+    turns the 18-D command into a 12-D one.
+
+What is missing is the framing. This preview uses a head camera and the body leaves the frame
+around step 83 of 139. A dataset render has to match `data/ik_walk_8body` exactly or the model
+sees a different scene, not a different body:
+
+    --scale 0.5 --travel 0.8 --warmup 20 --cam_dx -0.6 --cam_dy 0.0 --spawn 0 0
+
+`--cam_dx -0.6 --spawn 0 0` is the pair that keeps the body fully in frame for all 66 frames and
+the floor edge out of view; without `--spawn` the robot starts 0.95 m from the edge of a 5x5 m
+floor. See direction_plan.md.
+
+Why it is worth building: it is the only body that separates *leg count* from *appearance*. The
+hexapod is 6-legged and insect-shaped, the B1 4-legged and quadruped-shaped, so nothing currently
+tells us which of the two an embodiment probe reading 0.99 is responding to. A 4-legged insect
+does.
 """
 import argparse
 import os

@@ -1832,6 +1832,13 @@ alone is harmless; ratio is only dangerous because it drives the dead zone.
 `norm(h[-1,:2] - h[0,:2])`, which is unsigned, and reads 0.46 m for a body reversing away from the
 start. The fix is to check the forward component and the lateral drift separately.
 
+**And these two bodies were already known to be bad.** PROGRESS 18.2 records them walking
+successfully in only 20-21 of 30 clips, and they were "cut" -- by leaving them out of
+`train_morphs` in the Stage 1 runs. The clips stayed in the directory. Stage 2 takes a directory
+and globs it, so **a convention enforced by naming bodies broke the moment a run stopped naming
+them.** That is the real mechanism: not that nobody noticed, but that the exclusion lived in the
+callers rather than in the data.
+
 **Who is affected.**
 
 | run | bodies | contamination |
