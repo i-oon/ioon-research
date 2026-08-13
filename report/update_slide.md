@@ -624,19 +624,70 @@ ten times an epoch. Found while measuring it:
 
 Everything below is on the fixed data, two seeds, 60 epochs, converged.
 
-### It works: Stage 2 has a generalisation test and passes it
+### Stage 2 now has a held-out body, and beats the no-learning baseline on it
 
-| held-out `c08f09t09` | seed 0 | seed 1 |
-|---|---|---|
-| deg per joint | 3.85 | 3.43 |
-| **R² against the body's own mean** | **+0.87** | **+0.90** |
+**What is measured.** Two consecutive frames of `c08f09t09` — a body withheld from training — go
+through the frozen encoder and the ITM to give `z`; the Motion Decoder turns `(e_t, z)` into 18
+joint commands through the hexapod head; those are compared against the IK commands that actually
+produced the clip.
 
-Positive on both, where **every Stage 1 held-out body scored negative** (−0.42 to −3.16). Stage 1
-scores 2.91 deg on this same body, so learning a quadruped alongside costs about 30% of hexapod
-accuracy and does not break it.
+| held-out `c08f09t09` | seed 0 | seed 1 | |
+|---|---|---|---|
+| RMSE per joint, **degrees** | 3.85 | 3.43 | against a command spread of **11.73 deg** — so 29–33% of the signal |
+| **R²**, unitless | **+0.87** | **+0.90** | 87–90% of the variance around **this body's own** mean posture |
 
-It is an interpolation test — that body sits inside the training range — but it is the one Stage 1
-held out, which is what makes the two stages comparable. **Slide 15 is the real test.**
+Two things about those units. The error is degrees per joint, averaged over all 18 joints and every
+timestep, and it only means something beside the spread of the commands themselves — **11.73 deg**
+for this body, so the model is missing by about a third of the signal.
+
+And R² is measured against **that body's own average posture**, not the training set's. Beating the
+training mean only says the model noticed this is not an average body; beating the body's own mean
+is the claim that matters, and **0 is the line** — negative means worse than someone who saw the
+body once and memorised how it stands.
+
+Positive on both seeds, where **every Stage 1 held-out body scored negative** (−0.42 to −3.16).
+Stage 1 scores 2.91 deg on this same body, so learning a quadruped alongside costs about 30% of
+hexapod accuracy and does not break it.
+
+**Three limits on what this shows.**
+
+It is **command reconstruction, not control.** The ground truth is the IK solution, so the ceiling
+is reproducing IK exactly — this can confirm imitation and never beat it. Unlike the 4-leg body on
+slide 15, these predictions were **not replayed through physics**, so "it walks" is not claimed
+here.
+
+It is **interpolation, not extrapolation.** `c08f09t09` is coxa 0.8, femur 0.9, tibia 0.9 — inside
+the training range on all three axes. It was chosen because Stage 1 held out the same body, which
+is what makes the two stages comparable.
+
+And **R² > 0 is a low bar** — it only says the model beats memorising this body's average posture.
+It is worth stating because Stage 1 never cleared it, not because clearing it is impressive.
+
+**Slide 15 is the real test.**
+
+### The ablations as behaviour, not as ratios
+
+Per-joint error and R² do not tell you whether the robot walks. The same ablations, driven through
+the physics on the held-out body:
+
+| | forward (m) | heading | RMSE deg |
+|---|---|---|---|
+| **ground truth (IK)** | **+0.592** | +13.8° | — |
+| intact | +0.374 | +14.0° | 3.98 |
+| embodiment identity removed | +0.345 | +24.8° | 4.18 |
+| frame zeroed | +0.297 | +26.8° | 7.26 |
+| **latent zeroed** | **+0.100** | **+59.6°** | 9.68 |
+
+**Zeroing the latent stops it walking** — a fifth of the distance, 59.6° off course, front-right
+foot down 9% of the time against 51%. It drags a leg and spins.
+
+**And the intact model walks only 63% as far as the reference**, while scoring 3.98 deg per joint
+on a spread of 11.7 and R² +0.87. The number reads small; the behaviour is a robot covering
+two-thirds of the ground, with 7.9% of its commands outside the range this body ever uses.
+
+**That gap is the lesson.** Reconstruction accuracy and locomotion are not the same claim, and only
+the second is what the thesis is about — which is why slide 15's replay matters more than any error
+figure on this slide.
 
 ### But the latent is not shared, and training made that worse
 

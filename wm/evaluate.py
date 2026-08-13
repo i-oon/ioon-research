@@ -103,8 +103,8 @@ def latents(itm, embeddings, chunk):
 
 
 @torch.no_grad()
-def decode(md, embeddings, z, chunk):
-    parts = [md(embeddings[i:i + chunk], z[i:i + chunk]) for i in range(0, len(z), chunk)]
+def decode(md, embeddings, z, chunk, head="default"):
+    parts = [md(embeddings[i:i + chunk], z[i:i + chunk], head) for i in range(0, len(z), chunk)]
     return torch.cat(parts).cpu().numpy()
 
 

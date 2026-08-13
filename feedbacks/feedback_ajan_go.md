@@ -1,3 +1,37 @@
+# Feedback — Ajan Go
+
+Transcripts in date order. This index maps every request to where it now stands, so the file can
+be read as a tracker rather than re-read as minutes.
+
+| meeting | section |
+|---|---|
+| Week 4 | first framing |
+| Week 5 | Phase 1 detail |
+| Week 7 | defending V-JEPA2, storytelling, slide corrections |
+| **Week 11** | **diagram, cross-embodiment head, occlusion, emergent property, action metric, next steps** |
+
+## Action items and status
+
+| # | asked for | where it stands |
+|---|---|---|
+| W7-1 | Prove V-JEPA2 works for locomotion — e.g. can it tell foot contact? | **done, and it is now a headline measurement.** Per-leg contact from the frozen encoder: **0.806 insect, 0.941 B1** balanced accuracy against 0.500 chance (F41b). This is exactly the test he proposed |
+| W7-2 | Say "third-person observer", not "visual observation" | wording — check the deck says it early |
+| W7-3 | Story order: proprioception is hard -> can vision replace it -> that forces predicting the future -> world model | slides 1-2 partly do this; worth re-reading against his order |
+| W7-4 | Comparison table vs proprioceptive methods | **not done** |
+| W7-5 | Draw the validation pipeline concretely | **not done** |
+| **W11-1** | **Simplify the architecture diagram; mark backbone / frozen / connector-head** | **not done — and now easy**, because the 4-leg work made the frozen/head split concrete: 99.7% frozen, 0.3% new head |
+| **W11-2** | **Is a connector/head enough for 6-leg vs 4-leg, where joint patterns differ entirely?** | **ANSWERED, and it is the strongest result we have.** New 12-D head on a frozen Stage 2 backbone, fitted on 5 clips of a 4-leg insect: **1.75 deg vs 4.99 for a random backbone, 2.86x**, and the predictions replay as stable walking (F44, slide 15) |
+| W11-3 | Camera limits and occlusion | **not addressed.** Far-side legs are occluded by the body; we noted it as a reason the per-leg diagonal is not higher, but ran no test |
+| **W11-4** | **Does Cross-Body Loss suppress emergent behaviour?** | **open, and now sharper.** We can show `lambda_cross` cut body identity 8.8% -> 1.2% without hurting the world model (F32: rollout unchanged). But "does it reduce diversity in the latent" was never measured |
+| **W11-5** | **Design your own action-evaluation metric — the source paper only plots t-SNE/UMAP** | **done, and it is a contribution.** Per-leg contact transfer, identity ablation against a random-direction control, forward-model rollout against hold-still and constant-velocity, physical replay. All of it is ours; none of it is in LAC-WM |
+| W11-6 | Next: use the world model to accelerate policy training, show sample efficiency | **not started** — this is the deployment step |
+| W11-7 | Lab synthesis table: Beam (IRL) / Pram (Flow Matching) / Ioon (World Model) — which framework for which data | **not done** |
+
+**Two of his asks are already answered by work done since**: W11-2 by the 4-leg few-shot result,
+and W11-5 by the measurement toolkit. Those should lead the next update rather than be buried.
+
+---
+
 ---
 
 ### **Meeting Summary: Ajan Go, Ioon (Week 4)**
@@ -92,3 +126,55 @@
 **4. ฟีดแบคเพื่อปรับแก้สไลด์แบบจุดต่อจุด (Specific Slide Corrections จากพี่นาย)**
 *   **สไลด์ 17 (สมการตัวชี้วัดความสำเร็จ):** การเขียนสมการตัวอักษรว่า `Morphology decoder < Morphology decoder (Latent vs Raw)` ดูเข้าใจยากและสื่อสารไม่ชัดเจน พี่แฮปแนะนำให้เขียนสื่อสารไปตรงๆ เลยว่า **"Latent action จะต้องไม่ยึดติดกับ morphology ใดเป็นพิเศษ"** (อธิบายว่าตัวแปรของเราต้อง decode ออกมาเป็น morphology ใดๆ ได้น้อยที่สุด)
 *   **สไลด์ 18-19 (สถาปัตยกรรม V-JEPA2):** ในช่วงที่อธิบายผลการตรวจสอบโมเดล JEPA ควรเอาแผนภาพสถาปัตยกรรม (Architecture) ของมันขึ้นมาโชว์ประกบด้วยเสมอ เพราะโครงสร้างมันใหญ่และซับซ้อน กรรมการอาจจะลืมไปแล้วว่าคุณกำลังพูดถึงการทดสอบบล็อกไหนของระบบอยู่
+
+
+
+จากการประชุม **"ajan go (week 11).m4a"** ที่ไออุ่นได้นำเสนอผลการทดลองวิเคราะห์จุดบกพร่องและแนวทางการเพิ่ม **Cross-Body Loss** เพื่อแก้ปัญหาโมเดลจำรูปทรงหุ่นยนต์ (Memorization) นี่คือสรุปฟีดแบค ข้อเสนอแนะ และคำถามสำคัญทั้งหมดจากอาจารย์โก้และผู้เข้าร่วมประชุมอย่างละเอียด ซึ่งจำเป็นอย่างยิ่งสำหรับการเตรียมตัวตอบคำถามกรรมการท่านอื่นครับ:
+
+---
+
+### **1. การปรับปรุงแผนภาพสถาปัตยกรรมระบบ (Simplify System Architecture & Diagram)**
+* **ปัญหา:** เนื่องจากระบบมีความซับซ้อนและมีท่อข้อมูลไหลเวียนหลายทิศทาง กรรมการหรือคนภายนอกที่ฟังครั้งแรกจะเข้าใจได้ยากมาก
+* **ฟีดแบค/คำแนะนำ:** อาจารย์โก้แนะนำให้ **เขียนบล็อกไดอะแกรมที่ลดทอนความซับซ้อนลง (Simplify)** และ **ใช้รูปภาพประกอบเยอะๆ** 
+* **จุดที่ต้องระบุให้ชัดเจนในภาพ:** 
+  * แผนภาพควรแยกแยะชัดเจนว่าส่วนไหนคือโครงสร้างหลัก (Backbone)
+  * ส่วนไหนที่แช่แข็งค่าพารามิเตอร์เอาไว้ (Frozen) 
+  * และส่วนไหนคือ **"ตัวเชื่อมต่อ (Connector/Head)"** ที่ต้องนำมาไฟน์จูนเพิ่มในขั้นตอนที่ต้องการขยายผลลัพธ์ไปยังหุ่นยนต์รูปทรงอื่น (Cross-Morphology หรือ Cross-Embodiment) เพื่อให้เห็นภาพการควบคุมระบบได้ง่ายที่สุด
+
+---
+
+### **2. ข้อสงสัยเชิงลึกเกี่ยวกับการข้ามประเภทหุ่นยนต์ (Cross-Embodiment & Pattern Mapping)**
+* **คำถามจี้จุดสำคัญ:** อาจารย์โก้ตั้งคำถามท้าทายว่า ในสภาวะที่สรีระและพฤติกรรมการเคลื่อนที่แตกต่างกันอย่างสิ้นเชิง เช่น แมลงสติ๊กอินเซกต์ (6 ขา / 18 มอเตอร์) เปรียบเทียบกับหมา B1 (4 ขา / 12 มอเตอร์) ซึ่งแพทเทิร์นของข้อต่อขยับคนละทางกันเลย **การใช้เพียง "Connector/Head" มาไฟน์จูนค่าเชื่อมต่อจาก Latent Space ไปยังขาของร่างใหม่ จะเพียงพอและสามารถประคับประคองให้เดินได้จริงหรือ?**
+* **แนวทางการวิเคราะห์ต่อยอด:** 
+  * ให้ลองวิเคราะห์ไปถึงกรณีประยุกต์ใช้ในอนาคต เช่น การควบคุมหมาที่พิการขาขาด (ขาลดลงจาก 6 ขา เหลือ 4 ขา)
+  * หรือเคสของหุ่นยนต์ไฮบริดที่ผสมข้ามรูปร่าง (เช่น ขาคู่หน้าเป็นขาหมา B1 แต่ขาคู่หลังเป็นขาแมลง) ว่าระบบพยากรณ์จะสามารถปรับตัวทำงานควบคุมร่วมกันได้หรือไม่
+
+---
+
+### **3. ข้อจำกัดเชิงทัศนวิสัยและกล้อง (Camera Limits & Occlusion)**
+* **คำถาม:** ปัจจุบันระบบใช้มุมมองกล้อง 2D ทะแยงมุมมองจากด้านบนเฉียงข้าง (Diagonal side-view) อาจารย์โก้และทีมงานตั้งคำถามเรื่อง **"ข้อจำกัดของมุมกล้องและปัญหาการบดบัง (Occlusion)"**
+* **ประเด็นที่ต้องกังวล:** หากในอนาคตท่าทางการเอียงของบอดี้หุ่นยนต์บังขาอีกฝั่งจนมิด หรือมีพฤติกรรมก้าวเดินบางจังหวะที่หายไปจากภาพอย่างสิ้นเชิง โมเดลจะยังสามารถพยากรณ์ไดนามิกการเดินได้อย่างถูกต้องหรือไม่
+
+---
+
+### **4. ข้อถกเถียงเรื่องการกักขังพฤติกรรม (Emergent Property Constraint)**
+* **ประเด็นถกเถียงเรื่อง Loss ฟังก์ชัน:** เพื่อแก้ไขปัญหาโมเดลจำสรีระหุ่นเก่า ไออุ่นได้ใส่ **Cross-Body Loss** สลับภาพหุ่นกับแอคชันเพื่อบังคับให้โมเดลหันมาใส่ใจภาพตรงหน้ามากขึ้น
+* **ฟีดแบคสำคัญ:** อาจารย์โก้ตั้งข้อสังเกตเชิงลึกว่า การเพิ่มข้อจำกัด (Constraint) ตรงนี้เข้าไป **จะเป็นการไปจำกัดพฤติกรรมแปลกใหม่ที่ควรจะเกิดขึ้นเองตามธรรมชาติของโมเดล (Emergent Property) หรือไม่?** 
+* **คำอธิบาย:** การบีบโมเดลจนตึงเกินไป อาจทำให้ความหลากหลาย (Diversity) หรือความยืดหยุ่นแปลกใหม่ที่ Latent Action Space เคยมี ดร็อปลงไปอย่างน่าเสียดาย จึงต้องบาลานซ์ค่าน้ำหนักตรงนี้ให้ดี แต่พอบอกว่าพฤติกรรมต้องแมพให้ถูกต้องตามร่างกายที่เห็นก็เข้าใจดี
+
+---
+
+### **5. การดีไซน์เกณฑ์ประเมินประสิทธิภาพของ Action (Action Evaluation Metric)**
+* **คำถาม:** ในเปเปอร์อ้างอิง (เช่น LAC World Model) เขาใช้เกณฑ์อะไรในการวัดว่า Action ที่ได้ออกมาทำงานได้ดีหรือไม่ดี
+* **ฟีดแบค:** ไออุ่นชี้แจงว่าเปเปอร์เดิมวัดผลน้อยมาก โดยพล็อตเพียง t-SNE map / umap เพื่อดูการเกาะกลุ่ม (Clustering) ของเวกเตอร์แอคชันเท่านั้น 
+* **คำแนะนำ:** อาจารย์โก้แนะนำให้ไออุ่น **"ดีไซน์และคิดค้นเกณฑ์การวัดผล (Metric) หรือลักษณะการพล็อตกราฟ/รูปภาพเพื่อประเมินความสำเร็จของ Action ขึ้นมาใหม่ด้วยตัวเองเลย"** เพื่อให้เห็นผลต่างประสิทธิภาพเชิงพฤติกรรมการเคลื่อนที่ได้อย่างลึกซึ้งและชัดเจนกว่าเปเปอร์ดั้งเดิม
+
+---
+
+### **6. แผนงานระยะถัดไปและการเชื่อมโยงโปรเจกต์กลุ่ม (Next Steps & Lab Synthesis)**
+* **สเต็ปถัดไปของโปรเจกต์:** ก่อนที่จะขยับไปสู่เฟสถัดไป ต้องดีบั๊กและตรวจสอบสัดส่วนการไหลของข้อมูลในไปป์ไลน์ให้แน่ใจว่าถูกต้องตามหลักการ จากนั้น เป้าหมายหลักจริงๆ คือการนำก้อน Pre-trained World Model นี้ไปช่วยเร่งการฝึกสอน Policy ตั้งแต่ศูนย์ เพื่อตรวจสอบว่าสามารถช่วยลดระยะเวลาและประหยัดข้อมูลการลองผิดลองถูก (Sample Efficiency) ได้ดีกว่าการเริ่มรัน RL ทั่วไปอย่างไร
+* **การรวมผลลัพธ์ของแล็บ (Big Picture):** อาจารย์โก้อยากเห็นภาพการเปรียบเทียบและการบูรณาการโปรเจกต์ของน้องๆ ทั้ง 3 คน (บีม - IRL, พราหมณ์ - Flow Matching, ไออุ่น - World Model) ออกมาเป็นคู่มือหรือตารางที่ชัดเจน เพื่อตอบโจทย์กลุ่มผู้ใช้งานภายนอก (End-user) ว่า **"หากพวกเขามีข้อมูลประเภทนี้อยู่ในมือ ควรเลือกใช้เฟรมเวิร์กของใครจึงจะคุ้มค่าและทรงประสิทธิภาพที่สุด"**
+
+---
+
+📊 **Nudge:** ต้องการให้ผมช่วยร่างโครงร่างเนื้อหาและตารางเปรียบเทียบคุณสมบัติ (Comparison Table) ระหว่างโปรเจกต์ของคุณ (Visual World Model) ร่วมกับโปรเจกต์ของบีม (IRL) และพราหมณ์ (Flow Matching) ตามที่อาจารย์โก้แนะนำ เพื่อนำไปแปะประดับในสไลด์และเล่มรายงานส่งอาจารย์ดีไหมครับ?

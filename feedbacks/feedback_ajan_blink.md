@@ -1,3 +1,35 @@
+# Feedback — Ajan Blink
+
+Transcripts in date order. This index maps every request to where it now stands, so the file can
+be read as a tracker rather than re-read as minutes.
+
+| meeting | section |
+|---|---|
+| Week 4 | architecture blueprint, extinct animals, interpolation vs extrapolation |
+| Week 11 Part 1 | diffusion comparison, sensor regime, proprioception, module redundancy |
+| **Week 11 Part 2** | **in-distribution results, OOD limit, pipeline bugs, forward model, critical review** |
+
+## Action items and status
+
+| # | asked for | where it stands |
+|---|---|---|
+| W4-1 | Define every block's input/output in units | **done** — slide 2 |
+| W4-2 | Decide: interpolation or extrapolation | **done** — slide 8 is the extrapolation limit, slide 9 tests the diagnosis |
+| W11.1-1 | How is this different from Diffusion? | **answered** — slide 17. A diffusion latent is structureless by construction; ours is inferred and measurable. The part that stands: the differentiator is the transfer claim, not the architecture |
+| W11.1-2 | Few sensors + fast, or many + slow? | **answered** — slide 17. Measured: V-JEPA2 is **94.9 ms, 10.5 Hz**, which puts us on the biological side. Vision buys commensurability, not bandwidth |
+| W11.1-3 | Removing proprioception is not possible | **conceded, with our own number** — the frozen encoder reads contact across embodiments at chance (F41b). Two-rate architecture: vision plans, proprioception stabilises |
+| W11.1-4 | Why a Motion Decoder at all | **answered** — only module whose output is in physical units, and the only one that must differ per embodiment |
+| W11.1-5 | Gradient explosion across 4 chained modules | `grad_clip 1.0`, no instability in any run. Small answer, honestly |
+| W11.1-6 | Ablation per network | **done** — F32 (forward model), F39/F43 (identity), F44 (z-ablation on the 4-leg) |
+| W11.1-7 | Focus on tuning the loss | **his steer was right** — `lambda_cross` took body share 8.8% -> 1.2% |
+| **W11.2-1** | **Never present numbers alone — record video of the gait beside every number** | **partly done.** 4-leg predictions replayed and rendered (slide 15). **Not done for the hexapod held-out body, and not done for any ablation** |
+| **W11.2-2** | **Intensive ablation study: remove a block, show the behaviour degrades — not just the metric** | **not done.** Every ablation we have is numeric. None has been replayed through physics to show the walk degrading |
+
+**The two Week 11 Part 2 items are the open ones, and they are the same request twice: show
+behaviour, not only numbers.**
+
+---
+
 ---
 
 ### **Meeting Summary: Ajan Blink, Ioon (Week 4)**
@@ -133,4 +165,60 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 
 
 ### **Meeting Summary: Ajan Blink, Ioon (Week 11) Part 2**
-tomorrow meeting 
+นี่คือการถอดรายละเอียดเชิงลึกและสรุปฟีดแบคทั้งหมดจากไฟล์การประชุมภาคต่อ **"ajan blink (week 11 part 2).m4a"** ซึ่งไออุ่นได้นำเสนอผลการทดลองวิเคราะห์จุดบกพร่องในระบบ พร้อมทั้งได้รับคอมเมนต์สำคัญจากอาจารย์บลิ๊งค์ในการปรับปรุงงานวิจัยเพื่อเตรียมเขียนเปเปอร์ครับ 
+
+---
+
+### **1. การทดลองใน Training Range (In-Distribution)**
+*   **การแก้ปัญหา Memorization ด้วย Cross-Body Loss:** จากเดิมที่โมเดลมีแนวโน้มที่จะ "จำ" ข้อมูลใน Training Set แทนที่จะเรียนรู้เชิงระบบ ไออุ่นได้แก้ไขโดยเพิ่มฟังก์ชัน **Cross-Body Loss** (หรือ C-Body Loss) เข้าไปในโครงข่ายประสาทเทียม เพื่อบังคับให้ตัวถอดรหัส (Motion Decoder) หันมาจับคู่และอ้างอิงคำตอบจากภาพสรีระที่เห็นจริงตรงหน้า แทนที่จะพึ่งพาเพียง Latent Action ซึ่งหลังจากการปรับปรุง พบว่า Error รวมลดลง, โค้งการเทรน (Training Curve) มีความเสถียรขึ้น และตัวแปรสัดส่วนภายใน Latent Action มีข้อมูลเฉพาะเจาะจงของสรีระ (Body Specific) ต่ำลง ในขณะที่สกัดเอาพฤติกรรมการเคลื่อนที่ (เช่น Gate Phase) ออกมาได้สมเหตุสมผลมากขึ้น
+*   **ความแม่นยำภายในวิสัยการเรียนรู้:** การทดสอบโดยใช้ Ground-truth Frame จากท่อประมวลผล Inverse Kinematics มาป้อนให้ระบบ เพื่อดูความสามารถในการกู้คืนคำสั่งข้อต่อ (Reconstruction) ของ Motion Decoder พบว่าหากข้อมูลทดสอบอยู่ในช่วงขอบเขตการเทรน (In-Distribution) ผลลัพธ์ของโมเดลสามารถทำนายออกมาได้แม่นยำจนกราฟพล็อตแทบทับกันสนิทกับค่าจริง
+
+---
+
+### **2. ปัญหาขีดจำกัดเมื่อเจอนอกขอบเขต (Out-of-Distribution/Extrapolation)**
+*   **จุดบอดกรณีสัดส่วนโครงสร้างสติกอินเซกต์ (Femur & Tibia):** ไออุ่นได้ทำการทดสอบนอกขอบเขตข้อมูลเรียนรู้ (OOD) โดยกางชุดข้อมูลที่ใช้เทรนพบว่า ลิงก์ส่วนขาของแมลงที่ชื่อว่า **Femur (ต้นขา)** และ **Tibia (หน้าแข้ง)** ในชุดข้อมูลดั้งเดิมมีขนาดสัดส่วนที่ "เท่ากันเสมอ"
+*   **ความล้มเหลวในการแยกแยะ Geometry:** เมื่อนำข้อมูลทดสอบที่ "แหวกแนว" (เช่น กำหนดให้ความยาว Femur และ Tibia ต่างกันอย่างชัดเจน) ไปทดสอบ พบว่าทั้งส่วนต้นทาง (Embedding Feature ของ Visual Encoder) และปลายทาง (Motion Decoder) ล้มเหลวโดยสิ้นเชิง โดยระบบคายคำสั่งข้อต่อออกมาเหมือนกับว่าขาทั้งสองข้างยังคงมีขนาดเท่ากันอยู่ 
+*   **การอุด gap:** ไออุ่นได้ทดลองเพิ่มชุดข้อมูลเทรนที่ขนาดของ Femur และ Tibia ไม่เท่ากันเข้าไป ซึ่งผลลัพธ์ได้รับการพิสูจน์ทันทีว่าระบบสามารถกลับมาทำนายและแยกแยะสัดส่วนลิงก์ขาได้อย่างถูกต้อง การทดลองนี้ยืนยันว่า **ขอบเขตความหลากหลายของ Dataset เทรน (Data Coverage) มีผลโดยตรงต่อระดับความสำเร็จในการทำนายของ World Model**
+
+---
+
+### **3. เครื่องมือทำนายล่วงหน้าผ่าน Linear Probing (Linear Probe Evaluation)**
+*   ไออุ่นค้นพบการใช้เทคนิค **Linear Probe** มาสกัดตรวจเช็ก Embedding Feature จาก Visual Encoder (V-JEPA 2) ตั้งแต่ต้นกระบวนการ เพื่อประเมินว่าระบบเข้าใจ Geometry ของหุ่นยนต์หรือไม่ โดยไม่ต้องเสียเวลาเทรนระบบ Downstream ทั้งหมดจนจบ
+*   ผลการ Probe ให้ค่า Error ที่สอดคล้องกับพฤติกรรมปลายทางอย่างสมบูรณ์แบบ (เมื่อข้อมูลเทรนสมบูรณ์ Probe Error จะต่ำและผลปลายทางจะดี กลับกันหากนอกขอบเขต Probe Error จะพุ่งสูงและโมเดลปลายทางจะพัง) ทำให้เป็นเครื่องมือที่มีประโยชน์มากสำหรับการดีบั๊ก
+
+---
+
+### **4. ข้อผิดพลาดร้ายแรงและการวิเคราะห์ท่อข้อมูล (Pipeline Bugs & Insights)**
+
+*   **บั๊กที่ 1: การแมปเวลาของข้อมูลแอคชันผิดพลาด (Cheating Transition):** 
+    ไออุ่นตรวจพบข้อผิดพลาดในจังหวะการเก็บข้อมูลซิมูเลชัน โดยระบบถูกออกแบบให้บันทึกภาพเฟรม \\(t\\) และ \\(t+1\\) คู่กับแอคชันที่ส่งผลให้เฟรม \\(t\\) กลายเป็นเฟรม \\(t+1\\) แต่ผลที่บันทึกจริงกลับกลายเป็นว่าเฟรม \\(t\\) ดันแอบบรรจุผลลัพธ์การเคลื่อนไหวที่เกิดขึ้นไปแล้วของแอคชัน \\(t\\) เอาไว้
+    *   *ความเสียหาย:* บั๊กนี้ทำให้โมเดลสามารถมองเห็น "เฉลยคำตอบล่วงหน้า" ในเฟรมปัจจุบันได้ทันที โดยไม่มีความจำเป็นต้องเรียนรู้การเปลี่ยนแปลงช่วงเวลา (Transition) หรือไดนามิกระหว่างเฟรมเลย
+    *   *ผลวิเคราะห์สุดแปลก:* เมื่อไออุ่นทำการแก้ไขโดยตั้งค่าหน่วงเวลา (Lag/Shift) เพื่อจัดเรียงความถูกต้องทางเวลาใหม่ และเปรียบเทียบผลระหว่าง "ท่อข้อมูลที่ถูกต้อง" กับ "ท่อข้อมูลที่โกงเฉลย" พบว่า **ผลลัพธ์การกู้คืนคำสั่งกลับแทบไม่ต่างกันอย่างมีนัยสำคัญ** แสดงว่ามีข้อมูลบางอย่างฝังแน่นใน Embedding Feature ที่สามารถชี้ทางคำสั่งได้โดยไม่ต้องพึ่งพา Transition
+
+*   **บั๊กที่ 2: ความซับซ้อนของข้อมูลที่ต่ำเกินไป (Gait Cycle Loop):**
+    เพื่อหาสาเหตุว่าทำไม Embedding Feature 1 เฟรมถึงเก่งขนาดทำนายได้หมด ไออุ่นจึงทดลองใช้ภาพเฟรมปัจจุบันไปพยากรณ์คำสั่งข้อต่อล่วงหน้ายาวไป 8 เฟรม และ 32 เฟรมข้างหน้า
+    *   *การค้นพบ:* พบว่า Error ของการทำนายเฟรมปัจจุบันกับ 32 เฟรมข้างหน้ามีระดับที่ใกล้เคียงกัน เนื่องจากข้อมูลการเคลื่อนที่เป็นพฤติกรรมการก้าวเดิน **Gait Cycle** ที่วนกลับซ้ำไปซ้ำมาเป็นวงกลม 
+    *   *ข้อสรุป:* ดาต้าเซตการเดินบนพื้นราบไม่มีความซับซ้อนพอที่จะ "บีบบังคับ" ให้โมเดลต้องตั้งใจเรียนรู้ความสัมพันธ์ของรอยต่อภาพ (Transition) ส่งผลให้เมื่อลองถอดโมดูล **Forward Transition Model** (พระเอกที่ใช้เดาอนาคต) ออกไปจากท่อทำงาน ค่าการสร้างพฤติกรรมเคลื่อนที่ใหม่จาก Motion Decoder ก็แทบจะไม่ดรอปเลย
+
+---
+
+### **5. การพิสูจน์บทบาทและความสำคัญของ Forward Transition Model**
+*   **การทดสอบ Dynamic พฤติกรรมเดาภาพอนาคต:** เพื่อพิสูจน์ว่า Forward Model ของเราไม่ได้ไร้ประโยชน์ ไออุ่นได้ทดสอบโดยล็อกค่า Latent Action ปัจจุบัน แล้วป้อนข้อมูลภาพแบบแปรปรวน 3 เงื่อนไข: 
+    1. เฟรมปกติลื่นไหลตามเวลา (Normal) 
+    2. แช่แข็งภาพเฟรมเดิมทิ้งไว้ตลอด (Hold Frame Still) 
+    3. เลื่อนการเปลี่ยนแปลงเฟรมด้วยความเร็วคงที่เชิงราบ (Constant Velocity)
+*   **ผลการทดสอบเชิงประจักษ์:** แม้ Error จะสะสมมากขึ้นเมื่อคาดการณ์สเต็ปที่ไกลออกไป (สเต็ปที่ 1, 3, 5, 10) แต่การรันด้วย Forward Model แบบปกติมีระดับ Error ต่ำกว่าสภาวะแช่ภาพหรือความเร็วคงที่อย่างชัดเจน พิสูจน์ได้ว่า **Forward Model เรียนรู้ไดนามิกการเปลี่ยนแปลงเชิงฟิสิกส์ถูกต้องตามทฤษฎี**
+*   **ข้อผิดพลาดในการเลือกดูจุดชี้วัด (Analysis Focus Error):** ไออุ่นวิเคราะห์ว่าสาเหตุที่ความเก่งของ Forward Model ไม่สะท้อนออกมาที่งาน Downstream เพราะไออุ่นไปตั้งเป้าประเมินผ่านตัว Motion Decoder แต่ในรากฐานของเปเปอร์ LAC World Model ตัวถอดรหัสนี้เป็นเพียงตัวช่วยเสริม (Auxiliary) เท่านั้น ตัวเอกที่สำคัญที่สุดคือตัวก้อน **Forward Transition (World Model) ที่พร้อมทำนาย Sequence อนาคตยาวๆ (Imaginary Rollouts) เพื่อไปช่วยประหยัด sample time ในขั้นตอนเทรน Policy** ต่างหาก
+
+---
+
+### **6. ข้อคิดเห็นและคอมเมนต์จี้จุดตายจากอาจารย์บลิ๊งค์ (Critical Review)**
+*   **ห้ามดูแต่ตัวเลข ให้ดึงพฤติกรรมการเดินจริงมาวิเคราะห์ (Behavioral Analysis):** อาจารย์บลิ๊งค์ติงว่า ระบบ Reinforcement Learning และ Deep Learning ไม่สามารถมองแค่ระดับตัวเลข (เช่น Error R-Square) ในมิติเดียวได้ เพราะสมองมนุษย์ไม่สามารถจินตนาการพฤติกรรมก้าวเดินจากการมองแค่ตัวเลขได้ อาจารย์สั่งให้ **อัดคลิปวิดีโออนิเมชันท่าเดินของหุ่นยนต์มาเปรียบเทียบและวิเคราะห์ประกบควบคู่กับตัวเลขเสมอ**
+*   **สั่งทำ Ablation Study แบบเข้มข้น:** อาจารย์แนะนำว่าให้ทำกรณีศึกษาโดยการ "ถอดบล็อกบางตัว" หรือ "ลบเทอม Reward บางพจน์" ออกจากกระบวนการทำงาน แล้วเปรียบเทียบผลลัพธ์ว่าพฤติกรรมการเดินและประสิทธิภาพดรอปจริงหรือไม่ เพื่อพิสูจน์คุณค่าของการมีอยู่ของแต่ละโมดูลในสถาปัตยกรรม (เช่น บล็อก Forward Transition) ซึ่งเป็นสิ่งจำเพาะที่กรรมการสอบต้องการเห็นและจำเป็นอย่างยิ่งในการเขียนส่งเปเปอร์วิจัย
+
+---
+
+### **7. ความคืบหน้าเฟส 2: การข้ามประเภทหุ่นยนต์ (Cross-Embodiment)**
+*   ไออุ่นได้ทำการเริ่มทดลองใน Phase 2 โดยนำภาพแมลงสติกอินเซกต์ข้ามสายพันธุ์ไปเทรนพฤติกรรมร่วมกับหุ่นยนต์สี่ขาอย่าง B1 ใน Simulation 
+*   **อุปสรรคเชิงทัศนวิสัย:** ข้อมูลภาพมีความต่างขั้วอย่างรุนแรงทั้งในแง่ของขนาด สัดส่วน และสีสันของสภาพแวดล้อม
+*   **การแก้ไขด้วย Normalization Trick:** ไออุ่นแก้ไขโดยการใช้เทคนิค **Normalize** หักลบค่าเฉลี่ยสรีระของแต่ละ Embodiment ออกไปก่อนนำไปใช้งาน ซึ่งผลลัพธ์พิสูจน์แล้วว่าการ Normalize ช่วยลดความสะเปะสะปะของข้อมูลเฉลี่ยรวมลงได้เป็นอย่างดี ทำให้วิเคราะห์ประเมินผลระบบร่วมกันได้เสถียรยิ่งขึ้น

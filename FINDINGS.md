@@ -2118,6 +2118,47 @@ different versions, and three of them silently scored a model on bodies it had n
 `z_identity_ablation` read 15.99 deg where the trained bodies read 1.45.
 `wm/evaluate.py:training_bodies(cfg)` now derives the list from the checkpoint's own config.
 
+### F43b. The ablations replayed as behaviour, and what the per-joint error was hiding
+
+Ajan Blink asked twice for the same thing: never present a number without the gait beside it, and
+run ablations that show the *behaviour* degrade rather than the metric. Every ablation up to here
+was numeric. These are the same ablations driven through CoppeliaSim on the held-out body
+`c08f09t09`, clip ep101, 65 steps (`wm/predict_actions.py --ablate`, then
+`sim/render_wm_prediction.py`).
+
+| | forward (m) | heading | mean feet down | RMSE deg | out-of-range commands |
+|---|---|---|---|---|---|
+| ground truth (IK) | **+0.592** | +13.8 deg | 3.00 of 6 | -- | 0.0% |
+| intact | +0.374 | +14.0 deg | 2.74 | 3.98 | 7.9%, worst 15.4 deg |
+| identity removed (8 dirs) | +0.345 | +24.8 deg | 2.75 | 4.18 | 7.5%, worst 15.0 deg |
+| frame zeroed | +0.297 | +26.8 deg | 3.09 | 7.26 | 3.2%, worst 17.6 deg |
+| **latent zeroed** | **+0.100** | **+59.6 deg** | 3.12 | 9.68 | 6.7%, worst 8.9 deg |
+
+**Zeroing the latent stops the robot walking.** 0.100 m against 0.592, turning 59.6 degrees off
+course, with the front-right foot down **9%** of the time against 51% for ground truth -- it drags
+a leg and spins. That is the 7.63x from the ablation table made visible.
+
+**And the intact model walks only 63% as far as the reference** while scoring 3.98 deg per joint
+and R^2 +0.87. Against a command spread of 11.7 deg that error reads small; behaviourally it is a
+robot covering two-thirds of the ground, with 7.9% of its commands outside the range this body
+ever uses. **This is exactly the gap Ajan Blink named: the metric and the behaviour do not tell the
+same story.** Reconstruction R^2 should never again be reported for this pipeline without the
+replay beside it.
+
+**Identity removal is nearly free behaviourally, with a caveat.** Forward distance 0.345 against
+0.374 supports the 1.03-1.05x from two independent code paths. But heading degrades, 24.8 against
+14.0 degrees. One clip, and heading is the noisiest of these measures, so it is not evidence
+against the ablation result -- but "invisible" overstates it.
+
+Method note: the replay path reproduced the identity ablation independently -- 1.05x here against
+1.03x in `scripts/z_identity_ablation.py` -- which is worth more than either number alone.
+
+Two bugs surfaced building this, both of the kind that returns plausible numbers instead of
+failing. Rewriting `load_model` dropped `itm.load_state_dict`, so the ITM ran randomly initialised:
+14.51 deg, and `zero_z` scored *better* than the intact model, since a zero latent is less harmful
+than a random one. And `load_clip` is hexapod-specific -- B1 clips key their commands as `action`
+-- so the identity basis crashed on the B1 side.
+
 ### F44. A third embodiment: Stage 2 features transfer to a 4-leg insect, few-shot
 
 The strongest result in the project, and the first that tests the thesis claim rather than
