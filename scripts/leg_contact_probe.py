@@ -36,7 +36,7 @@ import sys
 
 import numpy as np
 import torch
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import RidgeClassifierCV
 from sklearn.metrics import balanced_accuracy_score
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,8 +44,10 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
+from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import CONTACT_THRESHOLD  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 CACHE = os.path.join(ROOT, "results", "wm", "cache", "stage2_embeddings.pt")
 # the four bodies stage2_clean trains on: every one walks straight
@@ -66,7 +68,7 @@ def bands(tokens, grid=16, n=4):
     return t.reshape(len(tokens), n, grid // n * grid, -1).mean(2).flatten(1).numpy()
 
 
-def gather(encoder, chunk):
+def gather(encoder, chunk, itm=None, checkpoint=None):
     """Per embodiment: features, a binary label per corresponding leg, and clip ids."""
     cache = torch.load(CACHE, map_location="cpu") if os.path.exists(CACHE) else {}
     fresh = False
@@ -87,7 +89,21 @@ def gather(encoder, chunk):
                 fresh = True
             contact = ((clip["forces"] > CONTACT_THRESHOLD) if name == "insect"
                        else clip["foot_contact"] > 0.5).astype(int)
-            feats.append(bands(cache[path]))
+            if itm is None:
+                feats.append(bands(cache[path]))
+            else:
+                # the learned latent instead of the frozen encoder: does training make the two
+                # embodiments *more* comparable than V-JEPA2 left them?
+                e = cache[path]
+                off = offset_for(checkpoint, "hexapod" if name == "insect" else "b1")
+                if off is not None:
+                    e = e - off
+                n = len(e) - 1
+                with torch.no_grad():
+                    z = torch.cat([itm(e[t:min(t + 8, n)], e[t + 1:min(t + 8, n) + 1])
+                                   for t in range(0, n, 8)]).numpy()
+                feats.append(z)
+                contact = contact[:len(z)]
             labels.append(contact)
             clip_id.append(np.full(len(contact), i))
         out[name] = (np.concatenate(feats), np.concatenate(labels), np.concatenate(clip_id))
@@ -114,10 +130,20 @@ def main():
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--raw", action="store_true", help="skip per-embodiment standardisation")
+    ap.add_argument("--ckpt", default="",
+                    help="probe the learned latent z from this checkpoint instead of e_t")
     args = ap.parse_args()
 
+    itm = checkpoint = None
+    if args.ckpt:
+        checkpoint = torch.load(args.ckpt, map_location="cpu", weights_only=False)
+        itm = InverseTransitionModel(from_checkpoint(checkpoint["config"])).eval()
+        itm.load_state_dict(checkpoint["itm"])
+        print(f"probing the learned latent z from {args.ckpt}")
+    else:
+        print("probing the frozen encoder e_t")
     encoder = VJEPA2FrameEncoder(device=args.device, dtype=torch.float32)
-    data = gather(encoder, args.chunk)
+    data = gather(encoder, args.chunk, itm, checkpoint)
     del encoder
 
     for name, (x, y, _) in data.items():
@@ -138,7 +164,11 @@ def main():
             # split by clip, so neighbouring frames of one clip cannot sit on both sides
             train_clips = split_by_clip(ids.max() + 1)
             tr = np.isin(ids, list(train_clips))
-            model = LogisticRegression(max_iter=3000).fit(xs[tr], ys[tr])
+            # RidgeClassifier, not LogisticRegression: with 5,632 band-pooled features
+            # against ~1,900 samples, lbfgs grinds for hours without converging. Ridge
+            # has a closed form and picks its own penalty by cross-validation, which
+            # matters when n_features exceeds n_samples.
+            model = RidgeClassifierCV(alphas=np.logspace(-1, 4, 12)).fit(xs[tr], ys[tr])
             for dst in ("insect", "b1"):
                 xd, yd, _ = data[dst]
                 yd = yd[:, idx[dst]]

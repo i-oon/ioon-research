@@ -1802,6 +1802,73 @@ paying.
 Reproduce all six cells with `--features {mean,bands,max}` and `--normalize` on
 `scripts/cross_embodiment_probe.py`, from one cached encoder pass.
 
+### F41b. Per-leg contact: the encoder sees a loaded leg clearly and describes it differently for each robot
+
+The stance-fraction probe (F41) turned out to be unfixable, for a reason that only became clear
+later: the B1 trots and the insect walks a wave, so the two have **no shared gait phase**, and
+stance fraction is dominated by 0.5 on the B1 (86.6% of its frames) while the insect spreads
+across 2/6, 3/6 and 4/6. The phase label predicted the embodiment.
+
+Per-leg contact avoids all of it. "Is *this* leg loaded" needs no shared phase and no shared
+aggregate, is binary and near-balanced on both robots so chance is exactly 0.500, and the four
+corner legs correspond anatomically. The middle legs have no counterpart, which is the honest
+asymmetry between a hexapod and a quadruped rather than a defect.
+
+Band-pooled patch tokens, each embodiment standardised by its own statistics, split by clip,
+balanced accuracy (`scripts/leg_contact_probe.py`):
+
+| leg | insect -> insect | b1 -> b1 | insect -> b1 | b1 -> insect |
+|---|---|---|---|---|
+| left front | 0.848 | 0.931 | **0.487** | **0.469** |
+| left hind | 0.774 | 0.959 | 0.590 | 0.608 |
+| right front | 0.792 | 0.942 | **0.466** | **0.472** |
+| right hind | 0.812 | 0.934 | 0.582 | 0.638 |
+| **mean** | **0.806** | **0.941** | **0.531** | **0.547** |
+
+**The diagonal is a genuine ceiling this time** -- 0.806 and 0.941 -- so the cross cells at 0.531
+and 0.547 cannot be dismissed as "nothing there to predict", which is exactly what sank the
+stance-fraction version. The encoder reads a loaded leg well within an embodiment and transfers
+almost nothing across.
+
+**And the pattern is specific.** Front legs transfer *below* chance, hind legs above it. That
+tracks how differently the legs are used: the insect's front leg has duty **0.309** -- mostly in
+the air, partly a feeler -- against the B1's **0.578**, while the hind legs are much closer, 0.591
+against 0.500. Legs used similarly transfer a little; legs used differently transfer worse than
+chance. That points at **behaviour**, not appearance, as what the frozen encoder fails to share.
+
+**Run on the learned latent instead of the encoder, this becomes the most direct test of the
+source method's central claim** -- that a shared latent emerges from weight sharing alone. Same
+probe, same legs, `z` in place of `e_t`:
+
+| | insect -> insect | b1 -> b1 | **insect -> b1** | **b1 -> insect** |
+|---|---|---|---|---|
+| frozen encoder `e_t` | 0.806 | 0.941 | 0.531 | 0.547 |
+| `z`, `stage2_clean` | 0.811 | **0.986** | **0.373** | **0.401** |
+| `z`, `adv_warm10` | 0.798 | 0.969 | **0.490** | **0.500** |
+| `z`, centred | 0.851 | 0.978 | 0.559 | 0.468 |
+
+**Training makes the two embodiments less comparable, not more.** The frozen encoder sits barely
+above chance at 0.531/0.547; the trained latent falls to 0.373/0.401, which is *below* chance --
+a readout fitted on one embodiment is systematically wrong on the other, so the latent encodes
+"this leg is loaded" along an axis pointing the opposite way for each robot.
+
+Capacity does not explain it. `z` is 64 features against `e_t`'s 5,632, so a capacity limit would
+hurt everywhere; instead `z` is **better** within an embodiment (0.986 on the B1) and worse across.
+Weight sharing produced a sharper per-robot code and a poorer shared one.
+
+**The adversary repairs precisely this**, 0.373 -> 0.490 and 0.401 -> 0.500, which is the first
+measurement where it does something specific and good rather than merely harmless. But **nothing
+gets above chance**: the best any intervention achieves is back to where the frozen encoder already
+was. No version of this pipeline makes a hexapod and a quadruped more comparable than V-JEPA2 left
+them.
+
+This is a more direct test than the UMAP or the variance share, and unlike both it needs no shared
+gait phase.
+
+Solver note: `LogisticRegression(max_iter=3000)` on 5,632 band-pooled features against ~1,900
+samples does not converge in hours. `RidgeClassifierCV` has a closed form and picks its own
+penalty, which is what n_features > n_samples calls for.
+
 ### F42. Two bodies in the dataset do not walk, and two more crab sideways. UNRESOLVED
 
 Found by asking why the learned latent splits the hexapod frames into two clean groups. It does,
@@ -1996,10 +2063,47 @@ pressure that does not exist.
 | **probe** | **0.994** | **0.992** | 0.002 |
 | cluster separation | 0.39x | 0.24x | 0.15 |
 
-`two_way` balances its grid by subsampling every cell to the smallest, and the smallest holds six
-latents: the whole measurement rests on 2 embodiments x 6 phase bins x 6 latents = **72 points**.
-Two seeds of one config disagree by a factor of two. **F38's headline 33.0% rested on the same 72
-points.**
+`two_way` balances its grid by subsampling every cell to the smallest, which holds six latents.
+Two seeds of one config disagree by a factor of two.
+
+**And the phase axis is worse than under-sampled -- it barely exists.** Stance fraction takes only
+**8 distinct values** across both embodiments (0.167, 0.25, 0.333, 0.5, 0.667, 0.75, 0.833, 1.0),
+dominated by 0.5, so the quantile edges collapse onto each other:
+
+| requested bins | edges | bins actually occupied |
+|---|---|---|
+| 3 | [0.5, 0.5] | **2** |
+| 4 | [0.5, 0.5, 0.5] | **2**, giving numbers identical to 3 bins |
+| 6 | [0.5, 0.5, 0.5, 0.5, 0.667] | **3** |
+
+So the grid was never 2 x 6 x 6 = 72 cells; it was 24 to 36. The embodiment share reads **32.0% at
+three bins and 12.0% at six** on the same checkpoint -- a 2.7x swing from a parameter meant to be
+cosmetic.
+
+**And the deeper fault is that the two axes are not independent.** Splitting the distribution by
+embodiment shows where the pile-up at 0.5 comes from:
+
+| | frames at 0.5 | distinct values | std |
+|---|---|---|---|
+| hexapod | 41.8% | 5 | 0.147 |
+| **B1** | **86.6%** | 4 | 0.094 |
+
+The B1 is a trot -- diagonal pairs, two feet down 86.6% of the time, almost no other state. The
+insect is an animal's wave: 22% at 2/6, 42% at 3/6, 29% at 4/6. With more B1 frames as well
+(1,143 against 792), the B1 alone supplies **75% of all frames sitting at 0.5**.
+
+Which means the phase label predicts the embodiment: at 0.5 a frame is probably B1, away from 0.5
+it is probably the insect. A two-way decomposition into "row = embodiment, column = phase" assumes
+those factors are separable, and here **they are half the same variable**. That, not the cell
+count, is why the answer moves with the bin parameter.
+
+**F38's headline 33.0% came from this measurement and should be withdrawn**, not merely caveated.
+
+Stage 1's `z_body_share` is unaffected: insect bodies walk identical expert episodes, so at a given
+timestep every body is in the same phase by construction and the grid can use the timestep
+directly. Stage 2 had to invent a shared phase label, and the general point is that **two robots
+with genuinely different gaits may not have a shared phase to measure at all** -- a limit of the
+setting, not of the tool.
 
 The claim belongs on the probe and the ablation, which reproduce to three decimals:
 
@@ -2013,6 +2117,128 @@ under-sampled rather than unusable.
 different versions, and three of them silently scored a model on bodies it had never seen --
 `z_identity_ablation` read 15.99 deg where the trained bodies read 1.45.
 `wm/evaluate.py:training_bodies(cfg)` now derives the list from the checkpoint's own config.
+
+### F44. A third embodiment: Stage 2 features transfer to a 4-leg insect, few-shot
+
+The strongest result in the project, and the first that tests the thesis claim rather than
+inspecting the latent.
+
+**The body.** The stick insect with its middle legs removed, `ML,MR` -- a 4-leg insect. Built by
+ghost-removing the legs at runtime from the base scene, so no new scene file exists or is needed,
+and driven by the *unchanged* six-leg IK gait, so no policy was trained. The four remaining legs
+are geometrically identical, so the commands already computed for FL, HL, FR and HR still apply;
+dropping the six middle columns turns the 18-D command into 12-D. Of the three leg-loss variants
+only this one walks: front-loss tips and lies diagonal by frame 55, hind-loss rears vertical at
+frame 27 and collapses.
+
+Data: `data/ik_4leg_middleloss_clean9`, 9 clips passing the walk check, collected with the
+training set's framing (`--cam_dx -0.6 --spawn 0 0 --scale 0.5 --travel 0.8 --warmup 20`).
+Several accepted clips still drift 0.19-0.20 m laterally, so this is a probe set, not a training
+dataset.
+
+**The test has to be few-shot, not zero-shot.** The 4-leg action space is 12-D, and so is the B1's,
+but the coordinates mean different things -- matching dimensionality is not matching semantics.
+So: freeze V-JEPA, the ITM, the FTM and the decoder backbone; add a new 12-D head; fit only that
+head on a few 4-leg clips; score held-out clips. The control is the identical procedure on a
+**random backbone**, same architecture, same data budget.
+
+| split | pretrained Stage 2 | random backbone | gain |
+|---|---|---|---|
+| A | 1.86 deg | 5.06 | 2.72x |
+| B | 1.67 | 4.72 | 2.83x |
+| C | 1.71 | 5.18 | 3.03x |
+| **mean** | **1.75 +/- 0.10, R^2 +0.967** | **4.99 +/- 0.24, R^2 +0.743** | **2.86x** |
+
+**And it is sample efficiency, not just accuracy.** Over clip budgets 1, 3, 5, 7 with three splits
+each, the pretrained backbone beats random by 2.6-2.9x at every budget -- reaching with **one clip**
+(2.56 deg) what the random backbone never reaches with seven (4.78 deg).
+
+**The latent is doing work, not just the frame.** F31 established that one frame nearly determines
+the command in this data, so the obvious worry is that the 4-leg result is that same shortcut.
+Ablating the latent while refitting the head each time:
+
+| | test deg | R^2 |
+|---|---|---|
+| real `z` | **1.86** | +0.96 |
+| zero `z` | 2.49 | +0.94 |
+| shuffled `z` (real latents, permuted within clip) | 3.35 | +0.88 |
+| random backbone | 5.06 | +0.74 |
+
+Zero-`z` still beats random, so the frame plus the pretrained backbone carries a lot -- the F31
+effect is real and present. But `real_z` beats `zero_z` and strongly beats `shuffled_z`, so an
+**aligned** transition latent adds something a permuted one cannot. The cautious claim: few-shot
+transfer uses both the frame representation and the latent, and is neither zero-shot latent
+control nor pure frame-to-action fitting.
+
+**The commands physically walk.** Open-loop replay of the predicted actions in CoppeliaSim, all
+four held-out split-A clips, ghost-removed middle legs:
+
+| clip | predicted fwd/lat | IK fwd/lat | feet down pred/IK | out-of-range |
+|---|---|---|---|---|
+| ep101 | +0.660 / -0.233 m | +0.701 / -0.239 | 2.55 / 2.55 of 4 | 1.8% |
+| ep130 | +0.665 / -0.188 | +0.694 / -0.181 | 2.58 / 2.60 | 2.4% |
+| ep6 | +0.713 / -0.168 | +0.692 / -0.277 | 2.51 / 2.55 | 1.4% |
+| ep69 | +0.650 / -0.167 | +0.655 / -0.273 | 2.58 / 2.65 | 2.4% |
+
+Stable 4-leg walking, closely matching the IK reference; in two clips the prediction drifts *less*
+than the reference. Still open-loop reconstruction, not closed-loop control.
+
+**It does not repair bad demonstrations.** On `data/ik_4leg_middleloss_badtest` -- 8 clips that
+move forward but veer 0.22-0.31 m -- the pretrained backbone still beats random (2.31 vs 6.75 deg,
+R^2 +0.94 against +0.53), and the replay veers where the IK veers. Matching a bad clip means the
+correspondence was learned; it should not be framed as gait correction.
+
+### The three interventions on embodiment identity, all measured
+
+| | 4-leg few-shot, split A | held-out hexapod R^2 | probe after 8 dirs removed | `z` zeroed |
+|---|---|---|---|---|
+| `stage2_clean` | 1.86 deg | +0.87 | 0.738 | 7.63x |
+| `stage2_clean_centered` | 1.88 | +0.89 | 0.697 | **9.96x** |
+| `stage2_clean_adv_warm10` | **1.66** | +0.88 | **0.598** | **4.44x** |
+| random backbone | 5.06 | -- | -- | -- |
+
+**Centring does nothing.** The online probe reaches **1.000** during training, having started at
+0.594 and climbed back -- the model relearns identity within 25 epochs with the offset already
+removed. Centring subtracts the *first moment*; two robots differ in shape, silhouette and leg
+count, which vary frame to frame and survive it. The lesson from F41 -- that an offset wrecks a
+readout -- applies to a **linear readout fitted on one embodiment**, not to a nonlinear model
+trained on both.
+
+**The adversary is the only lever that moves anything**: best 4-leg result and lowest residual
+identity.
+
+The apparent cost -- zeroing `z` drops from 7.63x to 4.44x, suggesting a weaker latent -- does not
+survive checking. That was measured on the *decoder*. Rolling the **forward model** on its own
+output, true latents supplied, held-out body, 162 rollouts:
+
+| steps ahead | clean | adversary | centred |
+|---|---|---|---|
+| 1 | 1.38x | 1.37x | 1.38x |
+| 3 | 1.52x | 1.51x | 1.53x |
+| 5 | 1.48x | 1.47x | 1.48x |
+| 10 | 1.30x | 1.30x | 1.29x |
+
+Identical within 1% at every horizon, all beating a frozen world by ~1.5x and constant velocity by
+two orders of magnitude. **`z` still carries everything the world model needs.**
+
+What changed is the decoder's balance between its two inputs:
+
+| | `zero_z` | `zero_x` |
+|---|---|---|
+| clean | 0.365 | 0.193 |
+| adversary | **0.140** | **0.266** |
+
+The decoder now depends *less* on the latent and *more* on the frame -- which is the direction
+F18 and slide 4 ask for, since the failure they name is the decoder reading the body out of `z`
+while ignoring the frame it is holding. Consistent with the 4-leg result improving and held-out
+R^2 holding. So the adversary leaves the world model intact and moves the decoder toward reading
+geometry from pixels; it is a candidate to replace the baseline rather than a trade-off.
+
+**Measurement trap this cost.** `scripts/score_body.py` did not apply the stored
+`embedding_offsets`, so a centred checkpoint scored on raw embeddings read **15.10 deg, R^2 -0.95**
+-- reported as "centring breaks transfer" before the bug was found. With the offset applied it is
+3.61 deg, R^2 +0.89. The same omission does *not* affect `fit_4leg_head`, because the new head is
+fitted on the target data and absorbs a constant offset into its bias; a frozen head cannot.
 
 ## The setup this points to
 

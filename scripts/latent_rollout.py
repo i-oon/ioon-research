@@ -39,7 +39,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths, load_clip  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
@@ -59,6 +59,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--morph", default="")
+    ap.add_argument("--data_dir", default="",
+                    help="override cfg.data_dir; a cross-embodiment checkpoint carries "
+                         "stale single-morphology defaults there")
     ap.add_argument("--embodiment", default="",
                     help="required only for checkpoints trained with ftm_embodiment_channel")
     ap.add_argument("--clips", type=int, default=3)
@@ -68,8 +71,14 @@ def main():
 
     device = torch.device("cpu" if args.encode_device == "cpu" else "cuda")
     cfg, itm, ftm, epoch = load(args.ckpt, device)
+    # a `center_embeddings` checkpoint saw a per-embodiment mean subtracted; feeding it
+    # raw embeddings is a silent distribution shift, not an error
+    offset = offset_for(torch.load(args.ckpt, map_location='cpu', weights_only=False),
+                        args.embodiment or 'hexapod')
+    offset = offset.to(device) if offset is not None else None
     morph = args.morph or cfg.heldout_morph
-    data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
+    raw = args.data_dir or cfg.data_dir
+    data_dir = raw if os.path.isabs(raw) else os.path.join(ROOT, raw)
     paths = clip_paths(data_dir, (morph,))[:args.clips]
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
 
@@ -79,6 +88,8 @@ def main():
     for path in paths:
         clip = load_clip(path)
         e = encode_clip(encoder, clip["frames"], 2).to(device)
+        if offset is not None:
+            e = e - offset
         n = len(e)
         # the latent for each transition, inferred from the true frames
         z = torch.cat([itm(e[i:i + 1], e[i + 1:i + 2]) for i in range(n - 1)])

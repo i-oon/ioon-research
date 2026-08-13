@@ -602,64 +602,18 @@ can now check before spending the training run.
 
 ---
 
-## Slide 14 — Stage 2, first look
+## Slide 14 — Stage 2: it transfers, but not by sharing a latent
 
-The cross-embodiment path had never been run. It works: one ITM, one forward model and one decoder
-backbone shared across an **18-DOF hexapod and a 12-DOF quadruped**, with a per-embodiment output
-head. No cross-embodiment term — the source method has none, and claims the shared latent emerges
-from weight sharing alone.
+One ITM, one forward model and one decoder backbone shared across an **18-DOF hexapod and a 12-DOF
+quadruped**, with a per-embodiment output head. No cross-embodiment loss term — the source method
+has none, and claims the shared latent emerges from weight sharing alone. That claim is what this
+slide tests.
 
-**Before training, the frozen encoder does not hand over a shared space.** Fit a readout for stance
-fraction — the proportion of feet on the ground, defined for six legs and for four — on one
-embodiment and apply it to the other:
+### First, the data had to be fixed
 
-| fitted on | tested on | error / the target's own spread |
-|---|---|---|
-| insect | insect | 0.82x |
-| B1 | B1 | 0.89x |
-| **insect** | **B1** | **1.16x** |
-| **B1** | **insect** | **1.04x** |
-
-**1.00x is the line where looking at the image stops being worth anything.** Within an embodiment
-the readout beats guessing; across, it does not.
-
-
-**Two things that are not behaviour had to be controlled for first, and both moved the number a
-lot.** They are reported rather than buried, because either one alone would have made this
-measurement say whatever we wanted.
-
-*How the frame is reduced.* The encoder emits 256 patch tokens per frame, which must be collapsed
-to one vector. Which feet are loaded occupies perhaps 6–12 of those patches, so averaging all 256
-buries it — while faithfully preserving a large constant offset between insect frames and B1
-frames, which a fitted readout absorbs into its intercept and then mis-applies to the other robot.
-
-*How the two robots look.* The insect renders orange and occupies about a quarter of the frame; the
-B1 renders grey and occupies about three quarters. Neither is behaviour. Standardising each
-embodiment by its own statistics removes both, using only which dataset a frame came from and never
-the stance fraction being predicted.
-
-| cross cells | mean-pooled | band-pooled | max-pooled |
-|---|---|---|---|
-| raw | **4.72x / 3.00x** | 2.74x / 2.35x | 1.32x / 1.06x |
-| **appearance controlled** | 1.57x / 1.07x | **1.16x / 1.04x** | 1.22x / 1.02x |
-
-Raw, the answer swings by a factor of four depending on nothing but the pooling. Controlled, every
-reduction agrees within 1.02–1.57x. **The controlled row is the one that is a property of the
-encoder rather than of our choices**, so it is the one reported.
-
-The claim that survives is the flat one, and it is now the strong version of itself: **even with
-colour, apparent size and pooling all controlled, the frozen encoder gives nothing usable across
-embodiments.** Not that it is actively misleading — and not something that could be explained away
-by our two robots looking different.
-
-One honest limit: standardising per embodiment needs a batch of the new robot's frames to compute
-statistics from, so this is domain adaptation rather than zero-shot. That is already true of the
-setting, since a new embodiment needs a new output head fitted on some of its data regardless.
-
-**The first run whose data is defensible.** Our first Stage 2 numbers came from a dataset
-containing two robots that collapse and rotate rather than walk, with the embodiments at 10.5:1
-balanced only by repeating the quadruped's data ten times an epoch. Found while measuring it, and
-fixed:
+Our first Stage 2 numbers came from a dataset containing **two robots that collapse and rotate**
+rather than walk, with the embodiments at 10.5:1 balanced only by repeating the quadruped's data
+ten times an epoch. Found while measuring it:
 
 | | before | now |
 |---|---|---|
@@ -668,7 +622,9 @@ fixed:
 | validation | 67 B1 transitions, one hexapod body | 126 B1, **all four bodies** |
 | held-out body | **none** | **c08f09t09** |
 
-**Stage 2 now has a generalisation test, and it passes.** Two runs, identical but for the seed:
+Everything below is on the fixed data, two seeds, 60 epochs, converged.
+
+### It works: Stage 2 has a generalisation test and passes it
 
 | held-out `c08f09t09` | seed 0 | seed 1 |
 |---|---|---|
@@ -677,69 +633,79 @@ fixed:
 
 Positive on both, where **every Stage 1 held-out body scored negative** (−0.42 to −3.16). Stage 1
 scores 2.91 deg on this same body, so learning a quadruped alongside costs about 30% of hexapod
-accuracy and does not break it. It is an interpolation test — that body sits inside the training
-range — but it is the same one Stage 1 held out, which is what makes them comparable.
+accuracy and does not break it.
 
-**What the latent is made of, stated on the measurements that reproduce:**
+It is an interpolation test — that body sits inside the training range — but it is the one Stage 1
+held out, which is what makes the two stages comparable. **Slide 15 is the real test.**
+
+### But the latent is not shared, and training made that worse
+
+The direct question: can a readout of **"is this leg loaded"** move between the two robots? It
+needs no shared gait phase, it is binary and near-balanced so chance is exactly 0.500, and the four
+corner legs correspond anatomically.
+
+| | insect→insect | B1→B1 | **insect→B1** | **B1→insect** |
+|---|---|---|---|---|
+| frozen encoder `e_t` | 0.806 | 0.941 | 0.531 | 0.547 |
+| **`z`, our Stage 2** | 0.811 | **0.986** | **0.373** | **0.401** |
+| `z`, with an adversary | 0.798 | 0.969 | 0.490 | 0.500 |
+
+**The diagonal is a real ceiling** — the encoder reads a loaded leg well — so a weak cross cell
+cannot be dismissed as nothing being there to find.
+
+**The frozen encoder barely shares anything. Training makes it worse.** The trained latent falls
+*below* chance, meaning a readout fitted on one robot is systematically **wrong** on the other:
+`z` encodes "this leg is loaded" along an axis pointing the opposite way for each.
+
+Capacity does not explain it — `z` is 64 features against 5,632, yet it is **better** within an
+embodiment (0.986 on the B1) and worse across. **Weight sharing bought a sharper per-robot code and
+a poorer shared one.**
+
+The adversary repairs exactly that, back to chance. But **nothing gets above chance**: the ceiling
+for every intervention is *where the frozen encoder already was.*
+
+### What is inside the latent
 
 | | seed 0 | seed 1 |
 |---|---|---|
-| **embodiment decodable from `z`** | **0.994** | **0.992** |
-| **cost of deleting the embodiment from `z`** | **1.03x** | **1.04x** |
+| embodiment decodable from `z` | **0.994** | **0.992** |
+| cost of deleting the embodiment from `z` | **1.03x** | **1.04x** |
 | cost of deleting the same number of random directions | 1.18x | 1.14x |
 | cost of deleting `z` entirely | 7.63x | 8.29x |
 
-**The identity is fully present and nothing uses it.** Removing it costs *less* than removing
-arbitrary directions. Meanwhile `z` itself is doing real work — deleting it costs eight-fold.
+**The identity is fully present and nothing uses it** — removing it costs *less* than removing
+arbitrary directions. Meanwhile `z` is doing real work: deleting it costs eight-fold.
 
-We previously reported this the other way round, from a variance decomposition reading 33.0%. That
-number is not reproducible: the decomposition balances its grid to the smallest cell, which holds
-six latents, so it rests on 72 points — and two seeds of one config give 12.0% and 6.7%. **The
-claim belongs on the probe and the ablation, which agree to three decimals.**
+We previously reported 33.0% from a variance decomposition. That number is withdrawn: it needs a
+shared gait phase, and there isn't one — the B1 trots with two feet down 86.6% of the time while
+the insect walks a wave, so the phase label predicts the embodiment. The same measurement reads
+**32.0% at three bins and 12.0% at six.** The probe and the ablation reproduce to three decimals
+and say more anyway.
 
-![how much embodiment identity remains](../results/wm/figures/embodiment_axis.png)
-
-One axis, with the target marked — the same form as slide 4's left panel, and asking the mirror
-question. There we wanted the model to **keep** what the encoder carries about the body; here we
-want it to **remove** what the encoder carries about the robot. Same information, opposite goal.
-
-The conventional view of the same thing, for comparison against how this is usually shown:
+### The conventional picture, for comparison
 
 ![cross-embodiment UMAP](../results/wm/figures/cross_embodiment_umap_stage2_clean.png)
 
-**Weight sharing did most of the work and did not finish it.**
-
-| | frozen encoder `e_t` | learned latent `z` | |
+| | frozen `e_t` | learned `z` | |
 |---|---|---|---|
-| silhouette, how separated the two embodiments are | **+0.638** | **+0.051** | 12.5x less separated |
-| cluster separation, distance between means over within-cluster spread | **3.41x** | **0.39x** | means now closer than the spread |
-| embodiment recoverable by a linear probe | **1.000** | **0.994** | almost unchanged |
-| what the panels show | two far-apart masses | two tighter clusters | still two |
+| silhouette | +0.638 | +0.051 | 12.5x less separated |
+| cluster separation | 3.41x | 0.39x | means closer than the spread |
+| probe | 1.000 | 0.994 | **almost unchanged** |
 
-The first two rows are a large, real compression and it is visible in the figure. The last two are
-why it is not enough: the identity is still perfectly recoverable, and still draws as two clusters.
+Weight sharing compresses the two clusters a great deal, and it is visible. **But the identity
+stays perfectly recoverable, and the per-leg probe shows the compression did not buy shared
+meaning.** A picture cannot tell you that, in either direction, which is why the numbers sit beside
+it.
 
-Worth saying about the figure itself: **the projection overstates the separation.** A
-representation whose cluster means sit closer than their own spread still draws as two clean
-blobs, because UMAP is built to find and sharpen structure. A picture cannot tell you how much
-embodiment identity remains, in either direction — which is why the decomposition sits beside it.
+### So
 
-**So the shared trunk leaves the identity fully readable — but it is inert.** Not a switch the
-decoder flips, and not a shared language either: leakage from the frozen encoder that no module
-consumes and no loss penalises. Whether that harms transfer to a genuinely *new* embodiment is
-untested, and **cannot be tested with two embodiments**. That is question 2.
+**The trunk leaves the identity fully readable but inert, and produces a latent that is *less*
+transferable than the frozen encoder it started from.** Transfer still happens — slide 15 — so
+whatever carries it is not a shared latent in the sense the paper claims.
 
-The figure above is regenerated from `stage2_clean` seed 0. The exact silhouette and separation
-rows should still be treated as illustrative rather than headline evidence, since seed 1 moves the
-latent separation again; the stable claim is the paired one: the latent compresses embodiment
-separation strongly, while identity remains linearly recoverable.
-
-One caveat carried over and one retired. Still true: with two embodiments there is no held-out
-embodiment, only a held-out body. No longer true: validation used to be 67 B1 transitions from a
-split that took one body's clips — it is now 126 transitions stratified across every body, and
-train and validation track each other to within 1% across 60 epochs.
-
----
+Two caveats that remain real: with two embodiments there is no held-out *embodiment*, only a
+held-out body; and `lambda_cross`, the term that created sharing in Stage 1, cannot be used here
+because a hexapod and a B1 share no expert episodes. Slide 16 is what to do about that.
 
 ## Slide 15 — New held-out embodiment: 4-leg insect with a new head
 
@@ -925,12 +891,30 @@ plus a 10.5:1 imbalance, made a passive quantity look functional.
 frozen encoder: fully readable, consumed by nothing, penalised by nothing. Whether that costs
 anything for a third embodiment is untested — and with two embodiments it is untestable.
 
-**The adversarial removal run is now complete.** With the corrected ten-epoch warmup it does reduce
-the identity subspace: after removing eight identity directions, the residual probe drops from
-0.738 in `stage2_clean` to 0.598 in `adv_warm10`, and deleting that subspace costs only 1.01x.
-Held-out `c08f09t09` also improves slightly, 3.84 to 3.64 deg. The caution is that zeroing `z`
-costs less too, 7.63x to 4.44x, so the adversary may make the model rely less on the latent
-overall. Useful ablation; not yet the headline model.
+**All three interventions have now been built, run and measured**, against the 4-leg embodiment as
+the discriminating test:
+
+| | 4-leg few-shot | held-out hexapod R² | residual identity probe | `z` zeroed |
+|---|---|---|---|---|
+| `stage2_clean` — baseline | 1.86 deg | +0.87 | 0.738 | 7.63x |
+| **side channel** — remove the *need* | — | — | no change | — |
+| **centring** — remove the *supply* | 1.88 | +0.89 | 0.697 | **9.96x** |
+| **adversary** — remove the *ability* | **1.66** | +0.88 | **0.598** | **4.44x** |
+| random backbone | 5.06 | — | — | — |
+
+**Centring does nothing**, and the way it fails is informative. Its online probe starts at 0.594
+and climbs back to **1.000** over 25 epochs — the model relearns the identity with the offset
+already removed. Centring subtracts the *average*; two robots differ in shape, silhouette and leg
+count, which change every frame and survive it. An offset wrecks a **linear readout fitted on one
+embodiment** (slide 14) but not a nonlinear model trained on both.
+
+**The adversary is the only lever that moves anything** — best 4-leg result, lowest residual
+identity. The caution is that zeroing `z` costs less too, 7.63x → 4.44x, so part of what it buys
+is a weaker latent rather than a cleaner one. Useful; not yet the headline model.
+
+**And the honest summary of all three: none of them changed transfer.** Held-out R² is +0.87,
++0.89, +0.88, and the 4-leg result moves 1.86 → 1.88 → 1.66 against a random-backbone floor of
+5.06. Whatever carries the transfer is not the thing we spent three experiments removing.
 
 Their setting likely does not need one. The shortcut we measured only pays when knowing which body
 you are looking at tells you the command, and in our data each body does exactly one thing. In

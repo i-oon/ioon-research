@@ -1,0 +1,39 @@
+=== stage2_clean ===
+wm/runs/stage2_clean/best.pt  epoch 60
+body 'c08f09t09', 3 clips, un-augmented frames, 162 rollouts
+ steps ahead  forward model   hold still  constant vel   vs hold
+           1          1.535        2.114         5.781     1.38x
+           2          1.794        2.678        14.621     1.49x
+           3          2.007        3.054        27.615     1.52x
+           5          2.405        3.569        66.025     1.48x
+           8          2.978        4.122       155.794     1.38x
+          10          3.349        4.364       236.533     1.30x
+'vs hold' above 1 means the forward model beats doing nothing. Below 1 means it is
+worse than assuming the world is frozen, and has learned nothing it can roll forward.
+
+=== stage2_clean_adv_warm10 ===
+wm/runs/stage2_clean_adv_warm10/best.pt  epoch 60
+body 'c08f09t09', 3 clips, un-augmented frames, 162 rollouts
+ steps ahead  forward model   hold still  constant vel   vs hold
+           1          1.542        2.114         5.781     1.37x
+           2          1.804        2.678        14.621     1.48x
+           3          2.023        3.054        27.615     1.51x
+           5          2.429        3.569        66.025     1.47x
+           8          3.006        4.122       155.794     1.37x
+          10          3.366        4.364       236.533     1.30x
+'vs hold' above 1 means the forward model beats doing nothing. Below 1 means it is
+worse than assuming the world is frozen, and has learned nothing it can roll forward.
+
+=== stage2_clean_centered ===
+wm/runs/stage2_clean_centered/best.pt  epoch 60
+body 'c08f09t09', 3 clips, un-augmented frames, 162 rollouts
+ steps ahead  forward model   hold still  constant vel   vs hold
+           1          1.527        2.114         5.781     1.38x
+           2          1.785        2.678        14.621     1.50x
+           3          2.002        3.054        27.615     1.53x
+           5          2.407        3.569        66.025     1.48x
+           8          3.003        4.122       155.794     1.37x
+          10          3.384        4.364       236.533     1.29x
+'vs hold' above 1 means the forward model beats doing nothing. Below 1 means it is
+worse than assuming the world is frozen, and has learned nothing it can roll forward.
+

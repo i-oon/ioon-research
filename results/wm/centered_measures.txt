@@ -1,0 +1,30 @@
+=== CENTRED: held-out body ===
+wm/runs/stage2_clean_centered/best.pt  epoch 60
+cross-embodiment ['hexapod', 'b1'], scored through the 'hexapod' head, action_lag 1, lambda_cross 0.0
+
+body             deg    model  train mean  own mean     R2   zero_z   zero_x
+c08f09t09      15.10    1.114       0.581     0.571  -0.95    0.403    0.900
+
+'train mean' is what predicting the training mean pose scores; beating it only says
+the model noticed this is not an average body. 'own mean' is this body's own per-joint
+mean, the baseline R2 is defined against -- a negative R2 means worse than someone who
+saw the body once and memorised its average posture. 'zero_x' below 'model' means the
+frame is actively harmful.
+
+=== CENTRED: identity ablation ===
+wm/runs/stage2_clean_centered/best.pt  epoch 60  action_lag 1
+1909 latents of dim 64: 780 hexapod, 1129 b1
+
+embodiment probe as directions are peeled off: 0.997 -> 0.878 -> 0.837 -> 0.803 -> 0.767 -> 0.724 -> 0.709 -> 0.704
+8 of 64 directions carry the embodiment; with them removed the probe reads 0.697 against a chance level of 0.500
+
+latent                           b1     hexapod    vs intact
+intact                        2.65u       1.37u        1.00x
+identity removed (8d)         2.75u       1.41u        1.03x
+random 8d removed             3.23u       1.80u        1.27x
+z zeroed                     29.18u      12.17u        9.96x
+
+Errors are RMSE per joint in degrees. Read the identity row against the random row:
+if deleting the embodiment subspace costs no more than deleting the same number of
+arbitrary directions, nothing downstream was using it, the 33% is leakage from the
+frozen encoder, and an FTM side channel has no pressure to relieve.

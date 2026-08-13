@@ -1,0 +1,13 @@
+checkpoint : wm/runs/stage2_clean_centered/best.pt
+train clips: ['middleloss_ep144', 'middleloss_ep28', 'middleloss_ep198', 'middleloss_ep93', 'middleloss_ep22']
+test clips : ['middleloss_ep101', 'middleloss_ep130', 'middleloss_ep6', 'middleloss_ep69']
+action stats from train clips only: dim=12
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  94%|█████████▍| 795/843 [00:00<00:00, 7930.46it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7996.05it/s]
+
+=== 4-leg middle-loss few-shot new-head ===
+model                best_ep  train_deg  test_deg  test_mse  own_mean      R2
+pretrained_stage2        300       1.08      1.88    0.0394    0.9808   +0.96
+random_backbone          275       3.46      5.06    0.2531    0.9808   +0.74
+
+Interpretation: the pretrained row must beat the random row on held-out clips to count as evidence that Stage 2 transfers useful features to the new 4-leg embodiment.

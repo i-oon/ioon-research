@@ -43,7 +43,25 @@ Open, in the order they have to be decided:
 **Resolved 2026-08-12.** Items 1 and 3 are done and `stage2_clean` has been trained and measured
 on two seeds — see F43. The data questions are closed; what they uncovered is not:
 
-**Q13. Is the variance decomposition salvageable, or should it be dropped?**
+**Q13. RESOLVED 2026-08-12: drop it.** The cross-embodiment variance decomposition is not
+under-sampled, it is built on a phase label too coarse to be one. Stance fraction takes **8
+distinct values** across both embodiments, dominated by 0.5, so quantile edges collapse: asking
+for 3 bins gives 2, asking for 4 gives 2 (identical numbers), asking for 6 gives 3. The grid was
+never 2 x 6 x 6 = 72 cells; it was 24 to 36. The embodiment share therefore reads **32.0% at three
+bins and 12.0% at six**, same checkpoint, same data -- a 2.7x swing from a parameter that was
+supposed to be cosmetic.
+
+**F38's headline 33.0% came from this measurement.** Replace it everywhere with the probe (0.994 /
+0.992 across seeds) and the identity ablation (1.03x / 1.04x against a random control), which
+reproduce to three decimals and say something stronger anyway: the identity is fully present and
+nothing uses it.
+
+Stage 1's `z_body_share` is not affected -- insect bodies walk identical expert episodes, so its
+grid can use the timestep directly instead of inventing a shared phase label.
+
+*Original question below, kept for the reasoning.*
+
+**Q13 (as asked). Is the variance decomposition salvageable, or should it be dropped?**
 
 `two_way` balances its grid to the smallest cell, which holds six latents, so the whole
 measurement rests on 72 points. Two seeds of one config give **12.0% and 6.7%** for the embodiment

@@ -35,7 +35,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.dataset import EXCLUDED_BODIES  # noqa: E402
-from wm.evaluate import encode_clip, upgrade_decoder_state  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
@@ -59,7 +59,8 @@ def trained_bodies(cfg):
 
 
 @torch.no_grad()
-def score(itm, md, encoder, paths, mean, std, action_lag, chunk, head="default"):
+def score(itm, md, encoder, paths, mean, std, action_lag, chunk, head="default",
+          offset=None):
     """Squared error per joint, standardised and in degrees, plus the two input ablations."""
     totals = {k: 0.0 for k in ("model", "zero_z", "zero_x", "constant")}
     degrees, count = 0.0, 0
@@ -69,6 +70,12 @@ def score(itm, md, encoder, paths, mean, std, action_lag, chunk, head="default")
         # the encoder may run on the GPU; the trained modules are small and stay on the CPU, so
         # bring the embeddings back rather than moving a 1B-parameter model
         e = encode_clip(encoder, clip["frames"], chunk).cpu()
+        if offset is not None:
+            # a checkpoint trained with `center_embeddings` subtracted a per-embodiment
+            # mean before anything saw the frames; scoring it on raw embeddings is a
+            # silent distribution shift that reads as the model failing. It cost a
+            # reported R^2 of -0.95 once.
+            e = e - offset
         actions = clip["actions"].astype(np.float32)
         n = min(len(e) - 1, len(actions) - action_lag)
         target = torch.tensor((actions[action_lag:action_lag + n] - mean) / std)
@@ -151,7 +158,8 @@ def main():
         if not paths:
             print(f"{body:12}  no clips found in {data_dir}")
             continue
-        r = score(itm, md, encoder, paths, mean, std, cfg.action_lag, args.chunk, head)
+        r = score(itm, md, encoder, paths, mean, std, cfg.action_lag, args.chunk, head,
+                  offset_for(checkpoint, args.embodiment))
         print(f'{body:12}{r["deg"]:8.2f}{r["model"]:9.3f}{r["constant"]:12.3f}'
               f'{r["own_mean"]:10.3f}{r["r2"]:+7.2f}{r["zero_z"]:9.3f}{r["zero_x"]:9.3f}')
     del encoder
