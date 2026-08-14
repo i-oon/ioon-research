@@ -5,15 +5,70 @@ What each number means and the baselines it has to be read against are in
 
 ## Layout
 
-| Directory | Contents |
+Organised **by stage first, artifact second**. A result belongs to the run that produced it, and a
+run belongs to exactly one stage, so that is the outer level.
+
+```
+results/wm/
+  stage1/          figures/ gait/ predictions/ replay/ analysis/ eval/ logs/ measurements/
+  stage1_correct/  the retrain on clean data -- same subfolders, see its own README
+  stage2/          figures/ gait/ logs/ measurements/ 4leg_head/ ablation_replay/
+  dataset/         setup and data-quality checks that belong to neither stage
+  cache/           encoded embeddings and latents, shared and regenerable
+  README.md        RUNS.md   OVERNIGHT.md
+```
+
+**`stage1_correct/` is separate because the retrained runs reuse the same names** --
+`m3d_cross`, `m3d_bracketed`, `tib_cross`, `tib_ctrl`, `bracket_cross` -- so their outputs
+collide filename-for-filename with `stage1/` and would overwrite it. The two are also not
+comparable run-for-run: the retrain corrects `action_lag` **and** drops the non-walking bodies,
+so it differs in two things at once. `stage1/` is kept deliberately, because old against new is
+the only measurement of what the contaminated data cost. Details in
+[stage1_correct/README.md](stage1_correct/README.md).
+
+| | |
 |---|---|
-| `figures/` | every plot referenced from FINDINGS.md |
-| `analysis/` | JSON from `morphology_axis.py`, `morphology_mix.py` |
+| `figures/` | plots referenced from FINDINGS.md or the deck |
+| `gait/` | gait diagrams and side-by-side predicted-vs-IK videos |
 | `predictions/` | reconstructed joint commands in radians, from `wm.predict_actions` |
 | `replay/` | CoppeliaSim replays: frames, foot forces, head trajectories |
-| `gait/` | gait diagrams and the side-by-side predicted-vs-IK videos |
-| `cache/` | encoded embeddings and latents, so an analysis can be rerun without the encoder |
+| `analysis/` | JSON from `morphology_axis.py`, `morphology_mix.py` |
+| `measurements/` | raw stdout dumps from diagnostics, the numbers behind the findings |
+| `logs/` | training logs |
 | `eval/` | `evaluation.json` from the early two-body runs |
+| `4leg_head/` | the held-out 4-leg embodiment: few-shot curves, replays, summaries |
+| `ablation_replay/` | identity/frame/latent ablations driven through physics (F43b) |
+
+**`dataset/` is the category that is easy to forget.** Thirteen files -- `morphology_bodies`,
+`ratio_gaits_ep6`, `foot_force_threshold`, `dead_zone_comparison`, `leg_loss_strips`,
+`frame_clipping_comparison`, `spawn_test` and friends -- are checks on the data and the rendering
+setup. They were true before either stage and stay true after, so filing them under a stage would
+misattribute them.
+
+### The scripts still write to the old flat paths, on purpose
+
+Stage is a property of the run, not of the script: `plot_action_trace.py` runs on a Stage 1 or a
+Stage 2 checkpoint equally, and teaching every script to infer which one is more machinery than
+this is worth. So the diagnostics still write to `results/wm/figures/`, `.../predictions/`,
+`.../gait/` and `.../replay/`, and those directories **will reappear**.
+
+**Treat them as an inbox, not as the archive.** After a batch of measurements, move what you keep
+into the right `stage1/` or `stage2/` subfolder. If a flat directory exists here, it holds
+unfiled output.
+
+### Telling a file's stage from its name
+
+Needed when filing the inbox. Everything follows `{script}_{run}_{epoch}_{body}.ext`.
+
+| Stage | Run names that appear in filenames |
+|---|---|
+| **Stage 1** — cross-morphology, hexapod only, one 18-D head | `m3d_cross`, `m3d_bracketed`, `tib_cross`, `tib_ctrl`, `tib_sound`, `bracket_cross`, `stage1_*`, `fix_norm`, `fold_short`, `lag1_*`, `m3d_noaug`, `m3d_pooled`, `probe_ridge_*` |
+| **Stage 2** — cross-embodiment, hexapod + B1, per-embodiment heads | `stage2_clean`, `stage2_clean_s1`, `stage2_clean_centered`, `stage2_clean_adv_warm10`, `stage2_balanced`, `sidechannel_*`, `4leg_*`, `middleloss*`, `cross_embodiment_*`, `embodiment_axis`, `leg_contact_*`, `occlusion_*` |
+| **Neither** — dataset and setup checks, valid for both | `morphology_bodies`, `frame_clipping_comparison`, `framing_current`, `robot_framing_final`, `spawn_test`, `replay_frames`, `foot_force_threshold`, `gait_diagram_quality`, `dead_zone_comparison`, `ratio_gaits_*`, `leg_loss_strips`, `encoder_probe_matrix`, `encoder_vs_decoder` |
+
+Body codes disambiguate further: `c08f09t09` and friends are hexapod bodies (Stage 1 and 2 both
+use them), `middleloss` is the 4-leg built on the base geometry, `middleloss08` the one built on
+held-out `c08f09t09` (F48).
 
 ## Which target a run was trained on
 
@@ -76,7 +131,7 @@ Five bodies, held-out `c08f09t09`, averaged over epochs 1-10 unless stated.
 
 ## Does the latent carry the transition
 
-Produced by `scripts/z_dynamics.py`, which substitutes the second frame the ITM is given.
+Produced by `scripts/diagnostics/z_dynamics.py`, which substitutes the second frame the ITM is given.
 Held-out `c08f09t09`, 195 transitions, both runs `action_lag 0`.
 
 | what the ITM is given as `e_{t+1}` | control ep 6 | cross ep 8 |
@@ -94,7 +149,7 @@ was a pose code, not a latent action. FINDINGS.md F29 -- this is why `action_lag
 
 Foot-contact pattern and body identity decoded from `z` on the same clips, with `z`'s variance
 split by what explains it. Eight contact patterns, majority class 0.144; five bodies, chance
-0.200. Produced by `scripts/z_content.py`.
+0.200. Produced by `scripts/diagnostics/z_content.py`.
 
 | | control ep 20 | cross ep 8 | cross ep 27 |
 |---|---|---|---|
@@ -154,7 +209,7 @@ training bodies to five: the two-body run covered less than half, both five-body
 ## Augmentation noise in the reconstruction target
 
 Mean squared distance in embedding space, against a signal of **1.92** (consecutive frames, no
-augmentation). Produced by `scripts/aug_noise.py`.
+augmentation). Produced by `scripts/diagnostics/aug_noise.py`.
 
 | augmentation | noise | noise / signal |
 |---|---|---|
@@ -197,16 +252,16 @@ so predicting their mean costs 1.0 only on them. On held-out `medium` the trivia
 
 ```
 .venv/bin/python3 -m wm.predict_actions --ckpt wm/runs/<run>/epoch008.pt --clips 3
-.venv/bin/python3 scripts/plot_action_trace.py --pred results/wm/predictions/<name>.npz
-.venv/bin/python3 scripts/morphology_axis.py --ckpt wm/runs/<run>/epoch008.pt
-.venv/bin/python3 scripts/morphology_mix.py --pred results/wm/predictions/<name>.npz
-.venv/bin/python3 scripts/swap_pathway.py --ckpt wm/runs/<run>/epoch008.pt --bodies A B
+.venv/bin/python3 scripts/diagnostics/plot_action_trace.py --pred results/wm/predictions/<name>.npz
+.venv/bin/python3 scripts/diagnostics/morphology_axis.py --ckpt wm/runs/<run>/epoch008.pt
+.venv/bin/python3 scripts/diagnostics/morphology_mix.py --pred results/wm/predictions/<name>.npz
+.venv/bin/python3 scripts/diagnostics/swap_pathway.py --ckpt wm/runs/<run>/epoch008.pt --bodies A B
 .venv/bin/python3 wm/sweep_checkpoints.py --run wm/runs/<run>
-.venv/bin/python3 sim/render_wm_prediction.py --port 23000 --pred results/wm/predictions/<name>.npz --clip 0
-.venv/bin/python3 scripts/wm_gait_report.py --replay results/wm/replay/<name>_clip0.npz
-.venv/bin/python3 scripts/z_content.py
-.venv/bin/python3 scripts/z_dynamics.py --ckpt wm/runs/<run>/epoch008.pt
-.venv/bin/python3 scripts/aug_noise.py
+.venv/bin/python3 sim/render/render_wm_prediction.py --port 23000 --pred results/wm/predictions/<name>.npz --clip 0
+.venv/bin/python3 scripts/diagnostics/wm_gait_report.py --replay results/wm/replay/<name>_clip0.npz
+.venv/bin/python3 scripts/diagnostics/z_content.py
+.venv/bin/python3 scripts/diagnostics/z_dynamics.py --ckpt wm/runs/<run>/epoch008.pt
+.venv/bin/python3 scripts/diagnostics/aug_noise.py
 ```
 
 Add `--encode_device cpu` to any of them when a training run holds the GPU.

@@ -36,9 +36,12 @@ Open, in the order they have to be decided:
    at 0.984. Rescaling the foot trajectory per body would work geometrically and **must not be
    done**: `lambda_cross` is well defined only because every body walks identical expert episodes,
    so per-body targets turn a shared intent into a wrong label.
-4. **Whether ratio > 1 is admissible at all.** The base insect is 0.83, tibia longer. Femur-longer
-   legs exist in insects but not in Phasmatodea. If the thesis frames this as stick insects, the
-   honest range is ratio ≤ 1.
+4. ~~**Whether ratio > 1 is admissible at all.**~~ **Resolved, already logged**:
+   `sim/scene/make_leg_morphology.py`'s docstring states it directly -- "femur longer than tibia
+   inverts the animal's own proportion, so a body above 1.0 is a robot morphology, not a stick
+   insect." Ratio > 1 is not geometrically broken (bodies at 1.04-1.10 walk normally, per the
+   dead-zone measurement in the same docstring), it is just not a stick insect anymore. If the
+   thesis frames this as stick insects specifically, the honest range is ratio ≤ 1.
 
 **Resolved 2026-08-12.** Items 1 and 3 are done and `stage2_clean` has been trained and measured
 on two seeds — see F43. The data questions are closed; what they uncovered is not:
@@ -156,8 +159,36 @@ chance of 0.5 (F31).
 noisy ones. Stage 1's pairing is exact; part of why `L_cross` works may be that exactness. Across
 embodiments no pairing can be exact, and what counts as "the same phase" for a six-leg tripod and
 a four-leg trot has no physically correct answer -- it is a design decision that has to be stated
-and defended. **This is the largest untested risk in Stage 2 and there is currently no plan for
-it.**
+and defended. ~~**This is the largest untested risk in Stage 2 and there is currently no plan for
+it.**~~
+
+**MEASURED 2026-08-14, and the answer is that none of the three rows works on current data (F45).**
+The risk above is no longer untested. Per-leg contact was the most promising signal -- no shared
+period needed, corner legs correspond anatomically -- and it fails in a specific, informative way:
+
+| label | overlap | hexapod frames pairable | intent, hexapod | intent, b1 |
+|---|---|---|---|---|
+| `n_feet_down` | 0.572 | 98.9% | 0.913 | **0.998** |
+| `diagonal` | 0.711 | 100% | **0.918** | 0.605 |
+| `corner_pattern`, 16-way | **0.240** | **33.8%** | 0.630 | 0.524 |
+
+`intent` = matched-pair over random-pair command distance within one body; 1.0 means the label
+says nothing. The fine label means something on both robots but pairs only a third of the hexapod;
+the coarse labels pair everything and mean nothing on one side. **Coverage and meaning trade
+directly**, because coarsening is what destroys the meaning. The B1 spends 84.6% of its time in
+the two trot diagonals while the hexapod spreads over all sixteen patterns, nine of them
+hexapod-only.
+
+Velocity-alone, the first row of the table above, is worse still and needed no new measurement:
+the hexapod walks **one speed, forward only**, so velocity has no variation to pair *on* from the
+insect side at all.
+
+**So the plan is no longer "pick a pairing and defend it".** Either (a) accept that Stage 2
+follows the paper without a cross term -- which Q11 notes is what the source method actually does,
+making `lambda_cross` our addition rather than a missing piece -- or (b) broaden behavioural
+coverage first, since the overlap failure is partly the one-gait-one-speed constraint (F31)
+rather than a fact about hexapods and quadrupeds. Option (b) is the AMP-dataset question already
+open in Q11, and F45 is now a second, independent reason to take it seriously.
 
 Practical consequence: report claim A as the result, claim B as a measured limit with its
 mechanism, and treat sample efficiency as the transfer claim actually being made.
@@ -225,6 +256,45 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 
 **Lean:** (B) is the headline if we can produce a 4-leg walker (see Q2); (A) is the
 guaranteed-feasible fallback and a good first result. Likely do (A) first, then (B).
+
+**Update 2026-08-14 (F47): (B) was built, but the body chosen does not test composition.**
+The 4-leg is the *base* insect with the middle legs removed, so its geometry is `c10f10t10`'s --
+a training body's -- and its commands are that body's corner columns bit-identically. The latent
+sits 0.578 from the base body's against a chance of 0.981, so the model reads it as the base body
+at that phase and barely registers the missing legs. Leg count is the only novel axis; the
+compositional claim needs at least two.
+
+**Which axes a held-out embodiment can be novel on**, and where the current one stands:
+
+| axis | hexapod -> B1 | hexapod -> 4-leg, as built | fix |
+|---|---|---|---|
+| action dimensionality | 18 vs 12 | 18 vs 12, **novel** | -- |
+| leg count | 6 vs 4 | 6 vs 4, **novel** | -- |
+| segment geometry | n/a | **in distribution** | remove legs from a *held-out* body |
+| gait / dynamics | wave vs trot | unchanged insect wave | needs a 4-leg controller (Q2) |
+| appearance | insect vs quadruped | still a stick insect | a second quadruped, new assets |
+
+**Cheapest correct fix, one collection run and no new tooling**: ghost-remove the middle legs from
+`c08f09t09`, already withheld from Stage 2 training, so geometry and leg count are both unseen.
+Only middle-loss walks (front-loss tips, hind-loss rears, F44), so the variant is forced, and the
+body must be rendered before collecting -- a geometry change can break a gait that worked on the
+base scene.
+
+**DONE 2026-08-14 (F48).** `data/ik_4leg_c08f09t09_clean10`, 10 clips from a 30-episode sweep.
+The margin is **unchanged**: 2.85x against the base body's 2.86x (1.91 +/- 0.08 deg against a
+random backbone's 5.45 +/- 0.16). Geometry and leg count are now both novel and the claim holds.
+**Rows 1-3 of the table above are satisfied; rows 4 and 5 -- gait and appearance -- are not.**
+
+**Leg-loss itself is not the problem** and should not be abandoned: it produces a genuinely
+incomparable 12-D action space against the hexapod's 18-D, which is the asymmetry the thesis rests
+on. What was wrong is the *geometry* it was built from, and that is a one-line change to which
+scene the collector loads.
+
+**A stronger version, if there is time**: make the held-out body quadruped-like in *behaviour* as
+well as topology, so it shares appearance with the insect and gait with the B1 -- which is what
+"composition" was supposed to mean. That needs a 4-leg controller rather than the unchanged
+six-leg IK gait, which is Q2's open item. Strongest of all would be a second real quadruped, but
+that is new assets and a new policy, not a collection run.
 
 
 ---

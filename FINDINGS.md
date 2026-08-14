@@ -84,7 +84,7 @@ fails, the model knows where in the gait cycle it is.
 
 ### F4. Transfer to an unseen body covers about half the required distance
 
-![Morphology signal through the pipeline](results/wm/figures/morphology_axis.png)
+![Morphology signal through the pipeline](results/wm/stage1/figures/morphology_axis.png)
 
 *Left: the body's position between the two training bodies survives the encoder (0.465) and is
 lost in the ITM and decoder. Right: correcting the loss weighting makes the model move along the
@@ -119,7 +119,7 @@ Read the rows as separate statements rather than one decaying quantity: the axis
 space and the axis in joint space are different axes, so 0.465 in one is not "more" than 0.301
 in the other. What is directly comparable is the last two rows, both in joint space.
 
-Reproduce: `.venv/bin/python3 scripts/morphology_axis.py --ckpt wm/runs/<run>/epoch020.pt`
+Reproduce: `.venv/bin/python3 scripts/diagnostics/morphology_axis.py --ckpt wm/runs/<run>/epoch020.pt`
 
 ### F4b. A linear probe on the same latent generalises better than the trained decoder
 
@@ -162,7 +162,7 @@ decoder is a second lever alongside adding bodies.
 
 Two limits on how far this generalises:
 
-**The bodies are uniformly scaled, so the task is close to affine.** `sim/make_leg_morphology.py`
+**The bodies are uniformly scaled, so the task is close to affine.** `sim/scene/make_leg_morphology.py`
 takes one factor and scales coxa, femur and tibia together, and the resulting joint commands
 differ between bodies by 92 to 99 percent constant offset (F7). A linear readout is well matched
 to a near-affine problem, so its win here may not survive a morphology space with independent
@@ -221,7 +221,7 @@ already distilled what a well-conditioned readout needs.
 ### F4c. Replaying the commands in physics shows the same split
 
 Both command streams driven open-loop through the same scene and physics as the collector used,
-held-out `medium`, all three clips (`sim/render_wm_prediction.py`, `scripts/wm_gait_report.py`):
+held-out `medium`, all three clips (`sim/render/render_wm_prediction.py`, `scripts/diagnostics/wm_gait_report.py`):
 
 | Driven by | forward x, m (clip 0 / 1 / 2) | mean forward | mean absolute heading error | body height, m | tripod score (0 / 1 / 2) |
 |---|---|---|---|---|---|
@@ -263,12 +263,12 @@ and looks the steadier of the two; that is the decoder's straightest clip and th
 Across three clips the decoder's heading errors are +25.2, -37.5 and +64.8 deg. Report all
 clips, or the wrong predictor wins.
 
-![Gait, decoder](results/wm/figures/gait_stage1_100ep_framed_runB_epoch020_medium_clip0.png)
+![Gait, decoder](results/wm/stage1/figures/gait_stage1_100ep_framed_runB_epoch020_medium_clip0.png)
 
 *Decoder-driven gait above, ground truth below. Black is stance. The stance blocks fragment and
 the left and right tripods stop alternating.*
 
-![Gait, probe](results/wm/figures/gait_probe_ridge_runB_medium_clip0.png)
+![Gait, probe](results/wm/stage1/figures/gait_probe_ridge_runB_medium_clip0.png)
 
 *Probe-driven gait above, ground truth below, same axes. Stance blocks keep roughly the right
 length and phase.*
@@ -281,7 +281,7 @@ Fold 2 holds out `short` (leg scale 0.5) while training on `long` (1.0) and `med
 the test body lies outside the training range rather than between the training bodies. Axis
 here runs 0 = `long`, 1 = `medium`, and the correct position for `short` is 2.803 (CF).
 
-![Both folds](results/wm/figures/axis_both_folds.png)
+![Both folds](results/wm/stage1/figures/axis_both_folds.png)
 
 | Stage | fold 1, held-out medium (bracketed) | fold 2, held-out short (outside), epoch 6 | fold 2, epoch 20 |
 |---|---|---|---|
@@ -348,7 +348,7 @@ drifting through it, because nothing in the objective marks where the right answ
 
 ### F6. Trivial baselines beat the model on this task
 
-![Interpolation failure](results/wm/figures/interpolation_failure.png)
+![Interpolation failure](results/wm/stage1/figures/interpolation_failure.png)
 
 *Left: both training bodies are reconstructed to under 1.2 deg per joint while the held-out body
 is not. Right: shown the medium body, the model's output is closer to a training body's geometry
@@ -405,7 +405,7 @@ every baseline in F6 -- but two training bodies can only express a straight line
 
 ### F8. Aggregate error hides which joints transferred
 
-![Per-joint traces on the held-out body](results/wm/figures/action_trace_stage1_100ep_framed_runB_epoch020_medium.png)
+![Per-joint traces on the held-out body](results/wm/stage1/figures/action_trace_stage1_100ep_framed_runB_epoch020_medium.png)
 
 *Predicted (red, dashed) against IK ground truth (black) for all 18 joints on the held-out body.
 Left column is TC and tracks exactly; the CF and FT columns are over-amplified and out of phase.
@@ -455,7 +455,7 @@ must use the held-out body's own baseline. `wm.evaluate` reports both as
 
 ### F11. Validation on held-out episodes cannot detect cross-body failure
 
-![Validation against held-out body](results/wm/figures/heldout_sweep_two_seeds.png)
+![Validation against held-out body](results/wm/stage1/figures/heldout_sweep_two_seeds.png)
 
 *Same configuration and same `seed: 0` on two different GPUs. Left: validation on unseen episodes
 of the training bodies improves by an order of magnitude. Right: the held-out body does not, and
@@ -501,7 +501,7 @@ episodes is wasted; spend it on bodies.
 
 ### F14. Peak transfer arrives in the first tenth of training
 
-![Held-out sweep](results/wm/figures/heldout_sweep_runB.png)
+![Held-out sweep](results/wm/stage1/figures/heldout_sweep_runB.png)
 
 *Every snapshot re-scored on 2,600 identical cached held-out pairs. The dotted line at 1.0 is
 predicting the mean; the grey curve is the same model with the latent zeroed.*
@@ -515,13 +515,13 @@ curve is for reporting compute cost, not for choosing a model.
 
 Everything above was measured with two training bodies differing along one axis. This section
 uses `data/ik_walk_8body`: nine bodies generated by scaling coxa, femur and tibia
-independently (`sim/make_leg_morphology.py`), 30 clips each, 0 percent of frames edge-clipped.
+independently (`sim/scene/make_leg_morphology.py`), 30 clips each, 0 percent of frames edge-clipped.
 Two bodies were dropped because they stumble -- both have femur 0.6 with tibia 1.0, and their
 head height falls to 0.03 m against 0.111 m for the rest. Five bodies train; `c08f09t09`
 (0.8, 0.9, 0.9) is held out and lies inside their convex hull; `c06f06t06` is held out in a
 second run and lies outside it.
 
-![The nine bodies](results/wm/figures/morphology_bodies.png)
+![The nine bodies](results/wm/dataset/morphology_bodies.png)
 
 ### F15. The morphology space is three parameters but two dimensions
 
@@ -596,7 +596,7 @@ More bodies also help the unbracketed case, which two bodies did not:
 
 Every body walks the same expert episodes, so at a given timestep two bodies are at the same
 point in the gait cycle and the decoder's two inputs can be crossed. `m3d_bracketed` epoch 8,
-between two bodies whose commands differ by 28.63 deg (`scripts/swap_pathway.py`):
+between two bodies whose commands differ by 28.63 deg (`scripts/diagnostics/swap_pathway.py`):
 
 | frame from | latent from | RMSE vs c10f10t10 | RMSE vs c10f10t06 |
 |---|---|---|---|
@@ -639,7 +639,7 @@ component is exactly what the decoder uses.
 The frame carries leg lengths in full and the decoder ignores it. A lookup over five
 well-separated codes is a cheaper way to reduce the training loss than reading geometry off
 256x1408 tokens, and a lookup has no entry for a body that was never assigned a code. Fitting
-which mixture of training bodies the model's answer resembles (`scripts/morphology_mix.py`)
+which mixture of training bodies the model's answer resembles (`scripts/diagnostics/morphology_mix.py`)
 shows the same thing from the output side: **0.883 of the weight sits on one training body**
 where the best possible mixture spreads to 0.697, and the segment scales its answer implies are
 (0.980, 0.975, 0.973) against an actual (0.80, 0.90, 0.90).
@@ -1160,7 +1160,7 @@ the transition's contribution in the control and raises it slightly with the cro
 what it was designed to do; it simply was not what transfer was short of. `lag1_cross` also gives
 the lowest reconstruction of any checkpoint at 2.82 deg.
 
-**The cause is in the collector, not the model.** `sim/collect_ik.py` applies `cmds[t]`, steps the
+**The cause is in the collector, not the model.** `sim/collect/collect_ik.py` applies `cmds[t]`, steps the
 simulator, and only then captures `frames[t]`. So `frames[t]` is the *result* of `actions[t]`, and
 the command that caused `frames[t] -> frames[t+1]` is `actions[t+1]`. Training asked for
 `actions[t]` from `(e_t, e_{t+1})`: **the target was already visible in `e_t`**, which the decoder
@@ -1423,7 +1423,7 @@ to that term. The control's probe on `z` climbs from 0.519 to 0.762 over trainin
 ablation from 1.00x to 1.93x: with nothing opposing it the latent returns to being a body code.
 
 **This is compositional generalisation, and it points at a data fix, not a loss or architecture
-fix.** Bodies in which the femur and tibia differ can be generated with `sim/make_leg_morphology.py`.
+fix.** Bodies in which the femur and tibia differ can be generated with `sim/scene/make_leg_morphology.py`.
 
 Complete, ten epochs. The held-out error never moves: 10.53 at epoch 1, 10.47 mean, best 9.55 at
 epoch 4, drifting back to 10.71 by epoch 10, while training and validation both fall steadily.
@@ -1469,7 +1469,7 @@ F26 measured the latent's variance split on the five **training** bodies, becaus
 body-by-phase grid needs every body present at every timestep of the shared expert episode. The
 two held-out bodies also walk those episodes, so the same grid can be built from them alone. Two
 rows is not five, so all ten **pairs** of training bodies give a like-for-like reference at
-matching group size (`scripts/z_body_share.py`).
+matching group size (`scripts/diagnostics/z_body_share.py`).
 
 | body's share of the latent's variance | training bodies | training pairs | **held out** |
 |---|---|---|---|
@@ -1558,7 +1558,7 @@ loses a quarter and does not. No body is ever *too far* -- 0.0% in every row -- 
 never the constraint, and leg length does not sort the failures at all (`c10f08t10` at 703 mm
 fails while `c10f10t08` at 689 mm works).
 
-`sim/make_leg_morphology.py` now refuses to generate a violating body and prints the margin, with
+`sim/scene/make_leg_morphology.py` now refuses to generate a violating body and prints the margin, with
 `--force` to override. Three of the first six bodies attempted were infeasible; the rule would
 have caught all three before any collection.
 
@@ -1575,7 +1575,7 @@ Stage 2 trained for the first time: one ITM, one FTM and one decoder backbone sh
 term -- the source method has none, and claims the shared latent emerges from weight sharing alone.
 
 Latent variance split by what explains it, using stance fraction as the phase label since the two
-embodiments share no episodes (`scripts/z_embodiment_share.py`, `best.pt`, epoch 12):
+embodiments share no episodes (`scripts/diagnostics/z_embodiment_share.py`, `best.pt`, epoch 12):
 
 | | share |
 |---|---|
@@ -1588,7 +1588,7 @@ training bodies. **A third of the latent is a code for which robot this is**, an
 separates the two at **1.000**.
 
 **Training did pull them together, and the picture shows it.** Between the frozen encoder and
-the learned latent (`scripts/cross_embodiment_umap.py`, 2,104 frames):
+the learned latent (`scripts/diagnostics/cross_embodiment_umap.py`, 2,104 frames):
 
 | | embodiment probe | silhouette | cluster separation |
 |---|---|---|---|
@@ -1654,7 +1654,7 @@ The prior was passive, on structural grounds: the decoder's output head is *sele
 embodiment, so identity is handed to it for free, and the FTM sees `x_t`, which is a picture of
 the robot. Neither has to ask `z`. **That prior was wrong.**
 
-Tested without training anything (`scripts/z_identity_ablation.py`, `stage2_balanced/best.pt`
+Tested without training anything (`scripts/diagnostics/z_identity_ablation.py`, `stage2_balanced/best.pt`
 epoch 12, 2,104 latents). Identity is linearly decodable, so peel the directions carrying it out
 of the 64-D latent, re-run the decoder on the crippled latent, and compare against the cost of
 deleting the same number of *random* orthogonal directions -- the floor for losing capacity with
@@ -1800,7 +1800,7 @@ only the embodiment label, which training has, and costs nothing the setting was
 paying.
 
 Reproduce all six cells with `--features {mean,bands,max}` and `--normalize` on
-`scripts/cross_embodiment_probe.py`, from one cached encoder pass.
+`scripts/diagnostics/cross_embodiment_probe.py`, from one cached encoder pass.
 
 ### F41b. Per-leg contact: the encoder sees a loaded leg clearly and describes it differently for each robot
 
@@ -1815,7 +1815,7 @@ corner legs correspond anatomically. The middle legs have no counterpart, which 
 asymmetry between a hexapod and a quadruped rather than a defect.
 
 Band-pooled patch tokens, each embodiment standardised by its own statistics, split by clip,
-balanced accuracy (`scripts/leg_contact_probe.py`):
+balanced accuracy (`scripts/diagnostics/leg_contact_probe.py`):
 
 | leg | insect -> insect | b1 -> b1 | insect -> b1 | b1 -> insect |
 |---|---|---|---|---|
@@ -1928,7 +1928,7 @@ from a model that spent about a fifth of its hexapod gradient on a robot that do
 **And it bounds F33 / slide 8, measured rather than assumed.** `tib_cross` holds out `c10f10t06`,
 which veers 0.380 m sideways against 0.06-0.17 m for every body it trained on. Scoring the *same
 checkpoint* on three further held-out bodies that walk cleanly separates the geometry gap from the
-gait (`scripts/score_body.py`):
+gait (`scripts/diagnostics/score_body.py`):
 
 | held out | ratio | dead zone | deg/joint | R^2 | frame ablation |
 |---|---|---|---|---|---|
@@ -1978,7 +1978,7 @@ Femur longer than tibia is fine at 1.04 and 1.10. At 1.38 the body yaws steadily
 shared phase label in the cross-embodiment probe and the phase term in the latent decomposition.
 The force distribution is sharply bimodal -- a swing mode near 0.1 N, a stance mode near 6-10 N --
 and the 0.27 N cut sits in the empty valley with **1.8% of samples within +/-0.07 N** of it. Not a
-thresholding artefact. `scripts/plot_gait_quality.py`.
+thresholding artefact. `scripts/dataset/plot_gait_quality.py`.
 
 **The expert gait is a real stick insect's, so it is a variable wave, not a tripod.** Per-leg
 contact periods on the reference come out at 6, 22, 18, 4, 9 and 20 frames, front-leg duty runs
@@ -2017,7 +2017,7 @@ epoch over the last six).
     withheld  c06f10t06, c10f10t06                        veer 0.35-0.40 m off course
 
 **Stage 2 has a generalisation test for the first time.** With two embodiments neither can hold the
-other out, so a hexapod body was withheld instead (`scripts/score_body.py`, same weights, one
+other out, so a hexapod body was withheld instead (`scripts/diagnostics/score_body.py`, same weights, one
 unseen body):
 
 | | seed 0 | seed 1 |
@@ -2124,7 +2124,7 @@ Ajan Blink asked twice for the same thing: never present a number without the ga
 run ablations that show the *behaviour* degrade rather than the metric. Every ablation up to here
 was numeric. These are the same ablations driven through CoppeliaSim on the held-out body
 `c08f09t09`, clip ep101, 65 steps (`wm/predict_actions.py --ablate`, then
-`sim/render_wm_prediction.py`).
+`sim/render/render_wm_prediction.py`).
 
 | | forward (m) | heading | mean feet down | RMSE deg | out-of-range commands |
 |---|---|---|---|---|---|
@@ -2151,7 +2151,7 @@ replay beside it.
 against the ablation result -- but "invisible" overstates it.
 
 Method note: the replay path reproduced the identity ablation independently -- 1.05x here against
-1.03x in `scripts/z_identity_ablation.py` -- which is worth more than either number alone.
+1.03x in `scripts/diagnostics/z_identity_ablation.py` -- which is worth more than either number alone.
 
 Two bugs surfaced building this, both of the kind that returns plausible numbers instead of
 failing. Rewriting `load_model` dropped `itm.load_state_dict`, so the ITM ran randomly initialised:
@@ -2275,7 +2275,13 @@ while ignoring the frame it is holding. Consistent with the 4-leg result improvi
 R^2 holding. So the adversary leaves the world model intact and moves the decoder toward reading
 geometry from pixels; it is a candidate to replace the baseline rather than a trade-off.
 
-**Measurement trap this cost.** `scripts/score_body.py` did not apply the stored
+> **Last paragraph corrected by F46 (2026-08-14).** The swap test, run on these same two
+> checkpoints, shows the decoder still answers with the *latent's* body under the adversary. The
+> `zero_z`/`zero_x` shift above is real but overstates it: zeroing an input is out of distribution,
+> so those ratios compare runs rather than locating the pathway. "Moves the decoder toward reading
+> geometry from pixels" holds directionally; "a candidate to replace the baseline" does not.
+
+**Measurement trap this cost.** `scripts/diagnostics/score_body.py` did not apply the stored
 `embedding_offsets`, so a centred checkpoint scored on raw embeddings read **15.10 deg, R^2 -0.95**
 -- reported as "centring breaks transfer" before the bug was found. With the offset applied it is
 3.61 deg, R^2 +0.89. The same omission does *not* affect `fit_4leg_head`, because the new head is
@@ -2354,28 +2360,237 @@ linear mixture -- all interpolate inside a shared 18-D joint space. An 18-DOF he
 there. That is the asymmetry the thesis argues for: vision is a common space where
 proprioception is not.
 
+### F45. Cross-embodiment pairing has no usable label on this data, and the probe says so before the run
+
+`lambda_cross` is the only intervention of six that improved Stage 1 transfer (F24), so the
+obvious move for Stage 2 is to port it. It cannot be ported as written: it decodes body A's
+latent against body B's frame supervised by B's command, which is well posed only because every
+insect body walks the *same expert episodes*. The hexapod and the B1 share none. The pairing has
+to be rebuilt from something both robots record, and per-leg contact is the candidate -- it needs
+no shared gait period, and the four corner legs correspond anatomically (F41b).
+
+Measured before spending a run, on 150 hexapod clips over 5 sound bodies and 14 B1 clips
+(`scripts/diagnostics/pairing_feasibility.py`):
+
+| label | overlap | hexapod frames pairable | intent, hexapod | intent, b1 |
+|---|---|---|---|---|
+| `n_feet_down`, 0-4 | 0.572 | 98.9% | 0.913 | **0.998** |
+| `diagonal`, which pair is loaded | 0.711 | 100% | **0.918** | 0.605 |
+| `corner_pattern`, 16-way | **0.240** | **33.8%** | 0.630 | 0.524 |
+
+`intent` is matched-pair command distance over random-pair distance, **within a single body**, so
+geometry is held constant and only the label varies. **1.0 means the label carries nothing**, and
+that is the number that decides it: `L_cross` supervises the decoder with the *partner's* command,
+so a label that does not imply a similar command on one robot cannot mean "the same intent" across
+two. That is a **wrong target, not a noisy one**, and wrong targets do not average out.
+
+**No label in the family is usable, and the two failure modes are opposite.** The 16-way pattern
+carries real intent on both robots, 0.630 and 0.524, but leaves **two-thirds of hexapod frames
+with no partner at all**. The coarse labels cover everything precisely *because* they discard what
+made them meaningful: `n_feet_down` is a coin flip on the B1 at 0.998, `diagonal` is one on the
+hexapod at 0.918. Coarsening to raise coverage is the same operation that destroys the meaning,
+which is why both columns have to be read together.
+
+**The 16-way table shows the mechanism.** The B1 spends **84.6%** of its time in two patterns,
+`0110` and `1001` -- the two diagonals of a trot. The hexapod spreads over all sixteen with
+nothing above 15%, and **nine of the sixteen are hexapod-only**. This is the quantified form of
+the claim that there is no physically correct answer to what "the same phase" means for a six-leg
+wave and a four-leg trot: it is not that the answer is hard to choose, it is that on this data no
+choice is both covered and meaningful.
+
+**Checked before trusting it.** The B1's `foot_contact` is already binary, so its 0.5 threshold is
+a no-op; the hexapod uses the validated 0.27 N; and overall duty matches closely, 0.533 against
+0.515. The mismatch is not an artefact of two differently-calibrated sensors.
+
+**What this does not establish.** Only 14 B1 clips, 1,143 frames. And both datasets are
+behaviourally narrow -- one IK wave gait, one RL trot at a commanded velocity -- so part of the
+non-overlap is the F31 constraint restated rather than a fact about hexapods and quadrupeds. That
+cuts *for* the behavioural-diversity direction in Q11: a dataset with varied gaits and speeds is
+the one change that would widen the overlap, and this measurement says how much it would have to
+widen to matter.
+
+**The method here is slide 10's, reused.** A few minutes of CPU on recorded data, no encoder and
+no training, deciding whether a run can answer the question it is meant to ask. The Stage 1
+version predicted which held-out bodies would transfer; this one says a mechanism cannot be built
+at all yet, which is worth more than the run that would have discovered it in four GPU-hours.
+
+### F46. Stage 2 has the Stage 1 pathology, and the adversary does not fix it
+
+Every argument for porting `lambda_cross` to Stage 2 assumed the Stage 1 diagnosis carries over.
+It had never been checked here: the swap test that established the pathology (F18) had not been
+run on any Stage 2 checkpoint. It has now.
+
+Two hexapod training bodies whose own commands differ by **21.13 deg**, decoded through the
+hexapod head, 195 transitions each (`scripts/diagnostics/swap_pathway.py --embodiment hexapod`):
+
+| checkpoint | frame from | latent from | vs `c10f10t10` | vs `c10f06t06` | follows |
+|---|---|---|---|---|---|
+| `stage2_clean` | c10f10t10 | c10f06t06 | 21.03 | **6.98** | latent |
+| `stage2_clean` | c10f06t06 | c10f10t10 | **5.26** | 20.19 | latent |
+| `adv_warm10` | c10f10t10 | c10f06t06 | 18.76 | **8.04** | latent |
+| `adv_warm10` | c10f06t06 | c10f10t10 | **6.87** | 18.04 | latent |
+
+The diagonals are near-identical across the two runs -- 4.85/5.97 against 4.89/5.98 -- so both
+reconstruct their own bodies equally well and the crossed cells are comparable.
+
+**Stage 2 has the pathology.** `stage2_clean` answers with the *latent's* body to within 7 deg
+while sitting 21 deg from the body whose frame it is holding. Same shape as F18's Stage 1 control,
+which answered within 3.5 deg on a 28.6 deg spread. **This is the first direct evidence that a
+cross term is needed in Stage 2 rather than inherited as an assumption.**
+
+**The adversary does not fix it.** It narrows the margin from 3.0-3.8x to 2.3-2.6x, roughly a
+quarter of the way, and never approaches 1.0 where following the frame would begin. `lambda_cross`
+reversed this test outright in Stage 1 (F24).
+
+**Why F44 read it more favourably.** F44 measured the pathway by zeroing an input: `zero_z`/`zero_x`
+went 0.365/0.193 to 0.140/0.266, which looks like a reversal. Zeroing is out of distribution, so
+those ratios compare runs rather than locating the pathway -- the standing caveat in
+`scripts/README.md`, and exactly the case it was written for. The swap test feeds real embeddings
+and disagrees. **Two measurements of "which input does the decoder use" pointed opposite ways, and
+the one with the known confound was the optimistic one.**
+
+**What this opens.** The pathology lives *within* the hexapod head, where four bodies share one
+18-D output -- not between embodiments, where per-embodiment heads already select structurally and
+the identity in `z` is passive (F43). And those four bodies walk identical expert episodes, so
+`lambda_cross` is as well defined there as in Stage 1. F45 rules out *cross-embodiment* pairing; it
+says nothing about this. `MultiEmbodimentPairs` currently builds no `partners` map and emits no
+`cross_x_t`, so the term is simply never computed -- a code gap, not a data one, and the `group`
+field it needs is already loaded.
+
+### F47. The 4-leg's latent lands on the base body, so its transfer is lookup, not composition
+
+F46 crossed the decoder's inputs between two bodies of one embodiment. The same swap is exactly
+definable *across* embodiments for the 4-leg insect and nothing else: it is the base stick insect
+with the middle legs ghost-removed, driven by the **unchanged** six-leg IK gait, so its 12
+commands are the base body's corner-leg columns **bit-identically** (verified: max difference
+0.0000 deg) and it walks the same expert episodes. None of F45's pairing problem applies, because
+intent is shared by construction.
+
+Frame from the short body `c10f06t06`, latent from the 4-leg video, decoded through the hexapod
+head, corner columns only, 195 transitions (`scripts/diagnostics/swap_embodiment.py`):
+
+| frame from | latent from | RMSE vs frame's body | RMSE vs latent's body | follows |
+|---|---|---|---|---|
+| 4-leg | 4-leg | 5.68 | 5.68 | control |
+| `c10f06t06` | `c10f06t06` | 5.39 | 5.39 | control |
+| `c10f06t06` | 4-leg | 19.30 | **5.78** | latent |
+| 4-leg | `c10f06t06` | 21.46 | **6.91** | latent |
+
+The candidate answers differ by 21.62 deg, and both are commands the hexapod head already produces
+for training bodies, so neither is out of its reach.
+
+**Read alone this looks like the thesis property** -- a latent inferred from an embodiment never
+trained on still drives the output. It is not, and the latent itself says why. Distances between
+latents at matched timesteps, normalised by the latent's own spread:
+
+| pair | distance |
+|---|---|
+| 4-leg vs base `c10f10t10` | **0.578** |
+| 4-leg vs short `c10f06t06` | 1.148 |
+| base vs short | 1.103 |
+| base vs **itself at a random timestep** (chance) | 0.981 |
+
+**Two things follow, and the second undercuts the first reading.**
+
+**Body identity dominates gait phase in `z`.** Two *different* bodies at the *same* timestep sit
+1.103 apart while the *same* body at a *random* timestep sits 0.981 apart. Which body you are
+matters more than where you are in the stride -- F46's pathology, now located in the latent rather
+than inferred through the decoder.
+
+**The ITM barely registers the missing legs.** The 4-leg sits 0.578 from the base body, far closer
+than same-body-different-phase. It reads the 4-leg video as "the base body, at this phase". So the
+swap result is the same lookup F46 found, succeeding *because the 4-leg's geometry is a training
+body's geometry*.
+
+**What this costs the Stage 2 claim.** The 4-leg was designed as the compositional test: insect
+appearance, quadruped leg count. It does not currently test composition, because only leg count is
+novel and the latent is mostly tracking geometry. F44's few-shot numbers stand as measured -- 2.86x
+over a random backbone is a real comparison -- but the mechanism story changes: the backbone
+transfers well partly because the target's geometry is in distribution. **The 4-leg tests novel leg
+count, not a novel body.**
+
+**The fix is one collection run and no new tooling.** Ghost-remove the middle legs from a
+*held-out* geometry rather than the base one -- `c08f09t09` is already withheld from Stage 2
+training -- so leg count and geometry are both novel. Then the few-shot comparison measures what
+slide 15 claims it measures. Only middle-loss walks (front-loss tips, hind-loss rears, F44), so
+the variant is forced; render it before collecting, since a geometry change can break a gait that
+worked on the base body.
+
+> **Done, and the conclusion survives -- see F48.** The rebuilt body gives 1.91 +/- 0.08 deg
+> against a random backbone's 5.45 +/- 0.16, a **2.85x** margin where the base-geometry body gave
+> **2.86x**. The confound above was real in the evidence and did not change the answer.
+
+### F48. Rebuilt on held-out geometry, the 4-leg transfer survives unchanged
+
+F47 found that the 4-leg's geometry was a *training* body's, so the few-shot result could have
+been riding on that rather than on transfer. This is the control that decides it: the same leg
+removal (`ML,MR`) applied to **`c08f09t09`**, which Stage 2 withholds from training, so leg count
+and geometry are both unseen. Same collection settings, same few-shot protocol, same checkpoint,
+5 train clips, 300 epochs.
+
+| split | pretrained Stage 2 | random backbone | margin |
+|---|---|---|---|
+| A | 1.80 deg, R^2 +0.97 | 5.25, +0.74 | 2.92x |
+| B | 2.00, +0.96 | 5.47, +0.70 | 2.74x |
+| C | 1.94, +0.96 | 5.64, +0.68 | 2.91x |
+| **mean** | **1.91 +/- 0.08** | **5.45 +/- 0.16** | **2.85x** |
+
+Against the base-geometry body (F44): 1.75 +/- 0.10 against 4.99 +/- 0.24, **2.86x**.
+
+**The margin is identical -- 2.85x against 2.86x.** Both absolute numbers get slightly worse on a
+body whose geometry was never trained on, which is the expected direction, and the *ratio the
+claim rests on* does not move. So F47 identified a real flaw in the **evidence** and not in the
+**conclusion**: the few-shot transfer was not an artefact of the target's geometry being in
+distribution. Slide 15's claim now rests on a body that is genuinely held out on both axes.
+
+**Dataset.** `data/ik_4leg_c08f09t09_clean10`, 10 clips kept from a 30-episode sweep, built the
+same way `clean9` was (9 kept from 30) -- collector settings identical, walk check from
+`wm.bodies`.
+
+**A physical side-finding worth recording, because it explains the yield.** Removing the middle
+legs **flips the direction of lateral drift**:
+
+| body | lateral drift | sign |
+|---|---|---|
+| 6-leg `c10f10t10` | +0.134 m | 0/30 negative |
+| 6-leg `c08f09t09` | +0.095 | 4/30 negative |
+| 4-leg base | -0.180 | 9/9 negative |
+| 4-leg `c08f09t09` | -0.225 +/- 0.050 | **30/30 negative** |
+
+Every single 4-leg clip veers the same way, tightly, while the 6-leg bodies veer the other way.
+This is a systematic consequence of the missing middle legs, not instability and not a property of
+one body, which is why roughly two thirds of episodes fail the 0.20 m lateral gate on both 4-leg
+builds. The selection is therefore the same operation on both, and the F44/F48 comparison is not
+confounded by it -- but note that both datasets are the low-drift tail of a biased distribution,
+so neither is a straight-walking body.
+
 ## Files
 
+- `results/wm/stage2/4leg_head/c08f09t09_fewshot.csv` -- the three splits behind F48
+- `scripts/diagnostics/pairing_feasibility.py` -- is a cross-embodiment `L_cross` definable (F45)
+- `scripts/diagnostics/swap_pathway.py` -- also takes `--embodiment` for Stage 2 checkpoints (F46)
+- `scripts/diagnostics/swap_embodiment.py` -- does an unseen embodiment's latent drive the
+  decoder, or is it read as a training body (F47)
 - `wm/predict_actions.py` -- reconstruct joint commands for any body, in radians
-- `scripts/swap_pathway.py` -- cross the decoder's two inputs between bodies (F18)
-- `scripts/morphology_mix.py` -- which mixture of training bodies an answer resembles (F19)
-- `scripts/morphology_axis.py` -- where each stage places a held-out body (F4, F4d)
-- `sim/make_leg_morphology.py` -- generate a body by scaling segments independently
-- `results/wm/figures/morphology_bodies.png` -- the nine bodies
+- `scripts/diagnostics/swap_pathway.py` -- cross the decoder's two inputs between bodies (F18)
+- `scripts/diagnostics/morphology_mix.py` -- which mixture of training bodies an answer resembles (F19)
+- `scripts/diagnostics/morphology_axis.py` -- where each stage places a held-out body (F4, F4d)
+- `sim/scene/make_leg_morphology.py` -- generate a body by scaling segments independently
+- `results/wm/dataset/morphology_bodies.png` -- the nine bodies
 - `results/wm/cache/z_by_body.npz` -- latents behind the variance decomposition in F19
-- `scripts/plot_action_trace.py` -- per-joint predicted against ground truth, with R^2
+- `scripts/diagnostics/plot_action_trace.py` -- per-joint predicted against ground truth, with R^2
 - `wm/sweep_checkpoints.py` -- re-score every snapshot on identical cached embeddings
-- `results/wm/figures/interpolation_failure.png` -- F4 and F6 in one figure
-- `results/wm/figures/heldout_sweep_two_seeds.png` -- F11 and F12
+- `results/wm/stage1/figures/interpolation_failure.png` -- F4 and F6 in one figure
+- `results/wm/stage1/figures/heldout_sweep_two_seeds.png` -- F11 and F12
 - `results/wm/cache/axis_embeddings.npz` -- embeddings behind the axis positions in F4
-- `scripts/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39, F43)
-- `scripts/score_body.py` -- one checkpoint against several held-out bodies, no retraining (F43)
-- `scripts/write_run_log.py` -- regenerate `results/wm/RUNS.md` before deleting any checkpoint
+- `scripts/diagnostics/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39, F43)
+- `scripts/diagnostics/score_body.py` -- one checkpoint against several held-out bodies, no retraining (F43)
+- `scripts/dataset/write_run_log.py` -- regenerate `results/wm/RUNS.md` before deleting any checkpoint
 - `results/wm/OVERNIGHT.md` -- the clean Stage 2 results in one place, with what is withdrawn
 - `results/wm/cache/stage2_embeddings.pt` -- cached encoder pass behind F39, rebuilt on demand and
   gitignored: every patch token at full width is 2.9 GB
-- `scripts/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures
-- `scripts/compare_ratio_gaits.py` -- side-by-side video and contact diagram across the
+- `scripts/figures/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures
+- `scripts/dataset/compare_ratio_gaits.py` -- side-by-side video and contact diagram across the
   femur/tibia boundary, from recorded frames (F42)
-- `results/wm/gait/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
+- `results/wm/dataset/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
 - `results/wm/README.md` -- per-run metrics

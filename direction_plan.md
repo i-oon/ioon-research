@@ -112,7 +112,7 @@ e_t      ∈ ℝ^{256×1408}           256 patch tokens, 1408 dims each
 Each frame is encoded **independently** — fed twice into the minimal 2-frame tubelet so the
 model acts as an image encoder, not a video encoder. Feeding a real clip would let each frame
 see the future through bidirectional attention, so `e_t` would not be independent per timestep
-(`scripts/vjepa2_encoder.py`, verified in `scripts/test_vjepa2_frame_isolation.py`).
+(`scripts/vjepa2_encoder.py`, verified in `scripts/finished/test_vjepa2_frame_isolation.py`).
 
 The encoder **stays inside the training loop**: cross-augmentation needs fresh random views every
 epoch, so embeddings cannot be cached. It is the dominant cost — four encoder passes per sample.
@@ -196,7 +196,7 @@ CoppeliaSim 4.10, Bullet 2.78, 20 Hz (50 ms timestep), rendering fixed across ev
 
 | | |
 |---|---|
-| Bodies | short 0.5× / medium 0.75× / long 1.0× leg length, built and verified with `sim/make_leg_morphology.py` |
+| Bodies | short 0.5× / medium 0.75× / long 1.0× leg length, built and verified with `sim/scene/make_leg_morphology.py` |
 | Action | joint position targets ∈ ℝ^18 (6 legs × 3 joints), radians |
 | Clip length | 66 frames (~3.3 s) — one expert episode |
 | Episodes | 100 forward-walk episodes per body, from a 1000-episode expert set |
@@ -300,7 +300,7 @@ Stage 1 runs Steps -1 through 2; Stage 2 reuses the same numbering on the cross-
 
 > P'Hap: if same command produces same behavior, the whole experiment is pointless
 
-**RESULT — PASS** (`sim/step_minus1_morphology_gap.py`, 10s run, `step_minus1_comparison.png`).
+**RESULT — PASS** (`sim/diagnostics/step_minus1_morphology_gap.py`, 10s run, `step_minus1_comparison.png`).
 Controller = the open-loop gait replay baked into `main_script.py`/`ds_loopsm.csv` — morphology-independent by
 construction, so no trained policy was needed.
 
@@ -338,7 +338,7 @@ artefact rather than pose, and it understated the encoder by ~17 points.
 
 Foot contact is highly decodable within a body and **transfers only partially across bodies**
 (85% → 55%). That residual is the gap ITM + cross-augmentation exist to close, and it is the
-baseline Step 1.5 must beat. Current headline figure: **macro-F1 0.886** (`scripts/step0_macro_f1.py`).
+baseline Step 1.5 must beat. Current headline figure: **macro-F1 0.886** (`scripts/finished/step0_macro_f1.py`).
 
 **Morphology is ~100% decodable from raw `e_t`, and that is expected, not a failure.** A 0.5× leg
 genuinely looks different from a 1.0× leg; an encoder blind to that would be a worse encoder.
@@ -551,7 +551,7 @@ episodes each across 6–8 bodies before running this.
 **Status** done for the data, one run finished and one running.
 **Goal**: test whether coverage is what cross-body transfer was missing
 
-`sim/make_leg_morphology.py` now scales coxa, femur and tibia independently, so morphology is a
+`sim/scene/make_leg_morphology.py` now scales coxa, femur and tibia independently, so morphology is a
 volume rather than a line and a held-out body can be a combination no training body has.
 `data/ik_walk_8body` holds 7 usable bodies at 30 clips each with 0.0% edge clipping.
 
@@ -637,7 +637,7 @@ volume rather than a line and a held-out body can be a combination no training b
 **Status** cause found and fixed; the corrected baseline is training.
 **Goal**: make the task require the latent it is built around
 
-> `sim/collect_ik.py` applies `cmds[t]`, steps the simulator, and only then captures
+> `sim/collect/collect_ik.py` applies `cmds[t]`, steps the simulator, and only then captures
 > `frames[t]`. So `frames[t]` is the **result** of `actions[t]`, and the command that caused
 > `frames[t] -> frames[t+1]` is `actions[t+1]`. Training asked for `actions[t]` from
 > `(e_t, e_{t+1})` -- and the Motion Decoder receives `e_t` directly while never seeing
@@ -719,7 +719,7 @@ volume rather than a line and a held-out body can be a combination no training b
 > than a gradient: a body 2 mm past the line misses 0.3% of its targets and walks, one 40 mm past
 > misses 24% and returns IK residuals of 350 to 810 mm.
 >
-> `sim/make_leg_morphology.py` now refuses to generate a body that violates it, printing the
+> `sim/scene/make_leg_morphology.py` now refuses to generate a body that violates it, printing the
 > margin, with `--force` to override. Three of the first six bodies were infeasible; the rule
 > would have caught all three before any collection.
 >
@@ -750,7 +750,7 @@ place *before* the measurement it threatens.
 
 ### Render-style dominance
 
-**The finding** (`scripts/umap_domain_check.py`, logged in `PROGRESS.md §5`): three videos of the **same
+**The finding** (`scripts/_archive/umap_domain_check.py`, logged in `PROGRESS.md §5`): three videos of the **same
 behavior** (walking), rendered by three different setups (white bg / IsaacSim grid / MuJoCo checkerboard),
 produced **three completely non-overlapping UMAP clusters** of whole-frame `e_t`.
 
@@ -837,7 +837,7 @@ observation-only control isolating the action's contribution.
 
 **Extrapolation beyond the training range**
 He explicitly corrected short+long→medium as *"just Interpolation."* Currently **no out-of-range morphology
-exists**. `sim/make_leg_morphology.py` makes this nearly free — generating a **1.25×** (or 0.35×) 4th variant
+exists**. `sim/scene/make_leg_morphology.py` makes this nearly free — generating a **1.25×** (or 0.35×) 4th variant
 answers him with one command. Cheap, high-value.
 
 ---

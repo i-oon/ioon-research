@@ -1,6 +1,6 @@
 # Experiment: Frozen V-JEPA2 Features Encode Morphology / Session Identity
 
-Figure: `report/fig_morphology_evidence.png` (regenerate: `.venv/bin/python scripts/plot_morphology_evidence.py`)
+Figure: `report/fig_morphology_evidence.png` (regenerate: `.venv/bin/python scripts/figures/plot_morphology_evidence.py`)
 
 ## Experimental question
 
@@ -27,7 +27,7 @@ sees.
 (`facebook/vjepa2-vitg-fpc64-256`), used as a per-frame image encoder via the frame-duplication trick
 (each frame is duplicated into a 2-frame tubelet). This yields 256 patch tokens of dimension 1408, which
 are mean-pooled over the 256 patches to a single 1408-d whole-frame vector. The encoder is never
-fine-tuned. (Encoder wrapper: `scripts/vjepa2_encoder.py`; pooling: `scripts/step0_encode.py`.)
+fine-tuned. (Encoder wrapper: `scripts/vjepa2_encoder.py`; pooling: `scripts/_archive/step0_encode.py`.)
 
 **Label.** Body identity in {long, medium, short}. For the ordinal test, mapped to the leg-length scale
 {1.0, 0.75, 0.5}.

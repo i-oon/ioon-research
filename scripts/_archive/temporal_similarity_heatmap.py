@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))), "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder
 
 

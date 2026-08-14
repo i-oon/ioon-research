@@ -1,26 +1,48 @@
 # scripts
 
-Every file here has a docstring that states the question it answers and, where it matters, the
+Every file here has a docstring stating the question it answers and, where it matters, the
 measurement trap it exists to avoid. Read that before running one — several of these exist because
 an earlier, more obvious version of the same measurement gave a confidently wrong answer.
 
 Run everything from the repository root with `.venv/bin/python3`, never bare `python3`.
 Add `--encode_device cpu` to anything that encodes frames when a training run holds the GPU.
 
----
+```
+scripts/
+  vjepa2_encoder.py   the frozen encoder wrapper, imported by almost everything
+  *.sh                run sheets: retrain_stage1, com7_train, retrain_stage2_clean_adv
+  diagnostics/        what the model learned, and whether it works
+  dataset/            build, audit and inspect the recorded data
+  figures/            figures for the report that are not measurements
+  finished/           answered questions, kept because the findings cite them
+  amp/                the parked reinforcement-learning branch
+  _archive/           superseded; not expected to run
+```
 
-## Imported, not run
+## Do not redefine these
+
+`wm/bodies.py` is the single source of truth for which bodies and clips are valid, and for what
+counts as contact. It depends on nothing heavier than numpy, so `sim/`, `wm/` and `scripts/` all
+import from it.
 
 | | |
 |---|---|
-| `vjepa2_encoder.py` | Frozen V-JEPA2 wrapper. Encodes single frames in isolation via the frame-duplication trick. Imported by almost everything below. |
+| `CONTACT_THRESHOLD` | 0.27 N. Was defined in four places. |
+| `EXCLUDED_BODIES` | the four bodies that collapse or veer, with the reason for each |
+| `walk_check`, `walks` | signed forward travel and lateral drift, separately |
+| `bodies_in(data_dir)` | the bodies present in a directory, non-walking ones dropped |
+| `training_bodies(cfg)` | the bodies a checkpoint actually trained on, read off its own config |
+| `evenly`, `usable_clips`, `contact_labels` | |
+
+**Never write a body list into a script.** Nine did, and four of those lists still held bodies that
+do not walk long after that was known — including `z_content.py`, which produced the variance split
+quoted on slide 6. A literal list is correct only until the next run changes its split, and nothing
+warns you when it stops being. `scripts/dataset/compare_ratio_gaits.py` is the one deliberate
+exception, and says so in the file: the broken bodies are its subject.
 
 ---
 
-## The live toolkit — world model diagnostics
-
-These are the measurements the current findings rest on. `wm/READING_THE_LOG.md` covers the
-training log itself; these go deeper.
+## diagnostics/
 
 **What the decoder uses**
 
@@ -30,7 +52,7 @@ training log itself; these go deeper.
 | `morphology_mix.py` | What mixture of training bodies does the model's answer look like — is it interpolating or copying one? |
 | `morphology_axis.py` | Where a held-out body lands between two training bodies, at each stage of the pipeline. |
 | `plot_action_trace.py` | Predicted against ground-truth joint commands, per joint. Aggregate error hides which joints failed. |
-| `score_body.py` | One checkpoint against several held-out bodies, with both constant baselines and R^2. Use instead of retraining per test body. |
+| `score_body.py` | One checkpoint against several held-out bodies, with both constant baselines and R². Use instead of retraining per test body. |
 
 **What the latent contains**
 
@@ -39,25 +61,34 @@ training log itself; these go deeper.
 | `z_content.py` | Is the latent still a behaviour representation, or was it hollowed out? |
 | `z_dynamics.py` | Does the latent carry the transition, or only the pose at time t? |
 | `z_body_share.py` | How much of the latent is "which body is this", on trained and on held-out bodies. |
-| `z_embodiment_share.py` | The same question across a hexapod and a quadruped, using stance fraction as a shared phase label. |
+| `z_embodiment_share.py` | The same across a hexapod and a quadruped, using stance fraction as a shared phase label. |
 | `z_identity_ablation.py` | Is the embodiment in the latent load-bearing or only present? Project it out and compare against deleting random directions. |
-| `wm_umap.py` | UMAP of the encoder embedding beside the learned latent. |
+| `leg_contact_probe.py` | Does "is this leg loaded" read across embodiments? Needs no shared gait phase. |
+| `wm_umap.py`, `cross_embodiment_umap.py` | The encoder embedding beside the learned latent. |
 
 **Whether the forward model works**
 
 | | |
 |---|---|
-| `latent_rollout.py` | Closes the forward model on its own output and rolls it forward against two no-learning baselines. This is the only script that scores it on the task it is actually for. |
+| `latent_rollout.py` | Closes the forward model on its own output and rolls it forward against two no-learning baselines. The only script that scores it on the task it is actually for. |
 | `aug_noise.py` | How much of the reconstruction target is augmentation noise rather than motion. |
-| `gap_signal.py` | How far apart two frames must be before the real change beats that noise. |
 
 **Whether the setting supports the claim**
 
 | | |
 |---|---|
 | `cross_embodiment_probe.py` | Does the frozen encoder place a hexapod and a quadruped in a shared space? Run before spending GPU on Stage 2. |
+| `pairing_feasibility.py` | Can a cross-embodiment `L_cross` be defined at all? Scores each candidate pairing label on coverage *and* on whether it pins down the command within one robot. A label that fails the second gives the decoder a wrong target, not a noisy one. |
+| `swap_embodiment.py` | Does a latent inferred from an unseen embodiment drive the decoder, or is that embodiment simply read as a training body? The cross-embodiment form of `swap_pathway.py`, definable only for the 4-leg, which shares expert episodes with the hexapod. |
 | `b1_horizon.py` | Is the B1's command as determined by a single frame as the insect's is? |
 | `occlusion_dynamics.py` | Does the second frame matter more when one frame cannot fix the gait phase? |
+
+**Cross-embodiment transfer**
+
+| | |
+|---|---|
+| `fit_4leg_head.py` | Fit a new output head on a held-out embodiment with the backbone frozen. |
+| `sweep_4leg_fewshot.py` | The same, swept over how many clips the new head gets. |
 
 **Does the command actually walk**
 
@@ -67,51 +98,34 @@ training log itself; these go deeper.
 
 ---
 
-## Dataset tools
+## dataset/
 
 | | |
 |---|---|
+| `build_stage1_dirs.py` | Build the three clip directories the Stage 1 retrains read from. Links only clips that walk. |
 | `audit_ik_dataset.py` | Audit an IK dataset for cross-morphology correspondence. |
 | `make_ik_equal_windows.py` | Build equal-length clips from longer sources. |
-| `plot_ik_walk_gait.py` | Gait and contact diagrams for the IK forward-walk dataset. |
 | `plot_gait_quality.py` | Contact raster and duty factor per body, plus the raw forces against the 0.27 N cut. Use before trusting any stance-derived label. |
 | `compare_ratio_gaits.py` | Side-by-side video and contact diagram across the femur/tibia boundary, from recorded frames. |
-| `render_lock_check.py` | Render-lock check: is the camera and scene identical across bodies? |
-| `inspect_coppelia_scene_objects.py` | Compact object summary for a CoppeliaSim scene. |
+| `render_lock_check.py` | Is the camera and scene identical across bodies? |
+| `write_run_log.py`, `recover_config_yaml.py` | Reconstruct a run's record after the fact. |
 
----
+## figures/
 
-## Finished — Step 0 and Step -1 checks
+`make_track_figures.py`, `make_stage2_diagram.py`, `plot_morphology_evidence.py`,
+`plot_obs_format.py`, `plot_ik_intuition.py`.
+
+## finished/
 
 Answered, kept because the findings cite them. Not part of any current workflow.
+`test_vjepa2_encoder.py`, `test_vjepa2_frame_isolation.py`, `step0_macro_f1.py`,
+`temporal_similarity.py`, `plot_sanity_check.py`, `plot_step_minus1.py`.
 
-| | |
-|---|---|
-| `test_vjepa2_encoder.py` | Download V-JEPA2 and confirm the output shape. |
-| `test_vjepa2_frame_isolation.py` | Confirm the frame-duplication trick gives a context-independent `e_t`. |
-| `step0_macro_f1.py` | Foot-contact macro-F1, within against across morphology, with a shuffled-label control. |
-| `temporal_similarity.py` | Temporal similarity of frozen embeddings. |
-| `plot_sanity_check.py` | Does frozen `e_t` contain useful locomotion information? |
-| `plot_step_minus1.py` | Does a morphology gap exist at all? |
-| `plot_morphology_evidence.py` | Evidence that frozen `e_t` encodes leg-length morphology. |
-| `plot_ik_intuition.py` | Why fixing the command and fixing the foot target give different joint angles. |
-| `plot_obs_format.py` | Figure for "why test vision when proprioception is available". |
-| `make_stage2_diagram.py` | Stage 2 training and testing diagram. |
-
----
-
-## Parked — AMP policy work
+## amp/
 
 The reinforcement-learning branch, not part of the world-model pipeline. Kept because the trained
-policies in `amp/logs/` are a candidate source of behavioural diversity, which the IK data lacks.
-
-| | |
-|---|---|
-| `render_rollout.py` | Render a trained AMP policy rollout to mp4 to eyeball the gait. |
-| `gait_report.py` | Is the learned policy's gait actually like the expert's? |
-| `sweep_gait_checkpoints.py` | Find the checkpoint whose contact pattern is closest to the expert. |
-| `diagnose_amp_rollout.py` | Diagnose an AMP checkpoint numerically, without rendering. |
-| `measure_g_range.py` | Measure the raw discriminator output over a deterministic rollout. |
+policies are a candidate source of behavioural diversity, which the IK data lacks.
+`render_rollout.py`, `gait_report.py`, `measure_g_range.py`.
 
 ---
 
@@ -138,21 +152,32 @@ Each was hit at least once and cost real time.
 - **One direction is not a subspace.** Delete the probe's weight vector and the probe refits onto
   correlated axes. Peel directions off one at a time until accuracy reaches chance, and if it
   never does, the signal is distributed and no adversary can excise it.
+- **Check what your held-out body is actually held out *on*.** The 4-leg embodiment was built by
+  removing legs from the *base* scene, so its geometry was a training body's and its commands were
+  that body's corner columns bit-identically. It reads as a new embodiment and scores like one,
+  but the only novel axis is leg count -- the latent lands 0.578 from the base body against a
+  chance of 0.981. List the axes a test body is meant to be new on and verify each separately
+  (F47).
+- **A label two datasets share is not yet a label that means the same thing.** Checking that both
+  robots visit the same contact patterns says the pairing is *defined*, not that it is *right*.
+  A training pair carries the partner's command as its target, so a label that does not pin down
+  the command within a single robot yields a wrong target rather than a noisy one, and wrong
+  targets do not average out with more data. Measure coverage and meaning separately: coarsening
+  a label until both sides overlap is the same operation that destroys what it meant (F45).
 - **Do not retrain to change a *test* body — but you must retrain to change a *training* set.**
   A held-out body is never trained on, so any body absent from `train_morphs` already tests an
   existing checkpoint, and retraining for it changes the weights as well as the test: doing that
   once produced a "the frame is actively harmful, 1.34x" result the original checkpoint does not
-  show. **This only holds when the training set is already sound.** `tib_cross` qualifies — its
-  four bodies are all ratio 0.83 with 42-71 mm dead zones. `m3d_cross` does not: two of its five
-  training bodies veer, so removing those is a different model and needs a run. Ask which half of
-  the experiment is changing before deciding.
+  show. **This only holds when the training set is already sound.**
 - **Say which constant baseline.** Beating the *training* mean pose only says the model noticed
-  this is not an average body. R^2 is defined against the *held-out body's own* mean, and a model
+  this is not an average body. R² is defined against the *held-out body's own* mean, and a model
   can beat the first while losing badly to the second — here, by 16.16 against 2.45.
 - **A generated body is not a valid body until you watch it walk.** Two in `ik_walk_8body`
   collapse and rotate on the spot; they passed a walk check that used unsigned displacement, which
   reads a healthy 0.46 m for something tumbling. Check forward displacement and lateral drift
-  separately, signed, and look at the frames.
+  separately, signed, and look at the frames. `wm.bodies.walk_check` is that check.
+- **Never write a body list into a script.** See above; this is the same trap one level up, and it
+  is why `wm/bodies.py` exists.
 - **Do not score an animal's gait against a textbook template.** The expert here is a real stick
   insect walking a variable wave, so tripod separation sits at chance for every body and that is
   correct. Judge the labels instead: is the contact threshold in a gap.

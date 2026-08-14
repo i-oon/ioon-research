@@ -1,6 +1,6 @@
 # Experiment: Behaviour (Foot-Contact) Encoding in Frozen e_t
 
-Figure: `report/fig_sanity_check.png` (regenerate: `.venv/bin/python scripts/plot_sanity_check.py`)
+Figure: `report/fig_sanity_check.png` (regenerate: `.venv/bin/python scripts/finished/plot_sanity_check.py`)
 All numbers regenerated 2026-07-22 on `data/step0_v2/embeddings.npz`, contact threshold 0.5 N.
 
 ## Experimental question

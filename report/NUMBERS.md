@@ -51,7 +51,7 @@ Still present in the deck and still wrong: the distance table and the bimodality
 ### 2.1 Metric: report path length **and** net displacement
 
 The script currently computes only net straight-line displacement of `/head` in the xy plane,
-`norm(p_end - p_start)` (`sim/step_minus1_morphology_gap.py:54`). That measure is reduced by curvature,
+`norm(p_end - p_start)` (`sim/diagnostics/step_minus1_morphology_gap.py:54`). That measure is reduced by curvature,
 and every episode curves because the open-loop gait has no heading correction.
 
 Reporting both, plus their ratio, separates locomotion from steering:
@@ -82,7 +82,7 @@ curving. **Those figures were wrong**, produced by comparing the *instantaneous*
 inflated the result by roughly 3–5x (`long_ep2` read 74.9° against a true 14.2°).
 
 Drift is now the angle of the end point relative to the initial heading, in `drift_deg()` of
-`scripts/plot_step_minus1.py`. The walks are close to straight; plotting the trajectory panel at equal
+`scripts/finished/plot_step_minus1.py`. The walks are close to straight; plotting the trajectory panel at equal
 aspect makes this visible, and a stretched y-axis makes near-straight walks look like violent swerving.
 
 ```
@@ -102,7 +102,7 @@ distances are settled.
 
 Both scripts were re-run against the repo data. Note they read different datasets: `step0_analyze.py`
 uses `data/step0/` (3 episodes/body, n=1800) and `step0_analyze_v2.py` uses `data/step0_v2/`
-(5 episodes/body, n=3000). Commands: `.venv/bin/python scripts/step0_analyze.py` and `..._v2.py`.
+(5 episodes/body, n=3000). Commands: `.venv/bin/python scripts/_archive/step0_analyze.py` and `..._v2.py`.
 
 | Claim | Documented | Reproduced | Status |
 |---|---|---|---|
@@ -132,7 +132,7 @@ morphology probe = 99.6%
 ### 3.0 `INVALID` — reproduces exactly, but the label is an artefact
 
 A number can reproduce perfectly and still mean nothing. The phase label is defined in
-`scripts/step0_encode.py:65` as `phase = (step % 64) // 8`. It is not an expert gait annotation. 64 is
+`scripts/_archive/step0_encode.py:65` as `phase = (step % 64) // 8`. It is not an expert gait annotation. 64 is
 the length of the replayed command loop and 8 is an arbitrary division of it, so `phase_bin` measures
 position within a hand-chosen trim window, not a physically meaningful gait state.
 
@@ -189,7 +189,7 @@ Either remove it or address why it disagrees with the probe results on the same 
 
 ## 3.3 Morphology signal: proven decodable, NOT proven to be leg length
 
-Figure `report/fig_morphology_evidence.png`, from `scripts/plot_morphology_evidence.py`. Numbers
+Figure `report/fig_morphology_evidence.png`, from `scripts/figures/plot_morphology_evidence.py`. Numbers
 regenerated 2026-07-21 on `data/step0_v2/embeddings.npz`.
 
 | Claim | Value | Status |

@@ -347,7 +347,7 @@ if __name__ == "__main__":
 #      (rename if the importer prefixed them). Foot force sensors are NOT created by
 #      import -- add 4 (Add > Force sensor), parent each under a calf, position at the
 #      foot tip, alias them FR_foot / FL_foot / RR_foot / RL_foot.
-# 3. Add the fixed camera aliased "vjepa_cam" (reuse sim/add_camera.py, re-aimed/scaled
+# 3. Add the fixed camera aliased "vjepa_cam" (reuse sim/scene/add_camera.py, re-aimed/scaled
 #      for B1 -- it is much larger than the stick insect).
 # 4. Add a floor if the scene has none. Save as sim/env/b1_flat.ttt.
 # 5. Sanity: `python3 sim/collect_b1.py --scene sim/env/b1_flat.ttt --check`

@@ -39,7 +39,7 @@
 
 **วิธีแก้**: ป้อนแต่ละ frame ซ้ำ 2 ครั้ง (duplicate) เข้า tubelet แทนการป้อน clip จริง (`scripts/vjepa2_encoder.py` → `VJEPA2FrameEncoder`)
 
-**ยืนยันด้วยการทดลอง** (`scripts/test_vjepa2_frame_isolation.py`):
+**ยืนยันด้วยการทดลอง** (`scripts/finished/test_vjepa2_frame_isolation.py`):
 - Duplicated-frame encoding เป็น deterministic 100% (diff = 0.000000)
 - Frame เดียวกัน เข้ารหัสเดี่ยว vs. ฝังอยู่ใน clip จริง 64 เฟรม → cosine similarity เฉลี่ยแค่ 0.52 (ควรจะ = 1.0 ถ้าไม่มี contamination) → ยืนยันว่า clip-mode encoding รั่วข้อมูลข้าม timestep จริง
 
@@ -70,7 +70,7 @@
 
 **สรุป**: ปัญหาไม่ได้อยู่ที่ background — เป็นข้อจำกัดของวิธี **per-patch comparison เอง** (ดูทีละ patch เล็กๆ) ไม่ว่าจะลอง background แบบไหนก็ไม่ให้สัญญาณที่เชื่อถือได้
 
-Scripts: `scripts/temporal_similarity_heatmap.py`, `scripts/temporal_similarity_quantified.py`, `scripts/temporal_similarity_correlation.py`
+Scripts: `scripts/_archive/temporal_similarity_heatmap.py`, `scripts/_archive/temporal_similarity_quantified.py`, `scripts/_archive/temporal_similarity_correlation.py`
 
 ---
 
@@ -86,7 +86,7 @@ Scripts: `scripts/temporal_similarity_heatmap.py`, `scripts/temporal_similarity_
 
 **การตีความ**: encoder ไม่ได้ "ห่วย" — ทำงานสะอาดมากในระดับ whole-frame เพียงแต่ตอนนี้ raw `e_t` (ไม่ผ่าน cross-augmentation) ยัง sensitive กับ **สไตล์การ render** (แสง/พื้นหลัง/engine) มากกว่า behavior จริง ซึ่งเป็นเรื่องปกติของ pretrained encoder — และเป็นเหตุผลที่ยืนยันว่าทำไม ITM + cross-augmentation (ข้อ 3) ถึงจำเป็น เพื่อบีบให้ z_t ทิ้ง style แล้วเก็บแต่ motion
 
-Script: `scripts/umap_domain_check.py`
+Script: `scripts/_archive/umap_domain_check.py`
 
 ---
 
@@ -308,7 +308,7 @@ Larsen et al. เขียนเอง: *"Only sequences in which the insects **
 **แก้เกณฑ์ก่อนรัน** — เกณฑ์เดิม (*"morphology ต้องไม่ dominate e_t"*) **ผิดตรรกะ**: ขา 0.5× กับ 1.0× **หน้าตาต่างกันจริง** encoder ที่ดี*ต้อง*แยกออก และถ้า `e_t` morphology-agnostic อยู่แล้ว **เราไม่ต้องมี ITM เลย** → **Step 0 ต้องถามเรื่อง "ข้อมูลมีอยู่ไหม" ไม่ใช่ "invariance เกิดหรือยัง"** (เหตุผลเต็มใน `direction_plan.md`)
 
 **ข้อมูล**: 3 morphology × 3 episode × 200 step = **1800 เฟรม**, render ล็อกหมด
-`sim/collect_step0.py` → `scripts/step0_encode.py` → `scripts/step0_analyze.py`
+`sim/collect_step0.py` → `scripts/_archive/step0_encode.py` → `scripts/_archive/step0_analyze.py`
 
 **คุณสมบัติสำคัญของการทดลอง**: gait period = **64 step เป๊ะ** (`a_t` ซ้ำ bit-exact ที่ 64/128/192) → phase label แม่นยำ ไม่ใช่ประมาณ · **`a_t` เหมือนกัน bit-exact ทุก morphology ทุก episode** → **สัญญาณ morphology ใน `e_t` เป็นภาพล้วนๆ**
 
@@ -366,7 +366,7 @@ silhouette(phase) = **−0.0222** บอกว่า *"ไม่มีสัญ�
 ### 10.13 ✅ Step 0 v2 — 6-bit contact label ดีกว่าจริง (2026-07-18)
 
 เก็บชุดใหม่ `data/step0_v2` (3 ร่าง × **5 ep** × 200 step = **3000 เฟรม**) + บันทึก **force ดิบ 6 ขา**
-`sim/collect_step0.py` (เพิ่ม force) → `scripts/step0_encode.py` (เพิ่ม 6-bit contact) → `scripts/step0_analyze_v2.py`
+`sim/collect_step0.py` (เพิ่ม force) → `scripts/_archive/step0_encode.py` (เพิ่ม 6-bit contact) → `scripts/_archive/step0_analyze_v2.py`
 
 **เทียบ label 3 แบบ — ตัววัดคือ cross-morphology transfer (เทรน 2 ร่าง ทดสอบร่างที่เหลือ):**
 
@@ -621,7 +621,7 @@ policy ต่อร่างแทน → ได้ gait ที่ **natural + �
 - `amp/amp_train.py --port P --scene <body>.ttt --name insect_{long,medium,short}` +
   `--lam_warmup_frac --lam_ramp_frac` (schedule สั้น 0.03/0.15 → full λ ~350k, feedback ~4-5h)
 - diagnostics: TensorBoard (`return/test`, `eval/x_dist`, `gait/g_eval`, `eval/pitch_abs`, `eval/ep_len`,
-  loss/entropy/ratio) · `scripts/gait_report.py` (rate-normalized, ไม่ assume tripod) · `scripts/render_rollout.py`
+  loss/entropy/ratio) · `scripts/amp/gait_report.py` (rate-normalized, ไม่ assume tripod) · `scripts/amp/render_rollout.py`
 
 ### 13.5 สถานะ (2026-08-04)
 - ✅ pipeline healthy: g_eval ~2.9 (≈expert), ep_len 1000 (ไม่ล้ม), pitch ต่ำ, PPO stable
@@ -657,7 +657,7 @@ log/ทางเลือก แต่ไม่ใช่ main path สำหร�
 จากกล้อง/trajectory.
 
 ### 14.2 Render-lock / encoder check บน `data/ik_walk`
-รัน `scripts/render_lock_check.py --data data/ik_walk --out results/render_lock_ik_walk`
+รัน `scripts/dataset/render_lock_check.py --data data/ik_walk --out results/render_lock_ik_walk`
 
 ผล:
 - 9 clips, 594 frames, behavior = walk only, episodes = 521/625/926
@@ -719,7 +719,7 @@ episodes ที่มีอยู่ (144, 285, 521, 625, 926, 997) พร้อ
 **พบว่าข้อมูลที่แนะนำมีอยู่แล้ว** ใน `data/ik_all` — 6 episodes × 3 ร่าง × 3 repeats × 66 เฟรม = **3564 เฟรม
 forward-walk** (บวก turn/stop ที่เก็บไว้ด้วยแต่ยังไม่ใช้ตามมติเดิม "forward-only ปลอดภัยกว่า") ไม่ต้องเก็บ
 ข้อมูลใหม่ — สร้าง symlink dir `data/ik_walk_all6` (54 ไฟล์ forward-only) แล้วรัน
-`scripts/render_lock_check.py --data data/ik_walk_all6` ใหม่
+`scripts/dataset/render_lock_check.py --data data/ik_walk_all6` ใหม่
 
 ### 15.2 ผลลัพธ์ — PASS ที่ scale ใหญ่ขึ้น 6 เท่า
 ```
@@ -1032,7 +1032,7 @@ coxa เป็นท่อนสั้นที่สุดและติดล
 
 ### 18.5 หาสาเหตุจนถึงกลไก
 
-สร้าง `scripts/swap_pathway.py` สลับ input ของ decoder ระหว่างสองหุ่น (ทำได้เพราะทุกหุ่นเดินจาก
+สร้าง `scripts/diagnostics/swap_pathway.py` สลับ input ของ decoder ระหว่างสองหุ่น (ทำได้เพราะทุกหุ่นเดินจาก
 episode เดียวกัน จังหวะจึงตรงกัน)
 
 **ให้ภาพหุ่น A + `z` หุ่น B → decoder ตอบเป็นคำสั่งของหุ่น B ผิดแค่ 3.48 องศา** ทั้งที่สองหุ่นต่างกัน 28.63
@@ -1044,7 +1044,7 @@ episode เดียวกัน จังหวะจึงตรงกัน)
 **decoder เลือกใช้ร่างกาย 11% ที่อยู่ใน `z` แทนที่จะอ่านจากภาพซึ่งมีข้อมูลครบ**
 เพราะ lookup 5 โค้ดง่ายกว่าการอ่านเรขาคณิตจาก 256×1408 tokens — และ lookup ใช้กับหุ่นที่ไม่มีโค้ดไม่ได้
 
-`scripts/morphology_mix.py` ยืนยันจากฝั่ง output: น้ำหนัก **0.883 กระจุกที่หุ่นเดียว**
+`scripts/diagnostics/morphology_mix.py` ยืนยันจากฝั่ง output: น้ำหนัก **0.883 กระจุกที่หุ่นเดียว**
 และความยาวขาที่โมเดลอนุมานคือ (0.980, 0.975, 0.973) ทั้งที่ของจริง (0.80, 0.90, 0.90)
 
 ### 18.6 สองทางแก้ที่ทดสอบแล้วไม่ได้ผล
@@ -1302,7 +1302,7 @@ crop เป็นตัวใหญ่กว่า แต่บีบจาก 8
 วัดได้แล้วไม่ใช่แค่สมมติ สิ่งที่ยังไม่รู้คือมันจะไม่ขึ้นกับร่างกายข้าม *topology* ด้วยหรือไม่
 (6 ขา → 4 ขา contact pattern คนละจำนวน) ซึ่งเป็น claim B ของ Q0 ต้องรันจริงเท่านั้นถึงจะรู้
 
-เครื่องมือวัดถูกย้ายเข้าโปรเจกต์แล้ว: `scripts/z_content.py` และ `scripts/aug_noise.py`
+เครื่องมือวัดถูกย้ายเข้าโปรเจกต์แล้ว: `scripts/diagnostics/z_content.py` และ `scripts/diagnostics/aug_noise.py`
 
 ### 18.19 ทดสอบร่างนอกกรอบ — `lambda_cross` แย่ลง และรู้แล้วว่าทำไม (2026-08-09)
 
@@ -1465,7 +1465,7 @@ FTM ไม่เรียนอะไรเลย และการถอด ac
 แล้วเลือก action โดยเทียบภาพปลายทางกับภาพเป้าหมาย
 **เราเอาเทอมช่วยมาเป็นตัววัดหลักทั้งโปรเจกต์**
 
-**ทดสอบ FTM ที่หน้าที่จริง** (`scripts/latent_rollout.py`) กลิ้งบนเอาต์พุตตัวเอง ป้อน `z` ตัวจริง
+**ทดสอบ FTM ที่หน้าที่จริง** (`scripts/diagnostics/latent_rollout.py`) กลิ้งบนเอาต์พุตตัวเอง ป้อน `z` ตัวจริง
 ร่างที่ไม่เคยเห็น 162 rollout เฟรมไม่ augment
 
 | ก้าว | forward model | อยู่นิ่ง | ความเร็วคงที่ | ชนะอยู่นิ่ง |
@@ -1621,7 +1621,7 @@ F26 วัดสัดส่วนของ latent บนห้าร่าง�
 | **สัดส่วนร่างกายใน latent** | **1.2%** | **10.6%** |
 
 → บันทึกเป็น F36 ปรับขอบเขต F26 และแก้สไลด์ 5 กับ 12
-เครื่องมือย้ายเข้าโปรเจกต์แล้วที่ `scripts/z_body_share.py`
+เครื่องมือย้ายเข้าโปรเจกต์แล้วที่ `scripts/diagnostics/z_body_share.py`
 
 ### 18.30 เริ่มแผนสามวัน แบ่งเป็นสามแทร็ก (2026-08-10)
 
@@ -1649,7 +1649,7 @@ probe ความเร็วจะเรียนแค่ "ตัวเล็
 
 **ข้อจำกัด** เพดานในฝั่งเดียวกันเองก็อ่อน (0.88-0.89x) เพราะ mean-pool ทิ้งรายละเอียดเชิงพื้นที่
 ดังนั้นสรุปได้แค่ว่า **encoder ที่แช่แข็งไม่ได้ให้พื้นที่ร่วมมาฟรี** ส่วนโมดูล 96 ล้านพารามิเตอร์
-ที่เทรนทับจะสร้างขึ้นมาได้ไหม เป็นคำถามของ track B → `scripts/cross_embodiment_probe.py`
+ที่เทรนทับจะสร้างขึ้นมาได้ไหม เป็นคำถามของ track B → `scripts/diagnostics/cross_embodiment_probe.py`
 
 ### 18.32 track B — Stage 2 รันได้ แต่เจอความไม่สมดุล 15 ต่อ 1
 
@@ -1661,7 +1661,7 @@ probe ความเร็วจะเรียนแค่ "ตัวเล็
 เพิ่ม `balance_embodiments` (default จริง) ให้วน embodiment ที่เล็กกว่าจนได้ batch เท่ากัน
 ตรวจแล้ว 6.3% → 50.0% **ราคาคือ B1 แต่ละคู่ถูกเห็นราว 15 รอบต่อ epoch ต้องเฝ้า val ของ B1**
 
-เขียน `scripts/z_embodiment_share.py` ไว้วัดหลังรันจบ — แยกความแปรปรวนของ `z` เป็น
+เขียน `scripts/diagnostics/z_embodiment_share.py` ไว้วัดหลังรันจบ — แยกความแปรปรวนของ `z` เป็น
 "embodiment ไหน" กับ "เฟสไหน" โดยใช้สัดส่วนเท้าแตะพื้นเป็นป้ายเฟสร่วม
 **เปเปอร์ต้นทางอ้างเรื่องพื้นที่ร่วมด้วย UMAP ที่ทับกันกับตัวอย่างเชิงคุณภาพหนึ่งอัน ไม่มีตัวเลข**
 

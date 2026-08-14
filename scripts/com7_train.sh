@@ -32,7 +32,7 @@ if [ -n "$(git status --porcelain -- wm scripts 2>/dev/null)" ]; then
 fi
 
 echo "=== building dataset directories  $(date '+%F %T')"
-$PY scripts/build_stage1_dirs.py
+$PY scripts/dataset/build_stage1_dirs.py
 
 echo
 echo "=== training  $(date '+%F %T')"

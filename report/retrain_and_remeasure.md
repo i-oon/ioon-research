@@ -18,7 +18,7 @@ supposed to have been.
 
 ## What the runs train on
 
-Built by `scripts/build_stage1_dirs.py`, which links only clips where the head travelled at least
+Built by `scripts/dataset/build_stage1_dirs.py`, which links only clips where the head travelled at least
 0.30 m forward (signed) and drifted less than 0.20 m sideways.
 
 | directory | runs | bodies | train clips | held out |
@@ -44,7 +44,7 @@ change nothing here can see.
 On com7, from the repository root:
 
 ```
-.venv/bin/python3 scripts/build_stage1_dirs.py
+.venv/bin/python3 scripts/dataset/build_stage1_dirs.py
 ```
 
 ```

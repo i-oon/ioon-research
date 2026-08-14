@@ -128,7 +128,7 @@ The primary Stage 1 dataset. One expert foot trajectory is retargeted per morpho
 `simIK`, so behaviour is held fixed while joint commands differ per body.
 
 ```bash
-cd $REPO && .venv/bin/python3 sim/collect_ik.py \
+cd $REPO && .venv/bin/python3 sim/collect/collect_ik.py \
     --port 23000 \
     --episodes 6,20,22,28 \
     --repeats 1 \
@@ -152,8 +152,8 @@ Rolled out in MuJoCo, then replayed kinematically in CoppeliaSim so it is render
 same camera and floor as the insect.
 
 ```bash
-cd $REPO && .venv/bin/python3 sim/rollout_b1_mujoco.py
-cd $REPO && .venv/bin/python3 sim/render_b1_replay.py
+cd $REPO && .venv/bin/python3 sim/collect/rollout_b1_mujoco.py
+cd $REPO && .venv/bin/python3 sim/render/render_b1_replay.py
 ```
 
 Output in `data/b1/`: `frames (300,256,256,3)`, `action (300,12)`, `foot_contact (300,4)`,
@@ -165,7 +165,7 @@ Scales each leg segment and repositions downstream joints. Requires a running Co
 since it edits the model over ZMQ and then saves.
 
 ```bash
-cd $REPO && .venv/bin/python3 sim/make_leg_morphology.py \
+cd $REPO && .venv/bin/python3 sim/scene/make_leg_morphology.py \
     --factor 0.625 --out sim/env/medauroidea_stick_insect_0625.ttt
 ```
 
@@ -176,7 +176,7 @@ cd $REPO && .venv/bin/python3 sim/make_leg_morphology.py \
 Run before trusting any dataset.
 
 ```bash
-cd $REPO && .venv/bin/python3 scripts/render_lock_check.py \
+cd $REPO && .venv/bin/python3 scripts/dataset/render_lock_check.py \
     --data data/ik_walk_100 --out results/ik/render_lock
 ```
 
@@ -185,7 +185,7 @@ whether repeated recordings of the same clip are distinguishable (should be near
 Read PROGRESS.md section 15.2 before interpreting the repeat test.
 
 ```bash
-cd $REPO && .venv/bin/python3 scripts/audit_ik_dataset.py --data data/ik_walk_100
+cd $REPO && .venv/bin/python3 scripts/dataset/audit_ik_dataset.py --data data/ik_walk_100
 ```
 
 ---
@@ -277,7 +277,7 @@ Contact labels are used only for evaluation, never for training.
 Use a separate CoppeliaSim instance so training instances are not disturbed.
 
 ```bash
-cd $REPO && .venv/bin/python3 scripts/render_rollout.py \
+cd $REPO && .venv/bin/python3 scripts/amp/render_rollout.py \
     --port 23063 \
     --scene sim/env/medauroidea_stick_insect.ttt \
     --ckpt amp/logs/<run>/model/step<N> \
@@ -285,7 +285,7 @@ cd $REPO && .venv/bin/python3 scripts/render_rollout.py \
 ```
 
 ```bash
-cd $REPO && .venv/bin/python3 scripts/gait_report.py \
+cd $REPO && .venv/bin/python3 scripts/amp/gait_report.py \
     --port 23063 \
     --scene sim/env/medauroidea_stick_insect.ttt \
     --ckpt amp/logs/<run>/model/step<N> \
@@ -362,7 +362,7 @@ because of GitHub's 100 MB limit, and must be copied across manually.
 
 | Path | Size | Needed for |
 |---|---|---|
-| `sim/env/expert_66k_aug3c_fcontact.csv` | 132 MB | all IK collection; `sim/collect_ik.py` reads it directly |
+| `sim/env/expert_66k_aug3c_fcontact.csv` | 132 MB | all IK collection; `sim/collect/collect_ik.py` reads it directly |
 | `data/` | varies | training and evaluation. `data/ik_walk_100_framed` is 379 MB |
 | `wm/runs/` | 366 MB per checkpoint | only if continuing from existing checkpoints |
 
@@ -389,7 +389,7 @@ derived from the file's own location, so the repository can live anywhere.
 
 Some scripts still hold absolute paths to assets outside this repository:
 
-- `sim/rollout_b1_mujoco.py` and `sim/build_b1_scene.py` point at `~/Sim2Real-B1` and
+- `sim/collect/rollout_b1_mujoco.py` and `sim/scene/build_b1_scene.py` point at `~/Sim2Real-B1` and
   `sim/assets/b1_description`. Only needed to regenerate B1 trajectories or rebuild the B1 scene;
   the existing `sim/env/b1_flat.ttt` and `data/b1_traj` avoid this.
 - Anything under `sim/_archive/` or `scripts/_archive/`.

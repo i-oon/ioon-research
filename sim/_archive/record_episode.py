@@ -13,8 +13,8 @@ Decoder's loss (L_motion = ||MD(x_t, z_t) - a_t||^2) is only meaningful if the
 pairing is exact.
 
 Requires the scene to already have a camera + proper floor:
-  python sim/set_floor_texture.py --scene <scene>
-  python sim/add_camera.py        --scene <scene>
+  python sim/scene/set_floor_texture.py --scene <scene>
+  python sim/scene/add_camera.py        --scene <scene>
 
 Usage (CoppeliaSim must be running):
   python sim/record_episode.py --scene sim/env/medauroidea_stick_insect.ttt \\

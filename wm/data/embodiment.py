@@ -10,7 +10,7 @@ from typing import Callable
 
 import numpy as np
 
-CONTACT_THRESHOLD = 0.27
+from ..bodies import CONTACT_THRESHOLD  # noqa: F401  single source of truth, do not redefine
 
 
 def _hexapod(data):

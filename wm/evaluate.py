@@ -27,6 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
+from wm.bodies import training_bodies  # noqa: E402,F401
 from wm.config import Config, from_checkpoint  # noqa: E402
 from wm.data.dataset import clip_paths, contact_labels, load_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -52,33 +53,6 @@ def encode_clip(encoder, frames, chunk=16):
     for start in range(0, len(frames), chunk):
         embeddings.append(encoder.encode(list(frames[start:start + chunk])).float())
     return torch.cat(embeddings)
-
-
-def training_bodies(cfg, embodiment="hexapod"):
-    """The bodies a run actually trained on, read off its own config.
-
-    Every diagnostic used to hardcode a body list, and three of them silently scored a model on
-    bodies it had never seen: `z_identity_ablation` read 15.99 deg where the trained bodies read
-    1.45, because two of its five were held out and veer. A hardcoded list is correct only until
-    the next run changes its split, and nothing warns you when it stops being.
-
-    Cross-embodiment runs name a directory and glob it, so the set is what was globbed minus the
-    bodies excluded for not walking and minus the ones deliberately held out.
-    """
-    from wm.data.dataset import EXCLUDED_BODIES
-
-    if not cfg.sources:
-        return sorted(cfg.train_morphs)
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    bodies = set()
-    for spec in cfg.sources:
-        name, _, data_dir = spec.partition("=")
-        if name != embodiment:
-            continue
-        directory = data_dir if os.path.isabs(data_dir) else os.path.join(root, data_dir)
-        bodies |= {os.path.basename(p).split("_")[0]
-                   for p in glob.glob(os.path.join(directory, "*.npz"))}
-    return sorted(bodies - set(cfg.heldout_bodies or ()) - set(EXCLUDED_BODIES))
 
 
 def offset_for(checkpoint, embodiment):

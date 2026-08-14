@@ -10,11 +10,15 @@ import os
 import numpy as np
 from torch.utils.data import Dataset, Sampler
 
+from ..bodies import (CONTACT_THRESHOLD, EXCLUDED_BODIES, body_of,  # noqa: F401
+                      contact_labels, evenly, usable_clips)
 from .augment import apply, identity_params, sample_params
 from .embodiment import REGISTRY
 from .embodiment import load as load_embodiment
 
-CONTACT_THRESHOLD = 0.27
+# Re-exported above so existing `from wm.data.dataset import ...` keeps working. They are defined
+# in wm/bodies.py, which has no torch dependency, so the collector and the diagnostics can share
+# them. Do not redefine any of them here.
 
 
 def clip_paths(data_dir, morphs):
@@ -79,10 +83,6 @@ def action_stats(clips, within_body=True):
     else:
         std = actions.std(axis=0)
     return mean, np.maximum(std, 1e-6)
-
-
-def contact_labels(forces):
-    return (forces > CONTACT_THRESHOLD).astype(np.int64)
 
 
 class IKWalkPairs(Dataset):
@@ -182,40 +182,11 @@ class IKWalkPairs(Dataset):
 # 92.5 mm; both of these have a 208.2 mm dead zone, so the IK never solves and the insect tips onto
 # its side within about a dozen frames and rotates on the spot for the rest of the episode.
 #
-# They predate `sim/make_leg_morphology.py`'s reach check -- which was written using them as its
+# They predate `sim/scene/make_leg_morphology.py`'s reach check -- which was written using them as its
 # evidence -- and survived the walk check because it measured `norm(head[-1,:2] - head[0,:2])`,
 # unsigned, which reads a healthy 0.46 m for a body that is tumbling. Excluded by name because
 # Stage 2 takes a directory and globs it, so nothing else selects bodies at all.
 #
-# This is not a judgement about morphology. Every other body in the set locomotes; these two are
-# recordings of a robot falling over. See FINDINGS.md F42.
-EXCLUDED_BODIES = ("c06f06t10", "c10f06t10")
-
-
-def usable_clips(paths, excluded=EXCLUDED_BODIES):
-    """Drop clips belonging to bodies that do not walk, reporting what went."""
-    kept = [p for p in paths if os.path.basename(p).split("_")[0] not in excluded]
-    dropped = len(paths) - len(kept)
-    if dropped:
-        names = sorted({os.path.basename(p).split("_")[0] for p in paths}
-                       & set(excluded))
-        print(f"excluding {dropped} clips from non-walking bodies {names} "
-              f"({len(kept)} clips remain)")
-    return kept
-
-
-def evenly(items, keep):
-    """`keep` items spread across the list, not the first `keep`.
-
-    Clips are sorted by episode, so taking a prefix would take consecutive expert episodes and
-    the behavioural range would narrow along with the count.
-    """
-    if keep >= len(items):
-        return items
-    idx = np.linspace(0, len(items) - 1, keep).round().astype(int)
-    return [items[i] for i in dict.fromkeys(idx)]
-
-
 def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=(),
                      clips_per_body=()):
     """Split each embodiment's clips into train and validation source lists.

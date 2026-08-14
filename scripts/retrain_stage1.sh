@@ -8,7 +8,7 @@
 #   bash scripts/retrain_stage1.sh              run all five, in order
 #   bash scripts/retrain_stage1.sh tib_cross    run one by name
 #
-# Data comes from three directories built by scripts/build_stage1_dirs.py, which links only
+# Data comes from three directories built by scripts/dataset/build_stage1_dirs.py, which links only
 # clips where the body walked (signed forward travel >= 0.30 m, lateral drift < 0.20 m). Run
 # that script first; the preflight below refuses to start otherwise.
 #
@@ -94,14 +94,14 @@ preflight() {
   found=$(find "data/$dir" -name '*.npz' 2>/dev/null | wc -l) || true
   if [ "$found" -ne "$expected" ]; then
     echo "data/$dir holds $found clips, expected $expected." >&2
-    echo "run: $PY scripts/build_stage1_dirs.py" >&2
+    echo "run: $PY scripts/dataset/build_stage1_dirs.py" >&2
     exit 1
   fi
   # a dangling symlink still matches -name, so the count above cannot catch it
   dangling=$(find "data/$dir" -name '*.npz' -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l) || true
   if [ "$dangling" -ne 0 ]; then
     echo "data/$dir has $dangling symlinks whose targets are missing." >&2
-    echo "the source datasets are not where scripts/build_stage1_dirs.py left them." >&2
+    echo "the source datasets are not where scripts/dataset/build_stage1_dirs.py left them." >&2
     exit 1
   fi
 }

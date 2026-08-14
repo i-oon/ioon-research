@@ -155,7 +155,7 @@ of the truth. The decoder answers "essentially a full-size body" for a body whos
 20 percent short — it has slid its answer onto the nearest training body, `c10f10t10`. The larger
 model, holding the same frame, is the one that gets it wrong.
 
-![the encoder places the unseen body correctly, the decoder does not](../results/wm/figures/encoder_vs_decoder.png)
+![the encoder places the unseen body correctly, the decoder does not](../results/wm/stage1/figures/encoder_vs_decoder.png)
 
 **This figure is from the earlier three-body dataset** — train on a long and a short body, hold out
 a medium one — because an axis only draws cleanly with two training bodies. It shows on three
@@ -221,7 +221,7 @@ read the geometry from the frame.
 | Error, deg | 3.57 | **2.91** |
 | Copy the nearest training body (baseline) | 3.47 | 3.47 |
 
-![effect of the cross-body loss](../results/wm/figures/cross_loss_effect.png)
+![effect of the cross-body loss](../results/wm/stage1/figures/cross_loss_effect.png)
 
 **Left**: error on the held-out body per epoch, `m3d_cross` against its control `m3d_bracketed`.
 The control swings between 0.076 and 0.190 across epochs; the cross-body run stays between 0.057
@@ -307,7 +307,7 @@ on a body never trained on. `m3d_cross` against its control `m3d_bracketed`.
 - The cross-body loss improves the **quality of the pose**, not the distance: it stops
   commanding leg configurations the body never actually adopts, which is what makes legs
   fold once error accumulates.
-![gait diagram, predicted vs IK](../results/wm/gait/gait_m3d_cross_epoch008_c08f09t09_clip0.png)
+![gait diagram, predicted vs IK](../results/wm/stage1/gait/gait_m3d_cross_epoch008_c08f09t09_clip0.png)
 
 Black is stance, white is swing, over 65 simulation steps. The top block is driven by the
 predicted commands, the bottom by the IK ground truth. The tripod alternation and the
@@ -315,7 +315,7 @@ stance durations line up; duty-factor error averaged over six legs and three cli
 0.044 with the cross-body loss against 0.076 for the control.
 
 Video, side by side with distance travelled stamped on each frame:
-`results/wm/gait/replay_m3d_cross_epoch008_c08f09t09_clip0.mp4`
+`results/wm/stage1/gait/replay_m3d_cross_epoch008_c08f09t09_clip0.mp4`
 
 - Distance was fixed by **having more training bodies**, not by the loss: on the earlier two-body
   dataset the same replay covered less than half the required distance.
@@ -373,7 +373,7 @@ inside the range and is 0.172 here:
 
 Capacity is not the missing ingredient — an MLP in place of the ridge is no better.
 
-![per-joint reconstruction on the tibia-short body](../results/wm/action_trace_tib_cross_epoch004_c10f10t06.png)
+![per-joint reconstruction on the tibia-short body](../results/wm/stage1/figures/action_trace_tib_cross_epoch004_c10f10t06.png)
 
 Red is the model, black is ground truth, across three clips. **All 18 joints have negative
 R-squared** — every one is worse than predicting that body's own average posture.
@@ -420,7 +420,7 @@ original four bodies' 7,540 — so a better result cannot be put down to more da
 | predict a constant pose | 16.01 deg | 16.01 deg |
 | **the model** | **27.68 deg** | **16.10 deg** |
 
-![the coverage experiment](../results/wm/figures/coverage_experiment.png)
+![the coverage experiment](../results/wm/stage1/figures/coverage_experiment.png)
 
 **A second prediction, costing no GPU at all.** Refit the encoder probe on the enlarged set and its
 error on the held-out body should fall. It did — **0.172 → 0.098** — and the specific thing the
@@ -735,7 +735,7 @@ and say more anyway.
 
 ### The conventional picture, for comparison
 
-![cross-embodiment UMAP](../results/wm/figures/cross_embodiment_umap_stage2_clean.png)
+![cross-embodiment UMAP](../results/wm/stage2/figures/cross_embodiment_umap_stage2_clean.png)
 
 | | frozen `e_t` | learned `z` | |
 |---|---|---|---|
@@ -785,7 +785,7 @@ test. The fair test is few-shot calibration:
 
 **Result: the pretrained Stage 2 backbone makes the new 4-leg head much easier to fit.**
 
-![4-leg few-shot transfer and z ablation](../results/wm/figures/4leg_fewshot_and_z_ablation.png)
+![4-leg few-shot transfer and z ablation](../results/wm/stage2/figures/4leg_fewshot_and_z_ablation.png)
 
 Across three 5-train / 4-test splits:
 
@@ -797,7 +797,7 @@ Across three 5-train / 4-test splits:
 
 The same result holds as a few-shot curve. Each point averages three random train/test splits:
 
-![4-leg few-shot curve](../results/wm/figures/4leg_fewshot_curve.png)
+![4-leg few-shot curve](../results/wm/stage2/figures/4leg_fewshot_curve.png)
 
 | clips used for the new head | pretrained Stage 2 | random backbone | gain |
 |---:|---:|---:|---:|
@@ -812,7 +812,7 @@ backbone needs much less 4-leg data to calibrate a usable action head.
 **The commands also execute physically.** The predicted actions were replayed open-loop in
 CoppeliaSim with the middle legs ghost-removed, side-by-side with the IK ground truth:
 
-![4-leg replay stills](../results/wm/figures/4leg_replay_stills.png)
+![4-leg replay stills](../results/wm/stage2/figures/4leg_replay_stills.png)
 
 The four clean held-out clips all walk stably and closely track the IK reference. Example numbers:
 
@@ -827,6 +827,34 @@ The four clean held-out clips all walk stably and closely track the IK reference
 
 This is evidence for **few-shot transfer through a reusable visual-action backbone**, not direct
 zero-shot control. The model still needs a small output head for the new action coordinates.
+
+**A confound was found in this test, and then removed.** The 4-leg body above is the base stick
+insect with its middle legs removed, so its geometry is `c10f10t10`'s — a **training body's** — and
+its commands are that body's corner-leg columns bit-identically. Crossing the decoder's inputs
+shows the latent inferred from 4-leg video sits **0.578** from the base body's latent against a
+chance level of 0.981, while two different bodies at the same timestep sit 1.103 apart: the model
+reads the 4-leg as the base body at that gait phase and barely registers the missing legs. So as
+built, this tested a novel **leg count**, not a novel **body**.
+
+The control is the same leg removal applied to `c08f09t09`, which Stage 2 withholds from training,
+so geometry and leg count are both unseen. Identical collection settings, identical protocol,
+three splits:
+
+| | pretrained Stage 2 | random backbone | margin |
+|---|---:|---:|---:|
+| base geometry (above) | 1.75 ± 0.10 deg | 4.99 ± 0.24 | 2.86x |
+| **held-out geometry** | **1.91 ± 0.08 deg** | **5.45 ± 0.16** | **2.85x** |
+
+**The margin does not move: 2.85x against 2.86x.** Both absolute errors get slightly worse on a
+body whose geometry was never trained on — the expected direction — while the ratio the claim
+rests on is unchanged. The confound was real in the evidence and did not change the conclusion, so
+the few-shot result is not an artefact of the target's geometry being in distribution.
+
+What remains genuinely untested is **composition**: the body still has insect appearance, insect
+geometry family and the insect's own wave gait, so leg count and segment scale are the only novel
+axes. A quadruped-like gait would add the third, though F31 bounds how much that would change —
+one frame nearly determines the command, and a trot re-orders leg configurations the insect
+already visits rather than creating new ones.
 
 It is also not gait correction. When tested on deliberately bad/veering 4-leg clips, the model
 still decodes them far better than the random control:
@@ -852,11 +880,11 @@ gait phase information. The z-ablation quantifies how much:
 So the current frame is doing real work, but aligned `z` is not redundant. The honest claim is:
 the 4-leg transfer uses both the current visual representation and an aligned transition latent.
 
-**Adversarial identity removal is promising, but not the main baseline yet.** A completed
-`stage2_clean_adv_warm10` run lowers the removable identity signal and slightly improves held-out
-and 4-leg scores, but it also makes `z` less load-bearing overall:
+**Adversarial identity removal helps, but does not fix the pathway.** A completed
+`stage2_clean_adv_warm10` run lowers the removable identity signal and improves held-out and
+4-leg scores:
 
-![Stage2 clean vs adversarial warm10 summary](../results/wm/figures/stage2_clean_vs_adv_summary.png)
+![Stage2 clean vs adversarial warm10 summary](../results/wm/stage2/figures/stage2_clean_vs_adv_summary.png)
 
 | | clean | adv warm10 |
 |---|---:|---:|
@@ -865,8 +893,44 @@ and 4-leg scores, but it also makes `z` less load-bearing overall:
 | identity residual after removal | 0.738 | **0.598** |
 | cost of zeroing `z` | **7.63x** | 4.44x |
 
-So for this update I keep `stage2_clean` as the baseline and report `adv_warm10` as a useful
-ablation/candidate rather than a replacement.
+The last row looked like a cost -- a weaker latent -- until checked directly. Rolling the
+**forward model** on its own output, true latents supplied, held-out body, 162 rollouts:
+
+| steps ahead | clean | adversary |
+|---|---:|---:|
+| 1 | 1.38x | 1.37x |
+| 3 | 1.52x | 1.51x |
+| 5 | 1.48x | 1.47x |
+| 10 | 1.30x | 1.30x |
+
+Identical within 1% at every horizon. `z` still carries everything the world model needs; nothing
+was lost. What actually changed is the **decoder's** balance between its two inputs:
+
+| | `zero_z` | `zero_x` |
+|---|---:|---:|
+| clean | 0.365 | 0.193 |
+| adversary | **0.140** | **0.266** |
+
+That reads as the decoder moving toward the frame -- the direction slide 4 asks for. **The swap
+test says it does not get there.** Zeroing an input is out of distribution, so those ratios compare
+runs rather than measuring the pathway; the swap test feeds real embeddings and does not have that
+problem. Body A's frame with body B's latent, on two training bodies whose commands differ by
+21.13 deg:
+
+| | frame from | latent from | vs `c10f10t10` | vs `c10f06t06` | follows |
+|---|---|---|---|---|---|
+| clean | c10f10t10 | c10f06t06 | 21.03 | **6.98** | latent |
+| clean | c10f06t06 | c10f10t10 | **5.26** | 20.19 | latent |
+| adversary | c10f10t10 | c10f06t06 | 18.76 | **8.04** | latent |
+| adversary | c10f06t06 | c10f10t10 | **6.87** | 18.04 | latent |
+
+**Both models answer with the latent's body, not the frame's.** The adversary narrows the margin
+from 3.0-3.8x to 2.3-2.6x and never approaches 1.0, where following the frame would begin. In
+Stage 1 `lambda_cross` reversed this test outright; the adversary does not. So it is a real but
+partial improvement -- worth reporting, not yet a replacement for `stage2_clean` as the baseline.
+
+**And this is the first direct evidence that Stage 2 needs a cross term at all.** Until now that
+was assumed from Stage 1 rather than measured here.
 
 ---
 
@@ -960,8 +1024,12 @@ count, which change every frame and survive it. An offset wrecks a **linear read
 embodiment** (slide 14) but not a nonlinear model trained on both.
 
 **The adversary is the only lever that moves anything** — best 4-leg result, lowest residual
-identity. The caution is that zeroing `z` costs less too, 7.63x → 4.44x, so part of what it buys
-is a weaker latent rather than a cleaner one. Useful; not yet the headline model.
+identity. Zeroing `z` costing less too, 7.63x → 4.44x, looked like a weaker latent bought at the
+same time — checked directly on the forward model (rollout, 162 held-out sequences), clean and
+adversary agree within 1% at every horizon out to ten steps, so nothing about `z`'s own competence
+changed. But the swap test (slide 15) shows the decoder **still reads the body from `z`** under the
+adversary, margin only narrowing 3.0-3.8x → 2.3-2.6x where `lambda_cross` reversed it outright in
+Stage 1. So the `zero_z`/`zero_x` shift overstates what moved: a useful partial lever, not a fix.
 
 **And the honest summary of all three: none of them changed transfer.** Held-out R² is +0.87,
 +0.89, +0.88, and the 4-leg result moves 1.86 → 1.88 → 1.66 against a random-backbone floor of

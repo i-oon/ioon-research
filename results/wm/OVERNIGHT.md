@@ -16,7 +16,7 @@ and a body is held out.
 ## Held-out body — the new measurement
 
 Stage 2 has never had a generalisation test before; with two embodiments neither can hold the
-other out, so a hexapod body was withheld instead. `scripts/score_body.py`, same weights, one
+other out, so a hexapod body was withheld instead. `scripts/diagnostics/score_body.py`, same weights, one
 unseen body.
 
 | | seed 0 | seed 1 |
@@ -179,7 +179,7 @@ wm/runs/stage2_clean_centered/best.pt
 wm/runs/stage2_clean_centered/config.yaml
 wm/runs/stage2_clean_centered/summary/
 
-results/wm/stage2_clean_adv.log
+results/wm/stage2/logs/stage2_clean_adv.log
 ```
 
 What is **not** left locally:
@@ -191,12 +191,12 @@ older Stage 1/Stage 2 run checkpoints, except for any unrelated artefacts alread
 ```
 
 The adversarial run therefore needs retraining before it can be evaluated or used. The old
-`results/wm/stage2_clean_adv.log` is still useful as evidence of the previous trend and as the
+`results/wm/stage2/logs/stage2_clean_adv.log` is still useful as evidence of the previous trend and as the
 source for the warmup setting below, but it is not itself a resumable model.
 
 ### Stage 2 adversary reproducibility note
 
-The old `stage2_clean_adv` log in `results/wm/stage2_clean_adv.log` is not reproduced by the
+The old `stage2_clean_adv` log in `results/wm/stage2/logs/stage2_clean_adv.log` is not reproduced by the
 quick retrain command unless `--adv_warmup_epochs 10` is passed explicitly. The old log ramped
 the adversary as `x0.10, x0.20, ..., x1.00` over the first ten epochs; the current config default
 is five epochs, so a command without that flag ramps `x0.20, x0.40, ..., x1.00`.
@@ -226,7 +226,7 @@ trend, use a new name and set the warmup explicitly:
   --lr 0.0001 \
   --seed 0 \
   --checkpoint_every 10 \
-  2>&1 | tee results/wm/stage2_clean_adv_warm10.log
+  2>&1 | tee results/wm/stage2/logs/stage2_clean_adv_warm10.log
 ```
 
 ### 4-leg middle-loss dataset
@@ -239,7 +239,7 @@ rotation/collapse.
 Sanity collection used the normal stick-insect scene, ghost-removing the middle legs at runtime:
 
 ```bash
-.venv/bin/python3 sim/collect_ik.py \
+.venv/bin/python3 sim/collect/collect_ik.py \
   --port 23063 \
   --episodes 6,20,22 \
   --morphs middleloss=medauroidea_stick_insect.ttt \
@@ -316,7 +316,7 @@ check whether Stage 2 features help a new embodiment; it is not perfect evidence
 
 ### Code changes made for the 4-leg probe
 
-`sim/collect_ik.py`
+`sim/collect/collect_ik.py`
 
 - Added `CHAIN_NAMES` to enumerate the named objects in each leg chain.
 - Changed `read_forces` from fixed six feet to `len(force_h)`, so 4-foot datasets save `(T,4)`
@@ -333,7 +333,7 @@ check whether Stage 2 features help a new embodiment; it is not perfect evidence
   - `--remove_legs`, default empty
 - Added validation that requested legs are in the known six-leg set.
 
-`sim/npz_to_video.py`
+`sim/render/npz_to_video.py`
 
 - Added `--out`, so inspection videos can be written outside the dataset directory.
 - Made the grid overview work for arbitrary clip names, not only `long|medium|short`.
@@ -341,7 +341,7 @@ check whether Stage 2 features help a new embodiment; it is not perfect evidence
 - Changed the grid print from `grid (long|medium|short)` to `grid overview`, because middle-loss
   clips are not morphology triplets.
 
-`scripts/fit_4leg_head.py`
+`scripts/diagnostics/fit_4leg_head.py`
 
 - Added a few-shot 4-leg held-out test script.
 - It loads a Stage 2 checkpoint, freezes the trained ITM and Motion Decoder backbone, adds a new
@@ -369,28 +369,28 @@ check whether Stage 2 features help a new embodiment; it is not perfect evidence
   - `shuffled_z`: real latents permuted within each clip, preserving z distribution but breaking
     frame-transition alignment
 
-`sim/render_wm_prediction.py`
+`sim/render/render_wm_prediction.py`
 
 - Added `--active_legs` and `--remove_legs` so replay can drive a reduced-action embodiment such
   as the 4-leg middle-loss insect.
 - The replay output now stores `active_legs` and `remove_legs`.
 - The printed contact summary now reports `of {len(active_legs)}` instead of always `of 6`.
 
-`scripts/wm_gait_report.py`
+`scripts/diagnostics/wm_gait_report.py`
 
 - Reads `active_legs` from replay files and draws the correct number/order of contact rows.
 - Skips the 6-leg tripod score for 4-leg replays, reporting `nan` under a generic `coord`
   column instead of pretending a hexapod tripod exists.
 - Allows joint-range checks to use `data/ik_4leg_middleloss_clean9` for the middle-loss body.
 
-`scripts/sweep_4leg_fewshot.py`
+`scripts/diagnostics/sweep_4leg_fewshot.py`
 
 - Added a few-shot curve sweep for the 4-leg new-head test.
 - It encodes the 9 clean4-leg clips once, then fits new heads for multiple clip budgets and
   random train/test splits.
 - Outputs:
-  - `results/wm/4leg_head/fewshot_curve.csv`
-  - `results/wm/figures/4leg_fewshot_curve.png`
+  - `results/wm/stage2/4leg_head/fewshot_curve.csv`
+  - `results/wm/stage2/figures/4leg_fewshot_curve.png`
 
 ### Baseline Stage 2 test plan for 4-leg
 
@@ -417,7 +417,7 @@ Recommended test:
 Command now available:
 
 ```bash
-.venv/bin/python3 scripts/fit_4leg_head.py \
+.venv/bin/python3 scripts/diagnostics/fit_4leg_head.py \
   --ckpt wm/runs/stage2_clean/best.pt \
   --data data/ik_4leg_middleloss_clean9 \
   --train_eps 144,28,198,93,22 \
@@ -480,14 +480,14 @@ random backbone.
 Artefacts:
 
 ```text
-results/wm/4leg_head/fewshot_curve.csv
-results/wm/figures/4leg_fewshot_curve.png
+results/wm/stage2/4leg_head/fewshot_curve.csv
+results/wm/stage2/figures/4leg_fewshot_curve.png
 ```
 
 Predictions were exported for split A:
 
 ```text
-results/wm/4leg_head/splitA_predictions.npz
+results/wm/stage2/4leg_head/splitA_predictions.npz
 ```
 
 Open-loop replay in CoppeliaSim was then rendered for all four held-out split-A clips, using the
@@ -603,19 +603,19 @@ random_backbone           100       5.27      6.75    0.4599    0.9779   +0.53
 Summary figures for slides:
 
 ```text
-results/wm/figures/4leg_fewshot_and_z_ablation.png
-results/wm/figures/4leg_fewshot_curve.png
-results/wm/figures/4leg_replay_stills.png
+results/wm/stage2/figures/4leg_fewshot_and_z_ablation.png
+results/wm/stage2/figures/4leg_fewshot_curve.png
+results/wm/stage2/figures/4leg_replay_stills.png
 ```
 
 The stale cross-embodiment UMAP was regenerated from the local `stage2_clean` checkpoint:
 
 ```bash
-.venv/bin/python3 scripts/cross_embodiment_umap.py \
+.venv/bin/python3 scripts/diagnostics/cross_embodiment_umap.py \
   --ckpt wm/runs/stage2_clean/best.pt \
   --encode_device cuda \
   --chunk 4 \
-  --out results/wm/figures/cross_embodiment_umap_stage2_clean.png
+  --out results/wm/stage2/figures/cross_embodiment_umap_stage2_clean.png
 ```
 
 Output:
@@ -684,11 +684,11 @@ overall (`z zeroed` cost drops 7.63x -> 4.44x), so this is not a simple win.
 Artifacts:
 
 ```text
-results/wm/4leg_head/fewshot_curve_adv_warm10.csv
-results/wm/figures/4leg_fewshot_curve_adv_warm10.png
-results/wm/figures/cross_embodiment_umap_stage2_clean_adv_warm10.png
-results/wm/figures/stage2_clean_vs_adv_summary.png
-results/wm/4leg_head/stage2_clean_vs_adv_summary.csv
+results/wm/stage2/4leg_head/fewshot_curve_adv_warm10.csv
+results/wm/stage2/figures/4leg_fewshot_curve_adv_warm10.png
+results/wm/stage2/figures/cross_embodiment_umap_stage2_clean_adv_warm10.png
+results/wm/stage2/figures/stage2_clean_vs_adv_summary.png
+results/wm/stage2/4leg_head/stage2_clean_vs_adv_summary.csv
 ```
 
 Working conclusion: `stage2_clean_adv_warm10` is a useful candidate, not an automatic replacement.

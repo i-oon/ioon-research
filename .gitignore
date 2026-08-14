@@ -32,3 +32,7 @@ data/ik_turn/
 data/ik_all/
 data/hexapod/
 data/_archive/
+# Recovered Stage 1 checkpoints: ~366 MB each, over GitHub's 100 MB file limit.
+# Kept on disk as the "before" side of the contaminated-data comparison (F42, F48).
+wm/runs_original/*
+!wm/runs_original/README.md

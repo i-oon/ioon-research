@@ -17,6 +17,9 @@ import numpy as np
 import torch
 from scipy.stats import pearsonr, spearmanr
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))), "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder
 
 CROP = 256
