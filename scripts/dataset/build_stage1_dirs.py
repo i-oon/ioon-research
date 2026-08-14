@@ -67,6 +67,31 @@ def good_clips(body):
             if walks(p)]
 
 
+def episode_of(path):
+    return os.path.basename(path).split("_ep")[1].split(".")[0]
+
+
+def shared_episodes(pool, bodies):
+    """Episodes every one of `bodies` has a walking clip for.
+
+    `lambda_cross` decodes one body's latent against another body's frame at the same episode and
+    timestep, so it is defined only where a partner body exists. `MorphologyPairs.__getitem__`
+    emits `cross_x_t` only when one does, and `default_collate` then dies with a bare
+    `KeyError: 'cross_x_t'` the moment a batch mixes samples with and without it.
+
+    Capping each body against its *own* usable list is what breaks this: the bodies fail the walk
+    check on different episodes, so evenly-spaced picks from different lists leave episodes held
+    by a single body. Selecting from the intersection restores the invariant this module's
+    docstring already claims -- every body walks the same expert episodes.
+    """
+    return set.intersection(*[{episode_of(p) for p in pool[b]} for b in bodies])
+
+
+def restrict(pool, bodies, episodes):
+    """Each body's clips, filtered to a shared episode set."""
+    return {b: [p for p in pool[b] if episode_of(p) in episodes] for b in bodies}
+
+
 def build(name, bodies, per_body):
     directory = os.path.join(DATA, name)
     if os.path.islink(directory):
@@ -103,8 +128,21 @@ def main():
 
     heldout = evenly(pool[COV_HELDOUT], PER_BODY_HELDOUT)
 
+    # Both coverage directories draw from episodes shared by all of their training bodies, so no
+    # episode is left with a single body and `lambda_cross` is defined for every sample. The
+    # held-out body is exempt: it is never trained on, so it needs no partner.
+    narrow_shared = shared_episodes(pool, NARROW_TRAIN)
+    wide_shared = shared_episodes(pool, WIDE_TRAIN)
+    print(f"\nepisodes shared by all training bodies: narrow {len(narrow_shared)} "
+          f"(need {PER_BODY_NARROW}), wide {len(wide_shared)} (need {PER_BODY_WIDE})")
+    for label, shared, need in (("narrow", narrow_shared, PER_BODY_NARROW),
+                                ("wide", wide_shared, PER_BODY_WIDE)):
+        if len(shared) < need:
+            raise SystemExit(f"{label}: only {len(shared)} shared episodes, need {need}. "
+                             "Collect more clips or lower the per-body count.")
+
     print("\nik_walk_cov_narrow  (tib_cross, tib_ctrl)")
-    narrow = {b: pool[b] for b in NARROW_TRAIN}
+    narrow = restrict(pool, NARROW_TRAIN, narrow_shared)
     narrow[COV_HELDOUT] = heldout
     build("ik_walk_cov_narrow", narrow,
           {"_": PER_BODY_NARROW, COV_HELDOUT: PER_BODY_HELDOUT})
@@ -112,8 +150,9 @@ def main():
     print("\nik_walk_cov_wide  (bracket_cross)")
     # the four shared bodies subsample the narrow run's own selection, so wide sees a subset of
     # what narrow saw rather than an independent draw of the same size
-    narrow_choice = {b: evenly(pool[b], PER_BODY_NARROW) for b in NARROW_TRAIN}
-    wide = {b: narrow_choice.get(b, pool[b]) for b in WIDE_TRAIN}
+    narrow_choice = {b: evenly(clips, PER_BODY_NARROW)
+                     for b, clips in restrict(pool, NARROW_TRAIN, wide_shared).items()}
+    wide = {b: narrow_choice.get(b) or restrict(pool, [b], wide_shared)[b] for b in WIDE_TRAIN}
     wide[COV_HELDOUT] = heldout
     build("ik_walk_cov_wide", wide,
           {"_": PER_BODY_WIDE, COV_HELDOUT: PER_BODY_HELDOUT})

@@ -115,6 +115,21 @@ class IKWalkPairs(Dataset):
         for i, clip in enumerate(self.clips):
             self.partners.setdefault(clip["episode"], {}).setdefault(clip["morph"], i)
 
+        # An episode held by a single body has no partner, so `__getitem__` below emits no
+        # `cross_x_t` for it, and `default_collate` then dies with a bare
+        # `KeyError: 'cross_x_t'` inside a DataLoader worker as soon as one batch mixes samples
+        # with and without the key -- which says nothing about the cause. Fail here instead,
+        # naming the episodes, and note it happens whatever `lambda_cross` is set to, because
+        # collation runs before the loss ever looks at the batch.
+        if len(self.morphs) > 1:
+            orphans = sorted(ep for ep, bodies in self.partners.items() if len(bodies) < 2)
+            if orphans:
+                raise ValueError(
+                    f"{len(orphans)} episode(s) present for only one body: {orphans}. "
+                    "Every training body must share the same expert episodes, or the cross-body "
+                    "pair is undefined. Rebuild with scripts/dataset/build_stage1_dirs.py, which "
+                    "selects from episodes shared by all training bodies.")
+
         # The target sits action_lag steps past t, so a transition is only usable when that
         # index exists: t+1 for the frames and t+action_lag for the command.
         self.action_lag = action_lag
