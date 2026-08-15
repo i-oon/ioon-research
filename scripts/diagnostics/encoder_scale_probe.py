@@ -105,12 +105,23 @@ def main():
     del encoder
 
     model = RidgeCV(alphas=np.logspace(-1, 4, 12)).fit(X, y)
+
+    # The training bodies are reported too, in-sample by construction. They are the check that the
+    # readout is well conditioned rather than lucky on one body: a probe that cannot recover the
+    # bodies it was fitted on says nothing about the one it was not.
+    print(f"\n  {'body':<12}{'':<10}{'coxa':>16}{'femur':>16}{'tibia':>16}")
+    for body in args.train:
+        pred_b = model.predict(per_body[body]).mean(0)
+        true_b = scales_of(body)
+        cells = "".join(f"{p:>9.3f} / {t:.2f}" for p, t in zip(pred_b, true_b))
+        print(f"  {body:<12}{'train':<10}{cells}")
+
     pred = model.predict(X_test).mean(0)
     truth = scales_of(args.test)
-    names = ("coxa", "femur", "tibia")
-    print(f"\n  {'':7}{'predicted':>10}{'true':>8}{'error':>8}")
-    for n, p, t in zip(names, pred, truth):
-        print(f"  {n:7}{p:10.3f}{t:8.2f}{abs(p - t):8.3f}")
+    cells = "".join(f"{p:>9.3f} / {t:.2f}" for p, t in zip(pred, truth))
+    print(f"  {args.test:<12}{'HELD OUT':<10}{cells}")
+    print(f"\n  held-out error per scale: "
+          f"{'  '.join(f'{abs(p - t):.3f}' for p, t in zip(pred, truth))}")
     print(f"  **probe error {np.abs(pred - truth).mean():.3f}**  "
           f"({X.shape[1]} features to 3 outputs, {X.shape[1] * 3 + 3} parameters)")
 

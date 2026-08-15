@@ -134,15 +134,19 @@ run that is depends on which split is being discussed, so it is named each time:
 segment scales, using the four training bodies — `c10f10t10`, `c06f10t10`, `c10f06t06`,
 `c06f06t06` — and apply it to a body it has never seen.
 
-| held-out `c08f09t09` | coxa | femur | tibia |
-|---|---|---|---|
-| the truth | 0.80 | 0.90 | 0.90 |
-| **the probe** | **0.836** | **0.914** | **0.914** |
-| error | 0.036 | 0.014 | 0.014 |
+| Body | | coxa pred / true | femur | tibia |
+|---|---|---|---|---|
+| c10f10t10 | train | 0.978 / 1.00 | 0.999 / 1.00 | 0.999 / 1.00 |
+| c06f10t10 | train | 0.623 / 0.60 | 0.998 / 1.00 | 0.998 / 1.00 |
+| c10f06t06 | train | 0.997 / 1.00 | 0.602 / 0.60 | 0.602 / 0.60 |
+| c06f06t06 | train | 0.602 / 0.60 | 0.600 / 0.60 | 0.600 / 0.60 |
+| **c08f09t09** | **held out** | **0.836 / 0.80** | **0.914 / 0.90** | **0.914 / 0.90** |
 
-Errors of **0.036, 0.014 and 0.014** on a 0-to-1 scale, from **4,227 parameters** sitting on a
-1B-parameter encoder that has never seen a robot. Nothing supervises it to do this. **This is the
-premise the project rests on.**
+The training rows are in-sample and near-exact, which is what makes the last row worth reading: a
+readout that could not recover the bodies it was fitted on would say nothing about the one it was
+not. On the held-out body the errors are **0.036, 0.014 and 0.014** on a 0-to-1 scale, from
+**4,227 parameters** sitting on a 1B-parameter encoder that has never seen a robot. Nothing
+supervises it to do this. **This is the premise the project rests on.**
 
 **The model trained on top does not use it.**
 
