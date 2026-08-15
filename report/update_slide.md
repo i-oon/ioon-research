@@ -160,13 +160,19 @@ supervises it to do this. **This is the premise the project rests on.**
 | Held-out body `c08f09t09` | coxa | femur | tibia |
 |---|---|---|---|
 | **The truth** | **0.80** | **0.90** | **0.90** |
-| The probe on the frozen encoder, 4,227 parameters | 0.836 | 0.914 | 0.914 |
-| The trained decoder, 5.2M parameters | **0.98** | **0.98** | **0.97** |
+| The probe on the frozen encoder, 4,227 parameters | **0.836** | 0.914 | 0.914 |
+| The trained decoder, 5.2M parameters | **0.622** | 0.962 | 0.962 |
 
-The two rows are **different estimators, not the same number twice**. The probe lands within 0.04
-of the truth. The decoder answers "essentially a full-size body" for a body whose legs are 10 to
-20 percent short — it has slid its answer onto the nearest training body, `c10f10t10`. The larger
-model, holding the same frame, is the one that gets it wrong.
+Both rows read the same frame; they are **different estimators, not the same number twice**. The
+probe lands within 0.04 of the truth on every scale. The decoder's answer implies a **coxa 22
+percent shorter than the body actually has** — the larger model, holding the same frame, is the one
+that misreads it.
+
+**One thing this table does not test.** All four training bodies have femur equal to tibia, and so
+does the held-out one. Neither estimator can produce two different numbers for them, and neither is
+asked to: 0.914 / 0.914 is interpolation along an axis the data spans, not the recovery of two
+independent quantities. **Slide 8 is where they come apart**, and where both estimators fail
+together.
 
 ![the encoder places the unseen body correctly, the decoder does not](../results/wm/stage1/figures/encoder_vs_decoder.png)
 
@@ -360,14 +366,15 @@ independently.
 | **The truth** | 1.00 | **1.00** | **0.80** |
 | The trained decoder, from its output commands | 0.868 | **0.799** | **0.799** |
 | The linear probe on the frozen encoder | 0.955 | **0.819** | **0.819** |
-| The best any mixture of training bodies could say | 0.884 | **0.774** | **0.774** |
+| The best any mixture of training bodies could say | 0.882 | **0.777** | **0.777** |
 
 **All three give the femur and the tibia the same number, to three decimals.** The 5.2M-parameter
 decoder, the 4,227-parameter probe reading the raw encoder, and a mixture calculation that involves
 no learning at all — three things with almost nothing in common, making the identical mistake.
 
-The decoder also scores **12.48 deg against copy-the-nearest-body's 12.33** — marginally worse than
-simply reusing `c08f09t09`'s commands wholesale. There is no entry for a body it has not seen.
+The best a mixture could do is **11.19 deg** and the decoder scores **12.42** — it does not even
+reach the ceiling that copying and averaging the training bodies would give. There is no entry for
+a body it has not seen.
 
 The last row is why. **No combination of bodies in which the femur and tibia always move together
 can pull them apart.** The other two are not failing independently; they are reproducing the shape

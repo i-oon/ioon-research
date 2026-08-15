@@ -98,7 +98,12 @@ def main():
     keep = np.concatenate([np.arange(i * frames, (i + 1) * frames) for i, _ in usable])
     episodes = [e for _, e in usable]
 
-    target_actions = mean_actions(data_dir, held, episodes, frames)
+    # The held-out body's ground truth comes from the prediction file, not from disk. Reloading
+    # it here silently drops `action_lag`: the collector captures the frame *after* applying the
+    # command, so a lag-1 run's target sits one step later than `actions[t]`. Rebuilding it
+    # unshifted put the target 4.90 deg away from the aligned one and inflated the model's error
+    # from 3.37 to 5.92 deg -- and, worse, fitted the mixture against the wrong target.
+    target_actions = np.degrees(data["gt"])[keep]
     sources = {b: mean_actions(data_dir, b, episodes, frames) for b in train}
 
     pred = np.degrees(data["pred"])[keep]
