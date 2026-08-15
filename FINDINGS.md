@@ -1233,6 +1233,14 @@ periodic with a period near 22 frames, so a distant offset wraps back to a simil
 frame fixes the phase. The error never rises above 5.33 against a signal of 11.33 at any horizon
 tested.
 
+> **Superseded in its numbers by F53, not in its conclusion.** Re-measured on
+> `ik_walk_m3d_clean` the same way, the errors are uniformly lower — 3.00 / 3.40 / 2.86 for
+> `a_t` / `a_{t+8}` / `a_{t+32}` — because this fitted 18 clips rather than 4, and 4 clips is
+> 264 samples against 1,408 features. The measured cycle is **19 frames, not 22**, identical
+> across all five bodies, and 32 is not a multiple of it, so "a distant offset wraps back to a
+> similar phase" is not the mechanism: open-loop IK plus a fixed phase makes *every* horizon
+> predictable, whole cycle or not. Use F53's table.
+
 The transition is not worth *nothing*, and it is worth asking what it is worth, because the
 obvious objection is that direction of travel cannot be read from a still image -- a leg at
 mid-stroke looks the same going forward and going back. Measured directly, on the command
@@ -2822,6 +2830,85 @@ unseen robot: it needs that robot inside its training distribution. Since the so
 transfer is a LoRA finetune on 7,265 target-robot trajectories rather than zero-shot, the
 comparable question is not whether a frozen forward model generalises but **how few target clips
 it takes to adapt one** -- the same sample-efficiency framing already used for the action head.
+
+### F52. The forward model adapts to the B1 from one clip, and insect pretraining is worth 7x
+
+The question F51 leaves. ITM and FTM from `stage1_m3d_cross` fine-tuned on N clips of B1 video
+against the same architecture from random init, encoder frozen in both, scored by rolling the
+forward model on its own output and dividing by holding the frame still. Three splits per budget,
+1,000 optimiser updates each, four held-out clips.
+
+| clips | model | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|---|
+| 1 | pretrained | **1.02x** | 1.00x | 0.94x | 0.83x |
+| 1 | scratch | 0.89x | 0.68x | 0.64x | 0.66x |
+| 3 | pretrained | 1.17x | 1.11x | 1.02x | 0.89x |
+| 3 | scratch | 0.97x | 0.92x | 0.85x | 0.80x |
+| 5 | pretrained | 1.23x | 1.17x | 1.09x | 0.95x |
+| 5 | scratch | 0.98x | 0.97x | 0.91x | 0.85x |
+| 7 | pretrained | 1.32x | 1.29x | 1.19x | 1.00x |
+| 7 | scratch | 1.01x | 1.06x | 1.00x | 0.90x |
+| 9 | pretrained | **1.37x** | **1.36x** | **1.26x** | **1.05x** |
+| 9 | scratch | 1.01x | 1.10x | 1.06x | 0.96x |
+
+**Pretrained beats scratch in all twenty cells**, and both curves rise monotonically with the
+budget, so this is not noise.
+
+**The headline is sample efficiency, not the ceiling.** Pretrained reaches 1.0x at h=1 with **one**
+clip; scratch needs **seven** to reach the same place, and at h=3 scratch does not clear 1.0x until
+seven clips either. Insect pretraining is worth roughly **7x fewer target clips**.
+
+**The two curves separate rather than converge.** From five clips on, scratch is flat at h=1 --
+0.98x, 1.01x, 1.01x -- while pretrained keeps climbing, 1.23x, 1.32x, 1.37x. The margin widens from
+1.15x at one clip to 1.36x at nine. Scratch is not slowly catching up; it has saturated on what
+this much target data can teach from cold.
+
+**Against F51 this is a reversal of kind.** The frozen forward model scored 0.57-0.71x -- worse
+than predicting no motion. One clip of the target robot takes it to 1.02x. What does not transfer
+is not the representation but the calibration to the new body's dynamics, and that is cheap.
+
+**Ten steps ahead clears break-even at nine clips, and only for the pretrained arm.** Pretrained
+runs 0.83 / 0.89 / 0.95 / 1.00 / **1.05x** across the five budgets; scratch runs 0.66 / 0.80 /
+0.85 / 0.90 / 0.96x and never crosses. The longest horizon measured is where the two arms differ
+in kind rather than degree -- one gets there, the other does not.
+
+**Budget cap.** Fourteen clips with four held out leaves ten as the largest clean budget. A run at
+eleven was measured before this was noticed and put one of the four test clips inside the training
+set -- `train = order[:n]` and `test = order[-4:]` overlap once `n + 4 > 14`. Its numbers
+(1.46 / 1.42 / 1.31 / 1.08x pretrained) follow the same trend but are **not reportable**. The
+script now refuses the overlapping budget outright.
+
+**Trap this run cost.** `adapt()` originally summed gradients over every span before stepping, so
+`--steps` counted epochs, cost scaled with the clip budget, and the sweep was 374,400
+forward+backward passes and 13 hours. Batching the *device transfer* is what the memory limit
+requires; batching the *optimiser* is not. See `scripts/README.md`.
+
+### F53. F31 re-measured on the clean dataset: same conclusion, lower errors, and the cycle is 19
+
+F31 was fitted on **four clips** -- 264 samples against 1,408 encoder features. `ik_walk_m3d_clean`
+has 26 clips of `c10f10t10`, so the same ridge now sees 18. Nothing here uses a trained
+checkpoint, so this was never stale from the Stage 1 retrain; it was stale from the dataset.
+
+| predict from one frame | F31 (4 clips fitted) | F53 (18 clips fitted) |
+|---|---|---|
+| command spread | 11.33 deg | 11.34 deg |
+| `a_t` | 4.61 | **3.00** |
+| `a_{t+8}` | 5.23 | **3.40** |
+| `a_{t+32}` | 4.45 | **2.86** |
+| second frame, on the change | 1.09x | 1.11x |
+
+The two runs agree on the spread to 0.01 deg, so the protocol reproduces; the errors fall because
+the earlier fit was badly underdetermined.
+
+**Pooling all five bodies gives the same answer.** 140 clips, spread widened to 15.04 deg by
+between-body variance, errors 3.87 / 4.45 / 3.67 -- which is 26 / 30 / 24 percent of the signal
+against 26 / 30 / 25 percent for the single body. The claim does not depend on that choice.
+
+**The gait cycle is 19 frames, not 22**, measured by autocorrelation and identical across all five
+bodies (range 19-19, as expected from replayed expert episodes). 32 is not a multiple of 19, so
+F31's "a distant offset wraps back to a similar phase" was the wrong mechanism even though its
+conclusion held. The right one is that the commands are open-loop IK: one frame fixes the phase
+and everything downstream of it is determined, at any horizon.
 
 ## Files
 

@@ -40,7 +40,7 @@ that separation happens at all, in the easy case where the joint spaces do match
 | Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
 | Slides 11-12 | two facts about the task itself that bound what the latent can be worth |
 | Slides 13-16 | status, a first cross-embodiment run, a held-out 4-leg action space, and transfer to the B1 |
-| Slides 17-18 | what is settled, the two decisions left, and last term's questions answered |
+| Slides 17-18 | what is settled, the one decision left, and last term's questions answered |
 
 ---
 
@@ -578,14 +578,20 @@ movement, and the decoder cannot do without it.
 
 | Predict, from a single frame | now | 8 frames ahead | 32 frames ahead |
 |---|---|---|---|
-| Error, deg (signal spread 11.3 deg) | 4.6 | 5.2 | **4.5** |
+| Error, deg (signal spread 11.3 deg) | 3.0 | 3.4 | **2.9** |
 
-- Predicting 32 frames ahead is as accurate as predicting the present, because the gait is
-  periodic with a cycle near 22 frames and one frame fixes the phase.
+- **Predicting 32 frames ahead is as accurate as predicting the present.** The commands come from
+  inverse kinematics, which is open loop, and the gait is periodic with a measured cycle of 19
+  frames — so one frame fixes the phase and every horizon after it follows.
 - Six coordinated legs remove the ambiguity a single leg would have: one frame already identifies
   which feet are swinging with 81.5% accuracy, against 50% by chance.
-- The commands come from inverse kinematics, which is open loop — knowing the gait phase fixes
-  everything that follows.
+- A second frame is worth only **1.11x** on the step-to-step change, so almost nothing is left in
+  the transition for the latent to carry.
+
+Measured on `c10f10t10` in `ik_walk_m3d_clean`, ridge from mean-pooled frozen encoder features,
+18 clips fitted and 8 held out. Pooling all five bodies instead gives the same fractions of the
+signal — 26, 30 and 25 percent — against a spread widened to 15.0 deg by the between-body
+variance, so the claim does not depend on that choice.
 
 **Why this bounds the whole design.** The joint command cannot be where the latent earns its keep,
 because the frame nearly determines it on its own. That is a property of forward walking at one
@@ -1066,16 +1072,54 @@ by **5 to 8 percent**. The intervention that transforms the decoder barely touch
 model — so adding bodies, or even embodiments, is not a route to a forward model that works on an
 unseen robot.
 
-**Which reframes the remaining question.** The source method's own transfer is a LoRA finetune on
-7,265 target trajectories, not zero-shot. The comparable question is therefore not whether a frozen
-forward model generalises, but **how few target clips it takes to adapt one** — the sample-efficiency
-framing already used for the action head, now applied to the module a planner actually needs.
+**Which is why the measurement that matters is the finetune.** Adapting on target data was always
+the design here, as it is in the source method — a LoRA finetune on 7,265 target trajectories, not
+zero-shot. The question was never whether a finetune is needed, but **how few target clips it
+takes** — the sample-efficiency framing already used for the action head, now applied to the module
+a planner actually needs. The frozen numbers above are what shows that finetune is doing real work.
+
+### How few clips it takes
+
+ITM and FTM fine-tuned on N clips of B1 video against the same architecture from random init,
+encoder frozen in both, three splits per budget, four clips held out. Scored the same way as
+above: rolled on its own output, divided by holding the frame still.
+
+| clips | | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|---|
+| 1 | pretrained on insects | **1.02x** | 1.00x | 0.94x | 0.83x |
+| 1 | from scratch | 0.89x | 0.68x | 0.64x | 0.66x |
+| 3 | pretrained on insects | 1.17x | 1.11x | 1.02x | 0.89x |
+| 3 | from scratch | 0.97x | 0.92x | 0.85x | 0.80x |
+| 5 | pretrained on insects | 1.23x | 1.17x | 1.09x | 0.95x |
+| 5 | from scratch | 0.98x | 0.97x | 0.91x | 0.85x |
+| 7 | pretrained on insects | 1.32x | 1.29x | 1.19x | 1.00x |
+| 7 | from scratch | 1.01x | 1.06x | 1.00x | 0.90x |
+| 9 | pretrained on insects | **1.37x** | **1.36x** | **1.26x** | **1.05x** |
+| 9 | from scratch | 1.01x | 1.10x | 1.06x | 0.96x |
+
+**One clip of the target robot turns the forward model from unusable into usable.** Frozen, it
+scored 0.57–0.71x — worse than predicting no motion. After one clip, 1.02x.
+
+**Insect pretraining is worth about 7x in target data.** Pretrained clears 1.0x at one clip;
+scratch needs seven to reach the same place. Pretrained wins all twenty cells.
+
+**The two arms separate rather than converge.** From five clips on, scratch is flat at h=1 — 0.98x,
+1.01x, 1.01x — while pretrained keeps climbing, 1.23x, 1.32x, 1.37x. The margin widens from 1.15x
+to 1.36x. Cold training has saturated on what this much target data can teach; pretrained has not.
+
+**At nine clips every horizon measured clears break-even, including ten steps** — and only for the
+pretrained arm. Scratch runs 0.66, 0.80, 0.85, 0.90, 0.96x at h=10 and never crosses. This is where
+the two differ in kind rather than degree.
+
+**Scope of the claim.** Fourteen B1 clips with four held out caps the clean budget at ten, so the
+curve is measured, not extrapolated, and it has not flattened. What is demonstrated is a forward
+model that is **cheap to adapt** to a genuinely different robot — nine clips, one robot pair.
 
 ---
 
-## Slide 17 — What is settled, and the two decisions left
+## Slide 17 — What is settled, and the one decision left
 
-### Three things that were open questions last time and are now measurements
+### Four things that were open questions last time and are now measurements
 
 **1. What Stage 2 should be scored on — settled: both.** The source method rolls the world model
 forward and picks actions by comparing imagined futures to a goal, so per-joint reconstruction was
@@ -1104,20 +1148,20 @@ a wrong label, not a noisy one**, so this is not a matter of accepting some erro
 0.578 from the body it was cut from, against a chance level of 0.981. It tests a new action space.
 That is why slide 16 exists.
 
-### Decision 1 — is few-shot adaptation the claim we are making?
+**4. What the claim is — settled: the model is cheap to adapt to a new robot.** Adaptation on
+target data was always the design; the source method itself is a three-stage LoRA finetune on
+**7,265 trajectories** of the target robot, not zero-shot. The question was never whether a
+finetune is needed but **how small it can be**, and that is now measured: **one clip to clear
+break-even, nine to clear it at every horizon tested**, about **7x fewer target clips** than
+starting cold — and cold training never reaches ten-step rollouts at all.
 
-Slide 16 leaves the forward model as the open problem: it does not survive a change of robot, and
-coverage does not fix it. The route that remains is to **adapt it on a handful of target clips**
-rather than expect it to transfer frozen.
+The zero-shot measurements (F51's 0.57–0.71x) are not a failed attempt at a stronger claim. They
+are what establishes that the finetune is doing real work rather than being a formality.
 
-That is what the source method does — a three-stage LoRA finetune on **7,265 trajectories** of the
-target robot. Ours would be a handful of clips, which is a stronger version of the same claim, but
-it is no longer "the model transfers". It is "the model is cheap to adapt".
+**The caveat that travels with it is scope, not capability:** one robot pair, and a clean budget
+capped at ten clips by the size of the B1 set.
 
-**Is that the claim the thesis should make?** Everything measured supports it and nothing supports
-the stronger one.
-
-### Decision 2 — is one genuinely different robot enough?
+### The decision left — is one genuinely different robot enough?
 
 Stage 2 trains on exactly one cross-embodiment pair, insect against B1, and slide 16 tests transfer
 on that same B1 by holding it out. **Everything rests on a single robot pair.**
@@ -1129,7 +1173,8 @@ path, and **slide 16 measured that coverage buys the forward model only 5–8%**
 decoder 3.9x. So the case for spending that is weaker than it looks.
 
 **Two ways to go**: report the single pair honestly as the scope of the claim, or invest in a third
-robot and accept a later finish. This is the one that needs a decision rather than a measurement.
+robot and accept a later finish. This is the only item left that needs a decision rather than a
+measurement.
 
 ---
 

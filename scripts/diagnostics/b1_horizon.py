@@ -40,12 +40,19 @@ def rmse(model, features, target):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data_dir", default=os.path.join(ROOT, "data", "b1_framed"))
-    ap.add_argument("--device", default="cpu")
+    # The encoder ran on the CPU by default because the B1 set is 14 clips and that was tolerable.
+    # On the 140-clip insect directory the same default is 9,240 frames of ViT-g on the CPU, which
+    # had not finished after 38 minutes. Anything that encodes a whole directory belongs on the GPU.
+    ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--horizons", type=int, nargs="+", default=[0, 1, 2, 4, 8, 16, 32])
+    # Pooling every body inflates the command spread with between-body variance, which is a
+    # different question from "how much of one body's command does a frame fix". F31 measured one
+    # body; restrict here to reproduce that, leave the default to pool.
+    ap.add_argument("--pattern", default="*.npz")
     args = ap.parse_args()
 
-    paths = sorted(glob.glob(os.path.join(args.data_dir, "*.npz")))
+    paths = sorted(glob.glob(os.path.join(args.data_dir, args.pattern)))
     if not paths:
         raise SystemExit(f"no clips in {args.data_dir}")
     # hold out every third clip, so both policies and the whole speed range appear on both
@@ -56,7 +63,7 @@ def main():
     embeddings, actions, speeds = [], [], []
     for path in paths:
         clip = np.load(path, allow_pickle=True)
-        embeddings.append(encode_clip(encoder, clip["frames"], args.chunk).mean(1).numpy())
+        embeddings.append(encode_clip(encoder, clip["frames"], args.chunk).mean(1).cpu().numpy())
         # the B1 stores its command under `action` and a commanded speed alongside it; the insect
         # uses `actions` and walks one speed, so the same measurement runs on either by asking
         # which of the two is present rather than assuming the quadruped
@@ -99,18 +106,21 @@ def main():
             scores.append(rmse(Ridge(alpha=1.0).fit(xtr, ytr), xte, yte))
         print(f'{name:<26} {scores[0]:9.2f} {scores[1]:10.2f} {scores[0]/scores[1]:6.2f}x')
 
-    # can a single frame even tell how fast the robot was told to walk?
-    (xtr, ytr), (xte, yte) = split(lambda e: e, lambda a: a[:, :1] * 0)
-    per_clip_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i not in test_index])
-    per_clip_y = np.array([s for i, s in enumerate(speeds) if i not in test_index])
-    held_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i in test_index])
-    held_y = np.array([s for i, s in enumerate(speeds) if i in test_index])
-    speed_model = Ridge(alpha=1.0).fit(per_clip_x, per_clip_y)
-    error = float(np.sqrt(((speed_model.predict(held_x) - held_y) ** 2).mean()))
-    print(f'\ncommanded speed recovered from a clip of frames: {error:.3f} m/s error, '
-          f'against a range of {max(speeds) - min(speeds):.2f} m/s')
-    print("\nCompare with the insect (F31): one frame gave 4.61 deg on a_t against an 11.33 deg\n"
-          "spread, a_t+32 gave 4.45, and the second frame was worth 1.09x on the change.")
+    # Can a single frame even tell how fast the robot was told to walk? Only askable where the
+    # commanded speed varies: the B1 clips sweep a range, the insect walks one speed per body, so
+    # regressing on a constant target is not a weaker version of this question but a different one.
+    if np.isnan(speeds).any():
+        print("\nskipping the commanded-speed readout: this dataset has one commanded speed, so "
+              "there is nothing to regress")
+    else:
+        per_clip_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i not in test_index])
+        per_clip_y = np.array([s for i, s in enumerate(speeds) if i not in test_index])
+        held_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i in test_index])
+        held_y = np.array([s for i, s in enumerate(speeds) if i in test_index])
+        speed_model = Ridge(alpha=1.0).fit(per_clip_x, per_clip_y)
+        error = float(np.sqrt(((speed_model.predict(held_x) - held_y) ** 2).mean()))
+        print(f'\ncommanded speed recovered from a clip of frames: {error:.3f} m/s error, '
+              f'against a range of {max(speeds) - min(speeds):.2f} m/s')
 
 
 if __name__ == "__main__":

@@ -188,3 +188,20 @@ Each was hit at least once and cost real time.
   spread across the frame and buries ones confined to a few patches, and it also preserves a large
   constant offset between datasets that a fitted readout absorbs and then mis-applies. It turned a
   1.32x cross-embodiment result into 4.72x. Try more than one reduction and report the range.
+- **A script written for one embodiment breaks on the other, and the loud break is the lucky one.**
+  Both robots' clips are `.npz` but the B1 stores its command under `action` and the insect under
+  `actions`, so `b1_horizon.py` died with a `KeyError` on insect data — visible, cheap. The same
+  root cause in `morphology_mix.py` ran to completion and returned a number that was wrong by
+  2.55 deg, because it rebuilt the held-out ground truth from disk and so dropped `action_lag`.
+  `wm/data/embodiment.py` normalises the key names; a script that indexes the archive directly
+  bypasses it. Suspect *every* silent success on an embodiment the script was not written for.
+- **Defaults carry the size of the dataset they were written for.** `b1_horizon.py` encoded on the
+  CPU by default, which is tolerable for the B1's 14 clips and is 9,240 ViT-g frames on the
+  140-clip insect directory — still unfinished after 38 minutes. Same for `--clips`, `--chunk` and
+  split counts: re-read the defaults when you point a script at a bigger directory.
+- **Accumulating gradient over every batch is not the same as needing to.** `finetune_ftm.py`
+  cached embeddings on the CPU to avoid an OOM, then summed gradients over *all* spans before each
+  `opt.step()`. That made `--steps` count epochs rather than updates, made cost scale with the clip
+  budget, and put the 1/3/5/7-clip sweep at 374,400 forward+backward passes and 13 hours. Only the
+  *transfer to the device* has to be batched; sampling one batch per step is 15.6x cheaper and
+  gives every cell an equal number of updates, which is what a budget comparison needs anyway.

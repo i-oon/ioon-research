@@ -162,6 +162,14 @@ def main():
     results = []
     for n in args.clips:
         rows = {"pretrained": [], "scratch": []}
+        # `train = order[:n]` and `test = order[-test_clips:]` silently overlap once
+        # n + test_clips exceeds the pool, and the ratio then scores partly on clips the model was
+        # fitted on. With 14 B1 clips and 4 held out, budget 11 leaked exactly one of the four.
+        # Refuse rather than report an inflated number.
+        if n + args.test_clips > len(paths):
+            raise SystemExit(f"budget {n} + {args.test_clips} test clips exceeds the {len(paths)} "
+                             f"available: the split would overlap. Largest clean budget is "
+                             f"{len(paths) - args.test_clips}.")
         for split in range(args.splits):
             print(f"  ... {n} clips, split {split + 1}/{args.splits}", flush=True)
             order = np.random.default_rng(args.seed + split).permutation(len(paths))
@@ -173,11 +181,18 @@ def main():
                 rows[name].append(rollout(itm, ftm, test, args.horizons, device))
                 del itm, ftm
                 torch.cuda.empty_cache()
+        # Report the spread, not only the mean. A 1.05x that a reader cannot separate from the
+        # 0.96x beside it is not evidence, and averaging three splits throws away exactly the
+        # number that settles it.
         for name in ("pretrained", "scratch"):
             mean = {h: float(np.mean([r[h] for r in rows[name]])) for h in args.horizons}
-            results.append((n, name, mean))
-            print(f"{n:>6} {name:<12}" + "".join(f"{mean[h]:>8.2f}x" for h in args.horizons),
-                  flush=True)
+            lo = {h: float(np.min([r[h] for r in rows[name]])) for h in args.horizons}
+            hi = {h: float(np.max([r[h] for r in rows[name]])) for h in args.horizons}
+            results.append((n, name, mean, lo, hi))
+            print(f"{n:>6} {name:<12}"
+                  + "".join(f"{mean[h]:>7.2f}x" for h in args.horizons), flush=True)
+            print(f"{'':>6} {'  range':<12}"
+                  + "".join(f"{lo[h]:>4.2f}-{hi[h]:.2f}" for h in args.horizons), flush=True)
 
     print("\nAbove 1.00x means the adapted forward model beats holding the frame still on the")
     print("target robot. Below it, the rollout is worse than predicting no motion and cannot")
