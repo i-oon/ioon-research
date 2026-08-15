@@ -26,6 +26,7 @@ different conclusion, and the one that would keep the world-model framing alive.
   .venv/bin/python3 scripts/latent_rollout.py --ckpt wm/runs/m3d_cross/epoch008.pt
 """
 import argparse
+import glob
 import os
 import sys
 
@@ -66,6 +67,8 @@ def main():
     ap.add_argument("--embodiment", default="",
                     help="required only for checkpoints trained with ftm_embodiment_channel")
     ap.add_argument("--clips", type=int, default=3)
+    ap.add_argument("--glob", default="",
+                    help="clip pattern, for data whose names are not {body}_ep*.npz")
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 2, 3, 5, 8, 10])
     ap.add_argument("--encode_device", default="cpu")
     args = ap.parse_args()
@@ -80,15 +83,24 @@ def main():
     morph = args.morph or cfg.heldout_morph
     raw = args.data_dir or cfg.data_dir
     data_dir = raw if os.path.isabs(raw) else os.path.join(ROOT, raw)
-    paths = clip_paths(data_dir, (morph,))[:args.clips]
+    # A B1 clip is named p{policy}_vx{speed}, not {body}_ep{n}, and stores its command under a
+    # different key -- but this measurement only reads frames, so an embodiment-agnostic glob is
+    # enough. Needed to roll an insect-trained forward model on quadruped video (F50's follow-up).
+    if args.glob:
+        paths = sorted(glob.glob(os.path.join(data_dir, args.glob)))[:args.clips]
+        if not paths:
+            raise SystemExit(f"no clips matching {args.glob!r} in {data_dir}")
+    else:
+        paths = clip_paths(data_dir, (morph,))[:args.clips]
     encoder = VJEPA2FrameEncoder(device=args.encode_device, dtype=torch.float32)
 
     horizons = sorted(args.horizons)
     scores = {name: {k: [] for k in horizons} for name in ("rollout", "hold", "linear")}
 
     for path in paths:
-        clip = load_clip(path)
-        e = encode_clip(encoder, clip["frames"], 2).to(device)
+        with np.load(path, allow_pickle=True) as data:
+            frames = data["frames"]
+        e = encode_clip(encoder, frames, 2).to(device)
         if offset is not None:
             e = e - offset
         n = len(e)
@@ -109,7 +121,8 @@ def main():
                         ((e[start] + step * velocity - truth) ** 2).mean().item())
 
     print(f"{args.ckpt}  epoch {epoch}")
-    print(f"body '{morph}', {len(paths)} clips, un-augmented frames, "
+    label = args.glob if args.glob else f"body '{morph}'"
+    print(f"{label}, {len(paths)} clips, un-augmented frames, "
           f"{len(scores['rollout'][horizons[0]])} rollouts\n")
     print(f'{"steps ahead":>12} {"forward model":>14} {"hold still":>12} {"constant vel":>13} '
           f'{"vs hold":>9}')

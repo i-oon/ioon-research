@@ -244,6 +244,52 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 
 ---
 
+## Q14. What would actually improve cross-embodiment generalisation? (new, 2026-08-15)
+
+Answered as far as the measurements allow, so the next design decision is not made on intuition.
+
+**The transfer that exists travels entirely through `z` (F50).** Insect-only features give a 1.28x
+margin on a held-out B1; zeroing the latent drops that to 0.98x, indistinguishable from a random
+backbone. The decoder trunk's learned processing of the frame carries **nothing** across
+embodiments. Shuffling the latent scores worse than deleting it, so what matters is its alignment
+to the frame, not merely its content.
+
+**That rules out most of the obvious moves:**
+
+| lever | status |
+|---|---|
+| more bodies inside either family | **does not address this.** It solves the within-family problem twice and builds nothing between them -- and F43/F46 measured the shared trunk already producing sharper *per-robot* codes and a poorer shared one, so densifying each family likely pushes the wrong way |
+| anything acting on the frame pathway | **measured to carry nothing** across embodiments (F50) |
+| architecture: one shared trunk | **already done**; the measurement above is what it produces |
+| invariance methods | **three tried, none moved transfer** (F44: side channel, centring, adversary) |
+| genuine intermediate bodies | **leg-removal does not qualify** -- F47 shows the model reads them as the body they were cut from |
+| shared supervision across families | **blocked** -- F45 finds no pairing label that is both covered and meaningful |
+| **making the two robots' behaviour distributions overlap** | **the one lever still standing** |
+
+**Why behavioural overlap is the remaining candidate, and it is not a guess.** The ITM learns from
+*transitions*. F45 measured that the two robots barely share any: the B1 spends 84.6% of its time
+in two trot patterns the insect visits 9.8% and 5.7% of the time. If `z` is the only thing carrying
+transfer and `z` is learned from transitions, then shared transitions are the raw material it is
+short of. It also attacks F45's root cause directly, which would in turn unblock the pairing that
+`lambda_cross` needs.
+
+**The measurable target.** `z` reads a loaded leg at 0.986 within an embodiment and **0.373**
+across -- below the frozen encoder's 0.531, so training currently makes cross-embodiment sharing
+*worse than where it started*. Raising 0.373 is the thing to aim at, and `leg_contact_probe.py`
+measures it in minutes without training anything.
+
+**The cheap way to get behavioural diversity is IK, not AMP.** `sim/collect/collect_ik.py` already
+takes `--behavior turn`, `--turn_bias`, `--travel` and `--loops`. AMP is parked and its gaits are
+not a good stick-insect representation; IK is the reliable route and it can vary speed, turning and
+step geometry without touching the RL branch.
+
+**What is not known.** Whether more overlap actually raises 0.373 is untested -- the argument is
+mechanistic, not measured. Test it cheaply before committing to a collection: widen the insect's
+behaviour, re-run `pairing_feasibility.py` and `leg_contact_probe.py`, and see whether coverage and
+the cross cells move before spending on a full retrain.
+
+---
+
 ## Q1. Which cross-embodiment framing? (the main open choice)
 
 - **(A) 6-leg → B1** — feasible **now** with data in hand. Pretrain hexapod, test

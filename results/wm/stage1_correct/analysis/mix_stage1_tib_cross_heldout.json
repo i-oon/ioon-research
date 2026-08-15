@@ -1,0 +1,39 @@
+{
+  "held_out": "c10f10t08",
+  "train_morphs": [
+    "c10f10t10",
+    "c06f10t10",
+    "c10f06t06",
+    "c08f09t09"
+  ],
+  "epoch": 10,
+  "weights_model": {
+    "c10f10t10": 0.0,
+    "c06f10t10": 0.0,
+    "c10f06t06": 0.3377,
+    "c08f09t09": 0.6623
+  },
+  "weights_best_possible": {
+    "c10f10t10": 0.0,
+    "c06f10t10": 0.0,
+    "c10f06t06": 0.4185,
+    "c08f09t09": 0.5815
+  },
+  "scales_implied": [
+    0.8675,
+    0.7987,
+    0.7987
+  ],
+  "scales_best_possible": [
+    0.8837,
+    0.7744,
+    0.7744
+  ],
+  "scales_actual": [
+    1.0,
+    1.0,
+    0.8
+  ],
+  "concentration_model": 0.6622807459783553,
+  "rmse_deg_model": 12.475204467773438
+}

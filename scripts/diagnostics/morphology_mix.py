@@ -77,10 +77,31 @@ def main():
 
     episodes = [int(os.path.basename(str(c)).split("_ep")[1].split(".")[0]) for c in data["clips"]]
     frames = int(data["lengths"][0])
+
+    # The mixture is fitted against the training bodies at the *same* episodes, so an episode the
+    # prediction covers but some training body lacks cannot be used. The held-out body's clips are
+    # selected independently of the training bodies' shared set, so the two need not line up --
+    # drop the episodes that do not, and say which, rather than dying on a missing file or
+    # silently fitting on fewer.
+    usable, dropped = [], []
+    for i, ep in enumerate(episodes):
+        if all(os.path.exists(os.path.join(data_dir, f"{b}_ep{ep}.npz")) for b in train):
+            usable.append((i, ep))
+        else:
+            dropped.append(ep)
+    if not usable:
+        raise SystemExit(f"none of the prediction's episodes {episodes} exist for every training "
+                         f"body {train} in {data_dir}")
+    if dropped:
+        print(f"dropped episode(s) {dropped}: not present for every training body. "
+              f"Fitting on {[e for _, e in usable]}.")
+    keep = np.concatenate([np.arange(i * frames, (i + 1) * frames) for i, _ in usable])
+    episodes = [e for _, e in usable]
+
     target_actions = mean_actions(data_dir, held, episodes, frames)
     sources = {b: mean_actions(data_dir, b, episodes, frames) for b in train}
 
-    pred = np.degrees(data["pred"])
+    pred = np.degrees(data["pred"])[keep]
     stack = [sources[b].ravel() for b in train]
     model_weights = fit_mixture(pred.ravel(), stack)
     true_weights = fit_mixture(target_actions.ravel(), stack)

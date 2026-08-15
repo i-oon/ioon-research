@@ -61,7 +61,9 @@ def main():
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    cfg, itm, md, mean, std, epoch = load_model(args.ckpt, device)
+    # load_model also returns the decoder head name and the raw checkpoint, added for
+    # cross-embodiment runs; a single-morphology checkpoint reports head 'default'
+    cfg, itm, md, mean, std, epoch, head, _ = load_model(args.ckpt, device)
     morph = args.morph or cfg.heldout_morph
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
     paths = clip_paths(data_dir, (morph,))[:args.clips]
@@ -98,9 +100,9 @@ def main():
         }
         for name, e_next in variants.items():
             z = latents_from(itm, e_t, e_next, args.chunk)
-            collected[name].append(decode(md, e_t, z, args.chunk) * std + mean)
+            collected[name].append(decode(md, e_t, z, args.chunk, head) * std + mean)
         z0 = torch.zeros_like(latents_from(itm, e_t[:1], e_t[:1], 1)).repeat(n, 1)
-        collected["zero"].append(decode(md, e_t, z0, args.chunk) * std + mean)
+        collected["zero"].append(decode(md, e_t, z0, args.chunk, head) * std + mean)
         truth.append(actions[lag:lag + n])
 
     gt = np.concatenate(truth)

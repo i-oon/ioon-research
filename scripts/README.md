@@ -78,6 +78,7 @@ exception, and says so in the file: the broken bodies are its subject.
 | | |
 |---|---|
 | `cross_embodiment_probe.py` | Does the frozen encoder place a hexapod and a quadruped in a shared space? Run before spending GPU on Stage 2. |
+| `encoder_scale_probe.py` | Can a linear readout of the frozen encoder recover a body's segment scales, and does its error predict whether a split will transfer? Also reports the mixture gap, which is pure geometry and needs no encoder at all. |
 | `pairing_feasibility.py` | Can a cross-embodiment `L_cross` be defined at all? Scores each candidate pairing label on coverage *and* on whether it pins down the command within one robot. A label that fails the second gives the decoder a wrong target, not a noisy one. |
 | `swap_embodiment.py` | Does a latent inferred from an unseen embodiment drive the decoder, or is that embodiment simply read as a training body? The cross-embodiment form of `swap_pathway.py`, definable only for the 4-leg, which shares expert episodes with the hexapod. |
 | `b1_horizon.py` | Is the B1's command as determined by a single frame as the insect's is? |
@@ -88,6 +89,7 @@ exception, and says so in the file: the broken bodies are its subject.
 | | |
 |---|---|
 | `fit_4leg_head.py` | Fit a new output head on a held-out embodiment with the backbone frozen. |
+| `fit_b1_head.py` | The same on the B1, using a Stage 1 checkpoint so the quadruped is genuinely held out. `--stratify` matches velocities across the split; `--z_modes` ablates the latent, which is what showed the transfer travels entirely through `z` (F50). |
 | `sweep_4leg_fewshot.py` | The same, swept over how many clips the new head gets. |
 
 **Does the command actually walk**
@@ -113,6 +115,7 @@ exception, and says so in the file: the broken bodies are its subject.
 ## figures/
 
 `make_track_figures.py`, `make_stage2_diagram.py`, `plot_morphology_evidence.py`,
+`plot_cross_loss_effect.py`,
 `plot_obs_format.py`, `plot_ik_intuition.py`.
 
 ## finished/

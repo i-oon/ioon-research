@@ -28,8 +28,11 @@ OUT = os.path.join(ROOT, "results", "wm", "figures")
 BLUE, RED, GREY, GREEN = "#2471a3", "#c0392b", "#c8ccce", "#1e8449"
 
 # F35: volume-matched retrain, four bodies -> seven, 7,540 -> 7,735 training pairs
-BEFORE, AFTER = 27.68, 16.10
-CONSTANT_POSE, COPY_NEAREST = 16.01, 10.63
+# tib_cross and bracket_cross on the same held-out body c10f10t08, matched at 96
+# training clips. R^2 is against that body's own mean posture, so the zero line *is*
+# the constant-pose baseline -- no separate reference line needed.
+BEFORE, AFTER = 12.67, 3.27
+R2_BEFORE, R2_AFTER = -0.78, 0.89
 
 # F19 / F38: two-way variance decomposition of the latent
 SHARES = [
@@ -68,35 +71,43 @@ def save(fig, name, dpi):
 
 
 def coverage(dpi):
-    fig, ax = plt.subplots(figsize=(7.2, 5.4))
-    ax.bar([0, 1], [BEFORE, AFTER], width=0.5, color=[RED, BLUE])
+    fig, (left, right) = plt.subplots(1, 2, figsize=(10.6, 4.6))
+
+    left.bar([0, 1], [BEFORE, AFTER], width=0.5, color=[RED, BLUE])
     for x, v in ((0, BEFORE), (1, AFTER)):
-        ax.text(x, v + 0.7, f"{v:.2f}", ha="center", fontsize=15, fontweight="bold")
+        left.text(x, v + 0.25, f"{v:.2f}", ha="center", fontsize=15, fontweight="bold")
+    left.annotate("", xy=(0.78, AFTER + 1.6), xytext=(0.20, BEFORE - 0.8),
+                  arrowprops=dict(arrowstyle="->", lw=2.2, color="0.25"))
+    left.text(0.95, BEFORE * 0.55, f"{BEFORE / AFTER:.1f}x", fontsize=16, fontweight="bold",
+              color="0.25", ha="center")
+    left.set_xticks([0, 1])
+    left.set_xticklabels(["femur tied to tibia\n4 bodies", "decoupled\n6 bodies"], fontsize=11)
+    left.set_ylabel("held-out error, degrees per joint", fontsize=11)
+    left.set_ylim(0, BEFORE * 1.2)
+    left.set_title("Error on the held-out body", fontsize=12)
+    left.grid(axis="y", alpha=.3)
+    left.set_axisbelow(True)
 
-    # the two no-learning references the result has to be read against: beating a constant pose is
-    # the minimum bar, copying the nearest training body is what coverage alone would buy.
-    # Labelled in the right margin because the constant-pose line lands within 0.1 deg of the
-    # "after" bar's top, so anything placed over the axes collides with the bar's own value.
-    for y, colour, text in ((CONSTANT_POSE, "0.35", f"predict a constant pose, {CONSTANT_POSE:.2f}"),
-                            (COPY_NEAREST, GREEN, f"copy the nearest body, {COPY_NEAREST:.2f}")):
-        ax.axhline(y, ls="--", lw=1.4, color=colour)
-        ax.text(1.34, y, text, fontsize=11, color=colour, va="center", ha="left",
-                bbox=dict(fc="white", ec=colour, alpha=.9, boxstyle="round,pad=0.28"))
+    # R^2 zero is the constant-pose baseline by construction: below it the model is worse than
+    # memorising the held-out body's average posture.
+    right.bar([0, 1], [R2_BEFORE, R2_AFTER], width=0.5, color=[RED, BLUE])
+    for x, v in ((0, R2_BEFORE), (1, R2_AFTER)):
+        right.text(x, v + (0.06 if v > 0 else -0.12), f"{v:+.2f}", ha="center", fontsize=15,
+                   fontweight="bold")
+    right.axhline(0, color="0.25", lw=1.6)
+    right.text(1.34, 0, "predicting this body's\nown average posture", fontsize=10, color="0.25",
+               va="center", ha="left",
+               bbox=dict(fc="white", ec="0.6", alpha=.9, boxstyle="round,pad=0.28"))
+    right.set_xlim(-0.5, 2.5)
+    right.set_xticks([0, 1])
+    right.set_xticklabels(["femur tied to tibia\n4 bodies", "decoupled\n6 bodies"], fontsize=11)
+    right.set_ylabel("R² against the body's own mean", fontsize=11)
+    right.set_ylim(min(R2_BEFORE * 1.35, -0.3), 1.15)
+    right.set_title("Crossing zero is the whole result", fontsize=12)
+    right.grid(axis="y", alpha=.3)
+    right.set_axisbelow(True)
 
-    ax.annotate("", xy=(0.72, AFTER + 3.0), xytext=(0.14, BEFORE - 1.2),
-                arrowprops=dict(arrowstyle="->", lw=2.2, color="0.25"))
-    ax.text(0.88, BEFORE - 3.8, f"{BEFORE / AFTER:.1f}x", fontsize=16, fontweight="bold",
-            color="0.25", ha="center")
-
-    ax.set_xlim(-0.5, 2.35)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(["before\n4 bodies", "after\n7 bodies"], fontsize=12)
-    ax.set_ylabel("held-out error, degrees per joint", fontsize=12)
-    ax.set_ylim(0, BEFORE * 1.18)
-    ax.set_title("Filling the gap the diagnosis named\n"
-                 "same data volume: 7,735 training pairs against 7,540", fontsize=13)
-    ax.grid(axis="y", alpha=.3)
-    ax.set_axisbelow(True)
+    fig.suptitle("Filling the gap the diagnosis named — matched at 96 training clips", fontsize=13)
     save(fig, "coverage_experiment.png", dpi)
 
 

@@ -1,0 +1,15 @@
+split_type,train_clips,test_clips,model,deg,deg_sd,r2,margin
+random,5,9,pretrained,20.49,4.41,0.352,1.16
+random,5,9,random_backbone,23.80,2.29,0.222,
+random,7,7,pretrained,16.05,0.58,0.623,1.25
+random,7,7,random_backbone,20.09,0.30,0.475,
+random,9,5,pretrained,15.62,0.70,0.678,1.31
+random,9,5,random_backbone,20.48,1.17,0.508,
+velocity_stratified,7,7,pretrained,15.98,0.67,0.579,1.28
+velocity_stratified,7,7,random_backbone,20.49,0.72,0.393,
+velocity_stratified,7,7,pretrained_zero_z,20.86,1.02,0.342,0.98
+velocity_stratified,7,7,pretrained_shuffled_z,22.04,0.80,0.283,0.93
+ftm_rollout_b1,,,insect_ftm_on_b1_1step,3.455,,,0.63
+ftm_rollout_b1,,,insect_ftm_on_b1_10step,6.238,,,0.71
+ftm_rollout_insect,,,insect_ftm_on_heldout_insect_1step,1.391,,,1.52
+ftm_rollout_insect,,,insect_ftm_on_heldout_insect_10step,2.982,,,1.46

@@ -2564,8 +2564,272 @@ builds. The selection is therefore the same operation on both, and the F44/F48 c
 confounded by it -- but note that both datasets are the low-drift tail of a biased distribution,
 so neither is a straight-walking body.
 
+### F49. Retrained on clean data: the mechanism strengthens, its accuracy gain shrinks, and coverage becomes the strongest result
+
+All five Stage 1 runs the deck cites, retrained by `scripts/retrain_stage1.sh` on data where every
+training body walks and at the corrected `action_lag 1`. `tib_ctrl` is included, so slide 3's
+named control exists for the first time. Scored with `scripts/diagnostics/score_body.py`; raw
+numbers in `results/wm/stage1_correct/measurements/heldout_scores.csv`.
+
+| run | held out | deg | R^2 | `zero_z` | `zero_x` |
+|---|---|---|---|---|---|
+| `m3d_cross` (0.5) | c08f09t09 | **3.44** | +0.81 | 0.917 | **1.621** |
+| `m3d_bracketed` (0.0) | c08f09t09 | 3.67 | +0.79 | 0.729 | **0.083** |
+| `tib_cross` (0.5) | c10f10t08 | 12.67 | -0.78 | 2.349 | 1.991 |
+| `tib_ctrl` (0.0) | c10f10t08 | 13.41 | -0.41 | 5.404 | 1.510 |
+| `bracket_cross` (0.5, 6 bodies) | c10f10t08 | **3.27** | **+0.89** | 0.699 | 1.037 |
+
+**The pathway result is stronger than it ever was on contaminated data.** On the matched m3d pair
+the control's `zero_x` is **0.083** -- deleting the frame entirely costs almost nothing, so the
+decoder is not reading it at all -- against `zero_z` 0.729. With the cross term the order inverts:
+`zero_x` 1.621 against `zero_z` 0.917, so the frame matters *more* than the latent. A **16x swing
+in which input the decoder depends on, from one flag**, and the cleanest statement of F18 and F24
+in the project.
+
+**The accuracy gain shrank by three.** 3.44 against 3.67 is 6%, where the contaminated pair read
+2.91 against 3.57, or 18%. `lambda_cross` still wins and still repairs the pathway outright; what
+it buys in *degrees* is much smaller once the veering bodies are gone. Q13 predicted cleaning the
+data would strengthen Stage 1's claims -- it strengthened the mechanism and weakened the headline
+number, which is not what was predicted and should be said plainly.
+
+**Coverage is now the strongest result in Stage 1.** Four bodies that tie femur to tibia score
+12.67 deg at R^2 **-0.78**; six bodies that decouple them score 3.27 deg at R^2 **+0.89**, at
+matched volume (96 training clips both sides). The contaminated version of this comparison moved
+27.68 to 16.10 and landed exactly on the constant-pose baseline without passing it. **The clean
+version crosses zero R^2 and beats every baseline**: filling the named gap does not merely improve
+extrapolation, it removes the failure.
+
+**Read with three caveats, none optional.**
+
+- **The held-out body changed.** `tib_*` and `bracket_*` now hold out `c10f10t08` (ratio 1.04)
+  rather than `c10f10t06`, which does not walk (F42). With the six-body set spanning 0.83-1.10 the
+  held-out body sits *inside* the hull, so `bracket_cross` is interpolation where `tib_cross` is
+  extrapolation. That is exactly what coverage is meant to do, and also why the two are not a
+  like-for-like difficulty comparison.
+- **The m3d pair differs from the deck in two things**, data and `action_lag`, so old against new
+  is not attributable to either alone.
+- **The three 10-epoch runs peaked at epoch 10**, still improving when the budget ended. Not
+  converged.
+
+**One metric disagreement to settle before quoting slide 8.** `tib_cross` beats `tib_ctrl` in
+degrees, 12.67 against 13.41, and loses on R^2, -0.78 against -0.41. Degrees pool raw error while
+R^2 is in standardised units where low-variance joints weigh more, so both orderings are correct
+and answer different questions. Slide 8 should name which one it reports.
+
+### F49b. Every deck measurement re-run on the clean checkpoints, and what moved
+
+The deck's numbers all came from checkpoints trained on the contaminated data. Re-measured on the
+retrained pair, with the same scripts and the same held-out body. Recorded here rather than in the
+deck: the slides state the current numbers only, without narrating what they used to be.
+
+| measurement | contaminated (ctrl / cross) | clean (ctrl / cross) | verdict |
+|---|---|---|---|
+| swap test, which input decides | latent / **frame** | latent / **frame** | unchanged, and sharper |
+| latent variance: gait | 64.5% / 88.7% | 81.9% / **92.6%** | same direction |
+| latent variance: body | 8.8% / 1.2% | 12.4% / **3.4%** | same direction, 7x becomes 3.6x |
+| behaviour decodable from `z` | 0.757 / 0.744 | 0.729 / **0.732** | now improves rather than dips |
+| transition removed costs | 1.36x / 1.23x | 1.28x / 1.34x | unchanged in kind |
+| **latent deleted costs** | 3.97x / **2.61x** | 2.88x / **3.48x** | **reversed** |
+| replay distance, share of IK | 93% / 89% | 85% / **90%** | reversed |
+| replay heading deviation | 3.7 / 6.8 deg | 11.8 / **5.5 deg** | reversed |
+| commands outside joint range | 7.7% / **5.4%** | 6.1% / 6.4% | advantage gone |
+| worst excursion | 20.2 / **5.5 deg** | 8.2 / **3.9 deg** | unchanged in kind |
+
+**Three claims did not survive** and are gone from the deck: that the cross term reduces the
+decoder's dependence on the latent, that it lowers the *frequency* of out-of-range commands, and
+that neither model veers more than the IK reference. On one clean clip the reference walks almost
+straight, -0.8 deg, and both models veer to +11.5 and +15.0.
+
+**The reversal in the latent-deletion row is the informative one.** Under contamination the cross
+term *reduced* the decoder's need for `z`; on clean data it *increases* it, 2.88x to 3.48x. Both
+readings are correct for the data they were measured on, and together they say what `z` was
+carrying in each case. With veering bodies in training, `z` was largely a body code, so a decoder
+pushed onto the frame stopped needing it. With those bodies gone, `z` is 92.6% gait, so a decoder
+that reads the body from the frame still depends on `z` for the movement. The division of labour
+-- **frame carries which body, latent carries what movement** -- is only visible once the data is
+clean, and it is what slides 5 and 11 now report.
+
+**A swap-test detail worth keeping.** On the clean cross run the crossed rows score 4.79 and 5.84
+against uncrossed 4.77 and 5.88: substituting the other body's latent moves the answer by 0.04
+deg. Not a preference for the frame -- the latent contributes nothing to the body question at all.
+
+**Checked on both saved checkpoints.** `best.pt` is selected on validation *total*, which is ~99%
+reconstruction, while every number reported is action accuracy -- so the two could in principle
+disagree. Scoring `best_motion.pt` for all five runs returns the **same figures to two decimals**
+(3.44 / 3.67 / 12.67 / 13.41 / 3.27 deg, identical R^2), differing only in the third decimal of
+`zero_z`. The same epoch won on both criteria, so the selection rule does not affect anything in
+the deck.
+
+### F50. Insect-only features transfer to the B1, weakly but consistently
+
+Every cross-embodiment number so far was measured on a body Stage 2 trained on, or on the 4-leg
+insect that F47 showed the model reads as the body it was cut from. This is the question asked on
+the one genuinely different robot available: **hold the B1 out entirely, train on stick insects
+only, and fit a B1 head few-shot.**
+
+Backbone is `stage1_m3d_cross` -- four insect bodies, never a quadruped -- frozen, with a fresh
+12-D B1 head. Control is the same head on a random backbone at an identical budget. Protocol,
+fitting and metrics imported from `fit_4leg_head` so the scales match
+(`scripts/diagnostics/fit_b1_head.py`).
+
+| split | train / test | pretrained | random backbone | margin |
+|---|---|---|---|---|
+| random | 5 / 9 | 20.49 deg, R^2 +0.35 (+/- 4.41) | 23.80, +0.22 | 1.16x |
+| random | 7 / 7 | 16.05 deg, R^2 +0.62 (+/- 0.58) | 20.09, +0.48 | **1.25x** |
+| random | 9 / 5 | 15.62 deg, R^2 +0.68 (+/- 0.70) | 20.48, +0.51 | **1.31x** |
+| **velocity-stratified** | 7 / 7 | **15.98 deg, R^2 +0.58** | 20.49, +0.39 | **1.28x** |
+
+The margin is stable at **1.25-1.31x** wherever both arms produce a usable head, and grows slightly
+with the clip budget.
+
+**Transfer is real.** A backbone that has seen only stick insects makes a quadruped action head
+measurably cheaper to fit than random features do, consistently across splits and budgets.
+
+**And it is not a speed-generalisation artefact.** The B1 set is 2 policies x 7 commanded
+velocities, so a random split leaves unseen speeds in the test set and conflates "new robot" with
+"new speed". Stratifying -- one policy's clip of each speed in train, the other in test, so both
+sides cover all seven velocities -- gives **1.28x against the random split's 1.29x**. Controlling
+the confound does not move the result.
+
+**Read the margin only where both arms work.** At five clips the two backbones score R^2 -0.14 and
+-0.12 on a single split: neither produces a usable head, so their ratio compares two failures. The
+three-split average at that budget is positive but swings +/- 4.41 deg. Nine clips, or the
+stratified seven, is where the comparison means anything.
+
+**Do not read 1.28x against the 4-leg's 2.85x as "transfer is 2.2x weaker".** The tasks differ in
+difficulty independently of embodiment: the B1 set spans two policies and seven speeds with unseen
+combinations in the test set, while every 4-leg clip is one behaviour at one speed. Both show
+transfer; the B1's is smaller. That is as far as the comparison goes.
+
+**What this fixes in the argument.** The Stage 2 story rested on a 4-leg body the model does not
+perceive as new (F47), which left "transfer to a genuinely different robot" untested. It is now
+tested, on the one such robot in the project, and the answer is a small positive rather than the
+null that F41b and F45 predicted -- the frozen encoder shares little (0.531 / 0.547 across on
+per-leg contact) and the behaviour distributions barely overlap, yet something still carries.
+
+**All of the transfer travels through the latent, and none through the frame.** Ablating `z` on
+the velocity-stratified split, three splits, everything else identical:
+
+| arm | deg | R^2 | margin over random |
+|---|---|---|---|
+| pretrained, real `z` | **16.01** | +0.577 | **1.28x** |
+| pretrained, `z` zeroed | 20.86 | +0.342 | **0.98x** |
+| pretrained, `z` shuffled within clip | 22.04 | +0.283 | 0.93x |
+| random backbone | 20.49 | +0.393 | -- |
+
+**Zeroing `z` removes the entire margin.** A backbone trained on insects, with its latent deleted,
+scores 20.86 against a random backbone's 20.49 -- the same, within noise. So the decoder trunk's
+learned processing of `e_t` carries **nothing** to a quadruped; every bit of the advantage arrives
+through the ITM's latent.
+
+**And the latent's value is its alignment, not its distribution.** Shuffling real latents within a
+clip scores 22.04, *worse than supplying none at all*. A latent that does not belong with the frame
+it is paired with is an active liability.
+
+**This locates the lever.** The part of the pipeline that transfers across embodiments is the one
+module that encodes *change* rather than appearance. It also sharpens the target: `z` reads a
+loaded leg at 0.986 within an embodiment and 0.373 across (F41b), below the frozen encoder's
+0.531 -- and since `z` is the only thing carrying transfer, raising that 0.373 is the thing to aim
+at. Making the two robots' behaviour distributions overlap (F45's measured root cause) is the lever
+with a mechanism behind it: the ITM learns from transitions, so shared transitions are what it
+needs to find shared structure.
+
+**The forward model does not transfer -- it is actively harmful.** Rolling the same insect-trained
+FTM on B1 video, true latents supplied, against holding the frame still:
+
+| steps ahead | on B1 video | on its own held-out insect body |
+|---|---|---|
+| 1 | **0.63x** | 1.52x |
+| 3 | **0.57x** | 1.72x |
+| 5 | **0.63x** | 1.69x |
+| 10 | **0.71x** | 1.46x |
+
+**Below 1.0 at every horizon**: on a quadruped the forward model predicts *worse than assuming
+nothing moves*, while the same weights beat a frozen world by 1.5-1.7x on the body they were
+trained near.
+
+**So the three modules separate cleanly**, and only one of them crosses:
+
+| module | across embodiments |
+|---|---|
+| ITM, the latent `z` | **transfers** -- 1.28x |
+| decoder trunk's use of the frame | does not -- 0.98x, the same as random weights |
+| FTM | **harmful** -- 0.57-0.71x, worse than doing nothing |
+
+**This matters most for deployment.** The method's deployed form rolls the forward model, compares
+imagined futures against a goal and picks actions from that comparison -- so the FTM, not the
+motion decoder, is the module a planner depends on. A forward model that scores below a frozen
+world cannot support planning on that robot, however cheaply its action head fits. **The current
+model could not be deployed on the B1 whatever the few-shot numbers say.**
+
+It also corrects a conclusion drawn one measurement too early. `z` transferring made the latent
+look like the whole story; the module that *consumes* `z` fails on the same data, so the limit is
+not located in the latent alone.
+
+**What it rules out.** Adding bodies within either family does not touch this, and neither does
+anything acting on the frame pathway -- that pathway was measured to carry nothing across
+embodiments.
+
+**A prediction that did not hold, recorded because it was mine.** I framed this test expecting a
+null and wrote that expectation into the script. Two measurements pointing one way is a reason to
+run the experiment, not a reason to report its answer in advance.
+
+### F51. Coverage repairs the decoder and barely touches the forward model
+
+F50 found the forward model harmful across embodiments. Three follow-ups locate why, and they
+separate two modules that had been treated as one problem.
+
+**The architecture can model a quadruped; the Stage 1 model simply never saw one.** Same rollout,
+same B1 video, two checkpoints:
+
+| FTM rolled on B1 video | 1 step | 3 | 5 | 10 |
+|---|---|---|---|---|
+| `stage2_clean`, trained on insects **and** B1 | **1.39x** | **1.53x** | **1.52x** | **1.34x** |
+| `stage1_m3d_cross`, insects only | 0.63x | 0.57x | 0.63x | 0.71x |
+
+Identical architecture and objective. Exposure alone moves the forward model from *worse than a
+frozen world* to *1.5x better than one*. The limit is not the design.
+
+**But coverage inside a family barely helps it generalise.** `tib_cross` (4 bodies, femur tied to
+tibia) against `bracket_cross` (6 bodies, decoupled), rolled on the **same** held-out body at
+matched volume:
+
+| steps ahead | 4 bodies | 6 bodies |
+|---|---|---|
+| 1 | 1.23x | 1.29x |
+| 3 | 1.27x | **1.38x** |
+| 5 | 1.22x | 1.31x |
+| 10 | 1.04x | 1.07x |
+
+**Better at every horizon, by 5 to 8 percent.** On the *same pair of checkpoints* the motion
+decoder improved 12.67 deg to 3.27 and R^2 -0.78 to +0.89 -- a factor of 3.9 (F49). **The same
+intervention that transforms the decoder moves the forward model almost not at all.**
+
+**And multi-embodiment training costs the forward model something.** On a held-out *insect* body,
+`stage1_m3d_cross` rolls at 1.46-1.72x while `stage2_clean`, which added the B1 to training, rolls
+at 1.30-1.52x. Sharing the trunk with a quadruped makes the insect forward model slightly worse.
+Small, but it is a price nobody had measured, and it will matter if more embodiments are added.
+
+**What this means for the plan.** The two goals do not respond to the same lever:
+
+| goal | coverage helps? |
+|---|---|
+| action head fits cheaply on a new robot | **yes, enormously** -- 3.9x |
+| forward model rolls a new robot forward | **barely** -- 5-8% |
+
+So adding bodies, or even adding embodiments, is not a route to a forward model that works on an
+unseen robot: it needs that robot inside its training distribution. Since the source method's own
+transfer is a LoRA finetune on 7,265 target-robot trajectories rather than zero-shot, the
+comparable question is not whether a frozen forward model generalises but **how few target clips
+it takes to adapt one** -- the same sample-efficiency framing already used for the action head.
+
 ## Files
 
+- `results/wm/stage2/measurements/ftm_cross_embodiment.csv` -- the rollouts behind F51
+
+- `results/wm/stage2/measurements/b1_transfer.csv` -- the B1 few-shot splits (F50)
+
+- `results/wm/stage1_correct/measurements/heldout_scores.csv` -- the five retrained runs (F49)
 - `results/wm/stage2/4leg_head/c08f09t09_fewshot.csv` -- the three splits behind F48
 - `scripts/diagnostics/pairing_feasibility.py` -- is a cross-embodiment `L_cross` definable (F45)
 - `scripts/diagnostics/swap_pathway.py` -- also takes `--embodiment` for Stage 2 checkpoints (F46)
