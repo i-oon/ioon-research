@@ -57,13 +57,18 @@ def main():
     for path in paths:
         clip = np.load(path, allow_pickle=True)
         embeddings.append(encode_clip(encoder, clip["frames"], args.chunk).mean(1).numpy())
-        actions.append(np.degrees(clip["action"]))
-        speeds.append(float(clip["command"][0, 0]))
+        # the B1 stores its command under `action` and a commanded speed alongside it; the insect
+        # uses `actions` and walks one speed, so the same measurement runs on either by asking
+        # which of the two is present rather than assuming the quadruped
+        actions.append(np.degrees(clip["action" if "action" in clip.files else "actions"]))
+        speeds.append(float(clip["command"][0, 0]) if "command" in clip.files else float("nan"))
 
     pooled = np.concatenate(actions)
     steps = np.concatenate([np.diff(a, axis=0) for a in actions])
+    speed_note = (f", commanded speeds {min(speeds):.2f}-{max(speeds):.2f} m/s"
+                  if not np.isnan(speeds).any() else ", one commanded speed")
     print(f"{len(paths)} clips, {len(paths) - len(test_index)} fitted / {len(test_index)} held "
-          f"out, commanded speeds {min(speeds):.2f}-{max(speeds):.2f} m/s")
+          f"out{speed_note}")
     print(f"command spread {pooled.std(axis=0).mean():.2f} deg per joint | "
           f"step a_t+1 - a_t: std {steps.std():.2f} deg\n")
 

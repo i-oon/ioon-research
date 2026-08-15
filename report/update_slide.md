@@ -38,7 +38,7 @@ that separation happens at all, in the easy case where the joint spaces do match
 | Slides 2-3 | what was built, the data, and how every number below is measured |
 | Slides 4-7 | the central result: the geometry is readable, the model ignores it, what fixed that, and what the fix did to the latent |
 | Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
-| Slides 11-12 | two structural facts about the task itself, found last, that reframe the rest |
+| Slides 11-12 | two facts about the task itself that bound what the latent can be worth |
 | Slides 13-16 | status, a first cross-embodiment run, a held-out 4-leg action space, and transfer to the B1 |
 | Slides 17-18 | what is settled, the two decisions left, and last term's questions answered |
 
@@ -92,9 +92,9 @@ collapse or veer are excluded by name, not by hope.
 
 | Dataset | Bodies | Size | Used by |
 |---|---|---|---|
-| `ik_walk_m3d_clean` | 4 training + 1 held out | 140 clips | `m3d_cross`, `m3d_bracketed` |
-| `ik_walk_cov_narrow` | 4 training, all at femur/tibia 0.83 | 96 + 20 clips | `tib_cross`, `tib_ctrl` |
-| `ik_walk_cov_wide` | 6 training, femur/tibia decoupled | 96 + 20 clips | `bracket_cross` |
+| `ik_walk_m3d_clean` | 4 training, all femur = tibia | 140 clips | `m3d_cross`, `m3d_bracketed` — slides 4-8 |
+| `ik_walk_cov_narrow` | 4 training, all at femur/tibia 0.83 | 96 + 20 clips | `tib_cross`, `tib_ctrl` — slide 9 |
+| `ik_walk_cov_wide` | 6 training, femur/tibia decoupled | 96 + 20 clips | `bracket_cross` — slide 9 |
 
 The two coverage directories are **volume-matched at 96 training clips**, which is what lets slide
 9 attribute its result to coverage rather than to more data.
@@ -305,22 +305,27 @@ latent **stopped carrying a job that was never its own**, and kept the one that 
 Predicted commands driven open-loop through the same physics used to collect the data,
 on a body never trained on. `m3d_cross` against its control `m3d_bracketed`.
 
-Three clips, each figure the mean with the range across clips in brackets.
+Three clips. Every cell is the mean with the range across clips in brackets, and the last column
+counts the clips on which the cross-body run is the better of the two — the clips are the same
+episodes driven through the same physics, so the comparison is paired.
 
-| | Ground truth (IK) | Control | With the cross-body loss |
-|---|---|---|---|
-| Forward distance, share of IK | 100% | 85% [74–91] | **90%** [89–91] |
-| Heading deviation from IK | 0 deg | 11.8 deg | **5.5 deg** |
-| Commands outside the body's own joint range | 0% | 6.1% | 6.4% |
-| Worst such excursion | 0 deg | 8.2 deg [4.0–**16.6**] | **3.9 deg** [3.7–4.1] |
+| | IK | Control | With the cross-body loss | cross wins |
+|---|---|---|---|---|
+| Forward distance, share of IK | 100% | 85% [74–91] | **90%** [89–91] | 1 / 3 |
+| Heading deviation from IK | 0 deg | 11.8 [6.1–17.0] | **5.5** [0.6–12.3] | **3 / 3** |
+| Commands outside the body's own joint range | 0% | **6.1%** [5.8–6.2] | 6.4% [6.3–6.6] | 0 / 3 |
+| Worst such excursion | 0 deg | 8.2 [4.0–**16.6**] | **3.9** [3.7–4.1] | 2 / 3 |
 
-**Both models walk, and the averages are close. The spread is where they differ.** The cross-body
-run lands in a narrow band on every measure — 89 to 91 percent of the distance, worst excursion
-3.7 to 4.1 deg. The control matches it on two clips out of three and then fails badly on the
-third: 74 percent of the distance and a 16.6 deg excursion.
+**Both models walk, and on averages they are close. Read the ranges and the win column instead.**
 
-**Heading is the one measure it wins outright**, on all three clips: 5.5 deg of deviation from the
-IK reference against 11.8.
+**Heading is the only measure won outright** — closer to the IK reference on every clip. The ranges
+overlap, but the clips are paired, so the pairwise count is the comparison that applies.
+
+**The others say something different: the cross-body run is steadier, not better.** It sits in a
+narrow band everywhere — 89 to 91 percent of the distance, worst excursion 3.7 to 4.1 deg — while
+the control matches it on two clips and then fails badly on the third, at 74 percent of the
+distance with a 16.6 deg excursion. On the *frequency* of out-of-range commands the control is
+marginally ahead on every clip; what differs is the worst case, not how often.
 
 **What the joint-range row means.** A command outside the range a body ever adopts asks the leg
 for a pose it cannot hold; open loop those errors accumulate and the leg folds under the abdomen.
@@ -341,91 +346,101 @@ line up. Mean feet on the ground is 3.02 of six against the reference's 3.08.
 Video, side by side with distance travelled stamped on each frame:
 `results/wm/stage1_correct/gait/replay_stage1_m3d_cross_clip0.mp4`
 
+**Per joint, against the IK commands that produced the clip.** Black is ground truth, red is the
+model, three clips end to end:
+
+![per-joint reconstruction on the held-out body](../results/wm/stage1_correct/figures/action_trace_m3d_cross_c08f09t09.png)
+
+The mean of **R² 0.81** is an average over three very different groups:
+
+| joint | R² | RMSE |
+|---|---|---|
+| **TC**, the fore-aft swing | **1.00 on all six legs** | 0.4–1.0 deg |
+| **FT**, the knee | 0.81–0.91 | 4.0–4.5 deg |
+| **CF**, the leg lift | **0.49–0.80** | 3.7–4.1 deg |
+
+**The middle column is where it struggles, and it struggles in a specific way.** The red trace
+follows the *shape* of every CF cycle and sits at the wrong *height* — the model knows what the leg
+is doing and misplaces how high it holds it. That is the same failure the geometry read shows on
+slide 4, where the decoder puts the coxa at 0.622 against a true 0.80: **the coxa is the segment
+that sets leg height.** Two unrelated measurements land on the same joint.
+
 ---
 
 ## Slide 8 — The limit: everything ties the femur to the tibia, because the data does
 
-**The setup.** In all four training bodies, the femur and the tibia carry the same scale. Not by
-design — it is simply true of the four:
+**Same model as the last four slides.** `m3d_cross`, the same weights, the same frozen encoder.
+Only the body it is asked about changes.
 
 | Training body | coxa | femur | tibia |
 |---|---|---|---|
 | c10f10t10 | 1.0 | **1.0** | **1.0** |
 | c06f10t10 | 0.6 | **1.0** | **1.0** |
 | c10f06t06 | 1.0 | **0.6** | **0.6** |
-| c08f09t09 | 0.8 | **0.9** | **0.9** |
+| c06f06t06 | 0.6 | **0.6** | **0.6** |
 
-The held-out body is `c10f10t08`: **femur 1.0, tibia 0.8**, a ratio of 1.04 where every training
-body sits at 0.83. The first time the two come apart. Nothing in training ever showed them moving
-independently.
+In all four the femur and tibia carry the same scale. Not by design — every body in the dataset
+where they differ is one that does not walk (F42), so a training set of bodies that *do* walk is a
+training set in which those two segments have never moved apart.
 
-**Now ask three completely separate things what geometry this body has.**
+| the same weights, asked about | deg | **R²** |
+|---|---|---|
+| `c08f09t09` — femur 0.9, tibia 0.9, **inside the range** | **3.44** | **+0.81** |
+| `c10f10t08` — femur 1.0, **tibia 0.8**, the first time they differ | 13.35 | **−0.34** |
+
+**Now ask three separate things what geometry `c10f10t08` has.**
 
 | | coxa | femur | tibia |
 |---|---|---|---|
 | **The truth** | 1.00 | **1.00** | **0.80** |
-| The trained decoder, from its output commands | 0.868 | **0.799** | **0.799** |
-| The linear probe on the frozen encoder | 0.955 | **0.819** | **0.819** |
-| The best any mixture of training bodies could say | 0.882 | **0.777** | **0.777** |
+| The trained decoder, from its output commands | 1.000 | **0.681** | **0.681** |
+| The linear probe on the frozen encoder | 0.920 | **0.843** | **0.843** |
+| The best any mixture of training bodies could say | 0.809 | **0.600** | **0.600** |
 
-**All three give the femur and the tibia the same number, to three decimals.** The 5.2M-parameter
-decoder, the 4,227-parameter probe reading the raw encoder, and a mixture calculation that involves
-no learning at all — three things with almost nothing in common, making the identical mistake.
-
-The best a mixture could do is **11.19 deg** and the decoder scores **12.42** — it does not even
-reach the ceiling that copying and averaging the training bodies would give. There is no entry for
-a body it has not seen.
+**All three give the femur and the tibia the same number.** A 5.2M-parameter decoder, a
+4,227-parameter readout of the raw encoder, and a mixture calculation with no learning in it at
+all — three things with almost nothing in common, making the identical mistake.
 
 The last row is why. **No combination of bodies in which the femur and tibia always move together
 can pull them apart.** The other two are not failing independently; they are reproducing the shape
 of the gap in the data.
 
-That also puts a condition on the encoder result from slide 4, which was 0.021 error on a body
-inside the range and is 0.082 here:
+**The size of that gap is geometry, not experiment.** The closest point with femur equal to tibia
+to this body's (1.00, 0.80) is (0.90, 0.90), a distance of **0.141** — and that is exactly the
+mixture gap the probe reports, for any all-tied training set. It does not depend on which bodies
+were used.
 
-> **The probe recovers a new body to within 0.02 only if that body can be made by mixing the
-> bodies it was fitted on. If it cannot, the error jumps four-fold, to 0.08.**
+### Where the failure sits
 
-Capacity is not the missing ingredient — an MLP in place of the ridge is no better.
+![per-joint reconstruction on the tibia-short body](../results/wm/stage1_correct/figures/action_trace_m3d_cross_c10f10t08.png)
 
-![per-joint reconstruction on the tibia-short body](../results/wm/stage1_correct/figures/action_trace_tib_cross_c10f10t08.png)
+The error is not spread evenly. Grouped by joint type, across all six legs:
 
-Red is the model, black is ground truth, across three clips. **Mean R-squared is −0.42 across the
-18 joints** — on average worse than predicting that body's own posture, and no joint carries the
-reconstruction on its own.
+| joint | what it moves | R² |
+|---|---|---|
+| **TC**, thorax-coxa | swings the leg fore and aft | **+0.46 to +0.83 — still works** |
+| **CF**, coxa-femur | lifts the leg | −0.53 to +0.05 |
+| **FT**, femur-tibia | the knee | **−0.45 to −3.99** |
 
-**And it is not about one body.** The same checkpoint, same weights, scored on every unseen
-femur/tibia ratio available — only the test body changes:
+**The joint that fails worst is the one between the two segments the data could not separate**, and
+the joint that does not involve the tibia at all still works. This body differs from the training
+set in the tibia and nothing else, and the damage is localised accordingly. That is a fingerprint
+of the data gap, not a model that has simply got worse.
+
+**And it is not one unlucky body.** Every unseen femur/tibia ratio available, same weights:
 
 | held out | femur/tibia | deg per joint | **R²** |
 |---|---|---|---|
-| c10f10t08 | 1.04 | 12.67 | **−0.78** |
-| c10f09t07 | 1.07 | 12.08 | **−0.33** |
-| c10f08t06 | 1.10 | 11.24 | **−0.43** |
+| c10f10t08 | 1.04 | 13.35 | **−0.34** |
+| c10f09t07 | 1.07 | 11.63 | **−0.14** |
+| c10f08t06 | 1.10 | 10.51 | **−0.33** |
 
-**R² is negative on all three**, so on every unseen ratio the model does worse than someone who saw
-the body once and memorised its average posture. The errors cluster at 11–13 degrees per joint
-against a command spread of 11.7, so the honest statement is *comparable to the whole signal*.
-
-**Measured on a body that walks straight**, held out from a training set where all four bodies sit
-at femur/tibia 0.83:
-
-| held out `c10f10t08`, ratio 1.04 | deg | **R²** |
-|---|---|---|
-| `tib_cross` (cross term on) | 12.67 | **−0.78** |
-| `tib_ctrl` (its matched control) | 13.41 | **−0.41** |
-
-**Negative R² on both**, so the limit is not something the cross-body loss can reach: on an unseen
-femur/tibia ratio the model does worse than someone who saw the body once and memorised its
-average posture. The commands' own spread is 11.7 deg per joint, so the error is comparable to the
-whole signal.
-
-The two columns rank the pair differently — degrees pool raw error while R² is in standardised
-units where low-variance joints weigh more. Nothing here rests on which of the two runs is better;
-both fail, and that is the point of the slide.
+**Negative on all three**, so on every unseen ratio the model does worse than someone who saw the
+body once and memorised its average posture. The errors sit at 10–13 degrees per joint against a
+command spread of 11.7 — comparable to the whole signal.
 
 **The fix this points to is more bodies where the femur and tibia differ.** The scene generator
-already supports it. A data gap, not a loss or architecture problem — and no regularizer touches
+already supports it. A data gap, not a loss or architecture problem — and no regulariser touches
 it, because the information was never present to begin with.
 
 ---
@@ -434,18 +449,24 @@ it, because the information was never present to begin with.
 
 Slide 8 ends with an explanation, and an explanation makes a prediction: **if the femur and tibia
 are tied because every training body ties them, then adding bodies where they differ should untie
-them.** Two such bodies were generated, checked to walk, and added to the training set.
+them.** Two such bodies were generated and checked to walk: `c10f09t07` and `c10f08t06`, at
+femur/tibia 1.07 and 1.10.
 
-The run is **volume-matched** — six bodies at 16 clips each against four bodies at 24, both 96
-training clips — so a better result cannot be put down to more data.
+**Testing that needs two purpose-built runs, and here is why.** If the six-body set simply had more
+clips, any improvement could be put down to more data. So a matched pair was trained instead —
+**`tib_cross`** on four tied bodies and **`bracket_cross`** on those four plus the two decoupled
+ones, at **96 training clips each**, holding out the same body from the same clips.
 
-**Retrained on clean data**, held out `c10f10t08`, matched volume at 96 training clips per side:
-
-| | 4 bodies, femur tied to tibia | 6 bodies, decoupled |
+| | `tib_cross` — 4 bodies, femur tied to tibia | `bracket_cross` — 6 bodies, decoupled |
 |---|---|---|
 | training clips | 96 | 96 |
+| bodies | 4 x 24 clips | 6 x 16 clips |
+| held out | `c10f10t08` | `c10f10t08`, the same 20 clips |
 | **the model** | **12.67 deg** | **3.27 deg** |
 | **R² against the body's own mean** | **−0.78** | **+0.89** |
+
+Only one thing differs between the columns: whether the training set contains bodies whose femur
+and tibia move apart.
 
 **A 3.9x improvement, and it crosses zero.** The four-body run is worse than memorising the
 held-out body's average posture; the six-body run explains 89% of its variance and beats every
@@ -479,9 +500,9 @@ it converts an extrapolation problem into an interpolation one — but it means 
 face equally hard tasks, and the 3.9x measures the conversion rather than the same task done
 better.
 
-**These runs are 10 epochs and peaked at epoch 10**, still improving when the budget ended. The
-old numbers came from runs flat across their last five epochs; these are not converged, so the
-figures are a lower bound on both sides rather than settled values.
+**These runs are 10 epochs and peaked at epoch 10**, still improving when the budget ended, where
+the m3d pair on the earlier slides had 50. They are not converged, so both figures are a lower
+bound rather than a settled value.
 
 ---
 
@@ -525,17 +546,14 @@ set a numeric threshold.
 
 ---
 
-## Slide 11 — Two structural facts found last
+## Slide 11 — One frame nearly determines the command
 
-**One. The answer was already visible in the decoder's own input.**
+A structural fact about the task, not about the model, and it bounds what any latent could be
+worth here. Two measurements say it independently.
 
-The data collector applies a command, steps the simulator, and only then captures the
-frame. So the frame is the *result* of that command, and the command was being asked for
-from a frame that already shows it. The latent never had to carry anything.
+### The transition is worth about a third
 
-The collector's ordering is corrected — the command is now the one that produced the transition,
-not one already visible in the frame it is read from. Substituting the second frame the ITM is
-given, on the held-out body, 195 transitions:
+Substitute what the ITM is given as its second frame, on the held-out body, 195 transitions:
 
 | what the ITM is given as `e_{t+1}` | control | with the cross term |
 |---|---|---|
@@ -545,30 +563,36 @@ given, on the held-out body, 195 transitions:
 | a frame from a random other time | 3.54x | 3.44x |
 | the latent zeroed entirely | 2.88x | 3.48x |
 
-Read the rows in pairs first: **wrong transitions hurt more than missing ones**, and nonsense
-hurts most, so the latent is genuinely sensitive to what the second frame contains.
+Read the middle rows first: **a wrong transition hurts more than a missing one**, and nonsense
+hurts most, so the latent is genuinely sensitive to what the second frame contains — it is not
+ignoring it.
 
 Then the second row, which carries the conclusion. **Removing the transition entirely costs 28 to
-34 percent** — the rest of what the decoder needs is already in `e_t`, because one frame nearly
-fixes the gait phase. The transition matters, and it is not where the bulk of the answer lives.
+34 percent.** The other two thirds of what the decoder needs is already in `e_t` alone.
 
-The last row is the other half of slide 5's division of labour: **deleting the latent costs the
-cross-term run more, 3.48x against 2.88x.** Once the frame carries the body, `z` is left carrying
-the movement, and the decoder cannot do without it.
+The last row belongs to slide 5's division of labour: **deleting the latent costs the cross-term
+run more, 3.48x against 2.88x.** Once the frame carries the body, `z` is left carrying the
+movement, and the decoder cannot do without it.
 
-**Two. One frame nearly determines the command at any horizon.**
+### And the horizon does not matter
 
 | Predict, from a single frame | now | 8 frames ahead | 32 frames ahead |
 |---|---|---|---|
 | Error, deg (signal spread 11.3 deg) | 4.6 | 5.2 | **4.5** |
 
-- Predicting 32 frames ahead is as accurate as predicting the present, because the gait
-  is periodic with a cycle near 22 frames and one frame fixes the phase.
-- Six coordinated legs remove the ambiguity a single leg would have: one frame already
-  identifies which feet are swinging with 81.5% accuracy, against 50% by chance.
-- Consequence: the joint command cannot be the place the latent earns its keep. Removing the
-  forward-prediction term entirely leaves the action reconstruction unchanged.
-- **This bounds the action-decoding path only.** Slide 12 measures the forward model itself.
+- Predicting 32 frames ahead is as accurate as predicting the present, because the gait is
+  periodic with a cycle near 22 frames and one frame fixes the phase.
+- Six coordinated legs remove the ambiguity a single leg would have: one frame already identifies
+  which feet are swinging with 81.5% accuracy, against 50% by chance.
+- The commands come from inverse kinematics, which is open loop — knowing the gait phase fixes
+  everything that follows.
+
+**Why this bounds the whole design.** The joint command cannot be where the latent earns its keep,
+because the frame nearly determines it on its own. That is a property of forward walking at one
+speed, not a fault in the model — and it is the reason the next slide scores the forward model on
+rolling the world forward instead.
+
+**This bounds the action-decoding path only.** Slide 12 measures the forward model itself.
 
 ---
 

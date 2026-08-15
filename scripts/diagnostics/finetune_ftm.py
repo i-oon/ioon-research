@@ -77,11 +77,20 @@ def build(ckpt, pretrained, device):
 def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
-    Gradients accumulate over batches of transitions so a clip never has to be resident with its
-    activations; the loss is scaled by the batch count so the effective learning rate does not
-    depend on how many clips the budget gave us.
+    One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
+    device, so a clip never has to be resident with its activations -- which was the whole reason
+    the embeddings are cached on the CPU.
+
+    **This used to accumulate over every span before stepping**, i.e. full-batch gradient descent,
+    so `--steps` counted epochs rather than updates and the cost grew with the clip budget. The
+    sweep below then came to 374,400 forward+backward passes and 13 hours on a 2080 Ti for what is
+    meant to be a diagnostic. Sampling instead makes the cost per step constant in the budget, so
+    the 7-clip cell costs the same as the 1-clip cell and every cell gets the same number of
+    updates -- which is also the comparison the table wants, since `pretrained` and `scratch` have
+    to be given equal optimisation to be read against each other.
     """
     torch.manual_seed(seed)
+    rng = np.random.default_rng(seed)
     params = list(itm.parameters()) + list(ftm.parameters())
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=1e-4)
     spans = [(c, s, min(s + batch, len(c) - 1))
@@ -89,18 +98,16 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
     itm.train(); ftm.train()
     last = 0.0
     for step in range(steps):
+        e_cpu, s, t = spans[rng.integers(len(spans))]
         opt.zero_grad()
-        total = 0.0
-        for e_cpu, s, t in spans:
-            e_t = e_cpu[s:t].to(device)
-            e_next = e_cpu[s + 1:t + 1].to(device)
-            z = itm(e_t, e_next)
-            loss = torch.nn.functional.mse_loss(ftm(e_t, z), e_next) / len(spans)
-            loss.backward()
-            total += loss.item()
-            del e_t, e_next, z, loss
+        e_t = e_cpu[s:t].to(device)
+        e_next = e_cpu[s + 1:t + 1].to(device)
+        z = itm(e_t, e_next)
+        loss = torch.nn.functional.mse_loss(ftm(e_t, z), e_next)
+        loss.backward()
         opt.step()
-        last = total
+        last = loss.item()
+        del e_t, e_next, z, loss
     itm.eval(); ftm.eval()
     return last
 
@@ -132,7 +139,8 @@ def main():
     ap.add_argument("--data", default="data/b1_framed")
     ap.add_argument("--clips", type=int, nargs="+", default=[1, 3, 5, 7])
     ap.add_argument("--test_clips", type=int, default=4)
-    ap.add_argument("--steps", type=int, default=200)
+    ap.add_argument("--steps", type=int, default=1000,
+                help="optimiser updates, each on one sampled batch -- not epochs")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 3, 5, 10])
     ap.add_argument("--splits", type=int, default=2)
@@ -155,6 +163,7 @@ def main():
     for n in args.clips:
         rows = {"pretrained": [], "scratch": []}
         for split in range(args.splits):
+            print(f"  ... {n} clips, split {split + 1}/{args.splits}", flush=True)
             order = np.random.default_rng(args.seed + split).permutation(len(paths))
             train = [cached[paths[i]] for i in order[:n]]
             test = [cached[paths[i]] for i in order[-args.test_clips:]]
@@ -167,7 +176,8 @@ def main():
         for name in ("pretrained", "scratch"):
             mean = {h: float(np.mean([r[h] for r in rows[name]])) for h in args.horizons}
             results.append((n, name, mean))
-            print(f"{n:>6} {name:<12}" + "".join(f"{mean[h]:>8.2f}x" for h in args.horizons))
+            print(f"{n:>6} {name:<12}" + "".join(f"{mean[h]:>8.2f}x" for h in args.horizons),
+                  flush=True)
 
     print("\nAbove 1.00x means the adapted forward model beats holding the frame still on the")
     print("target robot. Below it, the rollout is worse than predicting no motion and cannot")

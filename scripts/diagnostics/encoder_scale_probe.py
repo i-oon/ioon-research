@@ -85,6 +85,10 @@ def main():
     ap.add_argument("--data_dir", required=True)
     ap.add_argument("--train", nargs="+", required=True)
     ap.add_argument("--test", required=True)
+    ap.add_argument("--test_dir", default="",
+                    help="directory holding the test body, when it is not stored with the "
+                         "training bodies -- the decoupled-ratio bodies live in their own "
+                         "directory, so a split can straddle two")
     ap.add_argument("--clips", type=int, default=3)
     ap.add_argument("--chunk", type=int, default=4)
     ap.add_argument("--encode_device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -101,7 +105,9 @@ def main():
     per_body = {b: features(encoder, data_dir, b, args.clips, args.chunk) for b in args.train}
     X = np.concatenate([per_body[b] for b in args.train])
     y = np.concatenate([np.repeat(scales_of(b)[None], len(per_body[b]), 0) for b in args.train])
-    X_test = features(encoder, data_dir, args.test, args.clips, args.chunk)
+    test_dir = args.test_dir or args.data_dir
+    test_dir = test_dir if os.path.isabs(test_dir) else os.path.join(ROOT, test_dir)
+    X_test = features(encoder, test_dir, args.test, args.clips, args.chunk)
     del encoder
 
     model = RidgeCV(alphas=np.logspace(-1, 4, 12)).fit(X, y)
