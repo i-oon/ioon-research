@@ -2,7 +2,8 @@
 
 Stick insect (*Medauroidea extradentata*), simulated in CoppeliaSim. Stage 1: one 18-DOF
 topology, several leg geometries. Stage 2 now appears on slides 14-15: first the clean
-hexapod+B1 run, then a held-out 4-leg action space. Seventeen slides.
+hexapod+B1 run, a held-out 4-leg action space, and transfer to a genuinely different robot.
+Eighteen slides.
 
 Slides 1 to 3 are background already covered previously. The update starts at slide 4.
 
@@ -38,7 +39,8 @@ that separation happens at all, in the easy case where the joint spaces do match
 | Slides 4-7 | the central result: the geometry is readable, the model ignores it, what fixed that, and what the fix did to the latent |
 | Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
 | Slides 11-12 | two structural facts about the task itself, found last, that reframe the rest |
-| Slides 13-16 | status, a first cross-embodiment run, a held-out 4-leg action space, and the decisions still open |
+| Slides 13-16 | status, a first cross-embodiment run, a held-out 4-leg action space, and transfer to the B1 |
+| Slides 17-18 | what is settled, the two decisions left, and last term's questions answered |
 
 ---
 
@@ -267,9 +269,9 @@ supposed to produce and what the reconstruction term alone never asks for.
 
 ---
 
-## Slide 6 — What is inside the latent, before and after
+## Slide 6 — What is inside the latent, with and without the cross-body loss
 
-**What is inside the latent, before and after.** Split its variance by what explains it, and
+**What the cross-body loss does to the latent.** Split its variance by what explains it, and
 separately ask what can still be decoded out of it:
 
 | | Without | With |
@@ -580,12 +582,13 @@ module is isolated, on the held-out body, 162 rollouts:
   **auxiliary regulariser**. The deployed system predicts future embeddings, rolls them eight
   steps, and picks actions by comparing predicted futures to a goal image. The action decoder is
   not the system's output. **We had made the auxiliary term the whole evaluation.**
-- **The cross-body loss costs nothing here.** The control `m3d_bracketed` scores 1.36x, 1.47x,
-  1.42x and 1.23x at
-  the same horizons — identical within noise. The term that fixed morphology reading leaves the
-  world model's own competence untouched, which makes sense: it never touches the prediction loss.
-- Honest limits: holding still is a weak baseline, 1.2-1.5x over it is real but modest, and the
-  margin decays with horizon.
+- **The cross-body loss costs nothing here.** The control `m3d_bracketed` scores 1.52x, 1.72x,
+  1.69x and 1.47x at the same horizons — **identical to two decimal places**. The term that fixed
+  morphology reading leaves the world model's own competence untouched, which makes sense: it
+  never touches the prediction loss.
+- Honest limits: holding still is a weak baseline, 1.5-1.7x over it is real but not dramatic, and
+  the margin decays with horizon. **And this is measured on a body the model trained near** —
+  slide 16 shows the same module scoring 0.57-0.71x on a robot it has never seen.
 
 Speaker note: this is why the earlier slides say "the command can be read off one frame" rather
 than "the world model does nothing". Those are different claims and only the first is supported.
@@ -598,8 +601,8 @@ than "the world model does nothing". Those are different claims and only the fir
 |---|---|
 | Frozen encoder | Carries body geometry in a directly readable, generalising form. Holds. |
 | Latent `z` | With the cross-body loss, 92.6% gait and 3.4% body, and behaviour still decodable from it. Across two *embodiments* the picture is different: the identity is fully decodable and the per-leg readout does not transfer. |
-| Motion Decoder | Transfers within the range of bodies it saw. Does not extrapolate beyond it, and we can say precisely why — and on the clean retrain **filling the named gap moved it 12.67 to 3.27 deg at matched data volume, R² −0.78 to +0.89**, which crosses zero and beats every baseline. On the contaminated data the same comparison only reached the constant-pose baseline. |
-| Forward model | Does not help action reconstruction, but **does roll the world forward**: 1.2-1.5x better than a frozen world out to ten steps. It was being measured against a task the method never assigns it. |
+| Motion Decoder | Transfers within the range of bodies it saw. Does not extrapolate beyond it, and we can say precisely why — and on the clean retrain **filling the named gap moved it 12.67 to 3.27 deg at matched data volume, R² −0.78 to +0.89**, which crosses zero and beats every baseline. |
+| Forward model | Does not help action reconstruction, but **does roll the world forward**: 1.46-1.72x better than a frozen world out to ten steps, on a body it was trained near. **Across embodiments it fails outright** — 0.57-0.71x on the B1, worse than predicting no motion (slide 16). Coverage does not repair it: the intervention that moved the decoder 3.9x moves the forward model 5-8%. |
 | Physical replay | Commands walk, stay inside the body's joint range, and do not veer more than the IK reference. |
 
 **The through-line**: the information transfer needs is readable from vision. Every failure we
@@ -624,9 +627,9 @@ can now check before spending the training run.
 
 **What is not settled**
 
-- Whether the forward model earns its place, because our data has no unpredictable future to
-  predict — slide 13, question 1.
-- How to define cross-embodiment pairing, or whether to need it at all — slide 13, question 2.
+- Whether a forward model can be adapted to an unseen robot cheaply enough to plan with — the
+  frozen one cannot, and coverage does not fix it (slide 16).
+- Whether one genuinely different robot is enough to scope the claim on — slide 17, decision 2.
 - Whether the encoder itself or the five-point readout is the limit outside the training range.
 
 ---
@@ -785,7 +788,8 @@ whatever carries it is not a shared latent in the sense the paper claims.
 
 Two caveats that remain real: with two embodiments there is no held-out *embodiment*, only a
 held-out body; and `lambda_cross`, the term that created sharing in Stage 1, cannot be used here
-because a hexapod and a B1 share no expert episodes. Slide 16 is what to do about that.
+because a hexapod and a B1 share no expert episodes. Slide 16 holds the B1 out to get around the
+first, and slide 17 reports what was measured about the second.
 
 ## Slide 15 — A held-out action space: 4-leg insect with a new head
 
@@ -965,116 +969,136 @@ was assumed from Stage 1 rather than measured here.
 
 ---
 
-## Slide 16 — Two questions for the professor
+## Slide 16 — Transfer to a genuinely different robot
 
-**1. Our evaluation was aimed at the wrong module. What should Stage 2 be scored on?**
+Slide 15's body is the stick insect with legs removed, and the model reads it as the body it was
+cut from. That leaves the thesis claim untested on anything the model sees as new. **The B1 is the
+one genuinely different robot in the project** — a different machine, 12 joints against 18, a trot
+against a wave — but Stage 2 trains on it, so Stage 2 cannot test it.
 
-We measured the system by how accurately it reconstructs joint commands. The source method does
-not: it rolls the world model forward and selects actions by comparing imagined futures against a
-goal image. Our forward model does roll forward usefully, and we only found that out by testing it
-directly.
+**So hold it out entirely.** Backbone from a Stage 1 checkpoint, insect bodies only, never a
+quadruped. Freeze it, add a 12-D B1 head, fit the head on a few clips, compare against the same
+head on a random backbone. Same protocol as slide 15, so the numbers sit on one scale.
 
-- Should Stage 2's headline metric be **rollout quality and planning success** rather than
-  per-joint reconstruction error?
-- The source method groups actions into **five-step chunks**, stating this improves world model
-  learning. We measured why that matters: at one step the forward model's target is 76 percent
-  augmentation noise, because consecutive frames at 20 Hz barely differ. Widening the gap to five
-  steps and dropping the crop from the augmentation moves the signal-to-noise ratio **from 0.24 to
-  0.89**, and at ten steps the signal exceeds the noise for the first time. Is it worth rebuilding
-  Stage 1's main comparison at that setting? It would make every number so far incomparable.
-- One structural fact remains regardless: our data is forward walking at one speed, and we
-  measured that a single frame predicts the joint command at every horizon out to 32 frames.
-  The commands come from inverse kinematics, which is open loop -- knowing the gait phase fixes
-  everything that follows.
-- **We already have an alternative asset**: AMP reinforcement-learning policies trained on three
-  leg-scale bodies, 200 checkpoints each across training, so distinctly different gaits, speeds
-  and body heights. A closed-loop policy's command depends on the robot's velocity and foot
-  forces, which a still frame does not show, so a single frame should stop determining the
-  future. Cost: a rollout-and-render pipeline, and only three morphologies on one axis, against
-  the six bodies on three axes we have now. **Is it worth building a dataset from these?**
+| clips fitted | pretrained on insects | random backbone | margin |
+|---|---:|---:|---:|
+| 5 | 20.49 deg, R² +0.35 | 23.80, +0.22 | 1.16x |
+| 7 | 16.05 deg, R² +0.62 | 20.09, +0.48 | **1.25x** |
+| 9 | 15.62 deg, R² +0.68 | 20.48, +0.51 | **1.31x** |
+| **7, velocities matched across the split** | **15.98 deg, R² +0.58** | 20.49, +0.39 | **1.28x** |
 
-**2. How should cross-embodiment training pairs be defined for Stage 2?**
+**Features learned from stick insects make a quadruped's action head measurably cheaper to fit.**
+Small, and consistent across budgets and splits.
 
-The mechanism that fixed Stage 1 decodes one body's latent against another body's frame,
-supervised by that body's command at the same moment. It is well defined only because
-every insect body walks identical expert episodes, so pairing is exact.
+**It is not a speed-generalisation artefact.** The B1 set is two policies across seven commanded
+velocities, so a random split leaves unseen speeds in the test set. Matching velocities on both
+sides changes 1.29x to 1.28x.
 
-The hexapod and B1 share no episodes. Candidate substitutes are pairing by matched body
-speed, or by gait phase estimated from the image, and both are inexact — and a mis-paired
-frame is a **wrong label**, not just a noisy one. There is also no physically correct
-answer to what "the same phase" means between a six-leg tripod and a four-leg trot.
+**Read the margin only where both arms work.** At five clips both score R² near zero and the ratio
+compares two failures; seven and nine are where it means something.
 
-**Slide 14 turns this from a risk into a measurement.** Weight sharing alone leaves the embodiment
-**fully decodable from the latent at 0.99**, against 3.4% of variance for the body within the insect
-family where the cross-body loss applies. So the pairing mechanism is **our addition**, and Stage 2
-can follow the paper without it — but the measurement says what that costs.
+### Which part of the model carries it
 
-**One concrete thing being tried first, which does not need pairing at all.** Give the forward model
-an embodiment embedding, `FTM(e_t, z, id)`, so the module that wants the identity gets it directly
-and `z` has no reason to carry it. Same principle as the per-embodiment output heads: known,
-non-behavioural information should arrive through structure rather than through the latent.
+Ablating the latent on the same split separates three modules that had been treated as one:
 
-**We built and ran that. It did nothing** — the embodiment share did not fall, and the identity
-stayed exactly as recoverable. The reason turned out to be more interesting than the fix:
+| | across embodiments |
+|---|---|
+| **the latent `z`** | **carries all of it** — zeroing `z` drops the margin to 0.98x, the same as random weights |
+| the decoder's use of the frame | carries none — a trained trunk is worth no more than an untrained one |
+| **the forward model** | **worse than useless** — rolled on B1 video it scores **0.57–0.71x**, below holding the frame still |
 
-**there was no pressure to relieve.** Delete the directions carrying the embodiment from `z` and
-re-score the decoder, against the cost of deleting the same number of *random* directions:
+Shuffling the latent within a clip scores *worse than deleting it*: a latent that does not belong
+with the frame it is paired with actively misleads the decoder.
 
-| | identity removed | random control | verdict |
-|---|---|---|---|
-| our first measurement | 1.69x | 1.16x | load-bearing |
-| **clean data, seed 0** | **1.03x** | 1.18x | **passive** |
-| **clean data, seed 1** | **1.04x** | 1.14x | **passive** |
+### Why the forward model matters more than the margin
 
-Removing the identity costs **less** than removing arbitrary directions. Nothing downstream reads
-it — which makes sense once stated: the decoder's output head is *selected* by embodiment, and the
-forward model sees `x_t`, a picture of the robot. Neither has to ask `z`.
+The deployed method rolls the forward model, compares imagined futures to a goal and picks actions
+from that comparison. **The planner depends on the forward model, not the action head.** A forward
+model scoring below a frozen world cannot support planning on that robot however cheaply its head
+fits.
 
-The first row was measured on the contaminated dataset, and is wrong. Two robots that fall over,
-plus a 10.5:1 imbalance, made a passive quantity look functional.
+**But that is exposure, not architecture.** The same design trained on both robots rolls the B1 at
+**1.34–1.53x**. Identical objective, identical modules — only whether a quadruped was ever seen:
 
-**So the honest statement is not that the trunk built a switch.** The identity is leakage from the
-frozen encoder: fully readable, consumed by nothing, penalised by nothing. Whether that costs
-anything for a third embodiment is untested — and with two embodiments it is untestable.
-
-**All three interventions have now been built, run and measured**, against the 4-leg few-shot fit
-as the discriminating test:
-
-| | 4-leg few-shot | held-out hexapod R² | residual identity probe | `z` zeroed |
+| FTM rolled on B1 video | 1 step | 3 | 5 | 10 |
 |---|---|---|---|---|
-| `stage2_clean` — baseline | 1.86 deg | +0.87 | 0.738 | 7.63x |
-| **side channel** — remove the *need* | — | — | no change | — |
-| **centring** — remove the *supply* | 1.88 | +0.89 | 0.697 | **9.96x** |
-| **adversary** — remove the *ability* | **1.66** | +0.88 | **0.598** | **4.44x** |
-| random backbone | 5.06 | — | — | — |
+| trained on insects **and** B1 | **1.39x** | **1.53x** | **1.52x** | **1.34x** |
+| trained on insects only | 0.63x | 0.57x | 0.63x | 0.71x |
 
-**Centring does nothing**, and the way it fails is informative. Its online probe starts at 0.594
-and climbs back to **1.000** over 25 epochs — the model relearns the identity with the offset
-already removed. Centring subtracts the *average*; two robots differ in shape, silhouette and leg
-count, which change every frame and survive it. An offset wrecks a **linear readout fitted on one
-embodiment** (slide 14) but not a nonlinear model trained on both.
+**And coverage does not substitute for it.** On the *same* pair of Stage 1 checkpoints where more
+bodies moved the decoder from 12.67 deg to 3.27 and R² −0.78 to +0.89, the forward model improves
+by **5 to 8 percent**. The intervention that transforms the decoder barely touches the forward
+model — so adding bodies, or even embodiments, is not a route to a forward model that works on an
+unseen robot.
 
-**The adversary is the only lever that moves anything** — best 4-leg result, lowest residual
-identity. Zeroing `z` costing less too, 7.63x → 4.44x, looked like a weaker latent bought at the
-same time — checked directly on the forward model (rollout, 162 held-out sequences), clean and
-adversary agree within 1% at every horizon out to ten steps, so nothing about `z`'s own competence
-changed. But the swap test (slide 15) shows the decoder **still reads the body from `z`** under the
-adversary, margin only narrowing 3.0-3.8x → 2.3-2.6x where `lambda_cross` reversed it outright in
-Stage 1. So the `zero_z`/`zero_x` shift overstates what moved: a useful partial lever, not a fix.
-
-**And the honest summary of all three: none of them changed transfer.** Held-out R² is +0.87,
-+0.89, +0.88, and the 4-leg result moves 1.86 → 1.88 → 1.66 against a random-backbone floor of
-5.06. Whatever carries the transfer is not the thing we spent three experiments removing.
-
-Their setting likely does not need one. The shortcut we measured only pays when knowing which body
-you are looking at tells you the command, and in our data each body does exactly one thing. In
-theirs, one robot performs thousands of different manipulations, so body identity says almost
-nothing. **We are applying the method to a regime it was not tested in** — bodies that differ
-slightly, one behaviour — and that regime is where the shortcut appears.
+**Which reframes the remaining question.** The source method's own transfer is a LoRA finetune on
+7,265 target trajectories, not zero-shot. The comparable question is therefore not whether a frozen
+forward model generalises, but **how few target clips it takes to adapt one** — the sample-efficiency
+framing already used for the action head, now applied to the module a planner actually needs.
 
 ---
 
-## Slide 17 — Three questions left open in Week 11, now with answers
+## Slide 17 — What is settled, and the two decisions left
+
+### Three things that were open questions last time and are now measurements
+
+**1. What Stage 2 should be scored on — settled: both.** The source method rolls the world model
+forward and picks actions by comparing imagined futures to a goal, so per-joint reconstruction was
+never the metric it was built for. But reconstruction is what makes the commands checkable against
+IK, and slide 16 shows the two disagree about which model is usable. **We report rollout quality
+*and* per-joint error**, because a model can be good at one and useless at the other.
+
+**2. How to pair frames across embodiments — settled: it cannot be done on this data.** The
+mechanism that fixed Stage 1 needs to know two frames show the same intent. Insect bodies walk
+identical expert episodes, so pairing is exact; the hexapod and B1 share none. Measured on every
+candidate label:
+
+| pairing label | overlap between robots | hexapod frames pairable | does it pin down the command? |
+|---|---|---|---|
+| feet on the ground, 0–4 | 0.572 | 98.9% | **no** — 0.998 on the B1, a coin flip |
+| which diagonal is loaded | 0.711 | 100% | **no** — 0.918 on the hexapod |
+| full 4-leg contact pattern | **0.240** | **33.8%** | yes, 0.63 / 0.52 |
+
+**No label is both covered and meaningful.** The fine one carries real intent and pairs a third of
+the frames; the coarse ones pair everything and mean nothing, because coarsening is what destroys
+the meaning. The B1 spends 84.6% of its time in the two diagonals of a trot while the insect
+spreads across all sixteen patterns, nine of them never visited by the B1. **A mis-paired frame is
+a wrong label, not a noisy one**, so this is not a matter of accepting some error.
+
+**3. Whether the 4-leg body tests a new embodiment — settled: it does not.** The latent places it
+0.578 from the body it was cut from, against a chance level of 0.981. It tests a new action space.
+That is why slide 16 exists.
+
+### Decision 1 — is few-shot adaptation the claim we are making?
+
+Slide 16 leaves the forward model as the open problem: it does not survive a change of robot, and
+coverage does not fix it. The route that remains is to **adapt it on a handful of target clips**
+rather than expect it to transfer frozen.
+
+That is what the source method does — a three-stage LoRA finetune on **7,265 trajectories** of the
+target robot. Ours would be a handful of clips, which is a stronger version of the same claim, but
+it is no longer "the model transfers". It is "the model is cheap to adapt".
+
+**Is that the claim the thesis should make?** Everything measured supports it and nothing supports
+the stronger one.
+
+### Decision 2 — is one genuinely different robot enough?
+
+Stage 2 trains on exactly one cross-embodiment pair, insect against B1, and slide 16 tests transfer
+on that same B1 by holding it out. **Everything rests on a single robot pair.**
+
+Adding a third embodiment would test whether the result generalises, and Stage 1's own evidence
+says coverage matters — going from four bodies to six moved the held-out body from R² −0.78 to
++0.89. But the equivalent at the embodiment level is a new robot, a new policy and a new render
+path, and **slide 16 measured that coverage buys the forward model only 5–8%** where it bought the
+decoder 3.9x. So the case for spending that is weaker than it looks.
+
+**Two ways to go**: report the single pair honestly as the scope of the claim, or invest in a third
+robot and accept a later finish. This is the one that needs a decision rather than a measurement.
+
+---
+
+## Slide 18 — Three questions left open in Week 11, now with answers
 
 ### 1. "How is this different from Diffusion?"
 
