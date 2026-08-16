@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, Sampler
 from ..bodies import (CONTACT_THRESHOLD, EXCLUDED_BODIES, body_of,  # noqa: F401
                       contact_labels, evenly, usable_clips)
 from .augment import apply, identity_params, sample_params
-from .embodiment import REGISTRY
+from .embodiment import HEXAPOD_DT, REGISTRY, body_motion
 from .embodiment import load as load_embodiment
 
 # Re-exported above so existing `from wm.data.dataset import ...` keeps working. They are defined
@@ -52,6 +52,9 @@ def load_clip(path):
             "morph": str(data["morph"]),
             "episode": int(data["expert_episode"]),
             "repeat": int(data["repeat"]),
+            # computed the same way as the cross-embodiment path, so a `lambda_body` run means
+            # the same thing whichever loader it went through
+            "body_motion": body_motion(data["head"].astype("float64"), HEXAPOD_DT),
         }
 
 
@@ -176,6 +179,10 @@ class IKWalkPairs(Dataset):
             "action": action.astype(np.float32),
             "morph_id": self.morph_index[clip["morph"]],
         }
+        if "body_motion" in clip:
+            # aligned to e_t, not to the lagged action: this describes the frame the latent was
+            # inferred from, not the command that follows it
+            sample["body_motion"] = clip["body_motion"][t]
 
         # a different body at the same episode and timestep: same intent, different geometry.
         # Its own augmentation, so the two frames share no nuisance factor the model could match
@@ -350,6 +357,7 @@ class MultiEmbodimentPairs(Dataset):
             "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
+            **({"body_motion": clip["body_motion"][t]} if "body_motion" in clip else {}),
         }
 
 

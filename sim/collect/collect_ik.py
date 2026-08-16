@@ -137,6 +137,34 @@ def body_rel_via_fk(sim, df, rows):
     return {leg: np.array(v) for leg, v in out.items()}
 
 
+def retime(brel, speed):
+    """Resample the shared foot path along time, so the same stride takes fewer or more steps.
+
+    Body speed in a kinematic replay comes from the stance feet sweeping backwards relative to the
+    abdomen, so playing the same Cartesian path through fewer samples makes the robot cover the
+    same ground in less time. `speed 1.15` is 15 percent faster.
+
+    **Every leg is resampled by the same time map**, so the inter-leg phase relationships are
+    untouched. That matters here more than it looks: the expert is a real stick insect walking a
+    variable wave, and F56 measured that its five non-reference legs land at near-uniform phase
+    (concentration 0.07-0.24) where a B1's are pinned at 0.99-1.00. That variability is a property
+    of the animal and the reason no tight cross-robot pairing exists; retiming preserves it, where
+    authoring a synthetic tripod path would throw it away along with the rest of the recording.
+
+    Why this is needed at all: the expert walks **one speed**. Across 1,000 episodes its forward
+    velocity has a standard deviation of 0.0086 m/s on 0.454, which is 1.9 percent. A body-level
+    quantity cannot be a shared supervisory signal between the two robots when one of them never
+    varies it.
+    """
+    if speed == 1.0:
+        return brel
+    T = len(next(iter(brel.values())))
+    T2 = max(4, int(round(T / speed)))
+    src, dst = np.linspace(0.0, 1.0, T), np.linspace(0.0, 1.0, T2)
+    return {leg: np.stack([np.interp(dst, src, path[:, k]) for k in range(3)], axis=1)
+            for leg, path in brel.items()}
+
+
 def precompute_commands(sim, simIK, scene, brel, scale):
     """Kinematic IK -> (T,18) joint commands, leg-major [FL m1..m3, ML ...]."""
     sim.loadScene(f"{ENV}/{scene}")
@@ -272,14 +300,30 @@ def main():
                     help="shared absolute foot-path scale about each target body's hip")
     ap.add_argument("--travel", type=float, default=0.8, help="distance gate (m); keeps robot in the fixed frame")
     ap.add_argument("--warmup", type=int, default=20)
-    ap.add_argument("--cam_dx", type=float, default=0.0,
+    # -0.6 and (0, 0) are not cosmetic and are not a starting point to tune from. The scene
+    # anchors the camera to the robot's *start* pose aiming 0.75 m down the runway, which put the
+    # robot outside the right image edge walking in: 67 percent of all frames were clipped, and
+    # unequally per body, so morphology decodability was partly measuring framing. These values
+    # give 0/66 clipped and keep the floor edge out of view (direction_plan.md, PROGRESS §16).
+    #
+    # **They were recorded as the fix and never made the default**, so every collection run since
+    # has had to remember two flags or silently produce clipped data. That happened again on
+    # 2026-08-17: 75 clips collected with the old defaults, 56-70 percent of frames touching the
+    # right edge, thrown away. The knowledge belongs in the code, not only in the plan.
+    ap.add_argument("--cam_dx", type=float, default=-0.6,
                     help="shift the fixed camera along world x; see drive_and_record")
     ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
-    ap.add_argument("--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
+    ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0), metavar=("X", "Y"),
                     help="respawn the robot head at this world x y; use the same value for every\n                         embodiment so they stand on identical floor")
     ap.add_argument("--repeats", type=int, default=1,
                     help="record each (episode,morph) this many times (fresh chaotic draw each) "
                          "-> repeated same-body-same-behavior for the render-lock gate")
+    ap.add_argument("--speed", type=float, default=1.0,
+                    help="time-scale the shared foot path: >1 walks faster, <1 slower. The "
+                         "collected bodies currently sit at Froude 0.155 and the B1 spans "
+                         "0.113-0.209, so 0.75-1.35 covers the quadruped's range. Verify the "
+                         "achieved speed from the clips rather than trusting this factor, and "
+                         "watch the video before training on it.")
     ap.add_argument("--loops", type=int, default=1,
                     help="repeat each 66-step expert foot path into one longer clip")
     ap.add_argument("--behavior", type=str, default="walk",
@@ -361,6 +405,7 @@ def main():
     for ep in episodes:
         rows = list(range(ep * EP, ep * EP + EP))
         brel = body_rel_via_fk(sim, df, rows)  # shared Cartesian behavior, once per episode
+        brel = retime(brel, args.speed)
         for morph, scene in SCENES:
             cmds, ikdiag = precompute_commands(sim, simIK, scene, brel, args.scale)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "

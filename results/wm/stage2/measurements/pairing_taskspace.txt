@@ -1,0 +1,25 @@
+hexapod 140 clips, 9240 frames, 5 bodies
+b1      14 clips, 1143 frames
+
+            Froude mean      5th-95th pct  hip height m
+hexapod           0.155     0.030 - 0.288          0.13
+b1                0.159     0.113 - 0.209          0.56
+
+8 phase bins x 3 Froude bins = 24 cells
+  cells visited by both robots      24 of 24
+  **overlap**                       0.578   (1.0 = identical distributions)
+  hexapod frames that get a partner 100.0%
+  b1 frames that get a partner      100.0%
+
+condition 3 -- does the label pin down the command within one robot?
+  label                          hexapod        b1   (1.0 = carries nothing)
+  phase x Froude                   0.647     0.278
+  phase alone                      0.895     0.303
+
+Compare with F45's contact labels, on the same three conditions:
+  feet down 0-4       overlap 0.572  pairable 98.9%  intent 0.998 on the b1
+  diagonal loaded     overlap 0.711  pairable  100%  intent 0.918 on the hexapod
+  corner pattern      overlap 0.240  pairable 33.8%  intent 0.63 / 0.52
+
+A usable label needs high overlap AND a low intent ratio on BOTH robots. The contact
+labels never managed both at once; read the two numbers above together, not separately.

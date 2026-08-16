@@ -3026,6 +3026,95 @@ frame being worth only 1.11x, `shuffled` matching `real` after finetuning, and `
 living at h=1 and dying by h=10. **The informative window is stride-scale; one timestep is the
 wrong unit to have built the comparison on.**
 
+### F55. The switch is the mechanism, and it has one named cause (synthesis, not a new measurement)
+
+Nothing here is new data. It is the chain that four existing findings make when read together, and
+it is written down because it identifies the single thing left to fix.
+
+| step | the evidence already recorded |
+|---|---|
+| no cross-embodiment frame pairing exists | **F45** — no label is both covered and meaningful; contact patterns either pair everything and mean nothing, or mean something and pair a third |
+| so `lambda_cross` cannot be applied | it needs to know two frames show the same intent; insect bodies walk identical expert episodes, the hexapod and B1 share none |
+| so nothing forces one `z` to mean the same thing on both robots | **F43/F46** — embodiment is decodable from `z` at 0.994 yet deleting it costs 1.03x, *less* than deleting random directions. The label is present and inert |
+| so the trunk partitions rather than shares | the per-leg contact probe reads **0.986 within** an embodiment and **0.373 across**, below the frozen encoder's 0.531 and below chance. Two codes pointing opposite ways, not one shared code |
+| so learned dynamics do not travel | **F54** — what survives the change of robot is the foothold in the *encoder's* space, which is shared by construction because V-JEPA2 is one model. What the trunk learned does not travel, because the trunk learned to split |
+
+**Stage 1 is the positive control for the last three steps.** There `lambda_cross` *is* definable —
+every body walks the same expert episode — and it **reverses the swap test outright**. In Stage 2,
+without it, the adversary narrows the same test from 3.0-3.8x to 2.3-2.6x and never approaches 1.0.
+An adversary removes *decodability*; it does not install *shared meaning*, which is exactly what the
+probe shows: it moves the cross cells to 0.490 and 0.500, chance, and no further.
+
+**What this predicts, so it can fail.** If a pairing can be defined and a cross term trained on it:
+the cross-embodiment contact probe should rise above 0.531, the swap test should move toward 1.0,
+and the frozen forward model should clear the 0.57-0.71x it currently scores on the B1. If pairing
+is fixed and none of those move, this chain is wrong.
+
+**This also re-weights Q14's remaining lever.** Widening behavioural overlap is not "more data is
+better" — it is the precondition for a pairing to exist at all, which is what unlocks the term that
+stops the partitioning. That makes it the one intervention aimed at the cause rather than at a
+symptom.
+
+### F56. The two gaits have different numbers of degrees of freedom, which is why no tight pairing exists
+
+F45 found that no contact label is both covered and meaningful and left it there. This measures the
+reason, and the reason is not "we have not found the right label yet".
+
+**Anchor phase at front-left touchdown, then ask where every other foot lands.** If one leg's phase
+fixes the whole body, the other legs land at a repeatable phase. Concentration is the circular
+resultant length: 1.0 is perfectly repeatable, 0.0 is uniform.
+
+| B1 | mean phase | concentration | | hexapod | mean phase | concentration |
+|---|---|---|---|---|---|---|
+| FL | 0.00 | **1.00** | | FL | 0.00 | **1.00** |
+| RR | 0.05 | **1.00** | | ML | 0.84 | **0.22** |
+| FR | 0.49 | **0.99** | | HL | 0.13 | **0.09** |
+| RL | 0.55 | **0.99** | | FR | 0.47 | **0.24** |
+| | | | | MR | 0.29 | 0.24 |
+| | | | | HR | 0.43 | **0.07** |
+
+**The B1 is a textbook trot** — FL and RR together, the other diagonal half a cycle later, all four
+determined by one. **The insect's other five legs are near-uniform.** It walks a variable wave, as
+the expert recording is a real animal, so its gait state needs roughly six loosely coupled numbers
+where the B1's needs one.
+
+**Consequence, and it is structural rather than empirical.** Any low-dimensional label that fully
+describes the B1's gait state must underdetermine the insect's. A pairing built on one will supply
+a **wrong** partner command rather than a noisy one, which is exactly F45's condition 3 and exactly
+why it failed. This is not a search problem.
+
+**Measured on the best task-space label we could build.** Phase anchored at touchdown, crossed with
+Froude number `v / sqrt(g*h)`:
+
+| label | overlap | hexapod pairable | b1 pairable | intent hexapod | intent b1 |
+|---|---|---|---|---|---|
+| F45 feet-down 0-4 | 0.572 | 98.9% | — | — | **0.998** |
+| F45 diagonal | 0.711 | 100% | — | **0.918** | — |
+| F45 corner pattern | 0.240 | **33.8%** | — | 0.63 | 0.52 |
+| **phase x Froude** | **0.578** | **100%** | **100%** | 0.647 | **0.278** |
+
+Better coverage than anything in F45 and a much better intent ratio on the B1, but **0.647 on the
+hexapod is loose**, and the asymmetry between 0.647 and 0.278 is the leg-DOF result above showing
+up in the pairing.
+
+**Froude is the part that works.** The hexapod averages **0.155** and the B1 **0.159**, on hip
+heights of 0.13 m and 0.56 m. The two robots walk at nearly the same Froude number despite a
+four-fold size difference, which is why task space overlaps where contact does not, and it holds
+without reference to phase.
+
+> **A trap this measurement walked into first.** The phase was initially the Hilbert phase of the
+> joint commands' first principal component, which gave intent ratios of 0.362 / 0.265 -- better
+> than anything here. That number was **circular**: the phase was derived from the commands it was
+> then tested against. Re-derived from contact, independent of the commands, the hexapod's intent
+> ratio moved 0.362 -> 0.647 and phase alone moved 0.437 -> 0.895, near meaningless. Any label
+> computed from the thing it is scored on will pass condition 3 for free.
+
+**What this rules in and out.** It rules out finding a tighter frame-level pairing by searching for
+a better label. It leaves two routes: make the insect's gait regular so one phase does determine
+its configuration (expensive -- new foot-trajectory generation and every Stage 1 number retrained),
+or drop frame-level pairing for a constraint that does not need a bijection, aligning only the part
+of `z` the two robots can share.
+
 ## Files
 
 - `results/wm/stage2/measurements/ftm_cross_embodiment.csv` -- the rollouts behind F51

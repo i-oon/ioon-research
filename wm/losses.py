@@ -10,7 +10,8 @@ import torch.nn.functional as F
 
 def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
                    adv_logits=None, morph_id=None, probe_logits=None,
-                   cross_action=None, cross_target=None):
+                   cross_action=None, cross_target=None,
+                   body_pred=None, body_target=None):
     recon = F.mse_loss(pred_next, target_next)
     motion = F.mse_loss(pred_action, target_action)
     total = cfg.lambda_recon * recon + cfg.lambda_motion * motion
@@ -21,6 +22,13 @@ def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
         cross = F.mse_loss(cross_action, cross_target)
         total = total + cfg.lambda_cross * cross
         parts["cross"] = cross.item()
+
+    if body_pred is not None and body_target is not None and cfg.lambda_body > 0:
+        # one head, every embodiment: the only term in this loss that asks the same z to decode
+        # the same way on both robots
+        body = F.mse_loss(body_pred, body_target)
+        total = total + cfg.lambda_body * body
+        parts["body"] = body.item()
 
     if adv_logits is not None and morph_id is not None and cfg.lambda_adv > 0:
         adv = F.cross_entropy(adv_logits, morph_id)

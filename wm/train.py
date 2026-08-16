@@ -34,6 +34,7 @@ from wm.data.dataset import (  # noqa: E402
 )
 from wm.data.embodiment import REGISTRY  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
+from wm.models.body_motion import BodyMotionDecoder  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.adversary import MorphAdversary, MorphProbe  # noqa: E402
@@ -150,6 +151,11 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         cross_pred = models["md"](cross_views, z, embodiment)
         cross_target = batch["cross_action"].to(device)
 
+    body_pred = body_target = None
+    if "body" in models and "body_motion" in batch:
+        body_pred = models["body"](z)
+        body_target = batch["body_motion"].to(device)
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -158,7 +164,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         if "probe" in models:
             probe_logits = models["probe"](z)
     return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
-                          adv_logits, morph_id, probe_logits, cross_pred, cross_target)
+                          adv_logits, morph_id, probe_logits, cross_pred, cross_target,
+                          body_pred, body_target)
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0,
@@ -256,6 +263,9 @@ def build_models(cfg, device, heads=None, n_bodies=0):
         "ftm": ForwardTransitionModel(cfg).to(device),
         "md": MotionDecoder(cfg, heads=heads).to(device),
     }
+    if cfg.lambda_body > 0:
+        # deliberately not keyed by embodiment -- see wm/models/body_motion.py
+        models["body"] = BodyMotionDecoder(cfg).to(device)
     if n_bodies >= 2:
         # always on: a pure read-out of how decodable the body is from z, costing one small MLP
         models["probe"] = MorphProbe(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)

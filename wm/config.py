@@ -28,6 +28,9 @@ LEGACY_DEFAULTS = {
     "within_body_std": False,
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
+    "lambda_body": 0.0,
+    "body_dim": 2,
+    "body_hidden": 128,
     "ftm_embodiment_channel": False,
     "center_embeddings": False,
     "heldout_bodies": (),
@@ -185,6 +188,15 @@ class Config:
     # by lambda_cross: stripping the code moved the decoder onto the frame and made transfer
     # worse, because it has no reason to read morphology there. See wm/models/adversary.py.
     lambda_adv: float = 0.0
+
+    # Decode body-level motion from z through a head **shared by every embodiment**, so that one
+    # latent is required to mean the same thing on both robots. `lambda_motion` cannot do this: it
+    # supervises through per-embodiment heads onto joint commands that have no correspondence
+    # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
+    # (F55). 0.0 reproduces every run recorded before 2026-08-17.
+    lambda_body: float = 0.0
+    body_dim: int = 2            # forward and lateral Froude number
+    body_hidden: int = 128
     adv_hidden: int = 128
     # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while
     # reconstruction is still falling steeply drives the classifier below chance, which means the
