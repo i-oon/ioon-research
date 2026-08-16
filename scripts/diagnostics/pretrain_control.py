@@ -11,19 +11,28 @@ Both predict a pretrained advantage over random weights, so the existing table c
 apart. This trains two arms that differ in exactly one thing -- what the ITM is given as its
 second frame -- and hands both to `finetune_ftm.py` for the identical B1 sweep.
 
-    real        (e_t, e_{t+1}), FTM predicts e_{t+1}.  Real dynamics.
-    shuffled    (e_t, e_s) for a random s in the SAME clip, FTM predicts e_s.  Same manifold,
-                same body, same scene, same lighting, same optimisation -- no temporal structure.
+    real        (e_t, e_{t+1}), FTM predicts e_{t+1}.  One timestep.
+    shuffled    (e_t, e_s) for a random s in the SAME clip.  Adjacency removed.
+    far         (e_t, e_s) restricted to |s - t| >= min_gap.  Long baselines only.
 
 Shuffling *within* a clip is the point. Drawing the partner from another clip would destroy the
-body and the scene at the same time as the time ordering, and then a difference in transfer would
-have three explanations instead of one.
+body and the scene at the same time as the ordering, and a difference in transfer would then have
+three explanations instead of one.
 
-**How to read the outcome.** Run the F52 sweep against each checkpoint:
+**What `shuffled` does NOT do, and this matters.** It does not remove motion. Its partners average
+21.9 frames away and the measured gait cycle is 19 (F53), so a shuffled pair shows the body at two
+points of a stride -- a *long-baseline* view of motion, not the absence of one. Measured,
+`shuffled` matches `real` at every budget, which therefore licenses only the narrower reading:
 
-    shuffled transfers about as well as real   -> what survives is manifold familiarity, and the
-                                                  thesis has to say that instead
-    shuffled transfers clearly worse           -> what survives is dynamics, and the claim stands
+    a one-step transition is not the useful window; a stride-scale one carries at least as much
+
+and NOT "motion does not transfer". `far` is the arm that tests the narrow reading directly, by
+never showing a short pair at all.
+
+This also settles a tension with slide 11, where a second frame was worth only 1.11x on the
+command. That was measured at t+1, where consecutive frames barely differ and the delta sits in
+the noise. Two frames half a cycle apart pin phase and direction. The two results agree once the
+window is stated.
 
 The two pretraining losses are NOT comparable and should not be read against each other: shuffled
 pairs sit further apart in the embedding, so that arm is solving a harder reconstruction. Only the
@@ -78,7 +87,7 @@ def encode_all(paths, chunk, device):
     return out
 
 
-def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save):
+def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save, min_gap=10):
     """Train ITM+FTM on `clips`; `mode` decides only which frame partners e_t.
 
     `save(tag, itm, ftm)` is called at a third and two thirds of the budget as well as at the end.
@@ -105,12 +114,23 @@ def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save):
         # with the time ordering removed. Rerolling the collisions keeps `shuffled` from quietly
         # including e_t paired with itself, which is a no-change transition and the one case the
         # two arms would agree on.
+        #
+        # `far` exists because `shuffled` does not separate what it was built to separate. Its
+        # partners average 21.9 frames away against a measured gait cycle of 19 (F53), so it is
+        # not a pair without motion -- it is a pair with a *long baseline*, and it mixes short
+        # ones in as well. Restricting to |partner - t| >= min_gap asks whether the long baseline
+        # alone carries the pretraining benefit, which is the claim that one timestep is the wrong
+        # window rather than the claim that motion does not matter.
         if mode == "real":
             partner = t + 1
-        else:
+        elif mode == "shuffled":
             partner = rng.integers(0, n, size=len(t))
             while (collide := partner == t).any():
                 partner[collide] = rng.integers(0, n, size=int(collide.sum()))
+        else:                                              # `far`: long baselines only
+            partner = rng.integers(0, n, size=len(t))
+            while (near := np.abs(partner - t) < min_gap).any():
+                partner[near] = rng.integers(0, n, size=int(near.sum()))
         e_t = clip[t].to(device).float()
         e_partner = clip[partner].to(device).float()
         z = itm(e_t, e_partner)
@@ -134,7 +154,11 @@ def main():
     ap.add_argument("--arch_ckpt", default="wm/runs/stage1_m3d_cross/best.pt",
                     help="only its Config is used, so both arms match the run they explain")
     ap.add_argument("--out_dir", default="wm/runs")
-    ap.add_argument("--modes", nargs="+", default=["real", "shuffled"])
+    ap.add_argument("--modes", nargs="+", default=["real", "shuffled"],
+                    choices=["real", "shuffled", "far"])
+    ap.add_argument("--min_gap", type=int, default=10,
+                    help="`far` only: smallest |partner - t| allowed, in frames. The gait cycle "
+                         "is 19 frames, so 10 is half a cycle.")
     ap.add_argument("--clips", type=int, default=100)
     ap.add_argument("--steps", type=int, default=6000)
     ap.add_argument("--lr", type=float, default=1e-4)
@@ -176,7 +200,8 @@ def main():
                         "pretrain_steps": args.steps, "pretrain_tag": tag}, path)
             print(f"  -> {path}", flush=True)
 
-        train_arm(mode, clips, cfg, args.steps, args.lr, args.batch, args.seed, device, save)
+        train_arm(mode, clips, cfg, args.steps, args.lr, args.batch, args.seed, device, save,
+                  args.min_gap)
         print("", flush=True)
         torch.cuda.empty_cache()
 

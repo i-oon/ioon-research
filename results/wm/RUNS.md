@@ -29,6 +29,31 @@ this **before** deleting anything.
 - checkpoints on disk: best.pt
 - settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=True`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
+## pretrain_real / pretrain_shuffled — control arms, NOT from `wm.train`
+
+Written by `scripts/diagnostics/pretrain_control.py`, 2026-08-16. These are **ITM+FTM only**, no
+decoder and no cross-body term, trained on 100 clips of `data/ik_walk_m3d_clean` for 15,000
+minibatch steps at lr 1e-4, batch 8, seed 0.
+
+> **`write_run_log.py` will mis-describe these.** The `config` block inside them is copied verbatim
+> from `stage1_m3d_cross` so the architecture matches the run they explain -- it does **not**
+> describe how they were trained. Read this section, not a generated one. The `pretrain_mode`,
+> `pretrain_clips` and `pretrain_steps` keys in each checkpoint carry the real provenance.
+
+| | what the ITM was given as its second frame |
+|---|---|
+| `pretrain_real` | `e_{t+1}`, the frame that actually follows |
+| `pretrain_shuffled` | `e_s` for a random `s` in the **same clip**, never `s == t` |
+
+Everything else is identical between the two, which is the point: the pair isolates temporal
+structure from familiarity with the encoder's feature manifold. Each holds `third.pt`,
+`twothirds.pt` and `best.pt` at a third, two thirds and all of the budget, so "was this pretrained
+long enough for the comparison to mean anything" is answerable without retraining.
+
+Final losses are **not comparable between the arms** -- shuffled pairs sit further apart in the
+embedding, so that arm solves a harder reconstruction (1.37 against 0.78). Only the downstream B1
+numbers compare.
+
 ## Deleted — config lost
 
 These directories exist with no checkpoint, so nothing records what they were.

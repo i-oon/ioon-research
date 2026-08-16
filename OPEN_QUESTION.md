@@ -5,7 +5,7 @@
 > Only genuinely open items. When a measurement settles one it moves to `FINDINGS.md` and leaves a single line in the settled table at the bottom, so no result is written out twice.
 
 Living doc. Supersedes the old "argue vs prove / terrain / leg-length" questions,
-which are now settled (see bottom). Updated 2026-08-08.
+which are now settled (see bottom). Updated 2026-08-16.
 
 Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
 this file carries only what is still undecided.
@@ -246,6 +246,18 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 
 ## Q14. What would actually improve cross-embodiment generalisation? (new, 2026-08-15)
 
+> **Partly overtaken, 2026-08-16.** This question was written while the goal was still a forward
+> model that transfers *frozen*. F51 measured that it does not (0.57-0.71x on the B1) and that
+> coverage moves it 5-8% where it moves the decoder 3.9x, so the lever hunt below is aimed at a
+> target that was abandoned. F52 then reframed the goal as **few-shot adaptation** and answered it:
+> one B1 clip clears break-even, nine clear every horizon tested, roughly 7x fewer target clips
+> than starting cold. **The action-head and forward-model goals are both now met.**
+>
+> What survives from the analysis below is the behavioural-overlap argument, which still matters
+> for the *shared* representation rather than for transfer: `z` reads a loaded leg at 0.986 within
+> an embodiment and 0.373 across, below the frozen encoder's 0.531. Raising that is still the
+> thing to aim at, and it is still untested whether more overlap does raise it.
+
 Answered as far as the measurements allow, so the next design decision is not made on intuition.
 
 **The transfer that exists travels entirely through `z` (F50).** Insect-only features give a 1.28x
@@ -396,12 +408,20 @@ are in `FINDINGS.md` at the finding named; nothing is repeated here.
 | **Q8** | What is the latent for, once the decoder stops needing it? | Gait, and only gait: 88.7% of its variance, with body down to 1.2%. | F26 |
 | **Q9** | Does the corrected target make the latent do its job? | It triples the transition's contribution (11% to 36%) and changes transfer not at all. The constraint is the data, not the target. | F29, F31 |
 | **Q10** | Is the forward model worth keeping? | Yes. It rolls the world forward 1.2-1.5x better than a frozen world out to ten steps; we had only ever scored it on a task the method does not assign it. | F32 |
+| **Q17** | Does the 4-leg body test a new embodiment? | No. The latent places it 0.578 from the body it was cut from, against a chance level of 0.981. It tests a new action space; the B1 held out entirely is the real test. | F47 |
+| **Q15** | Does anything transfer to a genuinely different robot? | Yes, and all of it travels through `z`: 1.28x on a held-out B1, dropping to 0.98x -- random weights -- when the latent is zeroed. The decoder's use of the frame carries nothing. | F50 |
+| **Q16** | Can the forward model be made to work on a new robot? | Not frozen (0.57-0.71x), and coverage does not fix it (5-8%). But **one target clip clears break-even and nine clear every horizon tested**, about 7x fewer clips than from cold. The claim is cheap adaptation, not zero-shot transfer. | F51, F52 |
 
 ---
 
 ## Settled / obsolete (was Q1–Q4 in the old version)
 
 - **Argue vs prove** → decided: **prove**, via cross-embodiment (above).
+- **How to word the proprioception claim** → settled 2026-08-16: **not** "proprioception cannot do
+  this". Morphology-agnostic proprioceptive control exists (joints as a token set over the
+  kinematic graph), so that sentence is refutable. The defensible form is that those methods must
+  be handed the **kinematic tree** and a camera has to be handed nothing. Four places in the deck
+  and FINDINGS were corrected; references still need verifying before they are cited.
 - **Leg amputation (nested, weak proof) vs different body** → chose a genuinely
   different body (B1 quadruped). Amputation reused only as the *4-leg test*, not the proof.
 - **Terrain experiment** → dropped (open-loop can't traverse it; poor cost/benefit).

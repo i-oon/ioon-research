@@ -70,6 +70,27 @@ Body codes disambiguate further: `c08f09t09` and friends are hexapod bodies (Sta
 use them), `middleloss` is the 4-leg built on the base geometry, `middleloss08` the one built on
 held-out `c08f09t09` (F48).
 
+## Where the 2026-08-16 numbers live
+
+The cross-embodiment few-shot result and the re-measured horizon table, so a claim in the deck can
+be traced to the file that produced it.
+
+| file | backs |
+|---|---|
+| *(none in this repo)* | **F52** itself -- the 1/3/5/7/9-clip sweep ran on com7 and its log stayed there. The table is transcribed in FINDINGS.md F52; regenerate with the command in that finding if it is ever needed here. |
+| `stage2/logs/preflight_real.log` | the gate that checked the control arms were trained enough to compare |
+| `stage2/logs/ft_pretrain_real.log` | F52's control: real temporal pairs |
+| `stage2/logs/ft_pretrain_shuffled.log` | F52's control: shuffled pairs, adjacency removed |
+| `stage2/measurements/pretrain_control_frozen.txt` | **F54** -- both arms with no adaptation at all, on the B1 and on held-out insect clips. The 1.38x-to-0.54x embodiment gap. |
+| `stage2/logs/pretrain_control.log` | how both control arms were trained (see RUNS.md) |
+| `stage1_correct/logs/horizon_c10f10t10.log` | **F53** -- F31 re-measured, the table on slide 11 |
+| `stage1_correct/logs/horizon_m3d_clean.log` | F53's robustness check, all five bodies pooled |
+
+> An 11-clip row was measured for F52 and is **not reportable**: with 14 clips and 4 held out,
+> `train = order[:11]` and `test = order[-4:]` overlap by one clip, so a quarter of the test set
+> was in training. The script now refuses that budget outright. Read budgets 1-9 only, and note
+> that 10 is the largest clean budget the B1 set allows.
+
 ## Which target a run was trained on
 
 `cfg.action_lag` decides which command the Motion Decoder is asked for, counted from frame `t`.

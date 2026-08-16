@@ -17,8 +17,16 @@ with no morphology label and no kinematics given, that separates *what movement 
 **Why vision rather than proprioception.** The committee's question was why vision is worth the
 trouble. Three leg lengths cannot answer it: they share an 18-D joint space, so proprioception
 transfers between them too, and vision wins only on convenience. Answering it needs a body whose
-action space is **disjoint** -- a 12-DOF quadruped against an 18-DOF hexapod cannot be fed to one
-proprioceptive model at all, while one camera sees both. Hence the two stages.
+action space is **disjoint** -- a 12-DOF quadruped against an 18-DOF hexapod share no joint
+correspondence, while one camera describes both in `256x256x3` whatever the body. Hence the two
+stages.
+
+> **State this carefully.** Morphology-agnostic proprioceptive control does exist -- joints as a
+> token set over the kinematic graph -- so "proprioception cannot do this" is not defensible and
+> should not appear in the deck or the thesis. The defensible claim is that those methods must be
+> **handed the kinematic tree**, and a camera has to be handed nothing: this pipeline is given
+> video of a B1 and knows nothing else about it. Verify the specific references before citing
+> them; the distinction stands regardless of which papers are named.
 
 **Target**: Stage 1 (cross-morphology) then Stage 2 (cross-embodiment), then a
 deployment loop. See `PROGRESS.md` for the dated engineering log and `SIM_GUIDE.md` for how to run
@@ -54,9 +62,26 @@ reference point. Blockquotes are reserved for caveats.
 ---
 
 ## 1. Claim
-Learn a **morphology-agnostic latent action z_t** from simulation video
-that clusters by **behavior** (walk/turn/stop), not by body shape.
-Prove it transfers to an unseen morphology without retraining.
+
+Learn a **morphology-agnostic latent action z_t** from simulation video that separates *what
+movement is happening* from *which body is doing it*, given no morphology label and no kinematics.
+
+Two claims, at two scopes, because they turned out to need different words:
+
+**Within the hexapod family** (Stage 1) the latent transfers to an unseen body **without
+retraining**: `m3d_cross` scores 3.44 deg and R² +0.81 on a held-out body. The mechanism is not
+what was expected -- the decoder reads the body from the frame and the latent carries the movement
+(F49, slide 5).
+
+**Across embodiments** (Stage 2) the claim is **cheap adaptation, not zero-shot transfer**. A
+frozen forward model does not survive the change of robot (F51, 0.57-0.71x on the B1, worse than
+predicting no motion), and adapting it on target data was always the design -- the source method
+itself finetunes on 7,265 target trajectories. Measured: **one B1 clip clears break-even, nine
+clear it at every horizon tested, about 7x fewer target clips than starting cold** (F52).
+
+> Do not write "transfers to a new robot without retraining". It was measured and it is false.
+> The defensible sentence is that the model is **cheap to adapt** to a robot it has never seen,
+> and that a camera is the only thing it has to be given about that robot.
 
 ---
 
@@ -74,18 +99,25 @@ where proprioception can't be shared at all but vision (pixels) can.
   the decisive latent-vs-raw-joint ablation. Proves the latent is *better*; does **not** prove
   vision > proprioception (same topology).
 - **Stage 2 — cross-embodiment / compositional transfer**: train on **6-leg stick insect + Unitree B1
-  quadruped (12-D)**, then test on a **4-leg stick insect**. This directly answers the committee's
-  "3 leg lengths is too simple for this pipeline" feedback: the train set contains two disjoint action
-  spaces (hexapod 18-D and B1 12-D), while the test body shares appearance with the insect and leg-count
-  structure with the quadruped. A proprioceptive model cannot be shared cleanly across these spaces; a
-  vision-latent model can. B1 data + render pipeline already exist (`data/b1_v1`, MuJoCo rollout →
-  CoppeliaSim kinematic replay, same camera/floor as insect = render-consistent). The 4-leg insect will
-  likely need a self-trained walker/data source; the lab's cutlegs AIRL policy is unusable (obs-config drift).
+  quadruped (12-D)**. The train set contains two disjoint action spaces (hexapod 18-D and B1 12-D),
+  which one camera describes in the same coordinates and a joint-space model has no correspondence
+  for. B1 data + render pipeline exist (`data/b1_framed`, MuJoCo rollout → CoppeliaSim kinematic
+  replay, same camera/floor as insect = render-consistent).
+
+  > **The 4-leg stick insect was the intended test body and it does not qualify.** It was built by
+  > removing legs from the base scene, so its geometry is a training body's and its commands are
+  > that body's corner columns bit-identically; the latent places it **0.578** from the body it was
+  > cut from against a chance level of 0.981 (F47). It tests a new *action space*, not a new
+  > embodiment. **The test body is now the B1 itself, held out entirely**: backbone trained on
+  > insects only, never a quadruped (F50, F52, slide 16). That is the only genuinely different
+  > robot in the project, and everything cross-embodiment rests on this single pair.
 
 **Terminology** — "disjoint action space" (Stage 2, B1) **≠** IK-retargeting (Stage 1). IK gives
 different *values* in the *same* 18-D space (comparable — proprioception still shares); disjoint =
-*different spaces* with no correspondence (proprioception can't share). That distinction is exactly why
-the two stages prove different things.
+*different spaces* with no correspondence, so a joint-space model has to be told how the two bodies
+map onto each other before it can share anything. That distinction is exactly why the two stages
+prove different things. See the caveat under "Why vision rather than proprioception" for how to
+word this without overclaiming.
 
 ---
 
@@ -224,6 +256,19 @@ earned result rather than an artefact of the data.
 > **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
 > cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
 
+**Where this stands, 2026-08-16.** Stage 1 is finished and retrained clean; Stage 2's two goals —
+a head that fits cheaply on a new robot, and a forward model that predicts on it — are both met,
+the second by few-shot adaptation rather than frozen transfer. What is left is not capability but
+**evidence quality and scope**: one control experiment still running (2h), one Stage-1 baseline
+never run (1e), and one decision that no measurement can make (below).
+
+**The one decision left: is a single robot pair enough?** Everything cross-embodiment rests on
+insect ↔ B1. A third embodiment would test whether the result generalises, and the natural axis is
+leg count — 6 → 4 → **2**, i.e. a biped such as H1 or G1, which the existing MuJoCo-rollout →
+CoppeliaSim-replay path could carry. Not Go1: a second quadruped is the same family and tests
+nothing new. Cost is days, not hours — new scene, new policy, new render path, and it must be
+watched walking before anything is trained on it.
+
 
 **Stage 1 — Cross-morphology** (3 leg lengths, **IK-retargeting**; shared 18-D space)
 *Goal: pipeline works end-to-end + latent organizes by behavior + latent beats raw-joint. Does **not**
@@ -241,22 +286,34 @@ source. IK is back to being the primary route; see the Step 0.5 section below fo
 | 1b | Collect IK dataset | walk via IK-retargeting, fixed cam → per-body-different `a_t` | re-collecting as `data/ik_walk_100_framed` (100 episodes, framing fixed) | 1 |
 | 1c | Train ITM + FTM + MD | `z_t`=64, fp16, trained on **long + short** only (medium held out) | implemented in `wm/`; 3 runs done | done |
 | 1d | Latent validation (two-sided) | behavior transfers **up** across legs **and** morphology decode **down** | **half passes** — behaviour transfer up (+0.11 to +0.22 macro-F1); morphology decode stays **~99%** across all 3 runs | done |
-| 1e | Decisive ablation | latent-conditioned FDM vs raw-joint-conditioned FDM (diagnostic) | ☐ | 5 |
-| 1e′ | **Invariance ablation** (new, highest value) | shrink `z_dim` / adversarial head → does *forcing* invariance change transfer? Every outcome is informative | ☐ | 5 |
-| 1f | Transfer test: medium held-out | frozen ITM+MD (trained on long+short) predicts `â_t` from medium's own frames; score against medium's real IK actions (`L_motion`) + gait-diagram similarity. **Note**: medium is not a simple interpolation of long/short in embedding space (perpendicular distance from the long↔short line ≈ long↔short distance itself) — this is closer to mild extrapolation than the easy case. | ☐ | 5–6 |
+| 1e | **EAC-WM analogue baseline** | latent-conditioned decoder vs one conditioned on the raw joint state | **☐ never run** — see the note below | open |
+| 1e′ | Invariance ablation | shrink `z_dim` / adversarial head / centring → does *forcing* invariance change transfer? | done — **three tried, none moved it** (F44); the objective did instead (F24) | done |
+| 1f | Transfer test, held-out body | frozen ITM+MD predicts `â_t` from the held-out body's own frames, scored against its real IK actions | done — `m3d_cross` **3.44 deg, R² +0.81**, control 3.67 / +0.79 (F49) | done |
+| 1g | **Mechanism, not error** | which pathway carries the answer: ablate the frame, ablate the latent, swap the latent between bodies | done — deleting the frame costs the cross-term run **9.6x** against the control's 0.4x; **swapping the latent moves the answer 0.04 deg** (F49, slide 5) | done |
+| 1h | **Coverage** | does filling the femur/tibia gap remove the failure or only soften it? | done — four bodies tying femur to tibia **12.67 deg, R² −0.78**; six decoupled at matched volume **3.27 deg, R² +0.89** (F49, slide 9) | done |
 
-**Stage 2 — Cross-embodiment / compositional transfer** (train 6-leg insect + B1, test 4-leg insect)
-*Goal: answer the committee's "too simple" critique with a real embodiment jump. Train on two bodies with
-disjoint action spaces (hexapod 18-D, B1 12-D), then test whether the learned vision-latent transfers to a
-new 4-leg insect that combines insect appearance with quadruped leg count.*
+> **Step 1e is the one Stage-1 item never done, and §9 lists it as required, not optional.**
+> Nothing here compares the latent against a decoder conditioned on the raw joint state. The frame
+> and latent ablations in 1g answer *which pathway inside our model carries the answer*, which is a
+> different question from *whether the latent beats the obvious non-latent baseline*. Decide
+> explicitly whether to run it or to state in the write-up why it is out of scope; do not leave it
+> implicitly covered.
+
+**Stage 2 — Cross-embodiment** (train 6-leg insect + B1; test the B1 itself, held out entirely)
+*Goal: answer the committee's "too simple" critique with a real embodiment jump — two disjoint action
+spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordinates.*
 
 | # | Step | Tests / produces | Status | ~Week |
 |---|---|---|---|---|
-| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | `data/b1_v1` | done |
-| 2b | 4-leg insect candidate | **"middle-loss"** variant (remove ML/MR, keep front+hind legs) picked from a 3-way preview — front-loss falls, hind-loss spins/drifts, middle-loss moves forward (ugly but usable). Still needs its own walker/data source (self-trained, PPO) — the lab's cutlegs AIRL policy is unusable. | candidate picked, walker not yet trained | 7–8 |
-| 2c | Train latent WM across {6-leg insect, B1} | shared ITM/FTM backbone (vision is embodiment-agnostic) + **per-embodiment Motion Decoder head** (18-D / 12-D) — see diagram `report/pipeline_diagram_stage2_cross_embodiment.png` | ☐ | 8–9 |
-| 2d | Held-out 4-leg test | 4-leg's action space is new (not 18-D, not 12-D) → **cannot be zero-shot** like Stage 1's medium test. Freeze ITM/FTM, fit a small **new** head on a little real 4-leg `(frame,action)` data (few-shot, N=5/10/20/50/100), then score `L_motion` | ☐ | 9–10 |
-| 2e | Cross-embodiment validation | behavior/contact transfer across embodiments; embodiment decode down | ☐ | 10 |
+| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | done — `data/b1_framed`, 14 clips | done |
+| 2b | 4-leg insect candidate | "middle-loss" variant, built by removing ML/MR from the base scene | **abandoned as the test body** — F47: the latent places it 0.578 from the body it was cut from against a chance of 0.981, so it tests a new *action space*, not a new embodiment | dropped |
+| 2c | Train latent WM across {insect, B1} | shared ITM/FTM backbone + **per-embodiment Motion Decoder head** (18-D / 12-D) | done — `stage2_clean` and variants; transfer works and the embodiment identity is passive (F43) | done |
+| 2d | **Hold the B1 out entirely** | backbone trained on insects only, never a quadruped; fit a 12-D head on a few B1 clips against the same head on a random backbone | done — **1.28x**, velocity-matched, and **all of it travels through `z`**: zeroing the latent gives 0.98x, identical to random weights (F50, slide 16) | done |
+| 2e | Cross-embodiment validation | does the shared trunk produce a shared code or a switch? | done — it produces a **switch**: Stage 1's pathology repeats and the adversary narrows but never reverses it (F43, F46) | done |
+| 2f | **Forward model across robots** | can a planner's forward model survive the change of robot? | done — **not frozen** (0.57–0.71x, worse than predicting no motion) and coverage does not fix it (5–8% against the decoder's 3.9x). Not architectural: trained on both robots it rolls the B1 at 1.34–1.53x (F51) | done |
+| 2g | **Few-shot adaptation of the forward model** | how few target clips does adapting one take, and is insect pretraining worth anything? | done — **one clip clears break-even, nine clear every horizon tested; ~7x fewer clips than from cold**, and the two curves separate rather than converge (F52, slide 16) | done |
+| 2h | **Control: dynamics or manifold?** | is the pretraining advantage learned locomotion, or just familiarity with V-JEPA2's feature space? | done — **both, and they separate**. Frozen, real time order beats shuffled on the B1 by 1.38x at one step; after a thousand adaptation steps the two are identical. Dynamics transfer but are overwritten; the foothold in the shared representation is what buys the 7x (F54) | done |
+| 2i | **Training window** | is one timestep the right pair to train the forward model on? | **no** — at 20 Hz, `t → t+1` is 50 ms, a nineteenth of a 0.95 s stride. In-domain, stride-scale pairs roll better at every multi-step horizon (F54). Acting on this means retraining, so it is a finding rather than a change already made | open |
 
 > **Data quality — read before trusting any pre-2026-08-07 number.**
 > The fixed camera was anchored to the robot's *start* pose with a 0.75 m runway aim, so the
@@ -679,7 +736,9 @@ volume rather than a line and a held-out body can be a combination no training b
 > the held-out error should get **worse**, because the task is genuinely harder now.
 
 ### Step 2.9 — Testing the diagnosis instead of asserting it
-**Status** in progress. Data collected; the training run is what remains.
+**Status** done, and it is the strongest Stage 1 result. Four bodies tying femur to tibia score
+**12.67 deg, R² −0.78**; six decoupled bodies at matched data volume score **3.27 deg, R² +0.89**.
+Filling the named gap **removes** the failure rather than softening it (F49, slide 9).
 **Goal**: turn "the failure has the shape of a gap in the data" into a prediction that can fail
 
 > Step 2.8 ends with an explanation. This step makes it falsifiable. In all four bodies the
@@ -1032,9 +1091,9 @@ ablation, not an assumption.**
 |---|---|---|
 | λ_recon, λ_motion | **open** | LAC-WM reports no numeric λ (nor LR, optimiser or schedule). Currently 1.0 / 1.0, but the terms sit on different scales — reconstruction ≈ 1.3, motion ≈ 0.002 — so equal weights do not mean equal influence. Ablate. |
 | `z_t` dimension | 64, following LAC-WM §4.2 | Also the lever for the invariance ablation: shrinking it should evict morphology first, since `e_t` already supplies body identity to both losses. |
-| Turn / stop behaviours | **missing** | Only forward walk exists. IK produces them as extra foot trajectories, but the earlier attempt let a probe separate them from a camera/path shortcut rather than from gait, so they need re-collecting before use. K-means(K=3) in Step 1.5 and the "≥3 behaviours" answer to the ICLR critique both depend on this. |
-| Step 2 evaluation metric | sample efficiency on the held-out body (confirmed with Ajan Go) | Episodes needed to reach a target error, pretrained vs from scratch (N = 5/10/20/50/100). |
-| Baseline exact setup | open | Separate pipeline per morphology, versus scratch. |
+| Turn / stop behaviours | **missing, and now the main lever left** | Only forward walk exists on either robot, which caps what `z` can be asked to carry and is the root of F45's pairing failure -- the B1 spends 84.6% of its time in two trot patterns the insect visits 9.8% and 5.7% of the time. `sim/collect/collect_ik.py` already takes `--behavior turn`, `--turn_bias`, `--travel` and `--loops`, so the insect side is collectable without touching the RL branch. Adding turning to **one** robot only would make the two sides asymmetric; the useful version widens both. IK produces them as extra foot trajectories, but the earlier attempt let a probe separate them from a camera/path shortcut rather than from gait, so they need re-collecting before use. K-means(K=3) in Step 1.5 and the "≥3 behaviours" answer to the ICLR critique both depend on this. |
+| Step 2 evaluation metric | **settled and measured** | Sample efficiency, pretrained against from-scratch, at N = 1/3/5/7/9 clips rather than episodes -- the B1 set has 14 clips, so 10 is the largest budget that leaves a clean held-out four. Reported for the action head (F50) and the forward model (F52). |
+| Baseline exact setup | **open, and it is Step 1e** | Section 9 calls an EAC-WM analogue required rather than optional, and it has never been run. Either run it or write down why it is out of scope -- the frame/latent ablations answer a different question and do not stand in for it. |
 | LAC-WM source code | not released | Rejected ICLR 2026, accepted ICML 2026; no public code. |
 ---
 

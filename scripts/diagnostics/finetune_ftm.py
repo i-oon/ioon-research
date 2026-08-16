@@ -144,6 +144,12 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 3, 5, 10])
     ap.add_argument("--splits", type=int, default=2)
+    # `scratch` is random init trained on the target clips: it depends on the config and the
+    # splits, never on which checkpoint --ckpt points at. Comparing two pretrained arms therefore
+    # recomputes an identical control, which is half the sweep. Measure it once, then pass
+    # `--arms pretrained` for the second arm.
+    ap.add_argument("--arms", nargs="+", default=["pretrained", "scratch"],
+                    choices=["pretrained", "scratch"])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--chunk", type=int, default=4)
     ap.add_argument("--encode_device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -161,7 +167,7 @@ def main():
     print(f"{'clips':>6} {'model':<12}" + "".join(f"{'h=' + str(h):>9}" for h in args.horizons))
     results = []
     for n in args.clips:
-        rows = {"pretrained": [], "scratch": []}
+        rows = {a: [] for a in args.arms}
         # `train = order[:n]` and `test = order[-test_clips:]` silently overlap once
         # n + test_clips exceeds the pool, and the ratio then scores partly on clips the model was
         # fitted on. With 14 B1 clips and 4 held out, budget 11 leaked exactly one of the four.
@@ -175,7 +181,8 @@ def main():
             order = np.random.default_rng(args.seed + split).permutation(len(paths))
             train = [cached[paths[i]] for i in order[:n]]
             test = [cached[paths[i]] for i in order[-args.test_clips:]]
-            for name, pretrained in (("pretrained", True), ("scratch", False)):
+            for name in args.arms:
+                pretrained = name == "pretrained"
                 _, itm, ftm = build(args.ckpt, pretrained, device)
                 adapt(itm, ftm, train, args.steps, args.lr, args.seed + split, device)
                 rows[name].append(rollout(itm, ftm, test, args.horizons, device))
@@ -184,15 +191,15 @@ def main():
         # Report the spread, not only the mean. A 1.05x that a reader cannot separate from the
         # 0.96x beside it is not evidence, and averaging three splits throws away exactly the
         # number that settles it.
-        for name in ("pretrained", "scratch"):
+        for name in args.arms:
             mean = {h: float(np.mean([r[h] for r in rows[name]])) for h in args.horizons}
             lo = {h: float(np.min([r[h] for r in rows[name]])) for h in args.horizons}
             hi = {h: float(np.max([r[h] for r in rows[name]])) for h in args.horizons}
             results.append((n, name, mean, lo, hi))
             print(f"{n:>6} {name:<12}"
-                  + "".join(f"{mean[h]:>7.2f}x" for h in args.horizons), flush=True)
+                  + "".join(f"{mean[h]:>9.2f}x" for h in args.horizons), flush=True)
             print(f"{'':>6} {'  range':<12}"
-                  + "".join(f"{lo[h]:>4.2f}-{hi[h]:.2f}" for h in args.horizons), flush=True)
+                  + "".join(f"{lo[h]:>5.2f}-{hi[h]:.2f}" for h in args.horizons), flush=True)
 
     print("\nAbove 1.00x means the adapted forward model beats holding the frame still on the")
     print("target robot. Below it, the rollout is worse than predicting no motion and cannot")

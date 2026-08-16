@@ -1722,9 +1722,16 @@ forward model and decoder together are a rounding error beside it.
 | **this pipeline's vision path** | one camera | **94.9 ms, 10.5 Hz** |
 
 **We are nearer the animal than the robot, and that is not a defect to optimise away.** Vision is
-not here for bandwidth or latency; it is here because it is the only channel in which an 18-DOF
-hexapod and a 12-DOF quadruped are described in the same coordinates. They share no joint space,
-no sensor correspondence and no midpoint (F38's premise). That property costs 95 ms per frame.
+not here for bandwidth or latency; it is here because it describes an 18-DOF hexapod and a 12-DOF
+quadruped in the same coordinates **without being given a description of either**. They share no
+joint space, no sensor correspondence and no midpoint (F38's premise). That property costs 95 ms
+per frame.
+
+**Do not write that proprioception cannot do this.** Morphology-agnostic proprioceptive control
+exists -- joints as a token set over the kinematic graph -- so the defensible claim is not that
+joint space cannot be made to work across bodies. It is that those methods must be **handed the
+kinematic tree**, and a camera has to be handed nothing. Check the specific references before
+citing them; the point stands regardless of which papers are named.
 
 Consequence for deployment: the architecture is **two-rate by necessity**. Perception plans at
 ~10 Hz and control stabilises at 50 Hz, which is also the answer to the objection that
@@ -2838,6 +2845,12 @@ against the same architecture from random init, encoder frozen in both, scored b
 forward model on its own output and dividing by holding the frame still. Three splits per budget,
 1,000 optimiser updates each, four held-out clips.
 
+```
+.venv/bin/python3 -u scripts/diagnostics/finetune_ftm.py --clips 1 3 5 7 9 --splits 3
+```
+
+Measured on com7; its log stayed on that machine, so the table below is the record.
+
 | clips | model | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|---|
 | 1 | pretrained | **1.02x** | 1.00x | 0.94x | 0.83x |
@@ -2909,6 +2922,109 @@ bodies (range 19-19, as expected from replayed expert episodes). 32 is not a mul
 F31's "a distant offset wraps back to a similar phase" was the wrong mechanism even though its
 conclusion held. The right one is that the commands are open-loop IK: one frame fixes the phase
 and everything downstream of it is determined, at any horizon.
+
+### F54. Insect pretraining transfers dynamics *and* a foothold in the feature space, and only the second one is what makes adaptation cheap
+
+F52 measured that insect-pretrained ITM+FTM adapt to the B1 from ~7x fewer clips than random init.
+`scratch` controls for "any initialisation", but two very different readings both predict that:
+
+    the model learned how legged bodies move, and that survives a change of robot
+    the model learned the shape of V-JEPA2's feature manifold, nothing about motion
+
+Two arms, identical in every respect except **what the ITM is given as its second frame**. Same
+100 clips of `ik_walk_m3d_clean`, same architecture, 15,000 minibatch steps, same seed. ITM+FTM
+only -- no decoder, no cross term -- since that is all `finetune_ftm.py` loads.
+
+| arm | second frame |
+|---|---|
+| `real` | `e_{t+1}`, the frame that actually follows |
+| `shuffled` | `e_s`, random `s` in the **same** clip, never `s == t` |
+
+**Not undertrained.** At 5 clips `real` reaches 1.17 / 1.15 / 1.09 / 0.98x against
+`stage1_m3d_cross`'s 1.23 / 1.17 / 1.09 / 0.95x, and `scratch` reproduces F52 to within 0.03x on a
+different run and checkpoint. The arms sit close enough to the full Stage 1 checkpoint for the
+comparison to mean something.
+
+**After finetuning, the two arms are indistinguishable.**
+
+| clips | arm | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|---|
+| 1 | real | 1.03x | 1.03x | 1.00x | 0.90x |
+| 1 | shuffled | 1.00x | 1.03x | 0.99x | 0.88x |
+| 5 | real | 1.19x | 1.17x | 1.10x | 0.98x |
+| 5 | shuffled | 1.18x | 1.19x | 1.11x | 0.98x |
+| 9 | real | **1.31x** | 1.30x | 1.21x | 1.05x |
+| 9 | shuffled | **1.31x** | 1.33x | 1.24x | 1.05x |
+
+At nine clips the three-split ranges lie on top of each other -- 1.29-1.34 against 1.28-1.34.
+
+**Frozen, before any finetuning, they are not.**
+
+| arm | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|
+| `real` | **0.54x** (0.53-0.54) | 0.51x (0.50-0.52) | 0.53x (0.52-0.55) | 0.59x (0.58-0.61) |
+| `shuffled` | **0.39x** (0.38-0.39) | 0.45x (0.44-0.46) | 0.49x (0.48-0.51) | 0.57x (0.55-0.59) |
+
+**The ranges are disjoint at h=1 and the advantage decays with horizon** -- 1.38x, 1.13x, 1.08x,
+1.04x. `real` was trained on one-step pairs and its edge appears at exactly the horizon it was
+trained on, which is the internal consistency check this rests on.
+
+**Both arms are competent in-domain, which is what licenses reading the B1 numbers at all.** The
+same frozen checkpoints, on 40 `ik_walk_m3d_clean` clips the pretraining never saw:
+
+| arm, frozen on held-out insect clips | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|
+| `real` | **1.38x** (1.38-1.39) | 1.37x (1.35-1.38) | 1.24x (1.23-1.26) | 1.04x (1.03-1.07) |
+| `shuffled` | 1.33x (1.31-1.35) | **1.46x** (1.44-1.48) | **1.34x** (1.32-1.37) | **1.10x** (1.08-1.14) |
+
+Two things fall out of this table.
+
+**The embodiment gap, stated as plainly as it gets: 1.38x to 0.54x on the same weights.** Both arms
+clear 1.0x at every horizon on insects and neither comes close on the B1. Nothing was retrained
+between those two measurements, so the B1 failure is not undertraining -- it is the change of
+robot.
+
+**And each arm is best at the horizon it was trained on.** `real` saw only `Δ=1` pairs and wins at
+h=1, then loses to `shuffled` at h≥3 with disjoint ranges. `shuffled` saw pairs averaging 21.9
+frames apart -- stride scale -- and wins at every multi-step horizon. **Training the forward model
+on adjacent frames produces a worse multi-step rollout than training it on stride-scale pairs**,
+in-domain, by 7 to 8 percent at h=3 and h=5. That is a design consequence, not a curiosity: the
+FTM is used by rolling it forward many steps, and it is currently trained on the one horizon where
+that advantage does not apply.
+
+> The cross-embodiment picture is the mirror image and should not be conflated with it. On the B1,
+> `real` leads at *every* horizon, by a margin that shrinks with distance. In-domain the long
+> baseline buys better rollout; across robots the little that survives is the one-step structure.
+> Both readings come from single frozen evaluations and neither has been repeated on a second
+> pretraining seed.
+
+**So pretraining supplies two separable things.**
+
+| what | measured by | size |
+|---|---|---|
+| transferable dynamics | the frozen comparison | real, **1.38x at h=1** -- but both arms are far below 1.0x, so it is useless on its own |
+| a foothold in V-JEPA2's feature space | the post-finetune comparison | **this is what produces the 7x** |
+
+A thousand optimiser steps on B1 clips teach more about B1 dynamics than insect pretraining ever
+carried, so the frozen 1.38x is overwritten. **This does not say pretraining is unnecessary**: at
+nine clips, pretrained scores 1.31x against `scratch`'s 1.01x, and that gap never closes. It says
+the part of pretraining that survives finetuning is familiarity with the shared representation --
+which is precisely what a camera provides and a joint space does not.
+
+**Read `shuffled` narrowly; it does not remove motion.** Its partners average 21.9 frames apart
+against a measured gait cycle of 19 (F53), so a shuffled pair shows the body at two points of a
+stride rather than at no motion at all. Measured on the joint commands, pose distance runs 3.44 deg
+at one frame, peaks at **17.67 deg at half a cycle**, and falls back to 5.81 deg at a full cycle;
+under uniform sampling 14.6% of pairs land within one frame of the same phase. What the arm removes
+is *adjacency*, not movement.
+
+**Which sets the scale the whole design should be read at.** The insect expert data runs at
+**20 Hz** (`sim_time` in `expert_66k_aug3c_fcontact.csv`), so a clip is 3.30 s, a stride is 0.95 s,
+and `t -> t+1` is **50 ms -- one nineteenth of a stride, and 19% of the pose change a half-stride
+carries**. That single number reconciles three results that looked in tension: slide 11's second
+frame being worth only 1.11x, `shuffled` matching `real` after finetuning, and `real`'s frozen edge
+living at h=1 and dying by h=10. **The informative window is stride-scale; one timestep is the
+wrong unit to have built the comparison on.**
 
 ## Files
 
