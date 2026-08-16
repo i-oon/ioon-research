@@ -11,7 +11,8 @@ import numpy as np
 from torch.utils.data import Dataset, Sampler
 
 from ..bodies import (CONTACT_THRESHOLD, EXCLUDED_BODIES, body_of,  # noqa: F401
-                      contact_labels, evenly, usable_clips)
+                      contact_labels, episode_number, evenly, sort_clips,
+                      usable_clips)
 from .augment import apply, identity_params, sample_params
 from .embodiment import HEXAPOD_DT, REGISTRY, body_motion
 from .embodiment import load as load_embodiment
@@ -255,7 +256,13 @@ def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=
             before = sum(len(v) for v in by_body.values())
             by_body = {b: evenly(sort_clips(c), caps[name]) for b, c in by_body.items()}
             after = sum(len(v) for v in by_body.values())
+            # Print which episodes survived, not just how many. The cap silently kept speed 0.72
+            # three times and dropped 1.10 entirely once episode numbers grew past two digits and
+            # a string sort stopped agreeing with a numeric one; the count was right throughout.
+            sample = sorted(by_body)[0]
             print(f"{name}: capped at {caps[name]} clips per body, {before} -> {after} clips")
+            print(f"{name}: {sample} keeps episodes "
+                  f"{[episode_number(p) for p in by_body[sample]]}")
         tr, va = [], []
         for body, clips in sorted(by_body.items()):
             n_val = max(1, round(len(clips) * val_fraction))
