@@ -29,7 +29,7 @@ def clip_paths(data_dir, morphs):
         print(f"WARNING: {sorted(named)} do not walk -- they collapse and rotate on the spot. "
               f"See FINDINGS.md F42.")
     paths = []
-    for path in sorted(glob.glob(os.path.join(data_dir, "*.npz"))):
+    for path in sort_clips(glob.glob(os.path.join(data_dir, "*.npz"))):
         if os.path.basename(path).split("_")[0] in morphs:
             paths.append(path)
     return paths
@@ -230,7 +230,7 @@ def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=
     train, val = [], []
     for name, data_dir in specs:
         directory = data_dir if os.path.isabs(data_dir) else os.path.join(root, data_dir)
-        paths = sorted(glob.glob(os.path.join(directory, "*.npz")))
+        paths = sort_clips(glob.glob(os.path.join(directory, "*.npz")))
         if exclude:
             paths = usable_clips(paths)
         if heldout_bodies:
@@ -253,7 +253,7 @@ def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=
             by_body.setdefault(os.path.basename(p).split("_")[0], []).append(p)
         if name in caps:
             before = sum(len(v) for v in by_body.values())
-            by_body = {b: evenly(sorted(c), caps[name]) for b, c in by_body.items()}
+            by_body = {b: evenly(sort_clips(c), caps[name]) for b, c in by_body.items()}
             after = sum(len(v) for v in by_body.values())
             print(f"{name}: capped at {caps[name]} clips per body, {before} -> {after} clips")
         tr, va = [], []

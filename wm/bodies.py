@@ -148,11 +148,39 @@ def training_bodies(cfg, embodiment="hexapod", root=None):
 # Sampling clips
 # --------------------------------------------------------------------------------------
 
+def episode_number(path):
+    """The integer episode in `body_ep<N>.npz`, or -1 when the name does not carry one."""
+    name = os.path.basename(path)
+    if "_ep" not in name:
+        return -1
+    try:
+        return int(name.split("_ep")[1].split(".")[0])
+    except ValueError:
+        return -1
+
+
+def sort_clips(paths):
+    """Sort by body then episode **numerically**, which a plain `sorted()` does not do.
+
+    Episode numbers used to be two digits, so string order and numeric order agreed and every call
+    site could sort paths directly. `merge_speed_dirs.py` encodes the speed as a block of a
+    thousand, and `"ep1006" < "ep20" < "ep2006"` compares character by character: the list handed
+    to `evenly` is then interleaved rather than ordered, and spreading picks across it stop being
+    spread across anything meaningful.
+
+    Measured before this existed: capping the five-speed set at 5 clips a body kept speed 0.72
+    two or three times per body and **dropped speed 1.10 entirely**, discarding half the range the
+    dataset was collected to provide. Nothing raised an error; the run just trained on less than
+    it was given.
+    """
+    return sorted(paths, key=lambda p: (os.path.basename(p).split("_ep")[0], episode_number(p)))
+
+
 def evenly(items, keep):
     """`keep` items spread across the list, not the first `keep`.
 
-    Clips are sorted by episode, so taking a prefix would take consecutive expert episodes and the
-    behavioural range would narrow along with the count.
+    Assumes the caller sorted with `sort_clips`: this spreads across list *positions*, so it only
+    spreads across episodes if the list is in episode order.
     """
     if keep >= len(items):
         return list(items)
