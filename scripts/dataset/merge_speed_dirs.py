@@ -38,12 +38,26 @@ from wm.bodies import walk_check  # noqa: E402
 
 
 def speed_of(directory):
-    """`data/ik_speed_1.10` -> 1.10. The directory name is the only record of it."""
-    tail = os.path.basename(directory.rstrip("/")).rsplit("_", 1)[-1]
-    try:
-        return float(tail)
-    except ValueError:
-        raise SystemExit(f"cannot read a speed from {directory!r}; expected .../ik_speed_<float>")
+    """`ik_speed_1.10` -> (1.10, 1.10); `ik_ramp_0.72_1.10` -> (0.72, 1.10).
+
+    Returned as a pair so a ramp and a constant collection never collide on one key. Taking only
+    the trailing number would map `ik_ramp_1.10_0.72` and `ik_speed_0.72` to the same value, and
+    they would then share a block of episode numbers -- putting a 72-frame ramped clip and a
+    92-frame constant clip in the same "episode", which is precisely the mis-pairing this whole
+    module exists to prevent.
+    """
+    name = os.path.basename(directory.rstrip("/"))
+    parts = name.split("_")
+    nums = []
+    for token in parts:
+        try:
+            nums.append(float(token))
+        except ValueError:
+            continue
+    if not nums:
+        raise SystemExit(f"cannot read a speed from {directory!r}; expected ik_speed_<float> "
+                         f"or ik_ramp_<float>_<float>")
+    return (nums[0], nums[-1])
 
 
 def main():
@@ -63,7 +77,8 @@ def main():
 
     kept, dropped, per_speed = 0, [], {}
     for index, directory in enumerate(sorted(args.dirs, key=speed_of)):
-        speed = speed_of(directory)
+        speed_pair = speed_of(directory)
+        speed, speed_end = speed_pair
         source = directory if os.path.isabs(directory) else os.path.join(ROOT, directory)
         paths = sorted(p for p in glob.glob(os.path.join(source, "*.npz"))
                        if "manifest" not in os.path.basename(p))
@@ -82,10 +97,11 @@ def main():
             episode = index * args.block + int(data["expert_episode"])
             data["expert_episode"] = np.array(episode)
             data["speed"] = np.array(speed)
+            data["speed_end"] = np.array(speed_end)
             np.savez_compressed(os.path.join(out, f"{body}_ep{episode}.npz"), **data)
             kept += 1
             n_here += 1
-        per_speed[speed] = n_here
+        per_speed[speed_pair] = n_here
 
     for source in args.dirs:
         manifest = os.path.join(ROOT, source, "manifest.npy")
@@ -93,9 +109,10 @@ def main():
             shutil.copy(manifest, os.path.join(out, f"manifest_{speed_of(source)}.npy"))
 
     print(f"{kept} clips -> {args.out}")
-    for speed in sorted(per_speed):
-        print(f"  speed {speed:<6} {per_speed[speed]} clips, episodes "
-              f"{sorted(args.dirs, key=speed_of).index(next(d for d in args.dirs if speed_of(d) == speed)) * args.block}+")
+    for i, d in enumerate(sorted(args.dirs, key=speed_of)):
+        lo, hi = speed_of(d)
+        tag = f"{lo}" if lo == hi else f"{lo}->{hi}"
+        print(f"  {tag:<12} {per_speed[speed_of(d)]} clips, episode block {i * args.block}")
     if dropped:
         print(f"\ndropped {len(dropped)} clips that fail walk_check:")
         for line in dropped:

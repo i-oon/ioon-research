@@ -123,6 +123,18 @@ All error figures below are RMSE in degrees, pooled over all 18 joints and all t
 body never trained on. The commands' own spread is about 11.7 deg per joint, so that is the number
 to read every error against.
 
+**One rule for every `x` in this deck: `comparison error ÷ our error`. Above 1.0 the comparison is
+worse; 1.0 is a tie.** Only what we compare against changes, and each table names it:
+
+| compared against | so `1.4x` means | slides |
+|---|---|---|
+| **a random backbone** — same head, same clips, untrained weights | pretraining is worth 1.4x | 15, 16 |
+| **holding the frame still** — predicting no change at all | the forward model beats doing nothing by 1.4x | 11, 12, 13, 16 |
+| **the same model with a part deleted** | that part was worth 1.4x — read as a *cost* of removing it | 14, 19 |
+
+The one exception is flagged where it occurs: slide 20 compares **R²**, where higher is better, so
+that ratio runs the other way.
+
 **"Control" throughout means the matched run**: identical data, identical split, identical
 architecture, identical seed, with **one flag changed** — the cross-body loss turned off. Which
 run that is depends on which split is being discussed, so it is named each time:
@@ -741,16 +753,27 @@ the second.
 
 ## Slide 15 — A held-out action space: 4-leg insect with a new head
 
+> **Slides 15 and 16 ask one question on two axes: is adaptation cheap?** A novel *action space*
+> here, a novel *robot* on 16. Each uses the backbone that genuinely withholds its target — Stage 2
+> for the 4-leg, which Stage 2 never saw; **Stage 1 for the B1, because Stage 2 trains on it.**
+> Whether the latent is *shared* is a separate question and resumes on slide 19.
+
 Trained on two embodiments — insect to an 18-D head, B1 to a 12-D head. The test body is neither:
 the same stick insect with the middle legs removed, leaving `FL, HL, FR, HR` into a **new 12-D
 insect head**. The dimensionality matches B1, the semantics do not, so this is **not** a zero-shot
 B1-head test.
 
-**Protocol.** Freeze the Stage 2 backbone, add the new head, fit only that head on N 4-leg clips,
-test on held-out clips, compare against the same head on a random backbone.
+> **Backbone: `stage2_clean` — trained on stick insects *and* the B1.** Frozen here. The B1 is
+> therefore *not* a novel robot on this slide; the 4-leg action space is what is novel.
+
+**Protocol.** Freeze that backbone, add a new 12-D head, fit only that head on N 4-leg clips, test
+on held-out clips, compare against the same head on a random backbone.
 
 **The test body is built from `c08f09t09`, which Stage 2 withholds**, so leg count *and* geometry
 are both unseen. Three seeds per budget:
+
+> **`gain` = how many times worse the random backbone is.** 2.97x means it makes nearly three
+> times the error on the same clips.
 
 | clips for the new head | pretrained Stage 2 | random backbone | gain |
 |---:|---:|---:|---:|
@@ -764,95 +787,92 @@ are both unseen. Three seeds per budget:
 **One clip reaches 2.60 deg; the random backbone never reaches that with seven.** The claim is
 **sample efficiency**, not final accuracy.
 
-**The commands execute physically.** Replayed open-loop in CoppeliaSim with the middle legs ghosted
-out, all five held-out clips walk forward 0.61-0.69 m, tracking the IK reference within 0.06 m on
-four of five and 0.12 m on the fifth. **The stance pattern agrees with the reference 90.2%
-frame-for-frame**, and duty factors match per leg — 0.55/0.75/0.71/0.58 predicted against
-0.57/0.74/0.70/0.56.
+**The commands execute physically.** Replayed open-loop with the middle legs ghosted out, all five
+held-out clips walk 0.61-0.69 m and their stance pattern matches the IK reference **90.2%
+frame-for-frame**.
 
 ![4-leg gait, predicted commands above IK ground truth](../results/wm/stage2/4leg_head/gait_heldout08_replay_clip0.png)
 
-**And they reproduce the reference rather than improve on it.** This 4-leg body drifts sideways --
-removing the middle pair does that -- and the IK reference drifts 0.22-0.31 m. The model drifts
-with it, adding at most 0.08 m of its own. It learned the visual/action correspondence, not that
-the drift is undesirable.
+**Reconstruction, not improvement.** The model reproduces the reference including its faults:
+removing the middle pair makes this body drift sideways, the IK reference drifts 0.22-0.31 m, and
+the model drifts with it. Beating the reference is a policy-training question and out of scope
+here. What is measured is whether commands can be *recovered* for an action space the model never
+had a head for.
 
-**The novel axis here is the output coordinates, not the embodiment.** A leg-removal variant is
-still the same animal with legs taken away, so this does not test transfer to a genuinely different
-robot however many variants are built. That is slide 16.
+**And the body is a variant, not a new robot** — the same animal with legs taken away. That is
+deliberate: it varies the **output coordinates while holding the embodiment nearly fixed**, where
+slide 16's B1 varies both at once. Run separately, the two say which axis costs what; run together,
+a failure would be unattributable.
 
-**The frame does much of the work, but `z` is not redundant** — the right panel. Zero-`z` at 3.02
-still beats the random backbone's 5.35, so frame plus pretrained backbone carries a lot. But real
-`z` beats zeroed by **1.52x** and shuffled by **2.08x**. Shuffling keeps the latent's distribution
-and destroys only its alignment, so that gap is the part an *aligned* latent contributes.
-
-### Removing the identity adversarially does not repair the pathway
-
-**It buys nothing on transfer.** Against the plain run it is 3.84 → 3.64 deg on the held-out body
-and **1.99 → 2.13 on the 4-leg**, one direction each way and neither outside noise. It does narrow
-the identity residual, 0.738 → 0.598, which F43 already showed is a quantity nothing reads.
-
-**And the swap test says why.** Body A's frame with body B's latent, on two training bodies whose
-commands differ by 21.13 deg:
-
-| | frame from | latent from | vs `c10f10t10` | vs `c10f06t06` | follows |
-|---|---|---|---|---|---|
-| clean | c10f10t10 | c10f06t06 | 21.03 | **6.98** | latent |
-| clean | c10f06t06 | c10f10t10 | **5.26** | 20.19 | latent |
-| adversary | c10f10t10 | c10f06t06 | 18.76 | **8.04** | latent |
-| adversary | c10f06t06 | c10f10t10 | **6.87** | 18.04 | latent |
-
-**Both answer with the latent's body, not the frame's.** The adversary narrows 3.0–3.8x to
-2.3–2.6x and never approaches 1.0, where following the frame would begin. In Stage 1 `lambda_cross`
-reversed this outright; the adversary does not — **the first direct evidence that Stage 2 needs a
-cross term**, which until now was assumed from Stage 1 rather than measured here.
+**`z` is not redundant** — right panel. Zeroing it costs **1.52x** and shuffling **2.08x**, though
+zeroed still beats a random backbone, so the frame carries a lot. Shuffling preserves the latent's
+distribution and destroys only its alignment, so that gap is what alignment buys.
 
 ---
 
 ## Slide 16 — Adapting to a genuinely different robot
 
+> **Backbone: `stage1_m3d_cross` — four stick insect bodies, never a quadruped.** Frozen here.
+> **Not** the Stage 2 model used on slides 14 and 15, which trains on the B1 and therefore cannot
+> be used to test it.
+
 **The B1 is the one genuinely different robot here** — 12 joints against 18, a trot against a
-wave. Stage 2 trains on it, so Stage 2 cannot test it. **So hold it out entirely:** backbone from a
-Stage 1 checkpoint, insect bodies only, then fit a 12-D head on a few B1 clips against the same
-head on a random backbone.
+wave. Testing transfer *to* it requires a backbone that never saw it, hence the Stage 1 checkpoint:
+fit a fresh 12-D B1 head on a few clips, against the same head on random weights.
 
-| clips fitted | pretrained on insects | random backbone | margin |
-|---|---:|---:|---:|
-| 5 | 20.49 deg, R² +0.35 | 23.80, +0.22 | 1.16x |
-| 7 | 16.05 deg, R² +0.62 | 20.09, +0.48 | **1.25x** |
-| 9 | 15.62 deg, R² +0.68 | 20.48, +0.51 | **1.31x** |
-| **7, velocities matched** | **15.98 deg, R² +0.58** | 20.49, +0.39 | **1.28x** |
+> **`x` = how many times worse the random backbone is.** 1.28x means 28% more error; 1.0x means
+> pretraining bought nothing.
 
-**Insect features make a quadruped's head measurably cheaper to fit** — small, consistent, and not
-a speed artefact (matching velocities moves 1.29x to 1.28x). Read it at seven and nine clips; at
-five both score R² near zero and the ratio compares two failures.
+| clips fitted | split | pretrained on insects | random backbone | margin |
+|---|---|---:|---:|---:|
+| 5 | random speed | 20.49 deg, R² +0.35 | 23.80, +0.22 | 1.16x |
+| 7 | random speed | 16.05 deg, R² +0.62 | 20.09, +0.48 | **1.25x** |
+| 9 | random speed | 15.62 deg, R² +0.68 | 20.48, +0.51 | **1.31x** |
+| 7 | all speed | **15.98 deg, R² +0.58** | 20.49, +0.39 | **1.28x** |
 
-### Which module carries it
+**Insect features make a quadruped's head cheaper to fit.** Each row is internally matched — both
+arms get the identical clips — but **rows are not comparable to each other**, since 5/9 and 9/5
+score on different test sets.
 
-| | across embodiments |
-|---|---|
-| **the latent `z`** | **all of it** — zeroing `z` gives 0.98x, the same as random weights |
-| the decoder's use of the frame | none — a trained trunk is worth no more than an untrained one |
-| **the forward model** | **worse than useless** — **0.57–0.71x** on B1 video, below holding the frame still |
+**The last two rows are the one controlled pair**: same budget, same 7/7 split size, differing only
+in the split rule. The B1 set is 2 policies x 7 commanded speeds, so a random split can leave
+speeds unseen and confuse "new robot" with "new speed"; forcing both halves to cover all seven
+gives **1.28x against 1.25x**. The confound does not explain the margin.
 
-Shuffling the latent scores *worse than deleting it*: one that does not match its frame misleads
-the decoder.
+At five clips both arms score R² near zero, so that ratio compares two failures — read seven and
+nine only.
+
+### All of it travels through the latent
+
+Give the **motion decoder** an all-zero latent instead of the ITM's, and it scores **20.86 against
+random weights' 20.49** — identical within noise. What the decoder learned about reading a *frame*
+is worth **nothing** on a quadruped; the whole margin arrives through the latent. Shuffled latents
+are worse still at 22.04 — one that does not match its frame actively misleads.
+
+> **This is where slide 15 differs, and the difference locates the embodiment gap.** On the 4-leg,
+> the same ablation leaves the frame pathway worth 1.77x. On a genuinely different robot it is worth
+> 0.98x. **What fails to cross embodiments is the frame pathway; the latent is what survives.**
 
 ### The forward model is what a planner needs
+
+> **A different baseline here: holding the frame still** — predicting the frame does not change.
+> On the held-out insect body that baseline scores 2.116 at one step against the forward model's
+> 1.452, hence 1.46x. So `1.39x` means doing nothing is 1.39 times worse than the model, and
+> `0.57x` means the model is **1.75 times worse than doing nothing**.
 
 | FTM rolled on B1 video | 1 step | 3 | 5 | 10 |
 |---|---|---|---|---|
 | trained on insects **and** B1 | **1.39x** | **1.53x** | **1.52x** | **1.34x** |
 | trained on insects only | 0.63x | 0.57x | 0.63x | 0.71x |
 
-**Exposure, not architecture** — identical modules, only whether a quadruped was ever seen. And
-coverage does not substitute: the intervention that moved the decoder from 12.67 deg to 3.27 moves
-the forward model **5–8%**.
+**Exposure, not architecture** — identical modules, only whether a quadruped was ever seen. Nor
+does coverage substitute: the intervention that took the decoder from 12.67 deg to 3.27 moves the
+forward model **5–8%**.
 
 ### How few clips it takes
 
-> **Zero-shot across robots does not work — the gap is real and measured. But one clip of the new
-> robot is enough for this pipeline to cross the line, where starting from scratch takes seven.**
+> **Zero-shot across robots does not work.** But one clip of the new robot puts this pipeline over
+> the line, where starting from scratch takes seven.
 
 | clips | | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|---|
@@ -863,18 +883,18 @@ the forward model **5–8%**.
 | 9 | pretrained | **1.37x** | **1.36x** | **1.26x** | **1.05x** |
 | 9 | scratch | 1.01x | 1.10x | 1.06x | 0.96x |
 
-- **7x in target data.** Pretrained clears 1.0x at one clip; scratch needs seven. Pretrained wins
-  all twenty cells across the five budgets measured.
-- **The curves separate rather than converge.** Scratch is flat at 1.01x from five clips on while
-  pretrained climbs to 1.37x.
-- **At nine clips every horizon clears break-even, including ten steps** — and only for pretrained.
-  Scratch reaches 0.96x at h=10 and never crosses.
-- Fourteen B1 clips with four held out caps the clean budget at ten. One robot pair.
+- **7x in target data.** Pretrained clears 1.0x at one clip, scratch at seven, and pretrained wins
+  all twenty cells measured.
+- **The curves separate rather than converge** — scratch flat at 1.01x from five clips on,
+  pretrained climbing to 1.37x.
+- **Only pretrained clears break-even at every horizon**, including ten steps. Scratch peaks at
+  0.96x there.
+- Fourteen B1 clips, four held out, caps the clean budget at ten. One robot pair.
 
 ### What the pretraining contributes
 
-Two arms differing in **one thing**: whether the ITM's frames are adjacent, or drawn at random from
-the same clip. Same data, architecture and budget.
+Two arms differing in **one thing**: whether the ITM's frames are adjacent or drawn at random from
+the same clip.
 
 | frozen, no adaptation | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|
@@ -884,12 +904,11 @@ the same clip. Same data, architecture and budget.
 | the B1 — random | 0.39x | 0.45x | 0.49x | 0.57x |
 
 - **The embodiment gap in one line: 1.38x to 0.54x, same weights, nothing retrained.**
-- **Real time order does transfer, and it is not what makes adaptation cheap.** Frozen on the B1 it
-  wins by 1.38x with no overlap between splits; after a thousand adaptation steps the two are
-  identical. What survives is the foothold in the shared representation.
-- **One timestep is the wrong training window.** At 20 Hz, `t → t+1` is 50 ms — a nineteenth of a
-  0.95 s stride. Stride-scale pairs roll better at every multi-step horizon in-domain, and the
-  forward model is used by rolling it forward.
+- **Real time order transfers, and is not what makes adaptation cheap.** Frozen it wins by 1.38x
+  with no overlap between splits; a thousand adaptation steps later the two are identical. What
+  survives is the foothold in the representation.
+- **One timestep is the wrong training window.** At 20 Hz `t → t+1` is 50 ms, a nineteenth of a
+  0.95 s stride — and stride-scale pairs roll better at every multi-step horizon in-domain.
 
 ---
 
@@ -1038,9 +1057,12 @@ is why, and what follows from it.
 | so nothing forces one `z` to mean the same thing on both robots | embodiment is decodable from `z` at **0.994** yet deleting it costs **1.03x**, *less* than deleting random directions — present and inert |
 | so the trunk partitions instead of sharing | a per-leg readout transfers at **0.986 within** and **0.373 across**, below the frozen encoder's 0.531 and below chance |
 
-**Stage 1 is the positive control for the last two steps.** There `lambda_cross` *is* definable and
-it **reverses the swap test outright**; here the adversary only narrows it, 3.0–3.8x to 2.3–2.6x,
-and never approaches 1.0.
+**Stage 1 is the positive control for the last two steps.** Swap the decoder's two inputs — body
+A's frame with body B's latent — and ask which body the output resembles. In Stage 2 it answers
+with the *latent's* body by 3.0–3.8x, and adversarial identity removal only narrows that to
+2.3–2.6x; **1.0 is where the frame would start to win, and nothing here approaches it.** In Stage 1
+`lambda_cross` reverses the same test outright. That is the direct evidence Stage 2 needs a cross
+term, rather than an assumption carried over.
 
 ### The pairing cannot be fixed by finding a better label
 
@@ -1078,19 +1100,24 @@ Add one term: decode body speed from `z` through a head **shared by both embodim
 per-embodiment heads `L_motion` already uses — one head, so the same latent must decode the same
 way on both robots. Matched control, one flag apart.
 
-Body-level speed read out of each representation, R² against the target robot's own mean:
+Body-level speed read out of each representation, **two seeds with a matched control at each**.
+R² against the target robot's own mean, so **higher is better** — unlike the error ratios elsewhere
+in this deck.
 
-| | insect→insect | b1→b1 | **insect→b1** | **b1→insect** |
+| | insect→insect | b1→b1 | insect→b1 | **b1→insect** |
 |---|---|---|---|---|
-| frozen encoder | 0.666 | 0.750 | **+0.012** | **+0.079** |
-| `z`, single-speed data | 0.520 | 0.215 | −4.601 | −24.359 |
-| `z`, five-speed data, no term | 0.624 | 0.155 | −4.163 | −5.595 |
-| **`z`, five-speed data + `L_body`** | **0.676** | **0.879** | −1.931 | **+0.407** |
+| frozen encoder | 0.666 | 0.750 | +0.012 | **+0.079** |
+| `z`, single-speed data | 0.520 | 0.215 | −4.60 | −24.36 |
+| `z`, five speeds, no term — s0 / s1 | 0.624 / 0.579 | 0.155 / 0.261 | −4.16 / −2.70 | −5.60 / −10.84 |
+| **`z`, five speeds + `L_body` — s0 / s1** | **0.676 / 0.705** | **0.879 / 0.879** | −1.93 / **+0.20** | **+0.407 / +0.377** |
 
-**`b1→insect` is +0.407 against the frozen encoder's +0.079 — 5.2x.** Nothing in this project had
-cleared that bar on any cross-embodiment measurement: the adversary reaches chance and stops,
-`lambda_cross` is not definable here. Three of four cells now beat the encoder, and `b1→b1` went
-from 0.155 to 0.879 — training now *preserves* body speed where it used to destroy it.
+**`b1→insect` reproduces at +0.407 and +0.377 — 5.0x the frozen encoder's +0.079.** Nothing in this
+project had cleared that bar on any cross-embodiment measurement: the adversary reaches chance and
+stops, `lambda_cross` is not definable here at all.
+
+**`b1→b1` lands on 0.879 in both seeds**, against the encoder's 0.750 — training used to destroy B1
+body speed and now preserves it better than the raw encoder. **Both controls are catastrophic**,
+−5.6 and −10.8, so this is the term and not the data.
 
 **Behavioural diversity was necessary and not sufficient.** Five speeds without the term moves
 `b1→insect` from −24.4 to −5.6 and leaves the sign wrong. The term without the data has nothing to
@@ -1100,17 +1127,18 @@ learn from. Both were needed.
 
 **Val motion worsens 50%**, 0.0245 to 0.0367 — the metric slide 14 reports. That is the trade.
 
-**`insect→b1` is still negative**, −1.93 against the control's −4.16. The direction that fails is
-the one fitted on the noisier side: between-clip speed variation against within-clip rocking is
-**7.28 for the B1 and 1.45 for the insect**. A readout fitted on the clean side transfers; one
-fitted on the noisy side does not.
+**`insect→b1` does not reproduce** — −1.93 then +0.20. It beats its control in both seeds, so the
+term helps in that direction consistently, but where it lands does not. This is the direction
+*fitted on the noisier side*: between-clip speed variation against within-clip rocking is **7.28 on
+the B1 and 1.45 on the insect**.
 
 **The head memorises.** Train loss 0.077, held-out-clip loss 0.855 against 1.0 for predicting the
 mean. Twelve distinct speed values across 32 clips is a lookup table. `z` acquired transferable
 structure the head itself never exploited — which says the next step is a *continuous* speed target
 within each clip, not a larger weight on this one.
 
-**One seed.** The pair should be repeated before this carries weight on its own.
+**The failing direction is what the next dataset targets** — speed ramped *within* each clip, so
+the insect's target stops being one constant per clip and its signal-to-rocking ratio rises.
 
 ---
 
@@ -1131,8 +1159,8 @@ forward model scores **0.57–0.71x** on the B1 — worse than assuming the fram
 **one clip** of the new robot clears break-even and **nine** clear every horizon tested, about
 **7x fewer clips** than starting cold.
 
-> **Zero-shot across robots does not work — the gap is real and measured. But one clip of the new
-> robot is enough for this pipeline to cross the line, where starting from scratch takes seven.**
+> **Zero-shot across robots does not work.** But one clip of the new robot puts this pipeline over
+> the line, where starting from scratch takes seven.
 
 ### The three things this project found that it did not set out to find
 

@@ -2703,8 +2703,13 @@ measurably cheaper to fit than random features do, consistently across splits an
 **And it is not a speed-generalisation artefact.** The B1 set is 2 policies x 7 commanded
 velocities, so a random split leaves unseen speeds in the test set and conflates "new robot" with
 "new speed". Stratifying -- one policy's clip of each speed in train, the other in test, so both
-sides cover all seven velocities -- gives **1.28x against the random split's 1.29x**. Controlling
-the confound does not move the result.
+sides cover all seven velocities -- gives **1.28x against the random 7/7 split's 1.25x**.
+Controlling the confound does not move the result.
+
+> Corrected 2026-08-18: this line read "against the random split's 1.29x", which contradicts the
+> table above it -- 20.09 / 16.05 = 1.25x, and no measurement in this entry produces 1.29x. The
+> table is arithmetically self-consistent and is the number to use. Found by checking the two
+> against each other; worth doing for every ratio quoted in prose beside a table.
 
 **Read the margin only where both arms work.** At five clips the two backbones score R^2 -0.14 and
 -0.12 on a single split: neither produces a usable head, so their ratio compares two failures. The
