@@ -748,17 +748,24 @@ B1-head test.
 **Protocol.** Freeze the Stage 2 backbone, add the new head, fit only that head on N 4-leg clips,
 test on held-out clips, compare against the same head on a random backbone.
 
-![4-leg few-shot transfer and z ablation](../results/wm/stage2/figures/4leg_fewshot_and_z_ablation.png)
+**The test body is built from `c08f09t09`, which Stage 2 withholds**, so leg count *and* geometry
+are both unseen. Three seeds per budget:
 
 | clips for the new head | pretrained Stage 2 | random backbone | gain |
 |---:|---:|---:|---:|
-| 1 | **2.56 ± 0.18 deg** | 6.68 ± 0.39 | 2.61x |
-| 3 | **1.97 ± 0.04** | 5.35 ± 0.17 | 2.72x |
-| 5 | **1.75 ± 0.05** | 5.09 ± 0.35 | 2.91x |
-| 7 | **1.71 ± 0.08** | 4.78 ± 0.08 | 2.80x |
+| 1 | **2.60 ± 0.08 deg**, R² +0.93 | 6.84 ± 0.30, +0.57 | 2.63x |
+| 3 | **2.05 ± 0.03**, +0.96 | 5.75 ± 0.25, +0.68 | 2.81x |
+| 5 | **1.76 ± 0.12**, +0.97 | 5.23 ± 0.24, +0.73 | **2.97x** |
+| 7 | **1.68 ± 0.21**, +0.97 | 4.94 ± 0.15, +0.76 | 2.94x |
 
-R² reaches **+0.96 to +0.97** against the random backbone's +0.72 to +0.77. The claim is **sample
-efficiency**, not just final accuracy.
+![4-leg few-shot curve on held-out geometry](../results/wm/stage2/figures/4leg_fewshot_curve_c08f09t09.png)
+
+**One clip reaches 2.60 deg; the random backbone never reaches that with seven.** The claim is
+**sample efficiency**, not final accuracy.
+
+> Everything above is on the held-out `c08f09t09` build. **Everything below is still on the
+> base-geometry build** and is being re-run on the held-out one. Swapping the curve moved the
+> margin by 0.06x, so these are not expected to change the conclusions.
 
 **The commands execute physically.** Replayed open-loop in CoppeliaSim with the middle legs ghosted
 out, all four held-out clips walk stably and track the IK reference within 0.05 m of forward travel.
@@ -772,16 +779,8 @@ The latent inferred from 4-leg video sits **0.578** from the base body's, agains
 4-leg as the base body at that gait phase.** The novel axis here is the output coordinates, not the
 embodiment.
 
-**The geometry confound was checked and does not explain the result.** Same leg removal applied to
-`c08f09t09`, which Stage 2 withholds:
-
-| | pretrained | random | margin |
-|---|---:|---:|---:|
-| base geometry | 1.75 ± 0.10 deg | 4.99 ± 0.24 | 2.86x |
-| **held-out geometry** | **1.91 ± 0.08** | **5.45 ± 0.16** | **2.85x** |
-
-Absolute errors worsen slightly, the ratio does not move. **So transfer to a genuinely different
-robot is still untested here** — leg-removal variants cannot close that gap however many are built.
+**Transfer to a genuinely different robot is still untested here** — leg-removal variants cannot
+close that gap however many are built, because the model reads them as the body they were cut from.
 That is slide 16.
 
 **It is not gait correction either.** On deliberately veering clips the model scores 2.31 deg,
@@ -1023,7 +1022,11 @@ So the architecture is **two-rate by necessity**: perception plans at ~10 Hz, co
 **Agreed, and our own measurement supports the objection.** A stance-fraction readout fitted on one
 embodiment's frozen encoder and applied to the other scores **0.82x and 0.89x** of the target's
 spread within an embodiment, and **1.16x and 1.04x** across — at or past the line where looking at
-the image is worth nothing, and that is *after* controlling for colour, apparent size and pooling.
+the image is worth nothing.
+
+**That is after controlling for colour, apparent size and pooling, and the controls do the work:
+uncontrolled and mean-pooled the same measurement reads 4.72x.** Reporting the range rather than
+the best reduction is the only way this number means anything.
 
 Vision does not read load transfer between bodies. The six-legs-minus-two argument is correct, and
 this is the number for it.

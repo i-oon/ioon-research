@@ -76,6 +76,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/stage2_clean/best.pt")
     ap.add_argument("--data", default="data/ik_4leg_middleloss_clean9")
+    # `fit_4leg_head.py` has had this since the c08f09t09 build existed and this script did not,
+    # so pointing --data at that dataset failed on a filename glob. The head is still called
+    # `middleloss` in either case -- that name labels the new 12-D output head, not the geometry
+    # the body was cut from.
+    ap.add_argument("--prefix", default="middleloss",
+                    help="clip filename prefix; middleloss08 is the c08f09t09 build")
     ap.add_argument("--budgets", default="1,3,5,7")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--epochs", type=int, default=300)
@@ -89,7 +95,7 @@ def main():
     args = ap.parse_args()
 
     data_dir = args.data if os.path.isabs(args.data) else os.path.join(ROOT, args.data)
-    paths = sorted(all_paths(data_dir), key=episode)
+    paths = sorted(all_paths(data_dir, args.prefix), key=episode)
     budgets = parse_list(args.budgets)
     seeds = parse_list(args.seeds)
     device = torch.device(args.device if torch.cuda.is_available() or args.device == "cpu" else "cpu")

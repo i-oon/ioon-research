@@ -145,7 +145,17 @@ def main():
     cfg, itm, md, mean, std, epoch, head, checkpoint = load_model(
         args.ckpt, device, args.embodiment)
     morph = args.morph or cfg.heldout_morph
-    unseen = morph not in (cfg.train_morphs or ())
+    # Which field says a body was withheld depends on the stage. Stage 1 lists the bodies it
+    # trained on in `train_morphs`; Stage 2 trains from `sources` and names the withheld bodies in
+    # `heldout_bodies`, leaving `train_morphs` at its default ('long', 'short') -- bodies from the
+    # old three-length dataset that a cross-embodiment run never saw. Reading `train_morphs` on a
+    # Stage 2 checkpoint therefore calls **every** body held out, including the ones it trained on,
+    # and writes that into the prediction file as `held_out=True`. The flag only labels output, so
+    # no measurement was wrong, but a confident wrong label is worse than none.
+    if cfg.sources:
+        unseen = morph in (cfg.heldout_bodies or ())
+    else:
+        unseen = morph not in (cfg.train_morphs or ())
 
     raw_dir = args.data_dir or cfg.data_dir
     data_dir = raw_dir if os.path.isabs(raw_dir) else os.path.join(ROOT, raw_dir)
