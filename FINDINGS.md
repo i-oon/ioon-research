@@ -3115,7 +3115,194 @@ its configuration (expensive -- new foot-trajectory generation and every Stage 1
 or drop frame-level pairing for a constraint that does not need a bijection, aligning only the part
 of `z` the two robots can share.
 
+### F57. The insect walked one speed, which made every body-level question unanswerable, and diversity alone does not fix the representation
+
+F56 established that body-level motion is the only level where the two robots overlap -- Froude
+0.155 against 0.159 at hip heights of 0.13 m and 0.56 m. The obvious next step was to read body
+speed out of `z` and see whether it transfers. That measurement was run and returned nonsense:
+`insect->b1` -0.284 and `b1->insect` -0.142 from the **frozen encoder**, worse than predicting the
+mean, before any training was involved.
+
+**The measurement was broken, not the representation.** Froude has two sources of variation and
+they were not separated:
+
+| | between clips (commanded speed) | within a clip (body rocking) | ratio |
+|---|---|---|---|
+| hexapod | 0.0188 | 0.0714 | **0.26** |
+| B1 | 0.0255 | 0.0170 | **1.50** |
+
+**The expert walks one speed.** Across 1,000 episodes its forward velocity has a standard deviation
+of 0.0086 m/s on 0.454 -- **1.9 percent**. A readout fitted on the B1 learns commanded speed; one
+fitted on the insect learns how far the body rocks within a stride. Those are different quantities
+that happen to share a name, and asking one to transfer to the other is not a question with an
+answer.
+
+**The fix is retiming, not a synthetic gait.** `collect_ik.py --speed` resamples the shared foot
+path along time: the same Cartesian path through fewer samples covers the same ground in less time.
+**Every leg is resampled by the same time map**, so the inter-leg phase relationships F56 measured
+-- the variable wave that makes the insect's gait high-dimensional -- are untouched. This replays a
+real animal's coordination at a different tempo, which is what the animal itself does, rather than
+authoring a tripod and discarding the recording.
+
+`data/ik_walk_speed5`: five speeds, 0.72 to 1.10, 67 clips from 75 after `walk_check`.
+
+| | insect, five speeds | B1 |
+|---|---|---|
+| mean Froude | **0.164** | 0.164 |
+| range | 0.113-0.221 | 0.121-0.216 |
+| sd between clips | 0.0284 | 0.0266 |
+| **signal / rocking** | **1.45** | 7.28 |
+
+Matched to the B1 by design: seven commanded speeds there, five retimings here, the same Froude
+band. The second axis differs on purpose -- the B1 has two gait policies, the insect five
+morphologies -- because an insect has no policy to switch.
+
+**Re-measured on data that has speed in it, the frozen encoder is positive across robots**: +0.012
+and +0.079, against -0.284 and -0.142 on the single-speed set. V-JEPA2 carried shared body-level
+structure the whole time and there was nothing to read it against.
+
+**And training destroys it.** Trained on the five-speed data with no new term, `z` gives -4.163 and
+-5.595.
+
+**Behavioural diversity is necessary and not sufficient.** Widening the insect from one speed to
+five moves `b1->insect` from -24.359 to -5.595 -- four-fold -- and the sign is still wrong and still
+two orders below the frozen encoder. `OPEN_QUESTION.md` Q14 named behavioural diversity as the one
+lever left; this is the first test of it, and on its own it does not close the gap.
+
+**Two measurement traps, both recorded because both cost a run.**
+
+The window matters more than it looks. Between-clip variation against within-clip rocking reads
+**0.63 at a five-frame window and 2.17 at a stride-length window** on the same clips. The rocking is
+real body motion at stride frequency, not noise -- targeting the raw per-frame value hands a readout
+mostly rocking and almost no speed. Same lesson as F54's `t -> t+1` being 50 ms.
+
+And a dataset can be "diverse" and still be a lookup table. Five discrete speeds is five numbers to
+memorise, which is what happened in F58.
+
+---
+
+### F58. A body-motion term shared across embodiments, and the first cross-embodiment result that beats the frozen encoder
+
+F55 traced the switch behaviour to a single absence: `L_motion` supervises `z` through
+**per-embodiment** heads onto 18-D and 12-D joint commands with no correspondence between them, so
+nothing in the objective ever asks one latent to mean the same thing on both robots. LAC-WM's
+equivalent term targets a hand-unified end-effector pose every arm has; their own EAC-WM ablation,
+identical weight sharing without that pressure, produces visibly disjoint per-dataset clusters.
+
+**The locomotion equivalent is body motion.** `wm/models/body_motion.py`: decode forward Froude
+number from `z` through **one head shared by every embodiment**. A per-embodiment head here would
+reintroduce exactly the freedom the term exists to remove.
+
+Matched pair on `data/ik_walk_speed5` + `data/b1_framed`, one flag apart, 60 epochs, one seed.
+
+| | insect->insect | b1->b1 | **insect->b1** | **b1->insect** |
+|---|---|---|---|---|
+| frozen encoder | 0.666 | 0.750 | **+0.012** | **+0.079** |
+| `z`, no term (control) | 0.624 | 0.155 | -4.163 | -5.595 |
+| **`z`, + `L_body`** | **0.676** | **0.879** | -1.931 | **+0.407** |
+
+**`b1->insect` is +0.407 against the frozen encoder's +0.079 -- 5.2x.** Nothing in this project had
+cleared that bar on any cross-embodiment measurement. The adversary reaches chance and stops (F38,
+F59); `lambda_cross` is not definable here at all (F45, F56).
+
+**Three of four cells beat the frozen encoder**, and `b1->b1` went 0.155 -> 0.879, past the
+encoder's 0.750: training now *preserves* B1 body speed where before it destroyed it.
+
+**Both ingredients were needed.** Five speeds without the term leaves the sign wrong (F57). The term
+without the data has nothing to learn from.
+
+**What it costs.** Val motion 0.0245 -> 0.0367, **+50%** on the metric slide 14 reports. Val recon
+is unchanged, 1.5990 -> 1.6040.
+
+**The embodiment probe stops saturating.** The control reaches 1.000 by epoch 32 and stays; the
+`L_body` run plateaus at 0.954-0.963 and never closes. First thing in Stage 2 to hold it below 1.0
+-- the adversary never managed it. Read against F43 though: identity is decodable at 0.994 and
+costs 1.03x to delete, so a probe reduction is not by itself evidence of shared meaning. The
+body-motion probe is.
+
+**Three things are still wrong, and they point somewhere specific.**
+
+`insect->b1` is still negative, -1.931. The direction that fails is the one fitted on the noisier
+side: signal-to-rocking is **7.28 on the B1 and 1.45 on the insect** (F57). A readout fitted on the
+clean side transfers; one fitted on the noisy side does not.
+
+**The head memorises.** Train loss 0.077 against 0.855 on held-out clips, where the target is
+standardised so **1.0 is exactly "predict the mean"** -- an 11x gap, and no generalisation at any
+epoch. Twelve distinct speed values across 32 clips is a lookup table: `z` encodes which clip this
+is and the head reads off that clip's speed.
+
+**But a weak readout is not a weak representation.** The head failed and the probe -- a fresh ridge
+fitted on `z` directly -- found +0.407. `z` acquired transferable structure the jointly-trained head
+never exploited. An earlier reading of this run called the term "satisfied by memorisation with no
+shared meaning" on the strength of the val loss alone; that was wrong in the second half.
+
+**Next step follows from the memorisation, not from the weight.** A continuous speed target within
+each clip -- retiming with a ramp rather than a constant factor -- removes the lookup table and
+raises the insect's signal-to-rocking ratio at the same time. Raising `lambda_body` would only
+press harder on a target that has 12 values.
+
+**One seed.** `stage2_clean` was run with two and the pair should be repeated before this carries
+weight alone.
+
+---
+
+### F59. The adversary's 4-leg benefit disappears on a test body that was actually held out
+
+F47 found the 4-leg test body had been cut from a *training* body and F48 re-measured the headline
+margin on a build cut from held-out `c08f09t09`, where it survived unchanged: 2.85x against 2.86x.
+The deck then kept using the base-geometry build for **everything else on that slide**. Re-measuring
+the rest, one claim does not survive.
+
+Same protocol throughout: frozen backbone, new 12-D head, five training clips
+(`ep28,69,93,101,113`), five held out, identical random-backbone control at 5.35 deg.
+
+| | base geometry | held-out `c08f09t09` |
+|---|---|---|
+| `stage2_clean` | 1.86 deg | 1.99 deg |
+| `stage2_clean_adv_warm10` | **1.66 deg** | **2.13 deg** |
+| | adversary 11% *better* | adversary **7% worse** |
+
+**The apparent gain was the target's geometry being in distribution, not better transfer.** On a
+body the world model never saw, adversarial identity removal costs a little rather than buying
+anything. Combined with F38 (repairs the leg probe to chance and no further) and the Stage 1 result
+that it made transfer 1.2x worse, the picture is consistent: **the adversary moves identity metrics
+and never moves transfer.**
+
+**What does survive re-measurement, and gets stronger.** The `z` ablation:
+
+| held-out 4-leg | real aligned `z` | zero `z` | shuffled `z` | random backbone |
+|---|---|---|---|---|
+| base geometry | 1.86 | 2.49 (1.34x) | 3.35 (1.80x) | 5.06 |
+| **held-out geometry** | **1.99** | 3.02 (**1.52x**) | 4.14 (**2.08x**) | 5.35 |
+
+An aligned latent matters *more* when the target geometry was never trained on, which is the
+direction that supports the claim rather than the one that undermines it. The few-shot curve also
+reproduces: 2.63x / 2.81x / 2.97x / 2.94x at budgets 1/3/5/7, against 2.61 / 2.72 / 2.91 / 2.80 on
+the base build.
+
+**The rule this establishes.** Any claim measured on a body cut from a training body is provisional
+until re-measured on a held-out one. F48 demonstrated that for one number and the demonstration was
+not generalised; two of three re-measurements held and one reversed, which is roughly the hit rate
+that makes the check worth doing every time.
+
+---
+
 ## Files
+
+- `data/ik_walk_speed5` -- five retimed speeds matched to the B1's Froude band (F57). Episode
+  numbers carry the speed as a block of a thousand, so cross-body pairing stays inside one speed
+- `sim/collect/collect_ik.py --speed` -- time-retime the shared foot path; every leg by the same
+  map, so inter-leg phase is untouched (F57)
+- `scripts/dataset/merge_speed_dirs.py` -- merge per-speed collections, rewriting `expert_episode`
+  so a 92-frame clip and a 60-frame clip never pair as "episode 6" (F57)
+- `scripts/dataset/preview_clips.py` -- watch clips straight from the npz before training on them
+- `scripts/diagnostics/body_motion_probe.py` -- does a body-level readout transfer where a
+  leg-level one does not; `--insect_dir` selects the dataset (F57, F58)
+- `wm/models/body_motion.py` -- the shared body-speed head, one for all embodiments (F58)
+- `wm/data/embodiment.py: body_motion, BODY_CHANNELS` -- the target, and why the lateral channel is
+  excluded: it separates the robots at AUC 0.788 against forward speed's 0.543 (F58)
+- `results/wm/stage2/4leg_head/fewshot_curve_c08f09t09.csv` -- the few-shot curve on held-out
+  geometry (F59)
 
 - `results/wm/stage2/measurements/ftm_cross_embodiment.csv` -- the rollouts behind F51
 

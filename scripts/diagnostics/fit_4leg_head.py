@@ -201,8 +201,14 @@ def main():
     ap.add_argument("--encode_device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--chunk", type=int, default=4)
-    ap.add_argument("--save_pred", default="",
-                    help="optional output .npz containing held-out predicted and ground-truth actions")
+    # Kept by default. The expensive part of this script is encoding the clips, and the
+    # predictions are the only thing that cannot be recovered from the printed summary -- the head
+    # weights are not saved either. This ran twice on the c08f09t09 build on 2026-08-17 and both
+    # times the predictions were computed and thrown away, so the replay video needed a third run.
+    # An output worth minutes of GPU should be written unless someone asks for it not to be.
+    ap.add_argument("--save_pred", default="auto",
+                    help="output .npz of held-out predicted and ground-truth actions; 'auto' "
+                         "derives a path from the dataset name, '' disables")
     ap.add_argument("--z_ablation", action="store_true",
                     help="also fit pretrained heads with zero_z and shuffled_z features")
     args = ap.parse_args()
@@ -274,6 +280,9 @@ def main():
 
     print("\nInterpretation: the pretrained row must beat the random row on held-out clips to count "
           "as evidence that Stage 2 transfers useful features to the new 4-leg embodiment.")
+    if args.save_pred == "auto":
+        args.save_pred = os.path.join(ROOT, "results", "wm", "stage2", "4leg_head",
+                                      f"{os.path.basename(data_dir)}_predictions.npz")
     if args.save_pred:
         if saved_payload is None:
             raise RuntimeError("no pretrained predictions were saved")
