@@ -1,0 +1,5 @@
+model,best_epoch,train_deg,test_deg,test_mse,own_mean,r2
+pretrained_stage2,300,0.94,1.99,0.0401,0.9757,0.96
+pretrained_zero_z,300,1.62,3.02,0.0922,0.9757,0.91
+pretrained_shuffled_z,200,1.54,4.14,0.1656,0.9757,0.83
+random_backbone,300,3.65,5.35,0.2805,0.9757,0.71

@@ -60,3 +60,10 @@ These directories exist with no checkpoint, so nothing records what they were.
 Numbers from them appear in FINDINGS.md and cannot be reproduced or re-scored.
 
 - `_gone`
+- `stage1_100ep_framed_runB` -- FINDINGS F-early cites
+  `wm/runs/stage1_100ep_framed_runB/epoch020.pt` directly and the file is gone. Not in
+  `wm/runs_original/` either, so it was not part of the recovery. Its outputs survive in
+  `results/wm/stage1/` -- the gait diagrams, the action traces, `heldout_sweep_runB.png` -- so the
+  *figures* are intact and only re-scoring is impossible. Found 2026-08-17 by scanning every
+  backticked path in the docs against the filesystem; that scan is worth repeating, it found
+  exactly two dead references in the whole docset.

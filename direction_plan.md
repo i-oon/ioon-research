@@ -1067,7 +1067,7 @@ ablation, not an assumption.**
   alternative to vision-latent + IK ground truth (train a policy per body against a shared gait prior)
   was tried and produced worse, less coordinated behaviour than the IK route — supports the case for the
   chosen approach rather than being an oversight. Failure-mode videos + gait diagnostics already exist
-  (`PROGRESS.md` §13, `results/amp_failed_peaks/`).
+  (`PROGRESS.md` §13, `results/dataset/amp_failed/`).
 
 ---
 

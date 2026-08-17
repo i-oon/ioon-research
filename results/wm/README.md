@@ -10,8 +10,8 @@ run belongs to exactly one stage, so that is the outer level.
 
 ```
 results/wm/
-  stage1/          figures/ gait/ predictions/ replay/ analysis/ eval/ logs/ measurements/
-  stage1_correct/  the retrain on clean data -- same subfolders, see its own README
+  stage1_correct/  the retrain on clean data -- cite this for current Stage 1 numbers
+  stage1/          the original runs -- kept for early findings and the contaminated-cost pair
   stage2/          figures/ gait/ logs/ measurements/ 4leg_head/ ablation_replay/
   dataset/         setup and data-quality checks that belong to neither stage
   cache/           encoded embeddings and latents, shared and regenerable
@@ -136,8 +136,10 @@ Training bodies `c10f10t10 c06f10t10 c10f10t06 c06f10t06 c10f06t06` throughout.
 `m3d_cross` was stopped at epoch 27: held-out sat at 0.0760 (epochs 1-10), 0.0705 (11-20) and
 0.0715 (21-27), so it had plateaued. Best checkpoint is **epoch 8**, 2.91 deg.
 
-Smoke runs on `data/_smoke` (975 pairs, 8 epochs) carry a `_smoke_` prefix and exist only to
-compare interventions cheaply; their held-out numbers swing by 5x and cannot be read.
+Smoke runs carry a `_smoke_` prefix and existed only to compare interventions cheaply; their
+held-out numbers swing by 5x and cannot be read. **`data/_smoke` no longer exists** -- it was 975
+pairs and was deleted at some point without a note, so the historical `_smoke_*` numbers cannot be
+re-run. Nothing depends on them.
 
 ## Held-out body, the numbers that matter
 

@@ -759,27 +759,32 @@ are both unseen. Three seeds per budget:
 | 5 | **1.76 ± 0.12**, +0.97 | 5.23 ± 0.24, +0.73 | **2.97x** |
 | 7 | **1.68 ± 0.21**, +0.97 | 4.94 ± 0.15, +0.76 | 2.94x |
 
-![4-leg few-shot curve on held-out geometry](../results/wm/stage2/figures/4leg_fewshot_curve_c08f09t09.png)
+![few-shot curve and latent ablation, held-out geometry](../results/wm/stage2/figures/4leg_fewshot_and_z_ablation_c08f09t09.png)
 
 **One clip reaches 2.60 deg; the random backbone never reaches that with seven.** The claim is
 **sample efficiency**, not final accuracy.
 
 **The commands execute physically.** Replayed open-loop in CoppeliaSim with the middle legs ghosted
-out, all four held-out clips walk stably and track the IK reference within 0.05 m of forward travel.
+out, all five held-out clips walk forward 0.61-0.69 m, tracking the IK reference within 0.06 m on
+four of five and 0.12 m on the fifth. **The stance pattern agrees with the reference 90.2%
+frame-for-frame**, and duty factors match per leg — 0.55/0.75/0.71/0.58 predicted against
+0.57/0.74/0.70/0.56.
+
+![4-leg gait, predicted commands above IK ground truth](../results/wm/stage2/4leg_head/gait_heldout08_replay_clip0.png)
+
+**And they reproduce the reference rather than improve on it.** This 4-leg body drifts sideways --
+removing the middle pair does that -- and the IK reference drifts 0.22-0.31 m. The model drifts
+with it, adding at most 0.08 m of its own. It learned the visual/action correspondence, not that
+the drift is undesirable.
 
 **The novel axis here is the output coordinates, not the embodiment.** A leg-removal variant is
 still the same animal with legs taken away, so this does not test transfer to a genuinely different
 robot however many variants are built. That is slide 16.
 
-**And the frame does much of the work, but `z` is not redundant:**
-
-| held-out 4-leg test | real aligned `z` | zero `z` | shuffled `z` | random backbone |
-|---|---:|---:|---:|---:|
-| test deg | **1.99** | 3.02 | 4.14 | 5.35 |
-| R² | **+0.96** | +0.91 | +0.83 | +0.71 |
-
-Zero-`z` still beats random, so frame plus pretrained backbone carries a lot. But real `z` beats
-zeroed by **1.52x** and shuffled by **2.08x** — an *aligned* latent adds what a permuted one cannot.
+**The frame does much of the work, but `z` is not redundant** — the right panel. Zero-`z` at 3.02
+still beats the random backbone's 5.35, so frame plus pretrained backbone carries a lot. But real
+`z` beats zeroed by **1.52x** and shuffled by **2.08x**. Shuffling keeps the latent's distribution
+and destroys only its alignment, so that gap is the part an *aligned* latent contributes.
 
 ### Removing the identity adversarially does not repair the pathway
 

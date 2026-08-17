@@ -30,9 +30,23 @@ is used, including that scores on *different* held-out bodies are not comparable
 compared is each model against the *same* body, which means scoring the recovered checkpoints on
 `c10f10t08` too. Changing a test body costs nothing, since it does not change the weights.
 
-## When this is verified
+## `stage1/` is not going to be retired, and should not be
 
-Point `FINDINGS.md` and `report/update_slide.md` at the figures here, then rename `stage1/` to
-`stage1_superseded/` in the same pass so nothing keeps citing the old numbers by accident.
-Until that happens the deck still cites `stage1/`, which is correct -- those are the numbers the
-current slides were written from.
+An earlier version of this file said to rename `stage1/` to `stage1_superseded/` once the citations
+moved. **That was wrong and is withdrawn.** The retrain regenerated five figures -- three
+`action_trace_*`, `coverage_experiment.png`, `cross_loss_effect.png` -- and deliberately not the
+rest. The other ~15 in `stage1/figures/` document findings on datasets that no longer exist: the
+three-body leg-scale set behind the morphology axis, the 100-epoch framed runs behind F11 and F12.
+Nothing here replaces them, so renaming would break eleven embeds and relabel a legitimate
+historical record as an error.
+
+**Which directory a citation should use:**
+
+| the claim is about | cite |
+|---|---|
+| current Stage 1 numbers -- held-out scores, the pathway, coverage | `stage1_correct/` |
+| what the contaminated data cost, old against new | both, as the pair |
+| an early finding on a dataset since replaced (F4, F6, F11, F12) | `stage1/`, labelled as such |
+
+The deck does this correctly today: its one `stage1/` figure carries the caption "from the earlier
+three-body dataset" and illustrates a claim the table beside it measures on current data.

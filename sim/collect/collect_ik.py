@@ -137,7 +137,7 @@ def body_rel_via_fk(sim, df, rows):
     return {leg: np.array(v) for leg, v in out.items()}
 
 
-def retime(brel, speed):
+def retime(brel, speed, speed_end=None):
     """Resample the shared foot path along time, so the same stride takes fewer or more steps.
 
     Body speed in a kinematic replay comes from the stance feet sweeping backwards relative to the
@@ -156,12 +156,30 @@ def retime(brel, speed):
     quantity cannot be a shared supervisory signal between the two robots when one of them never
     varies it.
     """
-    if speed == 1.0:
+    if speed == 1.0 and speed_end is None:
         return brel
     T = len(next(iter(brel.values())))
-    T2 = max(4, int(round(T / speed)))
-    src, dst = np.linspace(0.0, 1.0, T), np.linspace(0.0, 1.0, T2)
-    return {leg: np.stack([np.interp(dst, src, path[:, k]) for k in range(3)], axis=1)
+    end = speed if speed_end is None else speed_end
+
+    # A **ramp**, not a constant factor, when speed_end differs. F58 measured why this matters:
+    # with one speed per clip the body-speed target takes 12 distinct values across 32 clips, and
+    # the shared decoding head learns the lookup table rather than the quantity -- train loss 0.077
+    # against 0.855 on held-out clips, where 1.0 is "predict the mean". Sweeping the speed inside a
+    # clip makes the target continuous, so there is no table to memorise, and it raises the
+    # insect's between-clip-signal to within-clip-rocking ratio, which is the 1.45-against-7.28 gap
+    # that leaves `insect->b1` negative while `b1->insect` transfers.
+    #
+    # The source path is walked at a rate that varies linearly across the output, so the sampling
+    # positions are the running sum of that rate rather than an even spacing. Renormalising to span
+    # the path exactly means the clip still covers the same ground, which keeps distance constant
+    # and puts the whole speed change into elapsed time -- the same invariant the constant case has.
+    mean_rate = 0.5 * (speed + end)
+    T2 = max(4, int(round((T - 1) / mean_rate)) + 1)
+    rate = np.linspace(speed, end, T2)
+    pos = np.concatenate([[0.0], np.cumsum(rate[:-1])])
+    pos = pos * (T - 1) / pos[-1]
+    src = np.arange(T, dtype=float)
+    return {leg: np.stack([np.interp(pos, src, path[:, k]) for k in range(3)], axis=1)
             for leg, path in brel.items()}
 
 
@@ -324,6 +342,11 @@ def main():
                          "0.113-0.209, so 0.75-1.35 covers the quadruped's range. Verify the "
                          "achieved speed from the clips rather than trusting this factor, and "
                          "watch the video before training on it.")
+    ap.add_argument("--speed_end", type=float, default=None,
+                    help="sweep the speed across the clip, from --speed to this. Leave unset for "
+                         "a constant factor. A ramp makes the body-speed target continuous instead "
+                         "of one value per clip, which is what stops a decoding head memorising "
+                         "it (F58).")
     ap.add_argument("--loops", type=int, default=1,
                     help="repeat each 66-step expert foot path into one longer clip")
     ap.add_argument("--behavior", type=str, default="walk",
@@ -405,7 +428,7 @@ def main():
     for ep in episodes:
         rows = list(range(ep * EP, ep * EP + EP))
         brel = body_rel_via_fk(sim, df, rows)  # shared Cartesian behavior, once per episode
-        brel = retime(brel, args.speed)
+        brel = retime(brel, args.speed, args.speed_end)
         for morph, scene in SCENES:
             cmds, ikdiag = precompute_commands(sim, simIK, scene, brel, args.scale)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "

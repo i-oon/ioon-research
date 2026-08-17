@@ -280,6 +280,20 @@ def main():
 
     print("\nInterpretation: the pretrained row must beat the random row on held-out clips to count "
           "as evidence that Stage 2 transfers useful features to the new 4-leg embodiment.")
+
+    # Written, not just printed. These four numbers were the content of
+    # `4leg_fewshot_and_z_ablation.png`, the figure was composed ad hoc, its source was lost, and
+    # when the base-geometry build was superseded the figure could not be rebuilt -- only
+    # transcribed from a terminal scrollback. A result that reaches a slide has to leave a file.
+    csv_path = os.path.join(ROOT, "results", "wm", "stage2", "4leg_head",
+                            f"{os.path.basename(data_dir)}_ablation.csv")
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    with open(csv_path, "w") as fh:
+        fh.write("model,best_epoch,train_deg,test_deg,test_mse,own_mean,r2\n")
+        for label, best, train_m, test_m in rows:
+            fh.write(f"{label},{best['epoch']},{train_m['deg']:.4f},{test_m['deg']:.4f},"
+                     f"{test_m['mse']:.6f},{test_m['own_mean']:.6f},{test_m['r2']:.4f}\n")
+    print(f"-> {os.path.relpath(csv_path, ROOT)}")
     if args.save_pred == "auto":
         args.save_pred = os.path.join(ROOT, "results", "wm", "stage2", "4leg_head",
                                       f"{os.path.basename(data_dir)}_predictions.npz")

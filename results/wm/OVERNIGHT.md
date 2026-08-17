@@ -389,7 +389,7 @@ check whether Stage 2 features help a new embodiment; it is not perfect evidence
 - It encodes the 9 clean4-leg clips once, then fits new heads for multiple clip budgets and
   random train/test splits.
 - Outputs:
-  - `results/wm/stage2/4leg_head/fewshot_curve.csv`
+  - `results/wm/stage2/4leg_head/fewshot_curve.csv`  [removed 2026-08-17: superseded by the c08f09t09 build, F59]
   - `results/wm/stage2/figures/4leg_fewshot_curve.png`
 
 ### Baseline Stage 2 test plan for 4-leg
@@ -480,14 +480,14 @@ random backbone.
 Artefacts:
 
 ```text
-results/wm/stage2/4leg_head/fewshot_curve.csv
+results/wm/stage2/4leg_head/fewshot_curve.csv  [removed 2026-08-17: superseded by the c08f09t09 build, F59]
 results/wm/stage2/figures/4leg_fewshot_curve.png
 ```
 
 Predictions were exported for split A:
 
 ```text
-results/wm/stage2/4leg_head/splitA_predictions.npz
+results/wm/stage2/4leg_head/base_splitA_predictions.npz
 ```
 
 Open-loop replay in CoppeliaSim was then rendered for all four held-out split-A clips, using the
@@ -504,18 +504,18 @@ Rendered artefacts:
 
 ```text
 results/wm/4leg_head/
-  replay_splitA_clip0.npz
-  replay_splitA_clip1.npz
-  replay_splitA_clip2.npz
-  replay_splitA_clip3.npz
-  replay_replay_splitA_clip0.mp4
-  replay_replay_splitA_clip1.mp4
-  replay_replay_splitA_clip2.mp4
-  replay_replay_splitA_clip3.mp4
-  gait_replay_splitA_clip0.png
-  gait_replay_splitA_clip1.png
-  gait_replay_splitA_clip2.png
-  gait_replay_splitA_clip3.png
+  base_replay_splitA_clip0.npz
+  base_replay_splitA_clip1.npz
+  base_replay_splitA_clip2.npz
+  base_replay_splitA_clip3.npz
+  base_replay_replay_splitA_clip0.mp4
+  base_replay_replay_splitA_clip1.mp4
+  base_replay_replay_splitA_clip2.mp4
+  base_replay_replay_splitA_clip3.mp4
+  base_gait_replay_splitA_clip0.png
+  base_gait_replay_splitA_clip1.png
+  base_gait_replay_splitA_clip2.png
+  base_gait_replay_splitA_clip3.png
 ```
 
 Replay verdict: predicted actions physically replay as stable 4-leg walking and closely match the
@@ -551,13 +551,13 @@ Rendered bad-gait clips:
 
 ```text
 results/wm/4leg_head/
-  badtest_predictions.npz
-  badtest_replay_clip2.npz        # ep20
-  badtest_replay_clip7.npz        # ep70
-  replay_badtest_replay_clip2.mp4
-  replay_badtest_replay_clip7.mp4
-  gait_badtest_replay_clip2.png
-  gait_badtest_replay_clip7.png
+  base_badtest_predictions.npz
+  base_badtest_replay_clip2.npz        # ep20
+  base_badtest_replay_clip7.npz        # ep70
+  base_replay_badtest_replay_clip2.mp4
+  base_replay_badtest_replay_clip7.mp4
+  base_gait_badtest_replay_clip2.png
+  base_gait_badtest_replay_clip7.png
 ```
 
 Bad-gait replay metrics:
@@ -603,7 +603,7 @@ random_backbone           100       5.27      6.75    0.4599    0.9779   +0.53
 Summary figures for slides:
 
 ```text
-results/wm/stage2/figures/4leg_fewshot_and_z_ablation.png
+results/wm/stage2/figures/4leg_fewshot_and_z_ablation.png  [removed 2026-08-17: superseded by the c08f09t09 build, F59]
 results/wm/stage2/figures/4leg_fewshot_curve.png
 results/wm/stage2/figures/4leg_replay_stills.png
 ```
@@ -684,11 +684,11 @@ overall (`z zeroed` cost drops 7.63x -> 4.44x), so this is not a simple win.
 Artifacts:
 
 ```text
-results/wm/stage2/4leg_head/fewshot_curve_adv_warm10.csv
+results/wm/stage2/4leg_head/fewshot_curve_adv_warm10.csv  [removed 2026-08-17: superseded by the c08f09t09 build, F59]
 results/wm/stage2/figures/4leg_fewshot_curve_adv_warm10.png
 results/wm/stage2/figures/cross_embodiment_umap_stage2_clean_adv_warm10.png
-results/wm/stage2/figures/stage2_clean_vs_adv_summary.png
-results/wm/stage2/4leg_head/stage2_clean_vs_adv_summary.csv
+results/wm/stage2/figures/stage2_clean_vs_adv_summary.png  [removed 2026-08-17: superseded by the c08f09t09 build, F59]
+results/wm/stage2/4leg_head/base_stage2_clean_vs_adv_summary.csv
 ```
 
 Working conclusion: `stage2_clean_adv_warm10` is a useful candidate, not an automatic replacement.
