@@ -284,8 +284,11 @@ def build_cross_embodiment(cfg, root):
                                                   clips_per_body=tuple(cfg.clips_per_body))
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
+    # body_stats too, not only the action stats: a validation split that centres body motion on
+    # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
-                                   cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
+                                   cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
+                                   body_stats=train_set.body_stats)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -403,6 +406,11 @@ def main():
         }
         if cross_embodiment:
             state["action_stats"] = train_set.stats
+            if getattr(train_set, "body_stats", None) is not None:
+                # every downstream script that decodes body motion has to undo the same
+                # standardisation, and these statistics are pooled across embodiments rather than
+                # per embodiment, so they cannot be recomputed from one robot's clips
+                state["body_stats"] = train_set.body_stats
         else:
             state["action_mean"] = train_set.mean
             state["action_std"] = train_set.std
@@ -486,6 +494,11 @@ def main():
             f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
             + (f" | cross {train_metrics['cross']:.4f}"
                if "cross" in train_metrics else "")
+            # Printed because it was not. `lambda_body 0.5` ran for 60 epochs contributing 0.002
+            # of a 6.0 total, and the line above showed only recon and motion, so the term looked
+            # absent rather than negligible. Any term that enters the loss has to enter this line.
+            + (f" | body {train_metrics['body']:.4f}"
+               if "body" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"

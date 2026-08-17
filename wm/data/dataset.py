@@ -287,7 +287,8 @@ class MultiEmbodimentPairs(Dataset):
     quadruped joint targets share no units or correspondence.
     """
 
-    def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1):
+    def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
+                 body_stats=None):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -300,6 +301,25 @@ class MultiEmbodimentPairs(Dataset):
                 actions = np.concatenate([c["actions"] for c in clips])
                 self.stats[name] = (actions.mean(0), np.maximum(actions.std(0), 1e-6))
             self.clips.extend(clips)
+
+        # **One set of statistics across every embodiment**, unlike `self.stats` above. The action
+        # target is standardised per embodiment because 18-D and 12-D joint commands have no
+        # correspondence; body motion is the opposite case -- it is dimensionless and comparable
+        # by construction, and centring each robot on its own mean would make the same Froude
+        # number decode to different values on the two robots, destroying exactly the shared
+        # meaning `lambda_body` exists to create.
+        #
+        # Standardised at all because the raw target is a Froude number in the 0.11-0.22 range, so
+        # its squared error starts near 0.004 against `recon` at 5.18 -- a factor of 1,300. The
+        # first run at lambda_body 0.5 was measurably active and changed nothing, because a term
+        # that small cannot move a gradient. `action` is standardised for this same reason a few
+        # lines above.
+        if "body_motion" in self.clips[0]:
+            pooled = np.concatenate([c["body_motion"] for c in self.clips])
+            self.body_stats = (pooled.mean(0),
+                               np.maximum(pooled.std(0), 1e-6)) if body_stats is None else body_stats
+        else:
+            self.body_stats = None
 
         # Labels for the adversary and probe. In the single-morphology setting these index the
         # *body*; here they index the *embodiment*, because that is the identity Stage 2 needs the
@@ -364,7 +384,9 @@ class MultiEmbodimentPairs(Dataset):
             "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
-            **({"body_motion": clip["body_motion"][t]} if "body_motion" in clip else {}),
+            **({"body_motion": ((clip["body_motion"][t] - self.body_stats[0])
+                                / self.body_stats[1]).astype(np.float32)}
+               if self.body_stats is not None else {}),
         }
 
 
