@@ -44,7 +44,8 @@ all, in the easy case where the joint spaces do match.
 | Slides 11-12 | two facts about the task itself that bound what the latent can be worth |
 | Slides 13-16 | status, a first cross-embodiment run, a held-out 4-leg action space, and the B1: zero-shot fails, one clip is enough |
 | Slides 17-18 | what is settled, the one decision left, and last term's questions answered |
-| Slide 19 | the conclusion: what was asked, what the measurements say, and the scope |
+| Slide 19 | why the latent is not shared, and the one lever left |
+| Slide 20 | the conclusion: what was asked, what the measurements say, and the scope |
 
 ---
 
@@ -645,16 +646,9 @@ quadruped**, with a per-embodiment output head. No cross-embodiment loss — the
 none and claims the shared latent emerges from weight sharing alone. **That claim is what this
 slide tests.**
 
-### The data had to be fixed first
-
-| | before | now |
-|---|---|---|
-| bodies that do not walk, in training | **2** | 0 |
-| hexapod : B1 | 10.5 : 1, faked by repetition | **1.04 : 1**, real |
-| validation | 67 B1 transitions, one hexapod body | 126 B1, **all four bodies** |
-| held-out body | **none** | **c08f09t09** |
-
-Everything below is on the fixed data, two seeds, 60 epochs, converged.
+**Setup.** Every training body walks; the two embodiments are balanced 1.04 : 1 without repeating
+data; validation is 126 B1 transitions across all four hexapod bodies; `c08f09t09` is withheld
+entirely. Two seeds, 60 epochs, converged.
 
 ### It beats the no-learning baseline on a held-out body
 
@@ -718,10 +712,6 @@ the ceiling for every intervention is where the frozen encoder already was.
 
 **The identity is fully present and nothing uses it** — removing it costs *less* than removing
 arbitrary directions, while deleting `z` costs eight-fold.
-
-> The previously reported 33.0% variance share is **withdrawn**: it needs a shared gait phase, and
-> the phase label predicts the embodiment. The same measurement reads 32.0% at three bins and 12.0%
-> at six.
 
 ### The conventional picture, for comparison
 
@@ -1049,7 +1039,74 @@ comparable claim.
 
 ---
 
-## Slide 19 — Conclusion: what was asked, and what the measurements say
+## Slide 19 — Why the latent is not shared, and the one lever left
+
+Slide 14 measured that the shared trunk acts as a **switch** rather than a common language. This
+is why, and what follows from it.
+
+### The chain, from four measurements already taken
+
+| step | evidence |
+|---|---|
+| no cross-embodiment frame pairing exists | no contact label is both covered and meaningful |
+| so `lambda_cross` cannot be applied | it needs to know two frames show the same intent |
+| so nothing forces one `z` to mean the same thing on both robots | embodiment is decodable from `z` at **0.994** yet deleting it costs **1.03x**, *less* than deleting random directions — present and inert |
+| so the trunk partitions instead of sharing | a per-leg readout transfers at **0.986 within** and **0.373 across**, below the frozen encoder's 0.531 and below chance |
+
+**Stage 1 is the positive control for the last two steps.** There `lambda_cross` *is* definable and
+it **reverses the swap test outright**; here the adversary only narrows it, 3.0–3.8x to 2.3–2.6x,
+and never approaches 1.0.
+
+### The pairing cannot be fixed by finding a better label
+
+Anchor phase at front-left touchdown and ask where every other foot lands. Concentration is 1.0 for
+perfectly repeatable, 0.0 for uniform:
+
+| B1 | | | hexapod | |
+|---|---|---|---|---|
+| FL | **1.00** | | FL | **1.00** |
+| RR | **1.00** | | ML | **0.22** |
+| FR | **0.99** | | HL | **0.09** |
+| RL | **0.99** | | HR | **0.07** |
+
+**One leg's phase fixes all four of the B1's legs and almost none of the insect's other five.** The
+B1 trots; the insect walks the variable wave of the real animal it was recorded from. Its gait
+state needs roughly six loosely coupled numbers where the B1's needs one, so **any low-dimensional
+label that describes the B1 completely must underdetermine the insect**. That is structural, not a
+search problem.
+
+### But the two robots do overlap at body level
+
+Hip heights of 0.13 m and 0.56 m, and both walk at a Froude number `v/sqrt(gh)` of **0.155 and
+0.159** — the same gait in dimensionless terms despite a four-fold size difference.
+
+**That is the level where a shared supervisory signal can exist**, and it is the level our loss
+never used: `L_motion` supervises `z` through per-embodiment heads onto 18-D and 12-D joint
+commands with no correspondence between them. LAC-WM's equivalent term targets a hand-unified
+end-effector pose that every arm has; ours had no such thing.
+
+### Training destroys what the encoder already provides
+
+Body-level speed read out of each representation, R² against the target robot's own mean:
+
+| | insect→insect | b1→b1 | **insect→b1** | **b1→insect** |
+|---|---|---|---|---|
+| frozen encoder | 0.666 | 0.750 | **+0.012** | **+0.079** |
+| `z`, single-speed data | 0.520 | 0.215 | −4.601 | −24.359 |
+| `z`, five-speed data | 0.624 | 0.155 | −4.163 | −5.595 |
+
+**Behavioural diversity alone is necessary and not sufficient.** Widening the insect from one speed
+to five moves `b1→insect` from −24.4 to −5.6 — four-fold — and the sign is still wrong and still
+far below the frozen encoder. This was the one lever left open, and it does not close the gap by
+itself.
+
+**In flight:** a decoding head from `z` to body speed, **shared by both embodiments**, trained
+against a matched control differing in that one term. The bar is the frozen encoder's +0.012 and
++0.079: no intervention has ever exceeded it on any cross-embodiment measurement.
+
+---
+
+## Slide 20 — Conclusion: what was asked, and what the measurements say
 
 **The question.** Can a latent action learned from video alone — no morphology label, no kinematics
 given — separate *what movement is happening* from *which body is doing it*, well enough to drive a
@@ -1100,9 +1157,20 @@ existing work does; the difference is that those methods must be handed the kine
 |---|---|
 | cross-embodiment evidence rests on | **one robot pair**, insect ↔ B1 |
 | B1 data available | 14 clips, clean budget capped at **10** |
-| behaviours | forward walking only, on both robots |
+| behaviours | the insect now spans five speeds matched to the B1's range; turning on neither |
 | never run | the EAC-WM analogue baseline — a decoder conditioned on raw joint state |
 
-**One decision remains and no measurement can make it**: report the single pair honestly as the
-scope, or invest in a third embodiment — a biped, on the leg-count axis 6 → 4 → 2 — and accept a
-later finish.
+### What is open, in the order it is being worked
+
+**1. Whether the shared latent can be repaired — being measured now.** Slide 19 names the cause and
+tests the one lever that follows from it. The bar is the frozen encoder, which no intervention has
+ever cleared on a cross-embodiment measurement.
+
+**2. Whether one robot pair is enough scope — no measurement can decide it.** Report the single
+pair honestly, or invest in a third embodiment: a biped, on the leg-count axis 6 → 4 → 2, and
+accept a later finish.
+
+**3. Closed-loop control and a benchmark comparison.** Every number in this deck is command
+reconstruction against IK, replayed open-loop. The pipeline exists to control a robot, and that is
+not yet tested. The EAC-WM baseline is the comparison arm that makes a benchmark meaningful, and it
+is the one item this deck lists as required and never run.
