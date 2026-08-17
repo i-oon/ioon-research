@@ -14,7 +14,7 @@ from ..bodies import (CONTACT_THRESHOLD, EXCLUDED_BODIES, body_of,  # noqa: F401
                       contact_labels, episode_number, evenly, sort_clips,
                       usable_clips)
 from .augment import apply, identity_params, sample_params
-from .embodiment import HEXAPOD_DT, REGISTRY, body_motion
+from .embodiment import BODY_CHANNELS, HEXAPOD_DT, REGISTRY, body_motion
 from .embodiment import load as load_embodiment
 
 # Re-exported above so existing `from wm.data.dataset import ...` keeps working. They are defined
@@ -55,7 +55,8 @@ def load_clip(path):
             "repeat": int(data["repeat"]),
             # computed the same way as the cross-embodiment path, so a `lambda_body` run means
             # the same thing whichever loader it went through
-            "body_motion": body_motion(data["head"].astype("float64"), HEXAPOD_DT),
+            "body_motion": body_motion(data["head"].astype("float64"),
+                                       HEXAPOD_DT)[:, BODY_CHANNELS],
         }
 
 
@@ -315,7 +316,7 @@ class MultiEmbodimentPairs(Dataset):
         # that small cannot move a gradient. `action` is standardised for this same reason a few
         # lines above.
         if "body_motion" in self.clips[0]:
-            pooled = np.concatenate([c["body_motion"] for c in self.clips])
+            pooled = np.concatenate([c["body_motion"][:, BODY_CHANNELS] for c in self.clips])
             self.body_stats = (pooled.mean(0),
                                np.maximum(pooled.std(0), 1e-6)) if body_stats is None else body_stats
         else:
@@ -384,7 +385,7 @@ class MultiEmbodimentPairs(Dataset):
             "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
-            **({"body_motion": ((clip["body_motion"][t] - self.body_stats[0])
+            **({"body_motion": ((clip["body_motion"][t, BODY_CHANNELS] - self.body_stats[0])
                                 / self.body_stats[1]).astype(np.float32)}
                if self.body_stats is not None else {}),
         }

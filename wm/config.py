@@ -29,7 +29,7 @@ LEGACY_DEFAULTS = {
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
     "lambda_body": 0.0,
-    "body_dim": 2,
+    "body_dim": 1,
     "body_hidden": 128,
     "ftm_embodiment_channel": False,
     "center_embeddings": False,
@@ -195,7 +195,7 @@ class Config:
     # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
     # (F55). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
-    body_dim: int = 2            # forward and lateral Froude number
+    body_dim: int = 1            # forward Froude only; see BODY_CHANNELS for why
     body_hidden: int = 128
     adv_hidden: int = 128
     # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while

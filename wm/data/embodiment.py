@@ -45,6 +45,20 @@ def body_motion(position, dt):
     return (np.stack(out, axis=1) / np.sqrt(G * max(height, 1e-6))).astype(np.float32)
 
 
+# Which columns of `body_motion` are safe to supervise on. **Forward only.**
+#
+# The lateral channel looked like a free extra dimension and is an embodiment label in disguise:
+# the insect drifts +0.021 and the B1 -0.025, opposite signs, because each gait has its own
+# asymmetry. A single-feature classifier separates the robots at AUC 0.788 from that column alone,
+# against 0.543 from forward speed. Training `z` to predict it is training `z` to encode which
+# robot it is looking at, which is the failure this whole term exists to remove -- and it showed
+# up immediately: the embodiment probe hit 0.824 at epoch 1 against the control's 0.537.
+#
+# Forward speed is what both robots are *doing*. Lateral drift is what each one happens to do
+# wrong, separately.
+BODY_CHANNELS = (0,)
+
+
 def _hexapod(data):
     return {
         "frames": data["frames"],
