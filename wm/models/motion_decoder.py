@@ -95,31 +95,45 @@ class MotionDecoder(nn.Module):
         self.heads = nn.ModuleDict({name: _head(self.mode, self.width, dim)
                                     for name, dim in spec.items()})
 
-        # **One head, no embodiment key** -- and that is the entire mechanism.
+        # **One head, no embodiment key, and blind to the frame.** Both properties are load-bearing
+        # and the second was measured the hard way.
         #
         # The heads above are per-embodiment because 18-D and 12-D joint commands are different
-        # spaces, so nothing in `L_motion` ever requires one `z` to mean the same thing on both
-        # robots. LAC-WM does not face that fork: its motion decoder targets end-effector and
-        # camera pose, the same 9+9 numbers for a human hand, a humanoid and a Franka arm, so a
-        # single output layer enforces shared meaning by construction. Its own EAC-WM baseline --
-        # separate action encoders per embodiment, i.e. what we had -- produces embeddings
-        # "clearly separated by dataset" in their Figure 2, which is what we reproduced without
-        # intending to (F55, F58).
+        # spaces, so nothing in `L_motion` requires one `z` to mean the same thing on both robots.
+        # LAC-WM does not face that fork: its motion decoder targets end-effector and camera pose,
+        # the same numbers for a human hand, a humanoid and a Franka arm, so one output layer
+        # enforces shared meaning. Its EAC-WM baseline -- separate encoders per embodiment, what we
+        # had -- gives embeddings "clearly separated by dataset" in their Figure 2 (F55, F58).
         #
-        # Body speed is the locomotion equivalent: every legged robot has one, and in Froude terms
-        # a 0.13 m hexapod and a 0.56 m quadruped walk at the same one (F56). This head hangs off
-        # the **same** `features(x_t, z)` as the joint heads, so the term shapes the shared trunk
-        # rather than only `z`, and it sees the frame for the same reason the joint heads do.
+        # **Why it does not take `x_t`, unlike every other head here.** LAC-WM's MD is conditioned
+        # on the observation, so matching the method means passing the frame. That was tried
+        # (`stage2_speed7_bodyframe`, F64) and it destroys the effect: cross-embodiment transfer
+        # goes from +0.544 / +0.435 to **-10.5 / -57.2**, worse than no term at all.
         #
-        # An earlier version was a separate module taking `z` alone. Excluding the frame was wrong
-        # twice over: it contradicts the project's own claim that vision carries the information,
-        # and it forced `z` to duplicate speed that `e_t` already supplies -- which is the likely
-        # reason that version moved the forward model by 0 percent.
-        # Gated on `lambda_body`, not just `body_dim`: a control run must have the identical
-        # parameter count and the identical sequence of RNG draws, or the matched pair differs
-        # in more than the flag.
+        # The reason is not that the head ignores `z` -- ablating `z` still costs 2.32x. It is that
+        # **the frame reveals which robot this is**, so the head learns one mapping per robot and
+        # `z` is free to use a robot-specific code again. That is the per-embodiment head problem
+        # re-entering through the image. Body speed is readable from a still frame (the frozen
+        # encoder scores R^2 0.676 on it), which is what makes the shortcut available here and not
+        # in LAC-WM's setting.
+        #
+        # So: any input that identifies the embodiment lets this head decode conditionally, and
+        # conditional decoding is exactly what it exists to prevent. `z` is built from two frames,
+        # so the head still reads vision -- through the bottleneck being shaped, which is the point.
         build_body = getattr(cfg, "lambda_body", 0.0) > 0 and getattr(cfg, "body_dim", 0)
-        self.body_head = _head(self.mode, self.width, cfg.body_dim) if build_body else None
+        self.body_sees_frame = getattr(cfg, "body_sees_frame", False)
+        if not build_body:
+            self.body_head = None
+        elif self.body_sees_frame:
+            # kept so F64's negative result is reproducible, not because it should be used
+            self.body_head = _head(self.mode, self.width, cfg.body_dim)
+        else:
+            self.body_head = nn.Sequential(
+                nn.LayerNorm(cfg.z_dim),
+                nn.Linear(cfg.z_dim, cfg.body_hidden),
+                nn.GELU(),
+                nn.Linear(cfg.body_hidden, cfg.body_dim),
+            )
         # per-embodiment because action spaces differ in dimension, but one linear layer each,
         # so the share of the decoder that transfers to a new embodiment barely moves
         self.offsets = nn.ModuleDict(
@@ -147,10 +161,12 @@ class MotionDecoder(nn.Module):
         return action
 
     def body(self, x_t, z):
-        """Body motion, from the same features every joint head reads."""
+        """Body motion from `z` alone. `x_t` is accepted and ignored unless body_sees_frame."""
         if self.body_head is None:
-            raise RuntimeError("body_dim is 0; no shared body head was built")
-        return self.body_head(self.features(x_t, z)).squeeze(1)
+            raise RuntimeError("lambda_body is 0; no shared body head was built")
+        if self.body_sees_frame:
+            return self.body_head(self.features(x_t, z)).squeeze(1)
+        return self.body_head(z)
 
     def add_head(self, name, hidden, action_dim, device=None):
         """A body with a new action space needs its own head; the backbone stays frozen."""

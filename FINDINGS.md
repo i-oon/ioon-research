@@ -3389,10 +3389,22 @@ the training data that matters and not the evaluation data.
 This is what `lambda_cross` does in Stage 1 and what the adversary never managed (F59). **It was
 achieved by making the insect walk more than one speed.**
 
-**Speed variation is not the only difference** between `ik_walk_8body` and `ik_walk_speed5` -- they
-are separate collection runs with different framing defaults and episode selection. Speed is the
-intended difference, not the isolated one. A clean isolation retrains on `ik_walk_8body` with
-`heldout_bodies c08f09t09` alone, three hours, and is worth doing before this carries a slide.
+**Isolated 2026-08-18.** `ik_walk_8body` and `ik_walk_speed7` are separate collection runs, so
+"speed variation" needed separating from "the newer dataset". `stage2_8body_matched` retrains on
+the **old** data with the **new** split -- `heldout_bodies c08f09t09` alone, 5 clips per body, 60
+epochs, same architecture and seed.
+
+| trained on | reads body identity from |
+|---|---|
+| `ik_walk_8body`, 3 bodies held out (`stage2_clean`) | **latent**, 3.1x / 3.9x |
+| `ik_walk_8body`, **1 body held out** (matched) | **latent**, 3.2x / 4.3x |
+| `ik_walk_speed7`, 1 body held out | **frame**, 2.9-5.0x |
+
+**Changing the split does nothing.** The old data still produces the switch. Ruled out alongside
+it: clips per body (5 in both) and frame clipping -- both datasets measure **0% of frames touching
+the image edge**, so the framing-default fix is not the difference either.
+
+What remains between the two datasets is the speed variation.
 
 **And the per-leg contact probe was never evidence about the latent.** Slide 14 led with `z`
 reading a loaded leg at 0.377 across, below the frozen encoder's 0.531 and below chance. Measured
@@ -3409,6 +3421,13 @@ That 0.586 looks like the first leg-level cross number to beat the encoder. **It
 hind scores 0.931 and the mean is 0.586, so the other three average **0.471 -- below chance**. In
 the `L_body` run the same leg scores 0.404 while the other three average 0.580: **a different leg
 carries it.**
+
+**And the matched run settles it.** `stage2_8body_matched` and `stage2_clean` train on *identical
+data* and differ only in the split. The leg probe reads **0.377 and 0.562** -- a 0.19 swing -- while
+the swap test on those same two runs reads 3.1x/3.9x against 3.2x/4.3x and the forward model differs
+by **0.014**. A metric that moves 0.19 on a change the representation does not register is not
+measuring the representation. Per leg the matched run reads **0.30 / 0.42 / 0.74 / 0.79**: two below
+chance, two well above, in one run.
 
 **A four-leg mean with one leg jumping is not a transfer result**, and F56 already said why the
 quantity cannot transfer -- one leg's phase fixes all four of the B1's and almost none of the
@@ -3521,12 +3540,21 @@ plainly:
 | the forward model's rollout | **data**, +7% (this) |
 | `z` carries body speed across the two robots | **the loss term** (F58, F60) -- every control stays at -7.1 |
 
-**Caveat, and it now sits under three findings.** `ik_walk_8body` and `ik_walk_speed7` are separate
-collection runs -- different framing defaults, different episode selection, different collection
-day. Speed is the *intended* difference, not the isolated one. The isolation is one retrain:
-`ik_walk_8body` with `heldout_bodies c08f09t09` alone, matching the speed sets' split, three hours.
-It would settle F61, F63 and the data half of F57 together, and until it is run all three read as
-"the newer dataset" rather than "the speed variation".
+**Isolated 2026-08-18, same run as F61.** `stage2_8body_matched` -- old data, new split -- rolled on
+the same two evaluation sets:
+
+| scored on | | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|---|
+| `ik_walk_8body` | `stage2_clean` | 1.38x | 1.57x | 1.50x | 1.29x |
+| | **matched, old data** | 1.38x | 1.57x | 1.49x | 1.26x |
+| | `speed7` control | **1.43x** | **1.66x** | **1.60x** | **1.37x** |
+| `ik_walk_speed7` | `stage2_clean` | 1.35x | 1.47x | 1.43x | 1.23x |
+| | **matched, old data** | 1.35x | 1.46x | 1.41x | 1.19x |
+| | `speed7` control | **1.41x** | **1.58x** | **1.56x** | **1.35x** |
+
+**The two single-speed runs differ by 0.014 on average across twelve cells.** The split does
+nothing. Against the *matched* run, speed variation gains **+7.9 percent on 12 of 12 horizons** --
+so the gain is not the newer collection, the different split, or the framing fix.
 
 **Smaller caveat.** Four clips per cell and two bodies. The effect is consistent in sign across
 every one of the 24, which is what makes it credible at this sample size rather than the magnitude
@@ -3534,9 +3562,83 @@ of any single number.
 
 ---
 
+### F64. The shared head only constrains the latent if it cannot tell the robots apart
+
+F58 added a body-motion head shared by both embodiments and it worked: `insect->b1` +0.544,
+`b1->insect` +0.435, against controls at -7.08 and -2.36. But that head read `z` alone, which is
+**not** what LAC-WM does -- their motion decoder is `MD(x_t, z_t)`, conditioned on the observation.
+Ours deviated from the source method and from our own `MotionDecoder`, and the deviation was
+recorded in a docstring rather than raised as a decision.
+
+Two objections to it, both fair. It sits badly with a thesis whose claim is that vision carries the
+information. And "the frame would let it take a shortcut" was asserted, never measured.
+
+**So it was rebuilt properly**: one head on `MotionDecoder`'s shared `features(x_t, z)`, no
+embodiment key, gradient reaching the trunk. `stage2_speed7_bodyframe`, same data, same weight,
+same control, both at epoch 60.
+
+| | insect->insect | b1->b1 | **insect->b1** | **b1->insect** |
+|---|---|---|---|---|
+| frozen encoder | 0.676 | 0.753 | -0.046 | +0.131 |
+| control, no term | 0.664 | 0.167 | -7.083 | -2.357 |
+| `z`-only head | **0.798** | **0.879** | **+0.544** | **+0.435** |
+| **frame + `z` head** | 0.680 | 0.347 | **-10.475** | **-57.170** |
+
+**The corrected version is worse than adding nothing.**
+
+**And the cost told the same story before the probe did.** Val motion against the control: the
+`z`-only head costs **+55 percent**, the frame version only **+12**. That looked like the redesign
+being cheaper. It was the term having stopped doing anything.
+
+**The mechanism is not the shortcut I assumed.** `scripts/diagnostics/body_head_ablation.py` zeroes
+one input at a time on the trained frame-conditioned head:
+
+| input | body loss | vs real `z` |
+|---|---|---|
+| real `z` | 0.3425 | 1.00x |
+| **`z` zeroed** | 0.7932 | **2.32x** |
+| frame zeroed | 0.6795 | 1.98x |
+
+**The head uses `z`.** Deleting it costs 2.32x, so `z` is carrying speed -- just a *robot-specific*
+code for it. The frame tells the head which robot it is looking at, so it learns one mapping per
+robot and `z` never has to agree with itself across embodiments.
+
+**That is the per-embodiment head problem re-entering through the image.** We removed the embodiment
+*key* and handed the head a photograph, which identifies the robot just as well.
+
+**The rule this establishes.**
+
+> A shared decoding head constrains the latent only if it is **blind to embodiment**. Any input that
+> identifies the robot lets it decode conditionally, and conditional decoding is what the term
+> exists to prevent.
+
+**Why LAC-WM does not hit this.** Their target is end-effector and camera pose in a setting where a
+still frame does not hand you the answer. Body speed *is* readable from one still frame -- the
+frozen encoder scores R^2 **0.676** on it within an embodiment -- so conditioning on the frame gives
+the head everything it needs and the bottleneck learns nothing. **The formulation does not port; the
+principle behind it does.**
+
+`z` is built from two frames, so the blind head still reads vision -- through the bottleneck being
+shaped, which is the point. Nothing in the deployed system is denied the image: the ITM, the FTM and
+the joint heads all take `e_t`. Only this one auxiliary head, whose job depends on having no
+shortcut, does not.
+
+**Kept reproducible.** `cfg.body_sees_frame` defaults to False and rebuilds the failed variant when
+set, because a negative result nobody can re-run is not much of one.
+
+**What this costs the earlier claim.** The `+0.544` stands, and its architecture is now justified by
+measurement rather than by assertion. What does not stand is describing it as LAC-WM's mechanism
+ported over: the port was tried, and it fails here for a reason specific to locomotion.
+
+---
+
 ## Files
 
 - `data/ik_walk_speed7` -- five constant speeds plus both ramp directions, 91 clips (F60)
+- `scripts/diagnostics/body_head_ablation.py` -- zero `z` or zero the frame on a trained body head
+  and see which input the loss actually depends on (F64)
+- `scripts/figures/plot_body_head_design.py` -- slide 19's three-panel figure: what we had, what
+  failed, what works
 - `scripts/diagnostics/latent_rollout.py` -- rolls the forward model on its own output. Needs
   `--data_dir` and `--glob` on any cross-embodiment checkpoint: the config's `morph` and `data_dir`
   are stale single-morphology defaults and produce a silent zero-clip run with NaN everywhere (F63)

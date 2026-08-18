@@ -30,6 +30,7 @@ LEGACY_DEFAULTS = {
     "lambda_adv": 0.0,
     "lambda_body": 0.0,
     "body_dim": 1,
+    "body_sees_frame": False,
     "body_hidden": 128,
     "ftm_embodiment_channel": False,
     "center_embeddings": False,
@@ -196,6 +197,9 @@ class Config:
     # (F55). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
     body_dim: int = 1            # forward Froude only; see BODY_CHANNELS for why
+    # True reproduces F64's negative result: conditioning the shared head on the frame lets it
+    # identify the robot and decode per-robot, and transfer collapses to -10.5 / -57.2.
+    body_sees_frame: bool = False
     body_hidden: int = 128
     adv_hidden: int = 128
     # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while

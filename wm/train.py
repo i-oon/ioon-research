@@ -518,8 +518,9 @@ def main():
         # written every epoch, overwritten in place, so an interrupted run loses at most one
         torch.save(training_state(epoch, best), os.path.join(run_dir, "last.pt"))
     writer.close()
-    print(f"best val selection {best['selection']:.4f} | total {best['total']:.4f} "
-          f"| motion {best['motion']:.4f} -> {run_dir}")
+    # `total` is no longer tracked -- selection replaced it as the checkpoint criterion, and
+    # printing an untouched inf reads as a failure
+    print(f"best val selection {best['selection']:.4f} | motion {best['motion']:.4f} -> {run_dir}")
 
 
 if __name__ == "__main__":

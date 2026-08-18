@@ -660,6 +660,18 @@ quadruped**, with a per-embodiment output head. No cross-embodiment loss — the
 none and claims the shared latent emerges from weight sharing alone. **That claim is what this
 slide tests.** Two seeds, balanced embodiments, `c08f09t09` withheld.
 
+| module | takes | returns | why it exists |
+|---|---|---|---|
+| **V-JEPA2** | the image | `e_t` | frozen; never trained |
+| **ITM** | `e_t, e_t+1` | **`z`** | what changed between two frames — **the latent under test** |
+| **FTM** | `e_t, z` | `ê_t+1` | predicts the next frame; what a planner needs |
+| **decoder trunk** | `e_t, z` | shared features | cross-attention, `z` queries the image |
+| `head["hexapod"]` | those features | 18 joints | drives the insect |
+| `head["b1"]` | those features | 12 joints | drives the quadruped |
+
+**Only the last layer is per-embodiment** — 18 and 12 outputs cannot share one projection. Everything
+above it is one set of weights for both robots, which is the sharing the source method relies on.
+
 ### It works on a held-out body
 
 **RMSE 3.85 and 3.43 deg, R² +0.87 and +0.90** against a command spread of 11.73 deg — positive on
@@ -937,13 +949,15 @@ things at once, with no change to the loss**:
 | is a body-level question answerable at all | no — the insect has no speed to read | yes |
 | the forward model, rolled on its own output | — | **+7%**, and rising with horizon |
 
-The first row is the switch behaviour, reversed. Same four training bodies, same clips per body,
-same epochs; and scoring the old model on the new clips still gives the latent, so it is the
-training data that changed and not the evaluation.
+The first row is the switch behaviour, reversed. **Isolated with a matched retrain** — the old data
+with the new split still follows the latent (3.2x against 3.1x), the two datasets are both 0%
+clipped, and clips per body are equal. Scoring the old model on the new clips also still gives the
+latent, so it is the training data and not the evaluation.
 
 The third row is the module nothing else had moved — coverage shifted it 5–8% where it shifted the
 decoder 3.9x. **24 of 24 comparisons** across two bodies and both evaluation sets, including the
-clips the old model trained on and the new one never saw.
+clips the old model trained on and the new one never saw. The matched retrain scores within
+**0.014** of the original single-speed run, so the gain is the speed and not the split.
 
 **Behavioural variety is worth handling carefully — it buys more than it looks like.** It also
 explains why the source paper did not hit this: their datasets vary, ours did not.
@@ -961,7 +975,7 @@ no such quantity at leg level — but it does at body level, and that is slide 1
 
 ---
 
-## Slide 19 — The fix: one decoding head both robots share
+## Slide 19 — Forcing one meaning into `z`
 
 **Is there any shared body-level signal at all?** Before adding anything, ask what the frozen
 encoder already has. Fit a body-speed readout on one robot, apply it to the other:
@@ -975,13 +989,18 @@ R², so 0 is "no better than guessing the average" and negative is worse. **Some
 it is faint — and training destroys it.**
 
 **Nothing in the loss ever asked for it.** `L_motion` supervises `z` through per-embodiment heads
-onto 18-D and 12-D joint commands with no correspondence between them. LAC-WM's equivalent term
-targets an end-effector pose every arm shares; locomotion has no such quantity at leg level, for
-the reason on slide 18. **Body motion is where a correspondence exists** — both robots have a
-forward speed, and in Froude terms they walk at the same one.
+onto 18-D and 12-D joint commands with no correspondence between them. Body speed is where a
+correspondence exists: both robots have one, and in Froude terms they walk at the same one.
 
-So: decode body speed from `z` through **one head shared by both embodiments**. Matched control,
-one flag apart.
+So decode it through **one head shared by both embodiments** — and the head must be unable to tell
+the robots apart, or it decodes each one separately and nothing is shared.
+
+![why the shared head must be blind to the frame](../results/wm/stage2/figures/body_head_design.png)
+
+**The middle panel is the obvious design and it fails.** Conditioning the head on the frame is what
+LAC-WM does, and here it is *worse than no term at all* — the image identifies the robot, so the
+head learns one mapping per robot and `z` stays robot-specific. Ablating `z` still costs 2.32x, so
+the head is not ignoring it; it is using a private code per robot.
 
 | | insect→insect | b1→b1 | **insect→b1** | **b1→insect** |
 |---|---|---|---|---|
@@ -989,32 +1008,34 @@ one flag apart.
 | control, no term | 0.664 | 0.167 | −7.083 | −2.357 |
 | **+ shared head** | **0.798** | **0.879** | **+0.544** | **+0.435** |
 
-**Both cross-robot directions turn positive**, against controls at −7.1 and −2.4, and all four
-cells beat the frozen encoder. Both arms scored at the same epoch.
+**Both cross-robot directions turn positive**, against controls at −7.1 and −2.4, and all four cells
+beat the frozen encoder. Matched control, one flag apart, both scored at the same epoch.
 
-> Read against the control, not the encoder: the encoder row is scored on one frame where `z` is
-> built from two, so it is handicapped. The control has identical access and identical data.
+**Val motion worsens 56%**, 0.0166 to 0.0259, and the forward model is untouched — 1.42x at one step
+in both arms. The term does one thing and pays for it in command accuracy.
 
-### Two things the data had to provide
+### Why blinding the head is a workaround, not the principle
 
-**The insect walked one speed**, so there was nothing to read. Retiming the recorded foot path
-gives five speeds matched to the B1's range, with inter-leg phase untouched — the gait stays the
-animal's.
+LAC-WM does not blind its motion decoder, and does not need to. **Their target is a *change*
+between two frames** — end-effector and camera pose deltas — and a single still cannot supply a
+change, so `z` is required whatever the head can see.
 
-**And speed had to vary inside each clip, not just between them.** With one speed per clip the
-shared head memorises rather than learns: held-out loss 0.86 against 1.0 for guessing. Ramping the
-speed across a clip brings that to 0.71. **It reduces memorisation; it does not make the head
-understand speed.**
+**Ours is a state a still frame gives away.** The frozen encoder reads body speed at **R² 0.676**
+from one image, so the head has the answer before `z` says anything, and blinding it is the only
+way to make `z` matter.
 
-### What it costs
+**That points at the real fix.** With richer behaviour — turning, strafing, changes of speed within
+a clip — a single frame stops determining what the robot is doing, and `z` is forced to carry the
+difference *by the task rather than by our architecture*. The shared head might then work
+frame-conditioned as LAC-WM's does, or become unnecessary.
 
-**Val motion worsens 56%**, 0.0166 to 0.0259 — the metric slide 14 reports as its headline. That is
-the trade, and `lambda_body` has never been swept, so it is not known how much of it is necessary.
+**One measurement decides it, and it is cheap**: can the frozen encoder read turn rate from a single
+frame? If not, the shortcut closes on its own. **Our B1 has no turning at all** — `vy` is zero in
+every clip and `vyaw` is a constant per policy — so testing it means new rollouts on both robots.
 
-**It costs the forward model nothing.** Rolled on B1 video at matched epochs, both arms sit at
-1.42x at one step and 1.31–1.33x at ten. The term does one thing and leaves the rest alone.
-
-**One seed on the ramped set.** `insect→b1` has flipped sign once already; a second seed is running.
+**What stands today:** the latent can be made to share meaning, we know what forces it, and we know
+why the source method's formulation does not port. **What is not settled** is whether the blinding is
+necessary or an artefact of a dataset with one behaviour in it.
 
 ---
 
@@ -1032,13 +1053,10 @@ when driven open-loop through physics.
 
 **Across incomparable robots it does not transfer, and it adapts cheaply instead.** A frozen
 forward model scores **0.57–0.71x** on the B1 — worse than assuming the frame does not move — but
-**one clip** of the new robot clears break-even and **nine** clear every horizon tested, about
-**7x fewer clips** than starting cold.
+**one clip** of the new robot clears break-even where starting cold takes seven, and nine clips
+clear every horizon tested.
 
-> **Zero-shot across robots does not work.** But one clip of the new robot puts this pipeline over
-> the line, where starting from scratch takes seven.
-
-### The three things this project found that it did not set out to find
+### Five things this project found that it did not set out to find
 
 **1. The mechanism is the opposite of the intuition.** The decoder reads *which body* from the
 pixels and the latent carries *what movement* — swapping the latent between two bodies whose
@@ -1051,10 +1069,25 @@ calculation with no learning at all — made the identical mistake. Adding decou
 matched volume moved a held-out body from **12.67 deg, R² −0.78** to **3.27 deg, R² +0.89**.
 
 **3. What survives a change of robot is the shared representation, not the learned dynamics.**
-Pretraining supplies both, and they separate: frozen, real time order beats shuffled by **1.38x**,
-yet after a thousand adaptation steps the two are identical. The **1.38x → 0.54x** drop between an
-insect body and the B1, on the same weights with nothing retrained, is the embodiment gap in one
-line.
+Frozen, real time order beats shuffled by 1.38x; after a thousand adaptation steps the two are
+identical. And **1.38x → 0.54x** between an insect body and the B1, same weights, nothing
+retrained, is the embodiment gap in one line.
+
+**4. Cross-embodiment alignment does not port from manipulation to locomotion — slide 19.** The
+published mechanism aligns a latent by decoding a label every embodiment shares. Manipulation has
+one, locomotion has none at leg level, and body motion is the analogue. But their label is a
+*change* between two frames and ours is a *state* a single frame gives away, so the mechanism has
+to be rebuilt rather than reused.
+
+> **The general form: an auxiliary head aligns a representation only if its target cannot be
+> recovered from the head's other inputs.** In manipulation that holds for free. In locomotion it
+> has to be arranged.
+
+**5. Most of what looked like a method failure was a data failure.** Of four measured failures in
+the shared trunk, **three were fixed by giving the insect five walking speeds instead of one** —
+the decoder switching on the latent, body-level questions being unanswerable, and the forward model
+at +7.9% — with a matched retrain ruling out the split, the clip budget and the framing. Only the
+fourth needed a loss term.
 
 ### What the claim is, stated so it cannot be overread
 
