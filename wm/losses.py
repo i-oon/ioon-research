@@ -40,6 +40,18 @@ def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
     # the number that selects best.pt would pick checkpoints for how badly the probe is doing
     parts["total"] = total.item()
 
+    # **The number `best.pt` selects on, and it deliberately excludes experimental terms.**
+    # `total` carries whatever loss the run happens to enable, so the two arms of a matched pair
+    # are checkpointed on different quantities. Measured on 2026-08-18: `lambda_body 0.5` put a
+    # noisy validation term into `total`, the run's minimum landed at **epoch 28** while its
+    # control's landed at **60**, and every downstream comparison silently compared a half-trained
+    # model against a fully trained one. The forward-model rollout read 1.33x against 1.15x and
+    # collapsed to 1.42x against 1.42x once the epochs matched.
+    #
+    # `recon + motion` are the two terms every run has, so selection means the same thing in both
+    # arms whatever else is switched on.
+    parts["selection"] = (cfg.lambda_recon * recon + cfg.lambda_motion * motion).item()
+
     if probe_logits is not None and morph_id is not None:
         # reads a detached z, so this trains only the probe and leaves the world model untouched
         probe = F.cross_entropy(probe_logits, morph_id)

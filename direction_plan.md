@@ -256,11 +256,25 @@ earned result rather than an artefact of the data.
 > **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
 > cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
 
-**Where this stands, 2026-08-16.** Stage 1 is finished and retrained clean; Stage 2's two goals —
-a head that fits cheaply on a new robot, and a forward model that predicts on it — are both met,
-the second by few-shot adaptation rather than frozen transfer. What is left is not capability but
-**evidence quality and scope**: one control experiment still running (2h), one Stage-1 baseline
-never run (1e), and one decision that no measurement can make (below).
+**Where this stands, 2026-08-18.** Stage 1 is finished and retrained clean. Stage 2's two original
+goals — a head that fits cheaply on a new robot, and a forward model that predicts on it — are both
+met, the second by few-shot adaptation rather than frozen transfer.
+
+**A third goal opened and is now partly met: the latent was not shared, and it can be.** Slide 14
+measured the trunk acting as a switch; F55 named the cause (nothing in the loss ever asks one `z`
+to mean the same thing on both robots) and F56 showed why the obvious fix is unavailable (the two
+gaits have different numbers of degrees of freedom, so no frame-level pairing exists). The route
+that worked is a **body-motion head shared by both embodiments** (F58), trained on data where the
+insect's speed varies (F57) and varies *within* each clip (F60). Cross-embodiment body-speed
+transfer went from -5.6 to **+0.377 / +0.432**, against controls at -7.1 and -2.3.
+
+**It costs 56% on val motion**, the metric this deck reports as its headline, and `lambda_body` has
+never been swept — 0.5 was copied from `lambda_cross`. One seed on the ramped set; a second is
+running.
+
+What is left is **evidence quality and scope**: confirm the ramped result on a second seed, sweep
+the loss weight to find whether the cost is necessary, one Stage-1 baseline never run (1e), and one
+decision no measurement can make (below).
 
 **The one decision left: is a single robot pair enough?** Everything cross-embodiment rests on
 insect ↔ B1. A third embodiment would test whether the result generalises, and the natural axis is

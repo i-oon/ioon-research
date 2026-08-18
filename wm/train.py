@@ -433,7 +433,7 @@ def main():
 
     # tracked separately: total is ~99% reconstruction, so selecting on it alone would
     # ignore the motion term that grounds the latent in real joint commands
-    best = {"total": float("inf"), "motion": float("inf")}
+    best = {"selection": float("inf"), "total": float("inf"), "motion": float("inf")}
     start_epoch = 1
     resume_path = os.path.join(run_dir, "last.pt") if args.resume == "auto" else args.resume
     if resume_path and os.path.exists(resume_path):
@@ -450,6 +450,8 @@ def main():
         schedule.load_state_dict(saved["schedule"])
         scaler.load_state_dict(saved["scaler"])
         best = saved["best"]
+        # runs checkpointed before `selection` existed carry only total/motion
+        best.setdefault("selection", float("inf"))
         start_epoch = saved["epoch"] + 1
         print(f"resuming {resume_path} at epoch {start_epoch} of {cfg.epochs} "
               f"(best so far total {best['total']:.4f}, motion {best['motion']:.4f})")
@@ -505,7 +507,10 @@ def main():
                if "probe_accuracy" in train_metrics else "") + suffix
         )
 
-        for key, filename in (("total", "best.pt"), ("motion", "best_motion.pt")):
+        # `selection`, not `total` -- see wm/losses.py. `total` includes whichever experimental
+        # term this run enables, so selecting on it checkpoints the arms of a matched pair at
+        # different epochs and every comparison downstream inherits the mismatch.
+        for key, filename in (("selection", "best.pt"), ("motion", "best_motion.pt")):
             if val_metrics[key] < best[key]:
                 best[key] = val_metrics[key]
                 torch.save(checkpoint(epoch), os.path.join(run_dir, filename))
@@ -516,7 +521,8 @@ def main():
         # written every epoch, overwritten in place, so an interrupted run loses at most one
         torch.save(training_state(epoch, best), os.path.join(run_dir, "last.pt"))
     writer.close()
-    print(f"best val total {best['total']:.4f} | best val motion {best['motion']:.4f} -> {run_dir}")
+    print(f"best val selection {best['selection']:.4f} | total {best['total']:.4f} "
+          f"| motion {best['motion']:.4f} -> {run_dir}")
 
 
 if __name__ == "__main__":

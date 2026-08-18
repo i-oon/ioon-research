@@ -257,6 +257,29 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 > for the *shared* representation rather than for transfer: `z` reads a loaded leg at 0.986 within
 > an embodiment and 0.373 across, below the frozen encoder's 0.531. Raising that is still the
 > thing to aim at, and it is still untested whether more overlap does raise it.
+>
+> **Answered, 2026-08-18 — and the answer is no, on its own.** The lever named here was behavioural
+> diversity, and it had never been tested. F57 built it: the expert walks one speed (1.9 percent
+> variation across 1,000 episodes), so `collect_ik.py --speed` retimes the shared foot path to
+> produce five speeds matched to the B1's Froude band. Trained on that data with no other change,
+> the cross-embodiment body-speed readout scores **-4.16 and -5.60**, and on the wider ramped set
+> **-7.10 and -2.33**. More diversity gives the trunk more to partition by.
+>
+> **Corrected 2026-08-18, and the answer splits in two.** "Necessary and not sufficient" is right
+> for *one* of the three failures and wrong for the other two (F61).
+>
+> | failure | fixed by |
+> |---|---|
+> | the decoder reads body identity from `z` instead of the frame | **diversity alone** -- the control reverses the swap test, 3.1x following the latent to 2.9x following the frame, with no loss term and no shared head |
+> | a body-level question is answerable at all | **diversity alone** -- a single-speed insect has no speed to read, so the measurement was not defined |
+> | `z` carries body speed across the two robots | **the loss term** -- every control stays negative, -7.10 and -2.33 even on seven conditions |
+>
+> So diversity fixed the switch behaviour that this whole line of questioning was aimed at, and the
+> shared head fixed the remaining one. Both were needed and they fixed different things.
+>
+> **The leg-level target named above was the wrong one and F56 says why.** One leg's phase fixes all
+> four of the B1's legs and almost none of the insect's other five, so any leg-level label that
+> describes one must underdetermine the other. Body-level motion is where a correspondence exists.
 
 Answered as far as the measurements allow, so the next design decision is not made on intuition.
 
