@@ -8,6 +8,7 @@ insect -> no render-style confound). Obs/control are ported verbatim from
 b1_deployment/deploy_mujoco.py.
 
   python3 sim/collect/rollout_b1_mujoco.py --vx 0.4 --steps 300 --out data/b1_traj/walk_vx0.4.npz
+  python3 sim/collect/rollout_b1_mujoco.py --vx 0.4 --schedule "1@0.4 0@0.2 1@0.4" --steps 300 ...
 """
 import argparse
 import numpy as np
@@ -34,6 +35,37 @@ FOOT_FORCE_THRESH = 1.0
 SPAWN_Z = 0.50
 _TOUCH_SDK_TO_IL_LEG = [1, 0, 3, 2]
 HEAD_K = 0.5
+
+
+def parse_schedule(spec, vx, vy, wz):
+    """`"1@0.4 0@0.2 1@0.4"` -> [(1.0, 0.4), (0.0, 0.2), (1.0, 0.4)], scaling the base command.
+
+    Identical syntax to `sim/collect/collect_ik.py`, so one schedule string can be handed to both
+    robots and mean the same thing: rate is a multiplier on the commanded velocity, fraction is the
+    share of the clip. Rate 0 commands a halt, which this policy holds standing rather than
+    stopping dead.
+    """
+    segments = []
+    for token in spec.split():
+        rate, _, frac = token.partition("@")
+        if not frac:
+            raise SystemExit(f"schedule segment {token!r} needs rate@fraction, e.g. 1@0.4")
+        segments.append((float(rate), float(frac)))
+    if not segments:
+        raise SystemExit("empty --schedule")
+    total = sum(f for _, f in segments)
+    return [(r * vx, r * vy, r * wz, f / total) for r, f in segments]
+
+
+def command_plan(segments, n):
+    """One (vx, vy, wz) row per policy step, so the loop reads a plan instead of branching."""
+    plan = np.zeros((n, 3), np.float32)
+    start = 0
+    for i, (cvx, cvy, cwz, frac) in enumerate(segments):
+        stop = n if i == len(segments) - 1 else min(n, start + int(round(frac * n)))
+        plan[start:stop] = (cvx, cvy, cwz)
+        start = stop
+    return plan
 
 
 def load_actor(checkpoint):
@@ -72,6 +104,10 @@ def main():
                     help="clock frequency in the observation. Must match the value the policy "
                          "was trained with (train_config.yaml: run.gait_freq) or the gait phase "
                          "the policy is tracking drifts against the one it is told about.")
+    ap.add_argument("--schedule", type=str, default="",
+                    help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
+                         "walk, stand for a fifth of the clip, then walk. Rate multiplies "
+                         "--vx/--vy/--wz. Same syntax as sim/collect/collect_ik.py.")
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--warmup", type=int, default=25, help="hold DEFAULT pose (settle) before policy")
     ap.add_argument("--policy_warmup", type=int, default=45,
@@ -92,6 +128,8 @@ def main():
     for _ in range(args.warmup * DECIMATION):
         mujoco.mj_step(m, d)
 
+    plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
+        if args.schedule else None
     last = np.zeros(12, np.float32); step_i = 0; heading_target = None
     L = {k: [] for k in ("base_pos", "base_quat", "joint_pos", "joint_vel",
                          "action", "command", "foot_contact")}
@@ -101,9 +139,13 @@ def main():
         cur_yaw = float(np.arctan2(_R[1, 0], _R[0, 0]))
         if heading_target is None:
             heading_target = cur_yaw
-        heading_target += args.wz * (DECIMATION * m.opt.timestep)
+        # the plan covers the recorded steps only; the warmup holds the nominal command
+        vx, vy, wz = (plan[min(_i - args.policy_warmup, len(plan) - 1)]
+                      if plan is not None and _i >= args.policy_warmup
+                      else (args.vx, args.vy, args.wz))
+        heading_target += wz * (DECIMATION * m.opt.timestep)
         yaw_err = float(np.arctan2(np.sin(heading_target - cur_yaw), np.cos(heading_target - cur_yaw)))
-        cmd = np.array([args.vx, args.vy, float(np.clip(HEAD_K * yaw_err, -1, 1))], np.float32)
+        cmd = np.array([vx, vy, float(np.clip(HEAD_K * yaw_err, -1, 1))], np.float32)
 
         lin = d.sensordata[adr["base_linvel"]:adr["base_linvel"]+3]
         ang = d.sensordata[adr["base_angvel"]:adr["base_angvel"]+3]

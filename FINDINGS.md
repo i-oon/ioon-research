@@ -3992,11 +3992,65 @@ the fix.
 
 ---
 
+### F70. Every body channel splits into behaviour and gait, and only behaviour crosses robots
+
+F69 argued that the shared head reached one axis because only one body channel varies in our data.
+That was an inference from what the collectors command. `scripts/diagnostics/channel_screen.py`
+measures it per channel, and the mechanism is sharper than the argument was.
+
+**A body-velocity channel is a sum of two timescales**: the slow part is what the robot is doing,
+the fast part is where it is in its gait cycle. Scoring each channel raw and smoothed over about one
+stride separates them, on the same clips and the same checkpoint:
+
+| channel | timescale | varies | robot AUC | insect->b1 | b1->insect |
+|---|---|---|---|---|---|
+| forward | per frame | 1.00 | 0.623 | **-1.453** | **-2.078** |
+| **forward** | **smoothed** | **1.00** | **0.529** | **+0.544** | **+0.435** |
+| lateral | per frame | 1.07 | 0.705 | -0.999 | -1.939 |
+| lateral | smoothed | 1.05 | **0.834** | -2.647 | -0.250 |
+| vertical | per frame | 0.78 | 0.505 | -1.333 | -3.883 |
+| vertical | smoothed | **0.20** | 0.510 | -0.471 | -3.460 |
+
+**The forward channel is its own control.** Same axis, same clips, same weights -- the only
+difference is whether the velocity is averaged over a stride, and it moves the cross-robot readout
+from **-1.45 to +0.54**. Nothing else can account for that. So `lambda_body` does not work because
+forward is a special direction; it works because forward is the one channel with a slow component
+that is not zero.
+
+**Three channels, three different gates failed** (the gates are F69's):
+
+- **forward** varies, hides the robot at 0.529, and transfers. The only one that passes.
+- **vertical** collapses when smoothed, 0.78 -> **0.20**. The bob is almost entirely gait; on level
+  ground the stride-averaged height barely moves. Nothing there to align, however large the
+  per-frame row looks.
+- **lateral** keeps its variation, 1.05, but its robot AUC *rises* to **0.834** once smoothed. The
+  slow part of lateral is "the B1 never drifts sideways and the insect does" -- embodiment identity,
+  not shared behaviour. This is the 0.788 that forced `BODY_CHANNELS = (0,)`, now located: it is the
+  slow component that betrays the robot, not the gait wobble.
+
+**Smoothing is not uniformly good, and the two AUC columns show it.** It isolates behaviour, so if
+the behaviour itself differs between the robots the identity gets *sharper* -- forward 0.623 ->
+0.529, lateral 0.705 -> **0.834**.
+
+**This is the measured form of the argument for more behaviour.** The other channels are not hiding
+in the data waiting to be extracted: their slow components are either zero (vertical, and yaw and
+pitch by the same logic) or robot-specific (lateral). **Turning, strafing and slopes would create
+slow components that do not exist today**, which is the difference between "we could not align it"
+and "there was nothing there to align".
+
+**Still to check**: roll, pitch and yaw cannot be screened at all yet -- `collect_ik.py` records
+`head` as a position and no orientation, so the hexapod has no measured body attitude. Adding it is
+a few lines at collection time and a full recollection to use.
+
+---
+
 ## Files
 
 - `data/ik_walk_speed7` -- five constant speeds plus both ramp directions, 91 clips (F60)
 - `scripts/diagnostics/body_head_ablation.py` -- zero `z` or zero the frame on a trained body head
   and see which input the loss actually depends on (F64)
+- `scripts/diagnostics/channel_screen.py` -- score each body-motion channel at two timescales
+  against F69's three gates; the evidence that more behaviour is needed (F70)
 - `scripts/diagnostics/target_window_sweep.py` -- is a candidate motion target readable from a
   single frame, swept over window length and direction (F68)
 - `scripts/diagnostics/body_motion_probe.py` -- cross-robot Froude readout; reports both

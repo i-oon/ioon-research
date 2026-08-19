@@ -137,6 +137,60 @@ def body_rel_via_fk(sim, df, rows):
     return {leg: np.array(v) for leg, v in out.items()}
 
 
+def parse_schedule(spec):
+    """`"1@0.4 0@0.2 1@0.4"` -> [(1.0, 0.4), (0.0, 0.2), (1.0, 0.4)].
+
+    Each segment is `rate@fraction`: how fast the foot path plays, and what share of the clip's
+    frames it gets. Rate 0 holds the pose, which is a stop. The same string drives
+    `rollout_b1_mujoco.py`, so one schedule can be handed to both robots and mean the same thing.
+    """
+    segments = []
+    for token in spec.split():
+        rate, _, frac = token.partition("@")
+        if not frac:
+            raise SystemExit(f"schedule segment {token!r} needs rate@fraction, e.g. 1@0.4")
+        segments.append((float(rate), float(frac)))
+    if not segments:
+        raise SystemExit("empty --schedule")
+    if all(r == 0 for r, _ in segments):
+        raise SystemExit("--schedule has no moving segment, so the clip would cover no ground")
+    if sum(f for _, f in segments) > 1.001:
+        raise SystemExit(f"--schedule fractions sum to {sum(f for _, f in segments):.2f}; "
+                         "they are shares of one clip and cannot exceed 1")
+    return segments
+
+
+def schedule_path(brel, segments):
+    """Play the shared foot path at a piecewise rate: the general form of `retime`.
+
+    A stop mid-clip is the point of this. Every clip today accelerates from rest at frame 0 and
+    slows at the end, so *when* the robot is stationary is fixed and a probe reads it off the body's
+    position in frame. Put the pauses somewhere the frame cannot predict and the same visual state
+    is followed by more than one future -- the condition an inverse model needs before its latent
+    carries anything the current frame does not already supply.
+
+    **Rate means the same thing as `retime`'s speed: source frames consumed per output frame.**
+    Rate 1 is the recorded pace, 0 holds the pose, 1.2 is twenty percent faster. It is deliberately
+    *not* renormalised so the clip still covers the whole path -- an earlier version did that, and it
+    made a pause silently speed up every moving segment to compensate (a schedule pausing for 30
+    percent of the clip walked the rest 1.43x faster, putting the insect at Froude 0.23 against the
+    B1's 0.17 on the same schedule string). Stopping and walking faster would then always arrive
+    together, which is exactly the confound the schedule exists to break. A clip that pauses covers
+    less ground instead, which the `--travel` gate and the fixed camera both handle.
+    """
+    T = len(next(iter(brel.values())))
+    pos, here = [], 0.0
+    for rate, frac in segments:
+        for _ in range(max(1, int(round(frac * T)))):
+            pos.append(min(here, T - 1.0))
+            here += rate
+    pos = np.clip(np.asarray(pos), 0, T - 1)
+
+    src = np.arange(T, dtype=float)
+    return {leg: np.stack([np.interp(pos, src, path[:, k]) for k in range(3)], axis=1)
+            for leg, path in brel.items()}
+
+
 def retime(brel, speed, speed_end=None):
     """Resample the shared foot path along time, so the same stride takes fewer or more steps.
 
@@ -353,6 +407,11 @@ def main():
                     help="behavior label saved in every clip (walk / turn / stop)")
     ap.add_argument("--stop", type=int, default=0,
                     help="if >0: STOP mode — hold the stance for this many frames (no stepping)")
+    ap.add_argument("--schedule", type=str, default="",
+                    help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
+                         "walk, stand still for a fifth of the clip, then walk. Rate 0 is a stop. "
+                         "Supersedes --speed/--speed_end. The same string works on "
+                         "rollout_b1_mujoco.py, so both robots can be given one schedule.")
     ap.add_argument("--turn_bias", type=float, default=0.0,
                     help="legacy asymmetric ThC offset (rad) added left/subtracted right")
     ap.add_argument("--morphs", type=str, nargs="+", default=None, metavar="NAME=SCENE",
@@ -428,7 +487,8 @@ def main():
     for ep in episodes:
         rows = list(range(ep * EP, ep * EP + EP))
         brel = body_rel_via_fk(sim, df, rows)  # shared Cartesian behavior, once per episode
-        brel = retime(brel, args.speed, args.speed_end)
+        brel = (schedule_path(brel, parse_schedule(args.schedule)) if args.schedule
+                else retime(brel, args.speed, args.speed_end))
         for morph, scene in SCENES:
             cmds, ikdiag = precompute_commands(sim, simIK, scene, brel, args.scale)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
@@ -450,7 +510,7 @@ def main():
                                     frames=f, actions=a, forces=fc, head=h,
                                     foot_order=np.array(active_legs), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=ep, repeat=rep, scale=args.scale,
-                                    behavior=args.behavior)
+                                    behavior=args.behavior, schedule=args.schedule)
                 fwd, lat, verdict = walk_check(h)
                 manifest.append(dict(tag=tag, morph=morph, ep=ep, rep=rep, n=len(f),
                                      forward=fwd, lateral=lat, verdict=verdict))
