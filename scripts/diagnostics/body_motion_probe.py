@@ -172,7 +172,7 @@ def readout(train):
     return RidgeCV(alphas=np.logspace(-1, 4, 12)).fit(x, y)
 
 
-def agreement(a_train, b_train, tests):
+def correlation(a_train, b_train, tests):
     """Correlation between the two robots' readouts applied to the *same* frames.
 
     **The stable companion to the R^2 cells, and it exists because they are not.** Two seeds of an
@@ -247,7 +247,7 @@ def main():
     print("Body-level motion (Froude number) read out of each representation.")
     print("R^2 against the target embodiment's own mean -- **0.0 is the no-learning line**.\n")
     print(f"{'representation':<26}{'insect->insect':>13}{'b1->b1':>13}"
-          f"{'insect->b1':>13}{'b1->insect':>13}{'agreement':>13}")
+          f"{'insect->b1':>13}{'b1->insect':>13}{'correlation':>13}")
     for label, data in rows:
         prepared = {}
         for name, (x, y, clip) in data.items():
@@ -257,15 +257,15 @@ def main():
             prepared[name] = ((x[in_train], y[in_train]), (x[~in_train], y[~in_train]))
         i, b = prepared["insect"], prepared["b1"]
         cells = [cell(i[0], i[1]), cell(b[0], b[1]), cell(i[0], b[1]), cell(b[0], i[1])]
-        agree = agreement(i[0], b[0], (i[1], b[1]))
+        corr = correlation(i[0], b[0], (i[1], b[1]))
         print(f"{label:<26}" + "".join(f"{r2:>13.3f}" for r2, _ in cells)
-              + f"{agree:>13.3f}")
+              + f"{corr:>13.3f}")
         print(f"{'  same, as Pearson r':<26}" + "".join(f"{r:>13.3f}" for _, r in cells))
 
     print("\nThe second line of each pair is Pearson r for the same cell. r^2 is the R^2 that")
     print("readout would reach with its gain and offset refitted, so the gap between them is")
     print("calibration and the gap to zero is direction.")
-    print("\n`agreement` fits a readout on each robot separately, runs both over the same frames,")
+    print("\n`correlation` fits a readout on each robot separately, runs both over the same frames,")
     print("and correlates the outputs: 1.0 means the two robots order speed identically, 0.0 means")
     print("unrelated. Bounded and symmetric where the R^2 cells are neither, and blind to the scale")
     print("and offset R^2 charges for, so it is the number to compare across seeds (F65).")

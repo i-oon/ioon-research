@@ -290,7 +290,7 @@ its Figure 2 is our control experiment. Three things follow:
    this and it is not their chunking**: short windows stay readable (0.670 at W=5), while a
    one-second *forward* displacement drops to 0.246.
 
-**What is left is therefore behavioural coverage, not a new coordinate**: steps 2j to 2l below. It is
+**What is left is therefore behavioural coverage, not a new coordinate**: steps 2j to 2n below. It is
 also the condition under which the published frame-conditioned motion decoder becomes runnable here
 rather than in the blinded variant F64 forced on us.
 
@@ -352,6 +352,8 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 | 2j | **Behavioural coverage on both robots** | turning, stopping/starting and lateral motion, so that more than one channel of body twist varies. Today lateral is **zero in every B1 clip** and yaw rate is a constant per policy, which is why a shared head can align exactly one axis | open — **the blocker**; collection on both sides, then retrain |
 | 2k | **Re-test the published motion decoder** | with several futures available from one state, a still no longer answers the question, so the frame-conditioned head (F64, −10.5 today) should become runnable and the forward model should move | open, follows 2j |
 | 2l | **Recollect B1** | 14 clips with 5 held out is the limit on every quadruped number, and any new behaviour has to be recorded there too | open — cheapest item, and 2j needs it anyway |
+| 2m | **Balance the data, not just the sampler** | after `clips_per_body hexapod=7` the training set is still **2.43:1 in frames** (2,780 against 1,143), and `balance_embodiments` closes that by repeating the B1 about 2.4 times an epoch. Repetition is not data: it invites memorisation on a validation split too small to detect it, which `config.py` already warns about. **Collect more B1 rather than capping the hexapod further** -- capping throws away bodies, and F13 says bodies are what matters | open, rides with 2l |
+| 2n | **Make the measurement read the same data as training** | `body_motion_probe.py` and `plot_z_umap.py` read the whole directory and see **5.9:1**, where training sees 2.43:1. The probe fits each embodiment separately so its numbers are unaffected, but the UMAP layout is dominated by the larger set and every quoted ratio has to say which of the two it means. One data-selection path for both | open — do it *after* the current deck is presented, since it moves the quoted numbers |
 | 2i | **Training window** | is one timestep the right pair to train the forward model on? | **no** — at 20 Hz, `t → t+1` is 50 ms, a nineteenth of a 0.95 s stride. In-domain, stride-scale pairs roll better at every multi-step horizon (F54). Acting on this means retraining, so it is a finding rather than a change already made | open |
 
 > **Data quality — read before trusting any pre-2026-08-07 number.**

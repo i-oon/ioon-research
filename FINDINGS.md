@@ -3760,12 +3760,24 @@ out **by clip** reads **AUC 1.000** on raw `z` and **0.441 / 0.459** once each e
 standardised -- which is the representation the probe measures in. So the transfer results are not
 identity leaking through a linear channel.
 
-**But "one cloud, shifted" overstates it.** A UMAP of the same standardised features still places
-the two robots in visibly different regions (`results/wm/stage2/figures/z_umap.png`, middle column).
-Standardising removes what a *linear* probe can use; it does not merge the manifolds. The honest
-statement is **linearly inseparable, still geometrically distinct** -- and the AUC values sitting a
-little below 0.5 are consistent with an estimate made from 5 held-out B1 clips, not with an inverted
-signal.
+**But "one cloud, shifted" overstates it, and this is now measured rather than read off a picture.**
+`scripts/diagnostics/identity_linearity.py` runs three classifiers on the same features:
+
+| classifier | raw `z` | standardised |
+|---|---|---|
+| linear (logistic) | 1.000 | **0.460** |
+| nonlinear (random forest) | 1.000 | **0.999** |
+| nonlinear (MLP) | 1.000 | **1.000** |
+
+**Standardising removes identity from what a straight line can use, and from nothing else.** The
+UMAP was right to show the robots apart. Two things follow, and they must be kept apart: the probe's
+transfer numbers are trustworthy, because a linear ridge cannot exploit what a linear classifier
+cannot find; and **no claim of the form "the latent forgets the body" is available to us**, because
+a nonlinear reader recovers the robot exactly.
+
+This is the `center_embeddings` lesson again -- subtracting each robot's mean embedding let the
+online probe climb back to 1.000 within 25 epochs. First and second moments are not where identity
+lives.
 
 (An earlier version of this check reported 0.212, below chance. It split folds by *frame*, and
 neighbouring frames of one clip are near-duplicates. Splitting by clip is the fix.)
@@ -4042,6 +4054,13 @@ and "there was nothing there to align".
 `head` as a position and no orientation, so the hexapod has no measured body attitude. Adding it is
 a few lines at collection time and a full recollection to use.
 
+**And the balance is not what it is usually described as.** With `clips_per_body hexapod=7` the
+training set is **2,780 hexapod frames against the B1's 1,143 -- 2.43:1**, not equal. What is equal
+is *gradient steps*: `balance_embodiments` repeats the B1 about 2.4 times an epoch. `config.py`
+already carries the warning ("balancing the sampler is not balancing the data") and it applies here.
+Separately, the probe and the UMAP read the **uncapped** directory and see **5.9:1**, so any quoted
+ratio has to say which of the two it means. Steps 2m and 2n.
+
 ---
 
 ## Files
@@ -4049,6 +4068,8 @@ a few lines at collection time and a full recollection to use.
 - `data/ik_walk_speed7` -- five constant speeds plus both ramp directions, 91 clips (F60)
 - `scripts/diagnostics/body_head_ablation.py` -- zero `z` or zero the frame on a trained body head
   and see which input the loss actually depends on (F64)
+- `scripts/diagnostics/identity_linearity.py` -- linear against nonlinear classifiers on raw and
+  standardised `z`; shows standardising hides identity from a straight line only (F66)
 - `scripts/diagnostics/channel_screen.py` -- score each body-motion channel at two timescales
   against F69's three gates; the evidence that more behaviour is needed (F70)
 - `scripts/diagnostics/target_window_sweep.py` -- is a candidate motion target readable from a
