@@ -256,25 +256,47 @@ earned result rather than an artefact of the data.
 > **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
 > cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
 
-**Where this stands, 2026-08-18.** Stage 1 is finished and retrained clean. Stage 2's two original
+**Where this stands, 2026-08-19.** Stage 1 is finished and retrained clean. Stage 2's two original
 goals — a head that fits cheaply on a new robot, and a forward model that predicts on it — are both
 met, the second by few-shot adaptation rather than frozen transfer.
 
-**A third goal opened and is now partly met: the latent was not shared, and it can be.** Slide 14
-measured the trunk acting as a switch; F55 named the cause (nothing in the loss ever asks one `z`
-to mean the same thing on both robots) and F56 showed why the obvious fix is unavailable (the two
-gaits have different numbers of degrees of freedom, so no frame-level pairing exists). The route
-that worked is a **body-motion head shared by both embodiments** (F58), trained on data where the
-insect's speed varies (F57) and varies *within* each clip (F60). Cross-embodiment body-speed
-transfer went from -5.6 to **+0.377 / +0.432**, against controls at -7.1 and -2.3.
+**A third goal opened, and is now met at one dimension.** The shared trunk acted as a switch rather
+than a common language (F55); no frame-level pairing exists to fix it the way Stage 1 was fixed
+(F56). What worked is a **body-motion head shared by both embodiments** (F58) on data where the
+insect's speed varies (F57, F60). Cross-robot speed transfer goes from **-7.08 to +0.54 / +0.68 /
++0.75** across three runs, against controls at -7.08 and -2.36, at **no measurable cost** at
+`lambda_body 0.1` (F65). Measured as direction agreement rather than R^2, the control reads
+**-0.01** and the treated runs **0.85 to 0.92** (F66).
 
-**It costs 56% on val motion**, the metric this deck reports as its headline, and `lambda_body` has
-never been swept — 0.5 was copied from `lambda_cross`. One seed on the ramped set; a second is
-running.
+**Reading the source paper properly (F67) reframes what to do next, and this is the current plan.**
+LAC-WM is not a rival result to beat -- it already showed latent conditioning beats explicit, and
+its Figure 2 is our control experiment. Three things follow:
 
-What is left is **evidence quality and scope**: confirm the ramped result on a second seed, sweep
-the loss weight to find whether the cost is necessary, one Stage-1 baseline never run (1e), and one
-decision no measurement can make (below).
+1. **Its motion labels are 10 to 147 dimensions; ours is 1.** Per-embodiment output heads are not
+   the divergence -- their label sizes differ per dataset too. **The divergence is the coordinate**:
+   they decode into a shared physical space (wrist poses, fingertip positions), we decode into
+   body-specific joint angles, which have no common referent across robots.
+2. **The obvious richer coordinate is the foot, and our own measurements rule it out (F69).** A
+   foot's motion splits into the part that is body speed rewritten -- which adds nothing we do not
+   already have -- and the gait itself, which F41b measured transferring at **0.373, below chance**.
+   Duty factor fails the other way, nearly identical on both robots (0.533 against 0.515) and so
+   carrying nothing to learn. **What a hexapod and a quadruped share is at body level, not leg
+   level.** The reason the shared head reached only one axis is that only one body channel *varies*
+   in our data: lateral speed is zero in every B1 clip and yaw rate is constant per policy.
+3. **Their target is a change between frames; ours was a state** a single frame supplies at R^2
+   0.676. That is why their frame-conditioned head fails here (F64) and, on the other side, why the
+   alignment left the forward model unmoved at 1.42x against 1.42x -- aligning something the frame
+   already gives cannot inform a model that sees the frame. **F68 measured which target form fixes
+   this and it is not their chunking**: short windows stay readable (0.670 at W=5), while a
+   one-second *forward* displacement drops to 0.246.
+
+**What is left is therefore behavioural coverage, not a new coordinate**: steps 2j to 2l below. It is
+also the condition under which the published frame-conditioned motion decoder becomes runnable here
+rather than in the blinded variant F64 forced on us.
+
+**Two scope limits that no amount of retraining fixes.** The B1 side is **14 clips, 5 held out** --
+every quadruped number rests on that, and recollecting is the cheapest improvement available. And
+step 1e, the EAC-WM analogue baseline, is still never run; §9 lists it as required.
 
 **The one decision left: is a single robot pair enough?** Everything cross-embodiment rests on
 insect ↔ B1. A third embodiment would test whether the result generalises, and the natural axis is
@@ -327,6 +349,9 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 | 2f | **Forward model across robots** | can a planner's forward model survive the change of robot? | done — **not frozen** (0.57–0.71x, worse than predicting no motion) and coverage does not fix it (5–8% against the decoder's 3.9x). Not architectural: trained on both robots it rolls the B1 at 1.34–1.53x (F51) | done |
 | 2g | **Few-shot adaptation of the forward model** | how few target clips does adapting one take, and is insect pretraining worth anything? | done — **one clip clears break-even, nine clear every horizon tested; ~7x fewer clips than from cold**, and the two curves separate rather than converge (F52, slide 16) | done |
 | 2h | **Control: dynamics or manifold?** | is the pretraining advantage learned locomotion, or just familiarity with V-JEPA2's feature space? | done — **both, and they separate**. Frozen, real time order beats shuffled on the B1 by 1.38x at one step; after a thousand adaptation steps the two are identical. Dynamics transfer but are overwritten; the foothold in the shared representation is what buys the 7x (F54) | done |
+| 2j | **Behavioural coverage on both robots** | turning, stopping/starting and lateral motion, so that more than one channel of body twist varies. Today lateral is **zero in every B1 clip** and yaw rate is a constant per policy, which is why a shared head can align exactly one axis | open — **the blocker**; collection on both sides, then retrain |
+| 2k | **Re-test the published motion decoder** | with several futures available from one state, a still no longer answers the question, so the frame-conditioned head (F64, −10.5 today) should become runnable and the forward model should move | open, follows 2j |
+| 2l | **Recollect B1** | 14 clips with 5 held out is the limit on every quadruped number, and any new behaviour has to be recorded there too | open — cheapest item, and 2j needs it anyway |
 | 2i | **Training window** | is one timestep the right pair to train the forward model on? | **no** — at 20 Hz, `t → t+1` is 50 ms, a nineteenth of a 0.95 s stride. In-domain, stride-scale pairs roll better at every multi-step horizon (F54). Acting on this means retraining, so it is a finding rather than a change already made | open |
 
 > **Data quality — read before trusting any pre-2026-08-07 number.**
@@ -1076,7 +1101,10 @@ ablation, not an assumption.**
 - **What we beat**: training from scratch per morphology (no transfer)
 - **Metric**: sample efficiency on medium leg — with vs. without pretrained FTM
 - No existing locomotion cross-morphology baseline → comparison is transfer vs. no-transfer
-- LAC-WM baseline (EAC-WM) is manipulation-only, cannot port directly
+- LAC-WM baseline (EAC-WM) is manipulation-only, cannot port directly. **Note the structural
+  resemblance**: EAC-WM is defined by per-embodiment action encoders, and our Stage 2 has
+  per-embodiment output heads inside pretraining. The difference that matters is the *coordinate*
+  those heads decode into, not their existence -- see F67 and step 2j.
 - **AMP (RL-trained per-body controller), as a negative-result baseline**: documents that a plausible
   alternative to vision-latent + IK ground truth (train a policy per body against a shared gait prior)
   was tried and produced worse, less coordinated behaviour than the IK route — supports the case for the
@@ -1084,6 +1112,28 @@ ablation, not an assumption.**
   (`PROGRESS.md` §13, `results/dataset/amp_failed/`).
 
 ---
+
+### The source method, read from the paper (F67)
+
+The full text is `doc/LATENT ACTION ROBOT FOUNDATION WORLD MODELS FOR CROSS-EMBODIMENT ADAPTATION.pdf`.
+Read it before writing anything that characterises the method; earlier text in this repo was written
+from a summary and got three things wrong.
+
+- **It has an alignment term.** `L = λ_recon·L_recon + λ_motion·L_motion`, where the motion decoder
+  is an auxiliary loss whose stated purpose is mitigating shortcuts. Its Figure 2 shows the latent
+  space is **disjoint by dataset without it** -- the same experiment as our `lambda_body` control.
+- **Motion labels are per-dataset and large**: Droid **10**-D, Agibot **29**-D, EgoDex **147**-D
+  (9-D wrist pose plus 60 finger-keypoint dimensions per hand, plus 9-D camera pose). So different
+  output widths per embodiment is *their* design too, not our divergence.
+- **`z` is split evenly**: first half decodes the end-effector pose, second half the camera pose.
+- **Actions are chunked into 5-step sequences** before training.
+- **The motion decoder sees the current frame** (`â_t = MD(x_t, z_t)`, `z_t` as a cross-attention
+  query over its visual tokens). Safe there because the target is a *delta*; unsafe for a state
+  target, which is F64.
+- **Per-embodiment mapping happens at finetuning**, via an action projector (raw action → latent),
+  trained in three LoRA stages after `z` is already shaped.
+- **Cross-augmentation** (two independent augmentations, IDM on one pair, FDM predicting the other)
+  -- we already do this.
 
 ### Notes from ICLR reviews of LAC-WM
 - **V-JEPA2 pixel decoder**: not included in V-JEPA2 — must be trained separately if needed for pixel-space output.

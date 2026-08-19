@@ -951,9 +951,11 @@ the second and not the first.
 the range the training bodies span. On `c06f06t06`, whose morphology axis the training set never
 demonstrates, the same flag makes transfer **1.35x worse** than the control.
 
-**Scope against the source method.** LAC-WM has no term like this; the shared latent space is
-meant to emerge from sharing the modules across embodiments. Its setting probably does not need
-one: the shortcut this term closes -- recognise the body, recall its commands -- only pays when
+**Scope against the source method.** LAC-WM has no *cross-decoding* term like this. **Corrected by
+F67**: the sentence that stood here said its shared latent space "is meant to emerge from sharing
+the modules across embodiments", and that is wrong -- LAC-WM's motion-decoding loss is an explicit
+alignment term, and its own Figure 2 shows the space is disjoint without it. What LAC-WM lacks is
+this term, not any term. Its setting probably does not need this one: the shortcut this term closes -- recognise the body, recall its commands -- only pays when
 knowing the body tells you the command, and in LAC-WM's data one robot performs thousands of
 different manipulations. In ours each body performs exactly one behaviour, so body identity is
 nearly the whole answer. This is an addition for the **cross-morphology** regime, not a correction
@@ -3217,7 +3219,9 @@ encoder's 0.750: training now *preserves* B1 body speed where before it destroye
 without the data has nothing to learn from.
 
 **What it costs.** Val motion 0.0245 -> 0.0367, **+50%** on the metric slide 14 reports. Val recon
-is unchanged, 1.5990 -> 1.6040.
+is unchanged, 1.5990 -> 1.6040. **Superseded by F65**: at `lambda_body 0.1` the cost is -2 percent
+with the transfer unchanged within seed spread, so this is the weight's price and not the
+mechanism's.
 
 **The embodiment probe stops saturating.** The control reaches 1.000 by epoch 32 and stays; the
 `L_body` run plateaus at 0.954-0.963 and never closes. First thing in Stage 2 to hold it below 1.0
@@ -3346,8 +3350,8 @@ identical data, differing in this one term, and sits at -7.102.
 
 **Costs and caveats.**
 
-Val motion 0.0166 -> 0.0259, **+56 percent** on the metric the deck reports as its headline. Same
-trade as the constant set, not worse.
+Val motion 0.0166 -> 0.0259, **+56 percent** on the metric the deck reports as its headline.
+**Superseded by F65**: this is the cost at `lambda_body 0.5`; at 0.1 it is -2 percent.
 
 **One seed on `speed7`**, and `insect->b1` is precisely the cell that has already flipped once. A
 second seed is running.
@@ -3632,11 +3636,371 @@ ported over: the port was tried, and it fails here for a reason specific to loco
 
 ---
 
+### F65. The 56 percent cost was the loss weight, not the mechanism -- and the probe is the noisy part
+
+F58 and F60 reported `lambda_body 0.5` costing **+55 percent on validation motion**, and called it
+the trade the mechanism demands. It was not. 0.5 was copied from `lambda_cross`, where it works in
+Stage 1, with no argument that it should transfer to a different loss on a different target.
+
+Swept at `lambda_body 0.1`, everything else identical, same control (`stage2speed7ctrl`, epoch 60):
+
+| | val recon | val motion | cost | body loss, train | held out |
+|---|---|---|---|---|---|
+| control | 1.5608 | 0.0167 | -- | -- | -- |
+| λ=0.5 | 1.5655 | 0.0259 | **+55%** | 0.1010 | 0.705 |
+| **λ=0.1** | **1.5603** | **0.0164** | **-2%** | 0.1032 | **0.668** |
+
+**A fifth of the weight reaches the same body loss at no measurable cost**, and validation recon and
+motion both land marginally *better* than the control. The mechanism is close to free at the right
+weight.
+
+**But the transfer numbers are noisier than they look, and this nearly produced a false claim.**
+The first reading was "λ=0.1 improves alignment as well" -- +0.675 against λ=0.5's +0.544. Then seed
+1 of λ=0.5 landed at **+0.749**:
+
+| | insect->b1 | b1->insect |
+|---|---|---|
+| control | -7.083 | -2.357 |
+| λ=0.5 seed 0 | +0.544 | +0.435 |
+| λ=0.5 seed 1 | **+0.749** | **+0.704** |
+| λ=0.1 seed 0 | +0.675 | +0.624 |
+
+**λ=0.1 sits inside λ=0.5's own seed spread.** One seed cannot separate the weights on transfer, and
+claiming it did would have been reading noise.
+
+**Where the pipeline is and is not seed-stable:**
+
+| metric | spread across two seeds |
+|---|---|
+| val total | **0.7%** |
+| val recon | **0.9%** |
+| val motion | 14% |
+| **probe `insect->b1`** | **27%** |
+
+Training is stable to under a percent. The probe is not, because it is a *downstream* measurement of
+a property nothing directly optimises -- a fresh ridge fitted on `z` and applied across robots, where
+small differences in the latent's geometry become large differences in transferability.
+
+**The effect still dwarfs it.** Control-to-treatment on the probe is **7.6**; the seed spread is
+**0.20**, a factor of 38. So *"the term makes body speed transfer"* is far outside seed variance.
+*"This weight beats that weight"* is not, and needs a second seed before it is claimed.
+
+**What to report.** The range across seeds -- `insect->b1` **+0.54 to +0.75** -- not a single run.
+And the cost as a property of the weight, with λ=0.1 as the operating point, since it is a
+within-seed comparison against a shared control and therefore does not suffer the same problem.
+
+**Still one seed at λ=0.1.** The zero cost is the only thing separating the two weights, and it has
+not been reproduced.
+
+---
+
+### F66. Correlating the two readouts' *predictions* is the stable statement; correlating their weights is chance
+
+F65 left the probe as the noisy part -- `insect->b1` moving 27 percent across two seeds whose
+training metrics move under one. The R^2 cells are a harsh way to ask the question: a readout is
+fitted on one robot and applied to the other, so it is charged for scale and offset on top of
+direction, and it is unbounded below, which is why the control reads **-7.083** with no way to say
+how bad that is.
+
+`body_motion_probe.py` now also reports **agreement**: fit a readout on each robot separately, run
+both over the same frames, correlate the outputs. Bounded, symmetric, and blind to the scale and
+offset R^2 punishes.
+
+| | insect->b1 R^2 | b1->insect R^2 | **agreement** |
+|---|---|---|---|
+| frozen encoder | -0.046 | +0.131 | **0.313** |
+| control (λ=0) | -7.083 | -2.357 | **-0.014** |
+| λ=0.5 seed 0 | +0.544 | +0.435 | **0.845** |
+| λ=0.5 seed 1 | +0.749 | +0.704 | **0.915** |
+| λ=0.1 seed 0 | +0.675 | +0.624 | **0.898** |
+
+**Two things become sayable that R^2 could not say.**
+
+The control's -7.083 becomes **-0.014**: the two robots' speed readouts are *uncorrelated*. Not
+inverted, not distorted -- unrelated. And the frozen encoder's -0.046 becomes **0.313**: V-JEPA2
+already leaves a partial shared ordering, which a single linear readout simply cannot exploit. Both
+are more precise claims than "no transfer", and neither was available from a number with no floor.
+
+**It is meaningfully more stable, but it does not rescue the weight comparison.** Across the two
+λ=0.5 seeds the spread is **8 percent** of the mean against R^2's 32 -- a factor of four -- yet the
+*ordering* survives (0.845 < 0.898 < 0.915 against 0.544 < 0.675 < 0.749). Since both metrics rank
+the three runs identically, part of the seed gap is a real difference in the latent's geometry, not
+only readout brittleness. **λ=0.1 still sits inside λ=0.5's seed spread on this metric too**, so
+F65's refusal to separate the weights stands, now on the measurement better suited to it.
+
+**Comparing the fitted weight vectors directly does not work, and was the first thing tried.** `z`
+is 64-D and heavily correlated, so a ridge's coefficients are not identified -- most of their norm
+lies in low-variance directions that barely move a prediction. Measured that way every run sat at
+chance, **0.014 to 0.085**, including the run with the best transfer of all:
+
+| | insect->b1 R^2 | |cos(w_A, w_B)| |
+|---|---|---|
+| control | -7.083 | 0.085 |
+| λ=0.5 seed 0 | +0.544 | 0.054 |
+| λ=0.5 seed 1 | **+0.749** | **0.014** |
+
+A readout that transfers at +0.749 cannot be built on an axis orthogonal to the other robot's. That
+contradiction is what exposed the error. Correlating predictions instead weights each direction by
+how much the data varies along it, so the unidentified part drops out.
+
+**General form: to ask whether two fitted models agree, compare what they predict, not what they
+weigh.** In any correlated feature space the parameters carry a large component the predictions
+never see.
+
+**Two corrections that fell out of reporting `r` beside R^2.**
+
+*The asymmetry between the two directions was mostly calibration.* `b1->insect` moves 0.435 -> 0.704
+across seeds, 62 percent, while its `r` moves **0.852 -> 0.863**, 1.3 percent. The direction is the
+most stable quantity in the whole table; the swing is gain and offset. The sentence above that reads
+"part of the seed gap is a real difference in the latent's geometry" holds for `insect->b1` (r 0.743
+-> 0.879) and **not** for `b1->insect`.
+
+*Embodiment identity is **linearly** carried by the per-feature mean and scale.* A classifier held
+out **by clip** reads **AUC 1.000** on raw `z` and **0.441 / 0.459** once each embodiment is
+standardised -- which is the representation the probe measures in. So the transfer results are not
+identity leaking through a linear channel.
+
+**But "one cloud, shifted" overstates it.** A UMAP of the same standardised features still places
+the two robots in visibly different regions (`results/wm/stage2/figures/z_umap.png`, middle column).
+Standardising removes what a *linear* probe can use; it does not merge the manifolds. The honest
+statement is **linearly inseparable, still geometrically distinct** -- and the AUC values sitting a
+little below 0.5 are consistent with an estimate made from 5 held-out B1 clips, not with an inverted
+signal.
+
+(An earlier version of this check reported 0.212, below chance. It split folds by *frame*, and
+neighbouring frames of one clip are near-duplicates. Splitting by clip is the fix.)
+
+**What to report.** Agreement as the headline -- **-0.014 for the control against 0.85 to 0.92 with
+the term** -- with the R^2 cells kept beside it as the practical question of whether one robot's
+readout can be *used* on the other, and `r` beside those to say which part of a weak cell is
+direction and which is calibration.
+
+**Spearman was measured and dropped.** It tracked Pearson within 0.013 on every run, so the
+straight-line assumption costs nothing and the column was not worth carrying.
+
+---
+
+### F67. Read against the source paper: our architecture is the *baseline* it beats, plus a patch
+
+The comparison in F24 and F64 was made against a summary of LAC-WM, not the text. Read properly
+(`doc/LATENT ACTION ROBOT FOUNDATION WORLD MODELS FOR CROSS-EMBODIMENT ADAPTATION.pdf`, ICLR 2026
+submission), three things stated here were wrong and one was right for a better reason than the one
+given.
+
+**Wrong 1: "LAC-WM has no alignment term."** It has exactly one, and it is the same shape as ours:
+
+> "LAC-WM uses continuous latent actions and mitigates shortcuts through an **auxiliary motion
+> decoding loss**" -- `L = λ_recon·L_recon + λ_motion·L_motion`
+
+And its Figure 2 is our control experiment: "IDM trained **without** the motion decoder (MD), where
+Agibot and Egodex cluster together but separate from Droid." **No auxiliary head, disjoint space.**
+That is `stage2speed7ctrl` at r = -0.048, arrived at independently.
+
+**Wrong 2, then wrong again in the other direction.** The first version of this entry said their MD
+never emits different-dimensional output and concluded our per-embodiment heads were the whole
+divergence. Appendix A.2 says otherwise:
+
+> "In **Droid**, it is **ten-dimensional** for a single arm... In **Agibot**, the end-effector pose
+> has **twenty dimensions**, ten per hand... In **EgoDex**, the end-effector pose includes the
+> nine-dimensional wrist pose **plus sixty dimensions representing finger positions**... for a total
+> of **138 dimensions** for both hands."
+
+Ten, twenty-nine and one hundred forty-seven (with the 9-D camera pose). No single MLP emits all
+three, so the MD **must** carry per-dataset output structure. The paper never describes it; the
+dimensionalities force it. So having per-embodiment output heads is *not* what separates us from
+LAC-WM, and the "we built EAC-WM" reading is too strong.
+
+**What actually separates us is the coordinate the heads predict, not their number or size.**
+
+| | their per-dataset outputs | ours |
+|---|---|---|
+| quantity | wrist pose, fingertip positions, camera pose | **joint angles** |
+| coordinate | 3-D position and rotation in a common physical frame | **body-specific joint space** |
+| shared meaning across bodies | **yes** -- a fingertip at (x,y,z) means the same thing for a human hand and a robot hand | **no** -- "leg 3 TC angle" has no referent on a B1 |
+
+Different *counts* of the same physical quantity is their entire setup: one arm, two arms, two hands
+with fingers. Different *quantities* is ours. **A shared trunk can align representations whose heads
+differ in width; it cannot align heads whose outputs have no common referent.**
+
+Their labels are also far richer than ours -- 10 to 147 dimensions against our **one**. The claim in
+F66 that a one-dimensional target aligns one direction is not a limitation of the method; it is what
+we asked for.
+
+**Wrong 3: "the unified coordinate is their main target."** It is not. `L_recon`, next-frame
+prediction, carries the task; the MD is auxiliary and its stated purpose is to *mitigate shortcuts*,
+with alignment as the demonstrated consequence. Gait-level detail in their setting survives in `z`
+through frame prediction, not through the motion label.
+
+**Right, for a better reason: the frame-conditioned head (F64).** Their MD *does* see the frame --
+"`z_t` serves as a query in a cross-attention module over visual tokens extracted from the current
+frame", `â_t = MD(x_t, z_t)` -- which is the design that scored -10.5/-57.2 for us. The paper never
+states the condition under which that is safe, because it never has to: **its target is a delta**
+("**delta** human hand poses, robot end-effector actions, and camera motion"), and a single still
+cannot supply a delta. Ours is a *state* a still supplies at R^2 0.676. So F64's rule is not a
+deviation from the paper; it is the hidden precondition the paper satisfies for free.
+
+**They also measure it with UMAP, on 7,000 embeddings from three datasets.** Our own note above --
+that a UMAP read as cleanly separated while the silhouette was +0.140 -- applies to that evidence
+too, and the `r`/agreement numbers in F66 are a quantity their figure does not report.
+
+**The "sufficiency" argument made here first was wrong and is withdrawn.** It said manipulation has
+a unified label that nearly determines the task while locomotion does not, so their recipe cannot
+port. But a 7-DoF arm reaching a 6-DoF pose has a null space too, and EgoDex's label includes every
+fingertip -- they did not discard the fine articulation, they *labelled* it. The asymmetry was an
+artefact of comparing their 147-dimensional label to our one-dimensional one.
+
+**What the port actually requires** -- **items 1 to 3 are withdrawn by F69**, which measures that
+the foot coordinate adds only the part that does not transfer, and that the binding constraint is
+behavioural coverage rather than the choice of coordinate. Item 4 stands:
+
+1. **The shared coordinate for locomotion is foot position, normalised by leg length.** Their
+   end-effector is where the body touches the world; ours is the feet. Six feet against four is the
+   same kind of mismatch as one arm against two hands.
+2. **The normalisation is the step locomotion adds.** Their robots are of comparable size; ours have
+   hip heights of 0.13 m and 0.56 m, so raw foot positions announce the embodiment and walk straight
+   into F64. Dividing by leg length is the same move Froude makes for speed.
+3. **Their `z` is split -- "the first half decodes the end-effector pose, and the second half decodes
+   the camera pose".** The locomotion counterpart is feet in one half and body twist in the other:
+   end-effector maps to feet, camera pose maps to how the body itself moves.
+4. **F64 is the precondition they satisfy for free** (their target is a delta; ours is a state).
+
+Every measurement in F58-F66 stands. What moves is that they describe **the joint-angle-target
+version** of the pipeline, which the plan now supersedes.
+
+---
+
+### F68. Chunking does not turn our target into a delta -- looking *forward* does
+
+F67's plan said to copy LAC-WM's 5-step action chunking so our motion target would stop being a
+state a single frame supplies. **Measured before spending a retrain on it, and the premise is
+wrong.** `scripts/diagnostics/target_window_sweep.py` fits a readout from **one frame's** frozen
+embedding to the forward speed averaged over W steps:
+
+| read from one frame, R^2 | W=1 | W=2 | **W=5** | W=10 | **W=20 (1 s)** |
+|---|---|---|---|---|---|
+| insect | 0.627 | 0.645 | **0.670** | 0.595 | **0.246** |
+| b1 | 0.491 | 0.480 | **0.420** | 0.295 | **0.361** |
+
+**Shorter windows are no harder to read from a still, and for the insect they are slightly easier.**
+The reasoning that made chunking look right is a manipulation intuition: a still of an arm says
+little about where the gripper goes next. A still of a *walking* robot shows the leg configuration,
+which is most of the gait phase, which largely fixes the instantaneous velocity. Locomotion leaks
+short-horizon motion into a single frame in a way manipulation does not.
+
+**What does change it is the direction of the window, not its length.** Today's target is body speed
+smoothed over one second **centred** on the frame -- frames t-10 to t+10 -- and reads **0.676**. The
+same one-second span taken **forward** from the frame, `(x[t+20] - x[t]) / 20dt`, reads **0.246**.
+The frame sits at the start of the window instead of its middle, so it stops being half the answer.
+
+**Both halves of the condition, and a forward horizon passes both.** F64 requires the target to be
+unrecoverable from the head's other inputs; it equally requires the target to be recoverable from
+`z`, or the auxiliary loss adds noise rather than a constraint. Reading the same targets out of a
+trained `z` (`--ckpt stage2speed7body`):
+
+| R^2 | | W=1 | W=2 | **W=5** | W=10 | **W=20** |
+|---|---|---|---|---|---|---|
+| insect | frame | 0.627 | 0.645 | **0.670** | 0.595 | **0.246** |
+| insect | **z** | 0.539 | 0.557 | **0.611** | 0.664 | **0.422** |
+| b1 | frame | 0.491 | 0.480 | **0.420** | 0.295 | **0.361** |
+| b1 | **z** | 0.610 | 0.609 | **0.578** | 0.464 | **0.538** |
+
+At the source method's 5-step chunk the frame beats `z` on the insect (0.670 against 0.611); at a
+one-second forward horizon `z` leads by 0.18 on both robots.
+
+**That comparison is much weaker evidence than it first looks, and the first version of this entry
+oversold it.** `z = ITM(e_t, e_{t+1})` is built from **two** frames. On any forward-looking target it
+therefore holds information a single frame cannot have, so `z > frame` is close to tautological and
+says little about whether the target is a good one. Add that the two feature spaces have different
+widths (64 against 5,632), that this is one seed of one checkpoint, and that `z` explains only 0.42
+and 0.54 in absolute terms, and the margin cannot carry a claim on its own.
+
+**The measurement F64 actually calls for is incremental**, because the head receives the frame and
+`z` *together* and can use both: does the frame add anything **on top of** `z`? No gain means
+nothing to shortcut to; a large gain means the shortcut survives however far ahead `z` is. That is
+`source = z+frame` in the same script, and it is the number to quote.
+
+> **Caveat, and it needs fixing before this is quoted.** `W` counts steps, and the two robots run at
+> different rates -- 0.05 s for the hexapod, 0.02 s for the B1. **W=20 is 1.0 s of insect and 0.4 s
+> of B1**, so the columns are not time-matched across rows. The trend within each robot stands; the
+> cross-robot comparison at a fixed W does not. Re-run matched by seconds, or by fraction of a
+> stride, before this number goes in a thesis.
+
+**Consequence for the plan.** Step 2l ("chunk actions to 5 steps") is withdrawn as stated.
+**Superseded by F69**: choosing a horizon by the `z`-minus-frame margin is also the wrong lever --
+the constraint is that only one shared *behaviour* varies in our data, not how the target's window
+is shaped.
+
+---
+
+### F69. What the two robots share is at body level, and only one channel of it varies
+
+F67 proposed decoding **foot geometry** as the locomotion analogue of LAC-WM's end-effector, and F68
+proposed reshaping the target's time window. Both were arguments from the source paper's structure.
+Checked against measurements this project already had, **the coordinate was never the binding
+constraint** -- and the foot proposal is contradicted by our own data.
+
+**Three gates a shared auxiliary target has to pass**, assembled from four separate measurements
+that were each made for another purpose:
+
+| candidate | does it vary? | does it hide the robot? | does its variation mean the same thing on both? | |
+|---|---|---|---|---|
+| duty factor | **no** -- 0.533 against 0.515 (F45) | yes | -- | fails |
+| lateral speed | yes | **no** -- AUC 0.788 | -- | fails |
+| which leg is loaded | yes | yes | **no** -- transfers at **0.373**, below the frozen encoder's 0.531 and below chance (F41b) | fails |
+| **forward Froude** | **yes** | **yes** | **yes** -- agreement 0.85 to 0.92 (F66) | **passes** |
+
+We screened these one at a time over months without noticing we were applying a single rule. Only
+one quantity we own passes it.
+
+**Why the foot target fails, in terms of the same gates.** Foot motion in body frame splits in two:
+
+| part | what it is |
+|---|---|
+| stance feet move backward at body speed ÷ leg length | **body speed rewritten** -- nothing beyond `lambda_body` |
+| which foot is in stance when | **the gait**, which is the 0.373 row above |
+
+**Everything a foot target adds beyond body speed is exactly the part measured not to transfer.**
+The B1 trots and the insect walks a six-leg wave, so a per-leg readout fitted on one is
+systematically wrong on the other. This is F45's structural argument arriving from a third
+direction: coarsen a leg-level label enough to describe both robots and you have destroyed what made
+it meaningful.
+
+**So the shared head reached one axis for a reason that has nothing to do with coordinates.** Body
+twist is six-dimensional in principle. In our data:
+
+| channel | status |
+|---|---|
+| forward speed | varies -- five speeds plus ramps |
+| lateral speed | **zero in every B1 clip** |
+| yaw rate | **constant per policy** |
+| acceleration | only at each clip's start and stop |
+
+**Five of six channels are constants.** A shared head trained on that can align exactly one
+direction, which is what it did. There was never more available to align.
+
+**The blocker is behavioural coverage, and clearing it also unlocks the published mechanism.** With
+one behaviour, the current state fixes the future, so `z` holds nothing a single frame lacks -- which
+is why F64 forced us to blind the head, and why the alignment left the forward model at 1.42x
+either way. Give one state several possible futures and the frame can no longer say whether the
+robot is about to turn, stop or accelerate. **Then the frame-conditioned decoder LAC-WM publishes
+should run here as written**, instead of in the blinded variant we had to build.
+
+**Withdrawn by this entry**: F67's foot-coordinate proposal and F68's "pick a horizon by the
+`z`-minus-frame margin". Both measured the wrong lever. The window sweep in F68 stands as a
+description of the target -- short windows stay frame-readable, forward ones less so -- but it is not
+the fix.
+
+---
+
 ## Files
 
 - `data/ik_walk_speed7` -- five constant speeds plus both ramp directions, 91 clips (F60)
 - `scripts/diagnostics/body_head_ablation.py` -- zero `z` or zero the frame on a trained body head
   and see which input the loss actually depends on (F64)
+- `scripts/diagnostics/target_window_sweep.py` -- is a candidate motion target readable from a
+  single frame, swept over window length and direction (F68)
+- `scripts/diagnostics/body_motion_probe.py` -- cross-robot Froude readout; reports both
+  transfer R^2 and the seed-stable `agreement` between the two robots' readouts (F66)
 - `scripts/figures/plot_body_head_design.py` -- slide 19's three-panel figure: what we had, what
   failed, what works
 - `scripts/diagnostics/latent_rollout.py` -- rolls the forward model on its own output. Needs

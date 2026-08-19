@@ -656,9 +656,10 @@ can now check before spending the training run.
 ## Slide 14 — Stage 2: it transfers, but not by sharing a latent
 
 One ITM, forward model and decoder backbone shared across an **18-DOF hexapod and a 12-DOF
-quadruped**, with a per-embodiment output head. No cross-embodiment loss — the source method has
-none and claims the shared latent emerges from weight sharing alone. **That claim is what this
-slide tests.** Two seeds, balanced embodiments, `c08f09t09` withheld.
+quadruped**, with a per-embodiment output head. No cross-embodiment loss, and at this point we
+believed the shared latent would emerge from weight sharing alone. **That belief is what this slide
+tests — and slide 20 shows it was a misreading of the source method, which has an alignment term of
+its own.** Two seeds, balanced embodiments, `c08f09t09` withheld.
 
 | module | takes | returns | why it exists |
 |---|---|---|---|
@@ -919,23 +920,21 @@ latent — and ask which body the output resembles. `lambda_cross` makes Stage 1
 *frame's* body; without it, the latent's. **Stage 2 has no such term available**, for the reason in
 the first row.
 
-### The pairing cannot be fixed by finding a better label
+### Could a better label exist? No
 
-Anchor phase at front-left touchdown and ask where every other foot lands. Concentration is 1.0 for
-perfectly repeatable, 0.0 for uniform:
+Anchor on the front-left foot touching down, then ask how repeatably each other foot lands.
+**1.0 = locked to it, 0.0 = unrelated:**
 
-| B1 | | | hexapod | |
-|---|---|---|---|---|
-| FL | **1.00** | | FL | **1.00** |
-| RR | **1.00** | | ML | **0.22** |
-| FR | **0.99** | | HL | **0.09** |
-| RL | **0.99** | | HR | **0.07** |
+| B1 | | hexapod | |
+|---|---|---|---|
+| the other three legs | **0.99 – 1.00** | the other five legs | **0.22, 0.09, 0.07 …** |
 
-**One leg's phase fixes all four of the B1's legs and almost none of the insect's other five.** The
-B1 trots; the insect walks the variable wave of the real animal it was recorded from. Its gait
-state needs roughly six loosely coupled numbers where the B1's needs one, so **any low-dimensional
-label that describes the B1 completely must underdetermine the insect**. That is structural, not a
-search problem.
+**The B1 trots: one leg tells you all four.** The insect walks the drifting wave of the real animal
+it was recorded from: one leg tells you almost nothing about the rest.
+
+So the insect's gait needs about six loosely coupled numbers where the B1's needs one — and **any
+label small enough to describe the B1 exactly is too small to pin the insect down.** Structural,
+not a search problem.
 
 ### First we tried the data, and it did more than expected
 
@@ -968,10 +967,13 @@ explains why the source paper did not hit this: their datasets vary, ours did no
 readout scores **−7.1**, against the frozen encoder's near-zero.
 
 **That is the part the data cannot fix**, and it is where the loss has to do the work. `L_motion`
-supervises `z` through per-embodiment heads onto 18-D and 12-D joint commands with no
-correspondence between them, so nothing in the objective ever asks one latent to mean the same
-thing twice. LAC-WM's equivalent term targets an end-effector pose every arm shares; locomotion has
-no such quantity at leg level — but it does at body level, and that is slide 19.
+supervises `z` through per-embodiment heads onto 18-D and 12-D joint commands **with no
+correspondence between them** — "leg 3 TC angle" has no referent on a quadruped — so nothing in the
+objective ever asks one latent to mean the same thing twice.
+
+Body speed is the one quantity that does correspond, and slide 19 uses it. **Slide 21 shows it was
+the thin version of the right idea**: the source method's label is 10 to 147 dimensions where ours
+is one.
 
 ---
 
@@ -1005,41 +1007,214 @@ the head is not ignoring it; it is using a private code per robot.
 | | insect→insect | b1→b1 | **insect→b1** | **b1→insect** |
 |---|---|---|---|---|
 | frozen encoder | 0.676 | 0.753 | −0.046 | +0.131 |
-| control, no term | 0.664 | 0.167 | −7.083 | −2.357 |
-| **+ shared head** | **0.798** | **0.879** | **+0.544** | **+0.435** |
+| control, no term | 0.664 | 0.167 | **−7.083** | **−2.357** |
+| + shared head, λ=0.5, two seeds | 0.798 / 0.815 | 0.879 / 0.881 | **+0.544 / +0.749** | **+0.435 / +0.704** |
+| + shared head, λ=0.1 | 0.809 | 0.868 | **+0.675** | **+0.624** |
 
-**Both cross-robot directions turn positive**, against controls at −7.1 and −2.4, and all four cells
-beat the frozen encoder. Matched control, one flag apart, both scored at the same epoch.
+**Every run turns both directions positive**, against controls at −7.1 and −2.4. The seed spread is
+0.2 where the control-to-treatment gap is **7.6** — a factor of 38, so the effect is nowhere near
+seed noise, though the difference *between weights* is.
 
-**Val motion worsens 56%**, 0.0166 to 0.0259, and the forward model is untouched — 1.42x at one step
-in both arms. The term does one thing and pays for it in command accuracy.
+### R² is a harsh scorer, so two more numbers
 
-### Why blinding the head is a workaround, not the principle
+R² charges a readout for scale and offset on top of direction, and it has no floor — which is why
+the control reads −7.083 with no way to say how bad that is. Fitting a readout on **each** robot and
+correlating what they predict on the same frames asks only about direction:
 
-LAC-WM does not blind its motion decoder, and does not need to. **Their target is a *change*
-between two frames** — end-effector and camera pose deltas — and a single still cannot supply a
-change, so `z` is required whatever the head can see.
+| | insect→b1 R² | **agreement** |
+|---|---|---|
+| frozen encoder | −0.046 | **0.31** |
+| control, no term | −7.083 | **−0.01** |
+| shared head, three runs | +0.54 / +0.68 / +0.75 | **0.85 / 0.90 / 0.92** |
 
-**Ours is a state a still frame gives away.** The frozen encoder reads body speed at **R² 0.676**
-from one image, so the head has the answer before `z` says anything, and blinding it is the only
-way to make `z` matter.
+**The control's −7.083 becomes −0.01: the two robots' speed readouts are *unrelated*** — not
+inverted, not distorted. And the frozen encoder's −0.046 becomes 0.31, so a partial shared ordering
+was there before training and a single linear readout simply could not use it. Neither statement was
+available from a number with no floor.
 
-**That points at the real fix.** With richer behaviour — turning, strafing, changes of speed within
-a clip — a single frame stops determining what the robot is doing, and `z` is forced to carry the
-difference *by the task rather than by our architecture*. The shared head might then work
-frame-conditioned as LAC-WM's does, or become unnecessary.
+It is also the more stable measurement: **8% spread across seeds against R²'s 32%**. Where R² swings
+hardest — `b1→insect`, 0.435 to 0.704 — the direction barely moves (r 0.852 to 0.863), so that
+swing is calibration, estimated from the 5 held-out B1 clips.
 
-**One measurement decides it, and it is cheap**: can the frozen encoder read turn rate from a single
-frame? If not, the shortcut closes on its own. **Our B1 has no turning at all** — `vy` is zero in
-every clip and `vyaw` is a constant per policy — so testing it means new rollouts on both robots.
+### Where the two robots actually sit
 
-**What stands today:** the latent can be made to share meaning, we know what forces it, and we know
-why the source method's formulation does not port. **What is not settled** is whether the blinding is
-necessary or an artefact of a dataset with one behaviour in it.
+![z UMAP, control against shared head](../results/wm/stage2/figures/z_umap.png)
+
+**Left: `z` separates the robots perfectly, AUC 1.000.** Middle: standardising each robot's features
+drops that to chance — the identity a linear probe can use is entirely the per-feature mean and
+scale, so the transfer result above is not identity leaking through. The manifolds are still
+visibly distinct, so this is *linearly inseparable*, not merged.
+
+**The control is one clean island; with the shared head the quadruped breaks into pieces spread
+through the insect's structure.** This is the same comparison as the source paper's Figure 2, which
+shows its own latent disjoint by dataset when the equivalent term is removed.
+
+*(91 insect clips against 14 B1 — the layout is dominated by the larger set.)*
+
+**And the cost is a choice, not a property of the mechanism.** Against the same control, λ=0.5 costs
+**+55% on val motion** and λ=0.1 costs **−2%** — no measurable cost, with the transfer unchanged
+within seed spread. The 0.5 was copied from `lambda_cross`, where it works in Stage 1, for no
+reason that transfers.
+
+### It aligns the latent and leaves the forward model exactly where it was
+
+At matched epochs the rollout on B1 video reads **1.42x for the control and 1.42x with the shared
+head**. The alignment is real and the forward model does not move.
+
+**That is not a disappointment, it is the diagnosis.** The quantity we aligned is one the frozen
+encoder already reads from a *single frame* at **R² 0.676** — and the forward model sees that frame.
+Aligning something the frame already supplies cannot give the forward model information it lacked.
+
+Compare the one intervention that *did* move it: giving the insect five walking speeds bought
+**+7.9% on 24 of 24 comparisons**, because behavioural variety adds what no single frame determines.
+
+| what we changed | alignment | forward model |
+|---|---|---|
+| five walking speeds — data | flipped the decoder's switch | **+7.9%** |
+| shared body head — loss | **−7.08 → +0.75** | unchanged |
+| a target a still cannot supply — proposed | should reach more than one axis | should move |
+
+**So the target has to be something a frame does not already give away.** That is the same condition
+as the next section, arriving from the forward model's side instead of the head's.
+
+### So
+
+**The latent can be made to share meaning, and we know what forces it: a head that cannot tell the
+robots apart.** Blinding it is a workaround, though, not a principle — **slide 21 says what the
+principle is**, and the forward model above is why it matters.
 
 ---
 
-## Slide 20 — Conclusion: what was asked, and what the measurements say
+## Slide 20 — Read against the source paper: it is not a rival, it is the foundation
+
+**What we built was a defensible design choice, and it works** — a shared trunk with per-embodiment
+heads, plus a body-level term that makes the latent carry one meaning across two robots.
+
+**But it leaves two things unanswerable.** It is not comparable against the published baseline,
+because we never built either arm of that comparison. And with a target the frame already supplies,
+there is no way to say how far along the pipeline actually is — the forward model above is the
+evidence.
+
+So we went back to the paper. Reading it properly moves three things, and none of the measurements.
+
+### It has an alignment term, and its control experiment is ours
+
+`L = λ_recon·L_recon + λ_motion·L_motion` — the motion decoder is an **auxiliary loss**, and the
+paper's Figure 2 reports what happens without it: *"IDM trained without the motion decoder, where
+Agibot and EgoDex cluster together but separate from Droid."*
+
+**No auxiliary head, disjoint space.** That is our control at agreement −0.01, arrived at
+independently on two robots that share no task. **We do not need to prove latent beats explicit —
+they proved it, by 46.7%.** Our question is what the recipe needs in order to work here.
+
+### Where we actually differ — the coordinate, not the count
+
+Their labels are *per-dataset different sizes*: **10** dimensions for Droid's single arm, **29** for
+Agibot's two hands, **147** for EgoDex including sixty finger-keypoint dimensions. So per-embodiment
+output structure is not the divergence — they have it too.
+
+| | their outputs | ours |
+|---|---|---|
+| quantity | wrist pose, fingertip positions, camera pose | **joint angles** |
+| frame | 3-D positions in a common physical space | **body-specific joint space** |
+| means the same across bodies? | **yes** — a fingertip at (x,y,z) is the same thing for a human and a robot | **no** |
+| size | 10 – 147 | **1** |
+
+**Different counts of the same physical quantity is their whole setup.** Different quantities is
+ours. A shared trunk can align heads that differ in width; it cannot align heads whose outputs have
+no common referent.
+
+> Slide 21 tests the obvious repair — decode feet instead of joint angles — against our own
+> measurements, and it fails. What a hexapod and a quadruped share is not at leg level at all.
+
+### The four gaps that remain
+
+| | LAC-WM | ours | closed? |
+|---|---|---|---|
+| frozen V-JEPA2, `z` = 64-D, cross-augmentation, `λ_recon + λ_motion`, end-to-end | ✓ | ✓ | **already matching** |
+| what the motion decoder predicts | shared physical space | joint angles, plus a 1-D shared body term | ✗ — but slide 21 shows the binding constraint is behaviour, not coordinates |
+| `z` split — "first half decodes end-effector, second half decodes camera" | ✓ | not split | ✗ |
+| actions chunked into 5 steps | ✓ | 1 step | ✗ — **measured not to help here** |
+| action projector + 3-stage LoRA finetune | ✓ | absent | ✗ |
+
+---
+
+## Slide 21 — The blocker is the data, and clearing it is what makes their pipeline runnable
+
+### Why the shared meaning stopped at one dimension
+
+Not because body motion is one-dimensional. **Because our behaviour is.**
+
+| body twist channel | in our data |
+|---|---|
+| forward speed | varies — five speeds plus ramps |
+| lateral speed | **zero in every B1 clip** |
+| yaw rate | **constant per policy** |
+| acceleration | only the start and stop of each clip |
+
+Body twist is six dimensions in principle and **effectively one here**, so a shared head trained on
+it can align exactly one axis. It did, at agreement 0.85–0.92. There was never more available.
+
+### We checked whether a richer coordinate could substitute, and our own measurements say no
+
+The obvious candidate is the feet — their end-effector is where the body meets the world, and ours
+is the foot. But a foot's motion splits in two, and we have already measured both halves:
+
+| part of foot motion | what it is | measured |
+|---|---|---|
+| stance feet move back at body speed ÷ leg length | **body speed rewritten** | already what we use |
+| which foot is in stance when | **the gait itself** | transfers at **0.373**, *below chance* (frozen encoder 0.531) |
+
+**Everything a foot target adds beyond body speed is the part that does not transfer.** The B1 trots
+and the insect walks a six-leg wave; a per-leg quantity fitted on one is systematically wrong on the
+other. Duty factor is the reverse failure — nearly identical on both robots, 0.533 against 0.515, so
+it carries nothing to learn.
+
+> Three gates a shared target has to pass, and only one quantity we own passes all three:
+>
+> | | varies? | hides the robot? | its variation means the same thing? |
+> |---|---|---|---|
+> | duty factor | **no** | yes | — |
+> | lateral speed | yes | **no**, AUC 0.788 | — |
+> | which leg is loaded | yes | yes | **no**, 0.373 |
+> | **forward Froude** | **yes** | **yes** | **yes** |
+
+### So the blocker is behavioural coverage
+
+Add turning, stopping and starting, and lateral motion **to both robots** and three of those channels
+start to vary — at the body level, the one level we have measured to be shared. No new coordinate,
+no forward kinematics, nothing at leg level.
+
+### And it unlocks their pipeline rather than only widening ours
+
+Our head has to be blind to the frame because a still already answers the question: with one
+behaviour, the current state fixes the future, so `z` carries nothing the frame lacks. **Give the
+same state several possible futures and that stops being true** — the frame can no longer say
+whether the robot is about to turn, stop or accelerate, and `z` becomes the only source.
+
+| | today | with mixed behaviour |
+|---|---|---|
+| head must be blind | **yes** — F64 | should no longer be needed |
+| motion decoder as published (frame-conditioned) | fails, −10.5 | becomes runnable |
+| forward model gains from the term | no, 1.42x either way | should move — it moved +7.9% on speed variety alone |
+
+**That is the honest form of the plan: the missing piece is data, and clearing it is the condition
+for reproducing the source pipeline as written rather than in a blinded variant.**
+
+### Also on the list
+
+**More B1 data.** Every quadruped number rests on **14 clips, 5 held out**, and any new behaviour has
+to be collected on that robot too.
+
+### What that makes the contribution
+
+Not that latent beats explicit — that is settled. **That a shared latent needs shared *behaviour*,
+not a shared coordinate**: we measured what a hexapod and a quadruped actually have in common, found
+it is body-level motion and not anything at leg level, and showed a shared head converts it into a
+shared axis — while stating exactly what has to be collected before the published mechanism can run
+unmodified.
+
+## Slide 22 — Conclusion: what was asked, and what the measurements say
 
 **The question.** Can a latent action learned from video alone — no morphology label, no kinematics
 given — separate *what movement is happening* from *which body is doing it*, well enough to drive a
@@ -1073,11 +1248,12 @@ Frozen, real time order beats shuffled by 1.38x; after a thousand adaptation ste
 identical. And **1.38x → 0.54x** between an insect body and the B1, same weights, nothing
 retrained, is the embodiment gap in one line.
 
-**4. Cross-embodiment alignment does not port from manipulation to locomotion — slide 19.** The
-published mechanism aligns a latent by decoding a label every embodiment shares. Manipulation has
-one, locomotion has none at leg level, and body motion is the analogue. But their label is a
-*change* between two frames and ours is a *state* a single frame gives away, so the mechanism has
-to be rebuilt rather than reused.
+**4. The published alignment mechanism ports, under a condition its own setting hides — slides 19
+to 21.** It aligns a latent by decoding a label every embodiment shares, and it works here: a
+shared head turns cross-robot speed transfer from **−7.08 to +0.75**, against a control at
+agreement −0.01. But their target is a *change* between two frames and ours was a *state* a single
+frame gives away at R² 0.676, so their frame-conditioned head scored **worse than no term at all**
+until we blinded it.
 
 > **The general form: an auxiliary head aligns a representation only if its target cannot be
 > recovered from the head's other inputs.** In manipulation that holds for free. In locomotion it
@@ -1104,13 +1280,16 @@ existing work does; the difference is that those methods must be handed the kine
 | B1 data available | 14 clips, clean budget capped at **10** |
 | behaviours | the insect now spans five speeds matched to the B1's range; turning on neither |
 | never run | the EAC-WM analogue baseline — a decoder conditioned on raw joint state |
+| the motion target today | **1 dimension** (forward Froude) against the source method's 10 to 147 — and the other five body channels are constant in our data, not merely unused |
 
 ### What is open, in the order it is being worked
 
-**1. Whether the shared latent can be repaired — the first evidence that it can.** Slide 19 clears
-the frozen-encoder bar by 5.2x in one direction, on one seed, at a 50% cost to command accuracy.
-The other direction is still negative and the diagnosis points at a continuous speed target as the
-next step.
+**1. Whether the shared latent can be repaired — it can, and what caps it is the data.** Both
+directions are positive on every run, at **no measurable cost** at λ=0.1, and agreement is 0.85–0.92
+against the control's −0.01. What is *not* repaired is the space, because only one shared channel
+ever varies: the B1 never moves sideways and its yaw rate is a constant. **Slide 21 is the fix** —
+turning, stopping and lateral motion on both robots, which is also the condition under which the
+published frame-conditioned decoder becomes runnable here.
 
 **2. Whether one robot pair is enough scope — no measurement can decide it.** Report the single
 pair honestly, or invest in a third embodiment: a biped, on the leg-count axis 6 → 4 → 2, and

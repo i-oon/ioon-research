@@ -154,7 +154,61 @@ def cell(train, test):
     y_tr = (y_tr - y_tr.mean()) / (y_tr.std() + 1e-9)
     y_te = (y_te - y_te.mean()) / (y_te.std() + 1e-9)
     model = RidgeCV(alphas=np.logspace(-1, 4, 12)).fit(x_tr, y_tr)
-    return float(r2_score(y_te, model.predict(x_te)))
+    pred = model.predict(x_te)
+    r2 = float(r2_score(y_te, pred))
+    # Pearson beside R^2 because the two differ by exactly the scale and offset calibration:
+    # r^2 is the R^2 this readout would reach if its gain and intercept were refitted on the
+    # target. A cell with low `r` has the direction wrong; a cell with high `r` and very negative
+    # R^2 has the direction right and only the calibration wrong. R^2 alone cannot tell them
+    # apart, and -7.083 is where that mattered (F66).
+    r = 0.0 if pred.std() < 1e-9 else float(np.corrcoef(pred, y_te)[0, 1])
+    return r2, r
+
+
+def readout(train):
+    """The ridge fitted on one embodiment, as a callable direction in feature space."""
+    x, y = train
+    y = (y - y.mean()) / (y.std() + 1e-9)
+    return RidgeCV(alphas=np.logspace(-1, 4, 12)).fit(x, y)
+
+
+def agreement(a_train, b_train, tests):
+    """Correlation between the two robots' readouts applied to the *same* frames.
+
+    **The stable companion to the R^2 cells, and it exists because they are not.** Two seeds of an
+    identical configuration move validation total by 0.7 percent and the cross-embodiment R^2 by
+    **27** (F65). R^2 scores a readout fitted on one robot and applied to the other, so it charges
+    for scale and offset on top of direction, and it is unbounded below -- a slightly wrong readout
+    reads -7 where a slightly right one reads +0.6.
+
+    This asks only the question the claim is about: do the two readouts **order the same frames the
+    same way**. Fit one per robot, run both over one common set of frames, correlate the outputs.
+    Bounded, symmetric, and blind to the scale and offset that R^2 punishes.
+
+    Comparing the fitted weight vectors directly does *not* work and was the first thing tried
+    here. `z` is 64-D and heavily correlated, so a ridge's coefficients are not identified -- most
+    of their norm lies in low-variance directions that hardly move a prediction. Measured that way
+    every run sat at chance (0.014 to 0.085) including the one with the **best** transfer of all,
+    R^2 +0.749, which is the contradiction that exposed the error. Correlating predictions weights
+    each direction by how much the data actually varies along it, so the unidentified part drops
+    out.
+
+    Averaged over both robots' test frames so neither embodiment's feature distribution decides
+    the answer alone.
+
+    Pearson rather than Spearman even though the sentence above says "order". Spearman is the
+    literal form of that claim, and it was measured: it tracked Pearson to within 0.013 on every
+    run (0.845/0.834, 0.898/0.885, 0.313/0.286). The straight-line assumption costs nothing here,
+    so the extra column was dropped rather than carried.
+    """
+    wa, wb = readout(a_train), readout(b_train)
+    scores = []
+    for x, _ in tests:
+        pa, pb = wa.predict(x), wb.predict(x)
+        if pa.std() < 1e-9 or pb.std() < 1e-9:
+            continue
+        scores.append(np.corrcoef(pa, pb)[0, 1])
+    return float(np.mean(scores)) if scores else float("nan")
 
 
 def main():
@@ -192,8 +246,8 @@ def main():
     print(f"insect clips from {args.insect_dir}\n")
     print("Body-level motion (Froude number) read out of each representation.")
     print("R^2 against the target embodiment's own mean -- **0.0 is the no-learning line**.\n")
-    print(f"{'representation':<26}{'insect->insect':>16}{'b1->b1':>10}"
-          f"{'insect->b1':>13}{'b1->insect':>13}")
+    print(f"{'representation':<26}{'insect->insect':>13}{'b1->b1':>13}"
+          f"{'insect->b1':>13}{'b1->insect':>13}{'agreement':>13}")
     for label, data in rows:
         prepared = {}
         for name, (x, y, clip) in data.items():
@@ -202,9 +256,19 @@ def main():
             in_train = np.isin(clip, list(train_clips))
             prepared[name] = ((x[in_train], y[in_train]), (x[~in_train], y[~in_train]))
         i, b = prepared["insect"], prepared["b1"]
-        print(f"{label:<26}{cell(i[0], i[1]):>16.3f}{cell(b[0], b[1]):>10.3f}"
-              f"{cell(i[0], b[1]):>13.3f}{cell(b[0], i[1]):>13.3f}")
+        cells = [cell(i[0], i[1]), cell(b[0], b[1]), cell(i[0], b[1]), cell(b[0], i[1])]
+        agree = agreement(i[0], b[0], (i[1], b[1]))
+        print(f"{label:<26}" + "".join(f"{r2:>13.3f}" for r2, _ in cells)
+              + f"{agree:>13.3f}")
+        print(f"{'  same, as Pearson r':<26}" + "".join(f"{r:>13.3f}" for _, r in cells))
 
+    print("\nThe second line of each pair is Pearson r for the same cell. r^2 is the R^2 that")
+    print("readout would reach with its gain and offset refitted, so the gap between them is")
+    print("calibration and the gap to zero is direction.")
+    print("\n`agreement` fits a readout on each robot separately, runs both over the same frames,")
+    print("and correlates the outputs: 1.0 means the two robots order speed identically, 0.0 means")
+    print("unrelated. Bounded and symmetric where the R^2 cells are neither, and blind to the scale")
+    print("and offset R^2 charges for, so it is the number to compare across seeds (F65).")
     print("\nRead the two cross columns against the frozen-encoder row above them, not against")
     print("zero alone: the question is whether training made the robots more comparable at body")
     print("level than V-JEPA2 already had them, which is the comparison the leg probe fails.")
