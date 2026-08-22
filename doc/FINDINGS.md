@@ -4187,7 +4187,7 @@ because the animal is not symmetric: the leg pairs are 0.771, 0.489 and 0.638 lo
 pose the oscillator is centred on is itself asymmetric. Collect and measure each direction
 separately.
 
-**Reading a direction off the abdomen frame needs care, and it has now caused two wrong numbers.**
+**Reading a direction off the abdomen frame needs care.**
 `frame_axes` identifies the abdomen's **z** as the fore-aft axis but not which end of it is the
 front, and it points **aft**: its dot product with the direction straight walking actually travels
 is **-0.96**. Taking it as forward reports left and right swapped. Heading *changes* survive this --
@@ -4577,11 +4577,10 @@ one robot's yaw is a free embodiment cue.
 policy or subtracting a per-robot mean, and subtracting a per-robot mean is exactly the kind of
 per-embodiment correction this project exists to avoid.
 
-**The general lesson, and it has now bitten twice in one day.** F71 read left and right swapped by
-taking the abdomen's fore-aft axis as pointing forward when it points aft. Here a magnitude-only
-match hid a sign flip. **A quantity matched across two robots has to be matched as a signed vector
-in a shared world frame, and the direction convention has to be checked against something physical
--- which way the robot actually travelled -- rather than assumed from an axis name.**
+**The rule this establishes.** A quantity matched across two robots has to be matched as a **signed
+vector in a shared world frame**, and the direction convention checked against something physical --
+which way the robot actually travelled -- rather than assumed from an axis name. `|w_hat|` agreeing
+to 5% is compatible with the robots turning opposite ways.
 
 
 ---
@@ -4622,14 +4621,13 @@ to **+0.36 +/- 0.10**, hexapod to B1. A readout for walking speed fitted on the 
 a quadruped performing behaviours it never saw. That is a real cross-embodiment transfer, and it is
 the same single channel F70 already had.
 
-**Withdrawn 2026-08-22, see F77: this section originally concluded that the collection had failed.**
-Everything below is measured on the **frozen encoder**, which is the state *before* any training --
-and F66 measures forward speed at 0.31 frozen against 0.85-0.92 once the body head is trained. Judged
-by its frozen number the one channel that works would have been condemned too. The correct reading
-of what follows is "no new channel is shareable **without being taught to be**", which is not the
-same claim and does not answer whether the collection helped.
+**Scope: this measures the frozen encoder, which is the state *before* any training.** F66 puts
+forward speed at 0.31 frozen against 0.85-0.92 trained, so a frozen number does not decide whether a
+channel is usable -- judged by its frozen value the one channel that works would fail too. What
+follows answers "which channels are shareable **without being taught to be**", and nothing more
+(F77).
 
-**With that caveat, what the frozen encoder says.** F70's stated cause was
+F70's stated cause was
 that five of six channels were constants in our data. They are not constants any more -- yaw spans
 w_hat 0.007-0.076 and lateral spans Froude 0.07-0.19, on both robots, matched to within 10%, with
 speed held apart from yaw so the channels are separable. **Coverage was supplied, and untrained the new channels
@@ -4725,11 +4723,9 @@ target of 0.0736** -- a 0.5% match, and wrong. Inside a clip the turn rate ran *
 average over a much longer window matched. **The clips would have been controller ringing labelled
 as steady turns.**
 
-The check that caught it was reading the signal *within* the clip rather than its summary. That is
-the same shape as F74 (a frame rate nobody wrote down) and F75 (a magnitude that hid a sign): a
-single aggregate agreeing while what it summarises does not. **Three times in one day, so it is a
-habit rather than an incident -- verify a matched quantity by its time course inside one clip, not
-only by its mean.**
+**The rule this establishes.** Verify a matched quantity by its **time course inside one clip**, not
+only by its mean. A steady-state average agreeing to 0.5% is compatible with the signal underneath
+it oscillating through the whole clip.
 
 **Tuned against three requirements at once**, since satisfying one alone is what produced the trap:
 
@@ -4789,13 +4785,10 @@ z points aft, so it must be negated. Same behaviour, opposite sign, and a shared
 both by learning which robot it was looking at. `forward_axis()` now carries the correction, checked
 against the direction straight walking actually travels.
 
-**That is the third time in one day that an unchecked convention produced a wrong sign or frame**
-(F71 swapped left and right, F75 hid a sign inside a magnitude, this one measured in the wrong
-frame). All three were invisible in summary statistics and all three surfaced only when a quantity
-was checked against something physical.
-
-**Credit where due: this one was caught by the user disbelieving the morphological explanation.**
-The number was internally consistent and had a plausible story attached to it.
+**The rule this establishes.** A body-relative quantity has to be computed in the **body frame**,
+and the frame's orientation verified against measured motion. World-frame differencing is correct
+only while every robot walks in a straight line along the same axis, which is a property of the old
+datasets rather than of the quantity.
 
 
 ---
@@ -4845,9 +4838,48 @@ hexapod-side target.
 lateral is excluded from the target -- and this makes the exclusion permanent rather than pending a
 re-test, since the channel now mixes a real quantity with a known per-policy artefact.
 
-**Credit: the second policy was the user's, and the conclusion is theirs too** -- they proposed that
-both the drift and the turn lean were policy quality rather than the robot, before either was
-measured.
+
+---
+
+### F81. The inverse model cannot run at control time, and the source paper's answer is a second encoder
+
+Planning was scoped as `e_t -> selector -> z_t -> Motion Decoder -> a_t`, with the selector sampling
+in latent space. Reading LAC-WM's method rather than its architecture section shows that is not how
+it works, and the reason is structural:
+
+> "Since future observations, required by the IDM, are unavailable at inference time, we train an
+> **action projector** that maps explicit actions into the latent action space, enabling the world
+> model to directly consume raw action inputs."
+
+**Our ITM has the same problem.** `z_t = ITM(e_t, e_{t+1})` needs the next frame, which at control
+time is the thing being decided. **The ITM is a training and analysis module and can never be in the
+loop.** Everything measured so far -- every transfer number, every probe -- reads `z` off two
+ground-truth frames, which is why `predict_actions.py` says it is reconstruction rather than control.
+
+**The two loops differ in which space the search happens in, and that decides what can go wrong:**
+
+| | sample in latent space | sample in action space (LAC-WM) |
+|---|---|---|
+| | `z -> MD -> a` | `a -> projector -> z -> FDM` |
+| every candidate executable? | **no** -- a sampled `z` need not correspond to any real behaviour | **yes**, by construction |
+| decode `z -> a` at run time? | required, and the MD must be right for the new body | **not needed** -- the action is what was sampled |
+| Motion Decoder's role | the controller | **auxiliary loss during pretraining only** |
+
+The second row is the one that matters. Sampling in latent space makes the whole loop depend on a
+Motion Decoder generalising to a body it was not trained on -- **never tested here** -- while
+sampling in action space removes the decode step entirely.
+
+**It also corrects a claim of ours.** "A new body needs only video" is stronger than what LAC-WM
+claims for itself: the abstract says *"adapt quickly to previously unseen robot embodiments through
+finetuning"*, and the projector is fitted on the target robot's own action data. The defensible form
+is that **video is what lets the world model span incomparable bodies; the projector still needs
+actions from the target robot** -- which is cheap rather than free, and F52 already measured how
+cheap: one B1 clip clears break-even, nine clear every horizon.
+
+**What this changes about the build.** The projector is a small network trained on data already
+collected, and it replaces both the latent-space selector and the requirement that the MD transfer.
+The closed loop becomes: sample candidate actions, project them, roll the FDM, score, execute the
+winner directly.
 
 
 ---

@@ -288,4 +288,4 @@ so predicting their mean costs 1.0 only on them. On held-out `medium` the trivia
 ```
 
 Add `--encode_device cpu` to any of them when a training run holds the GPU.
-`wm/READING_THE_LOG.md` covers the training log itself.
+`wm/README.md` covers the training log itself.

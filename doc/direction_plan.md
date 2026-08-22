@@ -256,7 +256,7 @@ earned result rather than an artefact of the data.
 > **Two stages (see Direction update above). Stage 1 = the detailed Steps below; Stage 2 adds the
 > cross-embodiment (B1) steps. Target ≈12 weeks, Aug–Oct.** Week numbers are relative from Stage-1 start.
 
-**Where this stands, 2026-08-19.** Stage 1 is finished and retrained clean. Stage 2's two original
+**Where this stands, 2026-08-22.** Stage 1 is finished and retrained clean. Stage 2's two original
 goals — a head that fits cheaply on a new robot, and a forward model that predicts on it — are both
 met, the second by few-shot adaptation rather than frozen transfer.
 
@@ -267,6 +267,21 @@ insect's speed varies (F57, F60). Cross-robot speed transfer goes from **-7.08 t
 +0.75** across three runs, against controls at -7.08 and -2.36, at **no measurable cost** at
 `lambda_body 0.1` (F65). Measured as direction agreement rather than R^2, the control reads
 **-0.01** and the treated runs **0.85 to 0.92** (F66).
+
+**The behaviour set that was blocking everything now exists.** `data/beh12_*`: twelve conditions per
+robot, balanced 4/4/4 across speed, turn and sideways, forward matched to 4% and yaw to 2%, at a
+common 20 Hz and 66 frames. Building it exposed four defects in existing code -- a frame-rate
+mismatch that made a stored transition mean 20 ms on one robot and 50 ms on the other (F74), a sign
+flip that had the robots turning opposite ways under a magnitude-only match (F75), a
+proportional-only heading controller leaving a standing yaw bias on the B1 (F78), and a body target
+differenced in the world frame, so "forward speed" was partly a rotation measurement once a robot
+turned (F79). All four are fixed; **every cross-embodiment number computed before 2026-08-22 was
+measured across at least the first of them.**
+
+**Untrained, the new channels still do not transfer** -- forward +0.36 +/- 0.10, lateral and yaw at
+zero (F76). That is the *before* condition and does not settle the question: forward speed itself
+reads 0.31 frozen against 0.85-0.92 trained (F66, F77). **The open question is what training does to
+yaw**, and three arms are running to answer it.
 
 **Reading the source paper properly (F67) reframes what to do next, and this is the current plan.**
 LAC-WM is not a rival result to beat -- it already showed latent conditioning beats explicit, and
@@ -367,11 +382,11 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 | 2g | **Few-shot adaptation of the forward model** | how few target clips does adapting one take, and is insect pretraining worth anything? | done — **one clip clears break-even, nine clear every horizon tested; ~7x fewer clips than from cold**, and the two curves separate rather than converge (F52, slide 16) | done |
 | 2h | **Control: dynamics or manifold?** | is the pretraining advantage learned locomotion, or just familiarity with V-JEPA2's feature space? | done — **both, and they separate**. Frozen, real time order beats shuffled on the B1 by 1.38x at one step; after a thousand adaptation steps the two are identical. Dynamics transfer but are overwritten; the foothold in the shared representation is what buys the 7x (F54) | done |
 | 2j | **Widen the shared target from 1 DOF to 6** | `lambda_body` supervises forward speed alone. The full shared quantity is a **body pose delta** -- three translation, three rotation, dimensionless. **Joint angles stay as the per-embodiment target** (see the note below on why the task-space version was withdrawn) | open — needs 2k first, since five of the six are constants today |
-| 2k | **Behavioural coverage** | **the insect side is closed; the speed ladder is `--cycles` 5.8 / 6.4 / 7.1 / 8.15 / 8.5 / 8.8 at `--scale 0.65`, matched to the B1's `--vx` 0.30-0.50 within 5% on Froude (F71).** `--gait cpg` (F71) gives the hexapod a **commandable** gait at **the same distance and body height as the recorded wave** -- its drive is a tripod but its contacts are not (F71, F73), plus a speed range via `--cycles` and turning via `--spin` (-73 deg against straight, sd 2 over three repeats). `--turn` was measured on 2026-08-22 **not** to steer -- it brakes, travel 0.37 to 0.21 m -- and F71's steering numbers there are withdrawn. Built from the oscillator in the lab's Olaf scene, no IK. Sideways works once the fore-aft swing is switched off, the splay is put in antiphase with the lift, and the residual yaw is subtracted: at `--scale 0.65`, `--amps 0.00 0.20 0.30 --ft_phase 0.5 --strafe 0.8 --spin -0.24 --spin_amp 0.25` walks **right** 0.52 m +/- 0.06 at -1 deg of heading with sideways travel 1.00 of total displacement; `--strafe -0.8 --spin 0.19` walks **left** 0.30 m +/- 0.01 at -0 deg. The two are **not** mirror images -- different distance, different yaw trim -- so both are collected and measured separately. **The insect side of 2k is now closed** -- straight, turn, sideways and a speed range. What is still missing: the B1 side of every behaviour | in progress — **collect the set, both robots** |
+| 2k | **Behavioural coverage** | **done.** `--gait cpg` gives the hexapod a commandable gait with no IK, ported from the lab's Olaf scene: straight, `--spin` for turning, a sideways gait, and a speed range via `--cycles`, all at `--scale 0.65`. Its drive is a tripod; its contacts are not, and neither are the lab's own (F71, F73) | done (F71) |
 | 2k' | **Record body orientation for the hexapod** | **done 2026-08-21** -- `body_quat` per frame, off the abdomen. Head orientation and Euler angles were both tried first and both read straight walking as a large turn (F72) | done, but every clip before this date lacks it |
+| 2k'' | **Collect the matched set** | **done** — `data/beh12_hex_flat` and `data/beh12_b1_flat`, 48 clips each. Hexapod `--spin` 0.05 / 0.15 / 0.29 / 0.56 against B1 `--wz` 0 / 0.055 / 0.139 / 0.294, matched within 3% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides. Speed matched by widening the hexapod's foot path rather than moving either robot's pace (F71, F72) | done |
+| 2k''' | **More distinct behaviours** | **partly addressed.** Effective n is the number of behaviours, not clips: within a condition the clips agreed to 2-10% of the between-condition spread. Running the B1's **two** policies at 2.00 and 1.67 Hz gives it genuinely different dynamics inside a condition (F80). The hexapod side still has one gait per condition | open, revisit if the screen stays underpowered |
 | 2k'''' | **Train the three arms** | control / body head forward-only / body head forward+yaw, on `data/beh12_*`. Arm 2 re-tests F66's 0.85-0.92 on rate-fixed data (F74); arm 3 asks the question the collection was built for. Commands written; `body_channels` is a config field now. **fibo7, not the 2080 Ti** | **next** |
-| 2k''' | **More distinct behaviours** | F76: **more clips would add copies, not samples** -- within a condition the four clips agree to 2-10% of the between-condition spread, so the effective n is **12 behaviours, not 48 clips**. Held out by behaviour rather than by clip, yaw's apparent transfer collapses (+0.31+/-0.06 -> +0.10+/-0.19) and only forward survives (+0.36+/-0.10). The lever is **more distinct behaviours** -- more levels per axis, or crossing axes | **next** |
-| 2k'' | **Collect the matched yaw set** | hexapod `--spin` **0.05 / 0.15 / 0.29 / 0.56** at `--scale 0.65` against B1 `--wz` 0.00 / 0.08 / 0.19 / 0.40, matched to within 5% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides (F72, re-derived 2026-08-22). **Speed matched by widening the hexapod's foot path instead of moving either robot's pace**: `--scale 0.65` puts it at Froude 0.131 against the **already collected** B1 clips at `--vx 0.30` (0.135), so the B1 side needs no new rollouts at all. Two earlier routes were measured and dropped -- speeding the hexapod with `--cycles 9.3` (reaches 0.161 but drifts more, and the sideways gait cannot follow) and slowing the B1 to `--vx 0.22` (reaches 0.101 cleanly, but makes both robots crawl and requires re-collecting the B1). | **ready to collect** |
 | 2l | **Re-test the published motion decoder** | with several futures available from one state, a still stops answering the question, so the frame-conditioned head (F64, −10.5 today) should become runnable and the forward model should move | open, follows 2k |
 | 2m | **Balance the data, not just the sampler** | after `clips_per_body hexapod=7` the training set is still **2.43:1 in frames** (2,780 against 1,143), and `balance_embodiments` closes that by repeating the B1 about 2.4 times an epoch. Repetition is not data: it invites memorisation on a validation split too small to detect it, which `config.py` already warns about. **Collect more B1 rather than capping the hexapod further** -- capping throws away bodies, and F13 says bodies are what matters | open, rides with 2l |
 | 2n | **Make the measurement read the same data as training** | `body_motion_probe.py` and `plot_z_umap.py` read the whole directory and see **5.9:1**, where training sees 2.43:1. The probe fits each embodiment separately so its numbers are unaffected, but the UMAP layout is dominated by the larger set and every quoted ratio has to say which of the two it means. One data-selection path for both | open — do it *after* the current deck is presented, since it moves the quoted numbers |
@@ -1110,9 +1125,59 @@ riskiest given what we now know about reward readability.
 4. **New experiment worth adding to Step 2** (cheap, data already collected):
    *does the Motion Decoder generalise across bodies?* Train MD on short + long, then ask it to decode
    `z_t` into joint commands for the medium body.
-   - If it generalises, the "new body needs only video" claim survives into deployment.
-   - If it does not, we learn exactly how much action data a new body requires, which is a useful
-     number in its own right.
+   - Worth knowing either way, but **not a blocker**: F81 puts the MD outside the runtime path.
+   - What a new body actually costs is the **action projector**, fitted on its own actions. "A new
+     body needs only video" overstates it, and overstates LAC-WM too -- the source paper adapts
+     "through finetuning". Video is what lets the world model span incomparable bodies; the
+     projector still needs target-robot actions, which F52 measured at one clip to break even.
+
+### What has to be built, and in what order (scoped 2026-08-22)
+
+**Nothing of the loop exists yet.** Every component so far consumes two ground-truth frames and
+reports what the robot *did*: `predict_actions.py` says so outright. There is no selector anywhere
+-- no module that chooses a `z`. The pieces that do exist and are reusable are the trained ITM/FTM/MD,
+the sim stepping code inside `collect_ik.py`, and `latent_rollout.py`, which already scores the FTM
+on "if I apply this, what happens next" -- the question a planner asks.
+
+**Two constraints set the order, and both are already measured.**
+
+*The encoder cannot run the loop.* F40: the vision path is **94.9 ms, 10.5 Hz** on a 2080 Ti,
+against data at 20 Hz and legged control that wants 50. Vision-in-the-loop is therefore a research
+instrument, not a runtime configuration -- which is the argument for distillation, but distillation
+needs a teacher, and the teacher is the vision loop. **The slow loop has to be built first even
+though it is not the deployable artefact.**
+
+*The fixed camera bounds an episode.* It sees about 2.1 m, which is why every collector carries a
+`--travel` gate. A closed-loop run is a few strides, not a traverse, until the camera moves onboard.
+
+**Order of work, rebuilt around the action projector (F81):**
+
+1. **Train the action projector.** `a_t -> z_t`, fitted so it matches `ITM(e_t, e_{t+1})` on the
+   same transitions. Small network, data already collected, one per embodiment. **This is the piece
+   that makes control possible at all** -- the ITM needs the next frame and so can never run in the
+   loop.
+2. **Close the loop on the body it was trained on.** Sample candidate actions, project, roll the
+   FDM, score, execute the winner. Same robot, no transfer. The point is the machinery: if the loop
+   cannot hold a gait on the body it learned from, cross-body is not worth attempting. Score in
+   **`z`-space, not `e`-space** -- V-JEPA2 encodes morphology almost completely, so matching raw
+   embeddings across bodies is confounded by shape.
+3. **Close the loop across bodies.** Fit a projector on the target robot's actions -- this is
+   LAC-WM's finetuning step, and the honest cost of a new body. Only here does the OOD risk below
+   apply.
+4. **Distil to a proprioception-only student.** The deployable artefact. The vision path runs at
+   **10.5 Hz** (F40) against control's 50, so vision-in-the-loop is a research instrument by
+   measurement, not by preference.
+
+**Two things this ordering drops**, both from an earlier scoping that assumed the Motion Decoder
+would be the controller. *Sampling in latent space* is out: a sampled `z` need not correspond to any
+executable behaviour, where a sampled action does by construction. *"Does the MD generalise across
+bodies"* is no longer a blocker: in this architecture the MD is an auxiliary loss during pretraining
+and is not in the runtime path at all. It remains worth measuring, but nothing waits on it.
+
+**What is deliberately not being done yet:** moving the camera onboard. It would make the
+camera-pose channel and the body-pose channel the same quantity, which is the right end state --
+but it invalidates every render-locked measurement in the deck, so it waits until the current
+results are defended.
 
 ### One closed loop, not open-loop replay
 

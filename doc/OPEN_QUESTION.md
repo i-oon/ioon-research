@@ -5,7 +5,7 @@
 > Only genuinely open items. When a measurement settles one it moves to `FINDINGS.md` and leaves a single line in the settled table at the bottom, so no result is written out twice.
 
 Living doc. Supersedes the old "argue vs prove / terrain / leg-length" questions,
-which are now settled (see bottom). Updated 2026-08-16.
+which are now settled (see bottom). Updated 2026-08-22.
 
 Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
 this file carries only what is still undecided.
@@ -244,84 +244,41 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 
 ---
 
-## Q14. What would actually improve cross-embodiment generalisation? (new, 2026-08-15)
+## Q14. Does behavioural overlap make a channel shareable? (open — three runs deciding it)
 
-> **Partly overtaken, 2026-08-16.** This question was written while the goal was still a forward
-> model that transfers *frozen*. F51 measured that it does not (0.57-0.71x on the B1) and that
-> coverage moves it 5-8% where it moves the decoder 3.9x, so the lever hunt below is aimed at a
-> target that was abandoned. F52 then reframed the goal as **few-shot adaptation** and answered it:
-> one B1 clip clears break-even, nine clear every horizon tested, roughly 7x fewer target clips
-> than starting cold. **The action-head and forward-model goals are both now met.**
->
-> What survives from the analysis below is the behavioural-overlap argument, which still matters
-> for the *shared* representation rather than for transfer: `z` reads a loaded leg at 0.986 within
-> an embodiment and 0.373 across, below the frozen encoder's 0.531. Raising that is still the
-> thing to aim at, and it is still untested whether more overlap does raise it.
->
-> **Answered, 2026-08-18 — and the answer is no, on its own.** The lever named here was behavioural
-> diversity, and it had never been tested. F57 built it: the expert walks one speed (1.9 percent
-> variation across 1,000 episodes), so `collect_ik.py --speed` retimes the shared foot path to
-> produce five speeds matched to the B1's Froude band. Trained on that data with no other change,
-> the cross-embodiment body-speed readout scores **-4.16 and -5.60**, and on the wider ramped set
-> **-7.10 and -2.33**. More diversity gives the trunk more to partition by.
->
-> **Corrected 2026-08-18, and the answer splits in two.** "Necessary and not sufficient" is right
-> for *one* of the three failures and wrong for the other two (F61).
->
-> | failure | fixed by |
-> |---|---|
-> | the decoder reads body identity from `z` instead of the frame | **diversity alone** -- the control reverses the swap test, 3.1x following the latent to 2.9x following the frame, with no loss term and no shared head |
-> | a body-level question is answerable at all | **diversity alone** -- a single-speed insect has no speed to read, so the measurement was not defined |
-> | `z` carries body speed across the two robots | **the loss term** -- every control stays negative, -7.10 and -2.33 even on seven conditions |
->
-> So diversity fixed the switch behaviour that this whole line of questioning was aimed at, and the
-> shared head fixed the remaining one. Both were needed and they fixed different things.
->
-> **The leg-level target named above was the wrong one and F56 says why.** One leg's phase fixes all
-> four of the B1's legs and almost none of the insect's other five, so any leg-level label that
-> describes one must underdetermine the other. Body-level motion is where a correspondence exists.
+The lever list of 2026-08-15 has been worked through and only one item is still standing:
+**make the two robots' behaviour distributions overlap**. Shared supervision is blocked by F45 (no
+usable frame pairing), architecture was measured to sharpen per-robot codes rather than share them
+(F43, F46), three invariance methods moved nothing (F44), and leg-removal bodies read as the body
+they were cut from (F47).
 
-Answered as far as the measurements allow, so the next design decision is not made on intuition.
+**Overlap in speed alone was tested and did not work.** Five matched speeds gave cross-embodiment
+readouts of -4.16 and -5.60; more diversity gave the trunk more to partition by (F57, F60).
 
-**The transfer that exists travels entirely through `z` (F50).** Insect-only features give a 1.28x
-margin on a held-out B1; zeroing the latent drops that to 0.98x, indistinguishable from a random
-backbone. The decoder trunk's learned processing of the frame carries **nothing** across
-embodiments. Shuffling the latent scores worse than deleting it, so what matters is its alignment
-to the frame, not merely its content.
+**Overlap across three behaviours now exists** and the untrained answer is still no: on the frozen
+encoder, forward transfers at **+0.36 +/- 0.10** and lateral and yaw sit at zero (F76). But the
+frozen encoder is the *before* condition, and forward speed itself reads **0.31 frozen against
+0.85-0.92 trained** (F66) -- so a frozen zero does not decide the question (F77).
 
-**That rules out most of the obvious moves:**
+**What is open**, in the order it gets answered:
 
-| lever | status |
-|---|---|
-| more bodies inside either family | **does not address this.** It solves the within-family problem twice and builds nothing between them -- and F43/F46 measured the shared trunk already producing sharper *per-robot* codes and a poorer shared one, so densifying each family likely pushes the wrong way |
-| anything acting on the frame pathway | **measured to carry nothing** across embodiments (F50) |
-| architecture: one shared trunk | **already done**; the measurement above is what it produces |
-| invariance methods | **three tried, none moved transfer** (F44: side channel, centring, adversary) |
-| genuine intermediate bodies | **leg-removal does not qualify** -- F47 shows the model reads them as the body they were cut from |
-| shared supervision across families | **blocked** -- F45 finds no pairing label that is both covered and meaningful |
-| **making the two robots' behaviour distributions overlap** | **the one lever still standing** |
-
-**Why behavioural overlap is the remaining candidate, and it is not a guess.** The ITM learns from
-*transitions*. F45 measured that the two robots barely share any: the B1 spends 84.6% of its time
-in two trot patterns the insect visits 9.8% and 5.7% of the time. If `z` is the only thing carrying
-transfer and `z` is learned from transitions, then shared transitions are the raw material it is
-short of. It also attacks F45's root cause directly, which would in turn unblock the pairing that
-`lambda_cross` needs.
-
-**The measurable target.** `z` reads a loaded leg at 0.986 within an embodiment and **0.373**
-across -- below the frozen encoder's 0.531, so training currently makes cross-embodiment sharing
-*worse than where it started*. Raising 0.373 is the thing to aim at, and `leg_contact_probe.py`
-measures it in minutes without training anything.
-
-**The cheap way to get behavioural diversity is IK, not AMP.** `sim/collect/collect_ik.py` already
-takes `--behavior turn`, `--turn_bias`, `--travel` and `--loops`. AMP is parked and its gaits are
-not a good stick-insect representation; IK is the reliable route and it can vary speed, turning and
-step geometry without touching the RL branch.
-
-**What is not known.** Whether more overlap actually raises 0.373 is untested -- the argument is
-mechanistic, not measured. Test it cheaply before committing to a collection: widen the insect's
-behaviour, re-run `pairing_feasibility.py` and `leg_contact_probe.py`, and see whether coverage and
-the cross cells move before spending on a full retrain.
+1. **Does training on yaw make it transfer?** Three arms running: control, body head forward-only,
+   body head forward+yaw. The middle arm is what makes the third attributable to the channel rather
+   than to the new dataset.
+2. **Does F66's 0.85-0.92 survive the frame-rate fix?** It was measured across the F74 mismatch.
+   Arm 2 settles it, and this is the number the deck currently claims.
+3. **Is twelve behaviours enough to resolve effects of this size?** Held out by condition, about
+   four test behaviours remain and the spreads run +/- 0.2 to 1.3. If the arms disagree weakly the
+   answer may be power rather than substance.
+4. **Should the yaw length scale be the stance radius rather than hip height?** Physically the
+   moment arm of a turn is where the feet meet the ground, and the two scales differ 4.4x in the
+   ratio between the robots. It does not change what transfers -- an affine rescale cancels against
+   a standardised target -- but it does change how much the channel identifies the robot, 0.637
+   against 0.571 (F77). Switching means re-solving the four `--spin` levels first, since the
+   collection is matched on the height version.
+5. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
+   frame corrected, and half the B1 clips carry a per-policy lateral artefact (F79, F80). Excluded
+   for now; the exclusion is a measurement, not a principle.
 
 ---
 
