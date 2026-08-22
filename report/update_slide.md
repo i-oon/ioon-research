@@ -728,8 +728,12 @@ Removing the identity costs **less than removing arbitrary directions**. It is p
 
 ![cross-embodiment UMAP](../results/wm/stage2/figures/cross_embodiment_umap_stage2_clean.png)
 
-Weight sharing compresses the clusters **12.5x** by silhouette. The probe still recovers the
-embodiment at **0.994**, and the per-leg readout shows the compression bought no shared meaning.
+**Weight sharing really does pull them together**: silhouette **+0.671 → +0.140**, a factor of ~4.8,
+and the cluster means end up **closer than the average spread inside a cluster** (4.01x → 0.77x).
+
+**And it bought nothing.** The probe still reads the embodiment at **1.000**, and the speed readout
+still does not cross. Compressing two clusters is not the same as giving them a shared meaning —
+which is why every figure in this deck carries its numbers.
 
 ### So
 
@@ -807,19 +811,22 @@ Fit a fresh 12-D B1 head on a few clips; compare against the same head on random
 
 > `x` = how many times worse the random backbone is. 1.0x means pretraining bought nothing.
 
-| clips fitted | split | pretrained on insects | random weights | margin |
-|---|---|---:|---:|---:|
-| 5 | random | 20.49 deg | 23.80 | 1.16x |
-| 7 | random | 16.05 | 20.09 | **1.25x** |
-| 9 | random | 15.62 | 20.48 | **1.31x** |
-| 7 | **all 7 speeds both halves** | **15.98** | 20.49 | **1.28x** |
+**Fourteen B1 clips in total**, so every clip fitted is one fewer left to test on:
+
+| train / test | pretrained on insects | random weights | margin |
+|---|---:|---:|---:|
+| 5 / 9 | 20.49 deg | 23.80 | 1.16x |
+| 7 / 7 | 16.05 | 20.09 | **1.25x** |
+| 9 / 5 | 15.62 | 20.48 | **1.31x** |
 
 **Insect features make a quadruped head cheaper to fit.** At five clips both arms score R² near
-zero, so read seven and nine only.
+zero, so read seven and nine only. Below five there is nothing to read; above nine the test set is
+too small to trust.
 
-**The last row is a confound control, not a bigger budget.** The B1 set is 2 policies x 7 commanded
-speeds, so a random split can leave speeds unseen and confuse "new robot" with "new speed". Forcing
-both halves to cover all seven: **1.28x against 1.25x**. The confound explains none of it.
+> **Confound control, at the 7 / 7 budget.** The B1 set is 2 policies × 7 commanded speeds, so a
+> random split can leave speeds unseen and confuse "new robot" with "new speed". Forcing both halves
+> to cover all seven speeds: **1.28x, against the random split's 1.25x.** The confound explains none
+> of it.
 
 ### All of it travels through the latent
 
@@ -1004,20 +1011,18 @@ correspondence exists: both robots have one, and in Froude terms they walk at th
 So decode it through **one head shared by both embodiments** — and the head must be unable to tell
 the robots apart, or it decodes each one separately and nothing is shared.
 
-![why the shared head must be blind to the frame](../results/wm/stage2/figures/body_head_design.png)
+![what we ran against what the source method does](../results/wm/stage2/figures/body_head_design.png)
 
-**The middle panel is the obvious design and it fails**, at *worse than no term at all*. The image
-identifies the robot, so the head learns one mapping per robot and `z` stays robot-specific.
-Ablating `z` still costs 2.32x, so the head is not ignoring it — it is using a private code per
-robot.
+**The head must be blind, and that is measured.** Let it see the frame and it scores **−10.5** —
+worse than no term at all. The image says which robot, so the head learns one mapping per robot and
+`z` is free to stay robot-specific. It is not ignoring `z` either: ablating `z` still costs 2.32x,
+so it is using a *private code per robot*.
 
-> **Not a refutation of the source design, and worth stating precisely.** LAC-WM has no head like
-> this. It has **one** motion decoder, frame-conditioned exactly as our middle panel is, and that
-> decoder is its whole alignment mechanism. **Our main decoder is already built that way** — `z`
-> cross-attends over the current frame's tokens — but it decodes into 18-D and 12-D joint commands,
-> which have no common referent, so it aligns nothing. The shared head is an *addition* forced by
-> that, and blinding it is what makes it work **in a pipeline that already has per-embodiment heads
-> carrying most of the loss**. Their decoder has no such competing path to fall back on.
+> **The right-hand panel is what makes this readable.** Both of our variants keep joint angles as
+> the main target and bolt alignment on beside them. **LAC-WM has no joint-angle head at all** — one
+> decoder, one target, and that target is a position in a physical space both embodiments share, so
+> it cannot be satisfied without a representation both robots share. Its labels differ in size per
+> dataset, 10 to 147, so **the divergence is not how many outputs there are — it is what they mean.**
 
 | | insect→insect | b1→b1 | **insect→b1** | **b1→insect** |
 |---|---|---|---|---|
@@ -1173,6 +1178,14 @@ Their labels differ in size per dataset too: **10** for Droid's arm, **29** for 
 
 **A shared trunk can align heads of different widths. It cannot align heads whose outputs have no
 common referent.**
+
+> **So should we predict foot positions instead of joint angles?** No, and two objections agree.
+> *Measured:* foot motion is body speed rewritten plus the gait, and the gait transfers at **0.373,
+> below chance** — the extra buys nothing. *Structural (Ajan Go):* a Cartesian target needs a
+> kinematic model and IK for every robot, which breaks on odd morphologies and weakens this
+> project's own claim. **The resolution keeps both: joint angles per embodiment, body pose delta
+> shared.** The body channel is observed from outside and needs no kinematic model — a new robot
+> needs its *joint count*, which is a number in the calibration clips, not a model.
 
 ### And 147 is not the gap it looks like
 
@@ -1351,6 +1364,16 @@ accept a later finish.
 reconstruction against IK, replayed open-loop. The pipeline exists to control a robot, and that is
 not yet tested. The EAC-WM baseline is the comparison arm that makes a benchmark meaningful, and it
 is the one item this deck lists as required and never run.
+
+> **"Does a walking robot need a camera at run time?" — no.** Our fixed third-person camera is a
+> research instrument: it exists to make two very different robots render-comparable, not to be the
+> runtime sensor. The deployment route is **teacher–student distillation** — train with vision,
+> distil to a proprioception-only student, which is standard in legged locomotion.
+>
+> **Vision is the medium that lets one model span incomparable bodies *during learning*. Nothing
+> requires it to be the sensor at run time.** The claim was never that a camera is the right sensor
+> for a walking robot; it is that a camera is the only thing a **new body** has to be handed, where
+> proprioceptive methods must be handed a kinematic tree.
 
 ---
 

@@ -1,18 +1,23 @@
-"""Slide 19's figure: why the shared head has to be blind to the frame.
+"""Slide 19's figure: what we ran, and what the source method actually does.
 
 Three panels, left to right, each a data-flow sketch of the motion decoder.
 
-    what we had     per-embodiment heads. 18-D and 12-D joint commands are different spaces, so
-                    nothing requires one `z` to mean the same thing on both robots.
-    what failed     one shared head, but conditioned on the frame like LAC-WM's motion decoder.
-                    The frame identifies the robot, so the head learns one mapping per robot and
-                    `z` is free to stay robot-specific -- the per-embodiment problem re-entering
-                    through the image. Measured: -10.5 / -57.2, worse than no term at all.
-    what works      one shared head reading `z` alone. One mapping, so `z` must use one code.
-                    +0.544 / +0.435.
+    what we had     per-embodiment heads only. 18-D and 12-D joint commands live in different
+                    spaces, so nothing requires one `z` to mean the same thing on both robots.
+    what works      the same, plus one shared head reading `z` alone. One mapping for both robots,
+                    so `z` has to use one code. +0.544 / +0.435.
+    LAC-WM          **no joint-angle head at all.** One decoder, one target, and that target is a
+                    position in a physical space both embodiments share.
 
-Drawn rather than described because the distinction is three qualifications in a sentence -- one
-head, no embodiment key, blind to the frame -- and one picture of the wiring settles all three.
+**A frame-conditioned version of our shared head was also run and scored -10.5**, worse than no
+term at all, which is where F64 comes from. It is not drawn: it differs from LAC-WM's decoder in
+*two* ways at once -- the frame conditioning and a one-dimensional state target sitting beside
+joint heads that carry ten times its weight -- so the panel invited the reading that we had tested
+the published design and refuted it. We had not. The number belongs in a sentence, not a diagram.
+
+The third panel carries no score because it has not been run. It is drawn to show that all our
+variants share a shape the source method does not: joint angles as the main target, with alignment
+bolted on beside them.
 
   .venv/bin/python3 scripts/figures/plot_body_head_design.py
 """
@@ -41,8 +46,8 @@ def arrow(ax, p, q, colour=INK, lw=1.1, style="-|>"):
                                  shrinkA=1, shrinkB=1))
 
 
-def panel(ax, title, verdict, verdict_colour, shared_head=None):
-    """shared_head: None, 'frame' or 'z'."""
+def panel(ax, title, verdict, verdict_colour, shared_head=None, source=False):
+    """shared_head: None or 'z'. source=True draws LAC-WM's shape instead of ours."""
     ax.set_xlim(0, 10); ax.set_ylim(0, 10); ax.axis("off")
     ax.set_title(title, fontsize=10.5, color=INK, pad=8)
 
@@ -51,6 +56,19 @@ def panel(ax, title, verdict, verdict_colour, shared_head=None):
     box(ax, 2.6, 6.6, 2.1, 1.9, "trunk\ncross-attn", face="#f1f3f5")
     arrow(ax, (1.7, 8.05), (2.6, 7.9))
     arrow(ax, (1.7, 6.35), (2.6, 7.2))
+
+    if source:
+        # one MLP, one target -- "the resulting cross-attended features are fed into an MLP"
+        box(ax, 5.6, 7.0, 4.1, 1.1, "one MLP  →  positions in a\nshared physical space",
+            face="#eef2ff", edge="#4c6ef5", lw=1.6)
+        arrow(ax, (4.7, 7.55), (5.6, 7.55), colour="#4c6ef5", lw=1.6)
+        ax.text(7.65, 6.3, "no joint-angle head anywhere",
+                fontsize=7.8, color="#4c6ef5", ha="center")
+        ax.text(7.65, 5.8, "→ one target, shared by construction\n→ nothing to align alongside it",
+                fontsize=7.8, color="#4c6ef5", ha="center", va="top")
+        ax.text(5.0, 1.5, verdict, fontsize=10, color=verdict_colour,
+                ha="center", va="center", weight="bold")
+        return
 
     box(ax, 5.6, 7.9, 3.9, 0.85, "head [hexapod]  →  18", face="white")
     box(ax, 5.6, 6.7, 3.9, 0.85, "head [b1]  →  12", face="white")
@@ -88,11 +106,12 @@ def main():
 
     fig, axes = plt.subplots(1, 3, figsize=(15.5, 4.6))
     panel(axes[0], "What we had", "insect→b1   −7.08", GREY, shared_head=None)
-    panel(axes[1], "One shared head, conditioned on the frame",
-          "insect→b1   −10.48", ORANGE, shared_head="frame")
-    panel(axes[2], "One shared head, reading $z$ alone",
+    panel(axes[1], "Ours: one shared head, reading $z$ alone",
           "insect→b1   +0.54", TEAL, shared_head="z")
-    fig.suptitle("The shared head only constrains $z$ if it cannot tell the robots apart",
+    panel(axes[2], "LAC-WM: one decoder, one shared target",
+          "not run", "#4c6ef5", source=True)
+    fig.suptitle("Every variant we ran keeps joint angles as the main target. "
+                 "The source method has none.",
                  fontsize=12, color=INK, y=0.99)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     out = os.path.join(ROOT, args.out)

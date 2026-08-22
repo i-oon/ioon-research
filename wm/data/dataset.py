@@ -55,8 +55,11 @@ def load_clip(path):
             "repeat": int(data["repeat"]),
             # computed the same way as the cross-embodiment path, so a `lambda_body` run means
             # the same thing whichever loader it went through
-            "body_motion": body_motion(data["head"].astype("float64"),
-                                       HEXAPOD_DT)[:, BODY_CHANNELS],
+            # **not sliced here.** The channel selection happens once, where the statistics are
+            # computed and where a sample is drawn; slicing at load as well meant the array was
+            # indexed twice, which is invisible at the default (0,) and an IndexError the moment a
+            # second channel is switched on.
+            "body_motion": body_motion(data["head"].astype("float64"), HEXAPOD_DT),
         }
 
 
@@ -289,7 +292,7 @@ class MultiEmbodimentPairs(Dataset):
     """
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
-                 body_stats=None):
+                 body_stats=None, body_channels=BODY_CHANNELS):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -316,11 +319,13 @@ class MultiEmbodimentPairs(Dataset):
         # that small cannot move a gradient. `action` is standardised for this same reason a few
         # lines above.
         if "body_motion" in self.clips[0]:
-            pooled = np.concatenate([c["body_motion"][:, BODY_CHANNELS] for c in self.clips])
+            self.body_channels = tuple(body_channels)
+            pooled = np.concatenate([c["body_motion"][:, self.body_channels] for c in self.clips])
             self.body_stats = (pooled.mean(0),
                                np.maximum(pooled.std(0), 1e-6)) if body_stats is None else body_stats
         else:
             self.body_stats = None
+            self.body_channels = tuple(body_channels)
 
         # Labels for the adversary and probe. In the single-morphology setting these index the
         # *body*; here they index the *embodiment*, because that is the identity Stage 2 needs the
@@ -385,7 +390,7 @@ class MultiEmbodimentPairs(Dataset):
             "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
-            **({"body_motion": ((clip["body_motion"][t, BODY_CHANNELS] - self.body_stats[0])
+            **({"body_motion": ((clip["body_motion"][t, self.body_channels] - self.body_stats[0])
                                 / self.body_stats[1]).astype(np.float32)}
                if self.body_stats is not None else {}),
         }

@@ -29,6 +29,7 @@ LEGACY_DEFAULTS = {
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
     "lambda_body": 0.0,
+    "body_channels": (0,),
     "body_dim": 1,
     "body_sees_frame": False,
     "body_hidden": 128,
@@ -196,7 +197,13 @@ class Config:
     # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
     # (F55). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
-    body_dim: int = 1            # forward Froude only; see BODY_CHANNELS for why
+    body_dim: int = 1            # must equal len(body_channels)
+    # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
+    # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise
+    # (F58: AUC 0.788 from that column alone) and yaw is the candidate `data/beh12_*` was built to
+    # test (F77). Kept in the config rather than as a module constant so a control arm and a
+    # widened arm are the same code path with different settings.
+    body_channels: tuple = (0,)
     # True reproduces F64's negative result: conditioning the shared head on the frame lets it
     # identify the robot and decode per-robot, and transfer collapses to -10.5 / -57.2.
     body_sees_frame: bool = False

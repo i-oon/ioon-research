@@ -280,12 +280,14 @@ def build_cross_embodiment(cfg, root):
                                                   heldout_bodies=tuple(cfg.heldout_bodies),
                                                   clips_per_body=tuple(cfg.clips_per_body))
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
-                                     cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
+                                     cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
+                                     body_channels=_channels(cfg))
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
-                                   body_stats=train_set.body_stats)
+                                   body_stats=train_set.body_stats,
+                                   body_channels=_channels(cfg))
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -298,6 +300,16 @@ def _bool(text):
     if text.lower() in ("false", "0", "no"):
         return False
     raise argparse.ArgumentTypeError(f"expected true or false, got {text!r}")
+
+
+def _channels(cfg):
+    """`cfg.body_channels` as integers.
+
+    `parse_args` builds tuple options with `nargs="+"` and no `type=`, so `--body_channels 0 2`
+    arrives as the strings `["0", "2"]` and indexes nothing. A YAML config gives real integers.
+    Both have to work.
+    """
+    return tuple(int(c) for c in cfg.body_channels)
 
 
 def parse_args(cfg):

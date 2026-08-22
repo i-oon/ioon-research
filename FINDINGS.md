@@ -3817,9 +3817,17 @@ divergence. Appendix A.2 says otherwise:
 > nine-dimensional wrist pose **plus sixty dimensions representing finger positions**... for a total
 > of **138 dimensions** for both hands."
 
-Ten, twenty-nine and one hundred forty-seven (with the 9-D camera pose). No single MLP emits all
-three, so the MD **must** carry per-dataset output structure. The paper never describes it; the
-dimensionalities force it. So having per-embodiment output heads is *not* what separates us from
+Ten, twenty-nine and one hundred forty-seven (with the 9-D camera pose). **The paper does not say
+how one decoder emits three different widths**, and it should not be guessed at: per-dataset final
+layers, one wide layer with each dataset supervising only its own slots, and zero-padding all three
+to a common width are all consistent with what is written ("the resulting cross-attended features
+are fed into **an MLP** to produce motion outputs"). An earlier version of this entry asserted
+per-dataset heads as fact; that was an inference, and the masked or padded designs would mean the
+output weights are **shared**, which is a stronger form of the mechanism than the one described
+here, not a weaker one.
+
+What does not depend on the answer: their labels all live in **one physical space**, and ours do
+not. So having per-embodiment output heads is *not* what separates us from
 LAC-WM, and the "we built EAC-WM" reading is too strong.
 
 **What actually separates us is the coordinate the heads predict, not their number or size.**
@@ -4063,8 +4071,796 @@ ratio has to say which of the two it means. Steps 2m and 2n.
 
 ---
 
+### F71. A second insect gait, and the four wrong ways to get one
+
+Step 2k needs behaviours the hexapod does not have -- turning, backing, speed range -- and
+`--turn_bias`, the collector's existing steering knob, was measured on 2026-08-20 not to steer:
+at most 8 degrees of heading against 30 degrees of natural gait wander, because it adds a constant
+to a joint and moving where a leg sits does not change how far it pushes.
+
+**What works: a joint-space oscillator, ported from the lab's `student_Locomotion_Control_olaf_6legs`
+scene.** Two sinusoids a quarter cycle apart drive the three joints of every leg, signs flipped
+between the two tripod groups. `--gait cpg` in `sim/collect/collect_ik.py`.
+
+**It is a commandable gait, not a tripod.** The *drive* is a tripod -- the sign pattern puts FL HL MR
+against ML FR HR exactly -- but the *contacts* are not, and calling it one anywhere below is wrong.
+Measured over three repeats at the best settings: within-group agreement **0.641 +/- 0.008** against a
+clean tripod's 1.0, across-group **0.691 +/- 0.007**, duty factors spread **0.227** across the six
+legs. The lab's own Olaf scene does not produce one either -- its middle legs carry 260-636 N while
+its corner legs carry 0.006-25 N -- so this is the behaviour of the pattern, not a porting error.
+What the gait is good for is that it holds heading and takes commands; grouping is not what it
+delivers.
+
+| | travel | hip | Froude | heading change | wander |
+|---|---|---|---|---|---|
+| recorded wave | +0.59 m | 0.129 m | 0.161 | **+29°** | 1.29 |
+| **oscillator** | +0.37 m | 0.132 m | 0.102 | **-6° +/- 2** | 2.28 |
+
+**It holds its heading better than the recording does.** Speed comes from `--cycles`.
+
+**Correction, 2026-08-22: `--turn` does not steer, and the heading numbers first written here were
+read off the wrong axis.** `frame_axes` (collect_ik.py:140) establishes that in this scene the
+abdomen's **z** runs front-to-back and its **x** is vertical; taking heading as rotation about z
+therefore measures roll. On the same clip that convention reads **+79 deg** where the correct one
+reads **-6**, against a measured wander of 2.28 -- the sign that it is wrong is that a clip which
+barely deviates cannot have yawed most of a right angle. Re-measured over three repeats each:
+
+| | heading | vs straight | travel | lateral | lateral/forward |
+|---|---|---|---|---|---|
+| straight | -6 +/- 2 | -- | 0.37 +/- 0.00 | -0.12 | -0.32 |
+| `--turn -0.3` | +8 +/- 2 | **+14** | 0.21 +/- 0.01 | -0.09 | -0.44 |
+| `--turn +0.3` | -4 +/- 3 | **+2** | 0.29 +/- 0.00 | 0.12 | 0.43 |
+| `--spin 0.8` | -79 +/- 2 | **-73** | 0.09 +/- 0.01 | -0.37 | -4.16 |
+| `--strafe 0.8` | +60 +/- 4 | +66 | 0.11 +/- 0.04 | **0.62 +/- 0.01** | 6.84 |
+
+`--turn +0.3` moves the heading **2 degrees** and `-0.3` moves it 14 -- neither monotonic nor
+symmetric, and both far inside `--spin`'s 73. **What `--turn` actually does is brake**: travel drops
+from 0.37 to 0.21 m. That follows from its mechanism, which scales down one side's amplitude, so
+both of that side's legs take shorter steps and the robot slows more than it yaws. The withdrawn
+claim was `+0.3 -> +30 deg, -0.3 -> -18`.
+
+**Use `--spin` for turning.** It is the drive F72's matched-yaw table is built on, so nothing there
+is affected. `--turn` and `--turn_bias` were removed from `collect_ik.py` on 2026-08-22.
+
+**Sideways is a gait, not a modifier -- and that is what makes it work.** `--strafe 0.8` on top of
+forward walking translates 0.62 m sideways but yaws 66 degrees doing it. Splitting the drive by leg
+row locates the yaw but does not fix it: the front row alone yaws **+1 deg**, the middle **+12**, the
+hind **+80**, so it is not a front-against-hind couple and no set of per-row gains cancelled it --
+the best of four tried still left 20 degrees. **Turning the fore-aft swing off does.** The yaw was
+never coming from the sideways drive; it came from that drive **fighting a swing that was still
+running** -- the hind legs asked to stride forward and splay outward in the same stroke, and the body
+twists.
+
+Three further corrections took it from a crawl to a real gait, and each was found by measuring
+rather than by tuning:
+
+*The splay-lift phase was inherited from forward walking and is wrong for sideways.* A leg has to
+splay while planted and fold while lifted; `--ft_phase 0.125` had it splaying in the air and
+dragging on the ground, which showed up as **80% of the stroke lost to slip** -- 0.24 rad of splay on
+a 0.5-0.77 m leg should carry 0.12-0.18 m and carried 0.03. Sweeping the full circle, **0.5 --
+exact antiphase, which is what the mechanics ask for -- is three times faster per cycle**.
+
+*`--spin` was multiplying by zero in the one configuration that needed it.* It scaled by `amps[0]`,
+the fore-aft amplitude, which this gait sets to **0.00**. A sweep of `--spin 0.15` against `0.25`
+moved the heading by 1 degree and read as "spin cannot cancel this yaw" when spin had never been
+applied. `--spin_amp` now gives it an amplitude of its own; **F72's matched-yaw table runs at
+`amps[0] = 0.25` and is unaffected**.
+
+*The residual yaw is a constant, so it subtracts.* Sideways at antiphase yaws **+20 deg +/- 2** --
+repeatable, therefore cancellable. `--spin` moves it about 150 deg per unit and monotonically:
+
+| `--strafe` | `--spin` | sideways | per cycle | forward | heading |
+|---|---|---|---|---|---|
+| -0.8 | 0 | 0.30 +/- 0.01 | 0.056 | +0.01 | +20 +/- 2 |
+| -0.8 | 0.15 | 0.33 +/- 0.03 | 0.060 | +0.06 | -2 +/- 2 |
+| +0.8 | -0.15 | 0.55 +/- 0.06 | 0.096 | -0.02 | -17 +/- 6 |
+| **+0.8** | **-0.18** | **0.42 +/- 0.06** | **0.073** | +0.06 | **-2 +/- 4** |
+| +0.8 | -0.20 | 0.39 +/- 0.04 | 0.068 | +0.08 | +3 +/- 5 |
+
+Cancelling the yaw always costs distance -- `--spin 0` runs 0.55 m and 38 degrees off -- so the
+setting is the largest `--spin` the heading can be brought to zero with, not the largest travel.
+
+**The sideways gait is therefore, one setting per direction** (re-derived at `--scale 0.65`):
+
+    right   --amps 0.00 0.20 0.30 --ft_phase 0.5 --strafe  0.8 --spin -0.24 --spin_amp 0.25
+    left    --amps 0.00 0.20 0.30 --ft_phase 0.5 --strafe -0.8 --spin  0.19 --spin_amp 0.25
+
+both with `--gait cpg --ik_iters 8 --scale 0.65 --symmetric`. **Right runs 0.52 m +/- 0.06 at -1 deg
+of heading and is pure -- sideways travel is 1.00 of total displacement. Left runs 0.30 m +/- 0.01
+at -0 deg, purity 0.98.** At the old `--scale 0.5` the same two ran 0.42 and 0.33.
+
+**Widening the foot path raises the extend ceiling from `A[2]` 0.30 to 0.40, and 0.40 still loses.**
+The headroom argument says take the larger: 0.40 clips nothing at this scale and travels **0.75 m**
+against 0.30's 0.58. But it also yaws **-56 deg** against -38, and cancelling that costs more than
+the extra distance is worth -- at zero heading, 0.30 lands at **0.54 m and 0.94** while 0.40 lands
+at 0.46 m and purity 0.94, walking 0.17 m forward while it crabs. **The quantity to maximise is
+travel after the yaw is removed, not before**, and a gait that generates less yaw to begin with
+starts ahead. `A[2] = 0.50` clips three joints and is out regardless.
+
+*The splay-lift antiphase is unchanged by the wider path*, as its mechanical argument predicts:
+`ft_phase` 0.375 and 0.625 travel 0.15 and 0.06 m against 0.5's 0.54. Sideways is now the faster of the two per cycle, which is the opposite of where this
+started.
+
+**The two directions are not mirror images and must not be generated by flipping a sign.** They
+differ in distance (0.42 against 0.33) and they need *different* yaw trims (-0.18 against +0.15),
+because the animal is not symmetric: the leg pairs are 0.771, 0.489 and 0.638 long and the walking
+pose the oscillator is centred on is itself asymmetric. Collect and measure each direction
+separately.
+
+**Reading a direction off the abdomen frame needs care, and it has now caused two wrong numbers.**
+`frame_axes` identifies the abdomen's **z** as the fore-aft axis but not which end of it is the
+front, and it points **aft**: its dot product with the direction straight walking actually travels
+is **-0.96**. Taking it as forward reports left and right swapped. Heading *changes* survive this --
+a constant 180 degree offset cancels in a difference, so every `a[-1] - a[0]` above stands -- but
+any statement about which way the robot went does not. Fix the sign against straight walking's own
+displacement before using it.
+
+**The extend amplitude cannot be raised, and the reason is a joint limit rather than traction.**
+Widening the splay is the obvious way to ask for more distance and it fails: `A[2]` at 0.35, 0.40
+and 0.50 travels 0.09, 0.08 and 0.20 m against 0.30's 0.42, and the direction reverses twice.
+Checking the commands against `sim.getJointInterval` shows why -- from 0.35 upward, three joints
+(`FR_2 MR_2 HR_2`) are commanded past their limit and the waveform is clipped. At 0.30 nothing is
+clipped and the margin is **0.06 rad**, in both strafe directions. This follows from the balance
+knob: `|right| = A[2](1 + |strafe|)` puts 90% of the splay on one side, so raising `A[2]` pushes
+only the side that is already full. **0.30 is the ceiling of this parameterisation, not of the
+robot** -- the standing pose of the extend joints sits about 2.5 rad, 0.64 from the +pi limit and
+5.6 from the other, so re-centring the bias would roughly double the available swing. Untried.
+
+**Two things not to assume.** The amplitude is a **narrow optimum** -- at `ft_phase 0.125`, `--strafe`
+0.6 and 1.0 scatter by a factor of ten across identical runs while 0.8 holds to +/- 0.03 -- so
+retuning any one number needs the repeats. And **the two sideways directions are not mirror images**:
+`--strafe +0.8` and `-0.8` at the same phase gave -0.55 and +0.30, different distances and different
+yaw, so left and right have to be measured separately rather than assumed symmetric.
+
+**Speed: widen the foot path, do not run the oscillator faster.** `--scale`, the shared foot-path
+scale about each body's hip, defaults to **0.5** -- feet pulled halfway in, so that the shortest
+legs in `ik_walk_8body` could still reach a shared absolute coordinate. Once the collection is one
+long-legged body (F15: the hexapod morphology space is two-dimensional and a held-out body is
+reconstructed from a 2-D basis to 0.203 deg, so extra bodies add almost nothing), that constraint
+has no purpose -- **and it reaches the oscillator too**, because `--gait cpg` centres itself on the
+mean of the IK commands, which were solved against the compressed targets. Three repeats:
+
+| `--scale` | Froude | heading | hip | wander | frames | FT headroom |
+|---|---|---|---|---|---|---|
+| 0.5 | 0.100 +/- 0.000 | -6 +/- 2 | 0.132 | 2.23 | 66 | 0.29 rad |
+| **0.65** | **0.131 +/- 0.003** | **-0 +/- 0** | 0.176 | 1.67 | 66 | 0.51 rad |
+| 0.8 | 0.200 +/- 0.002 | -3 +/- 2 | 0.219 | 1.37 | 55 | 0.74 rad |
+
+**Every column improves at once, which is not what tuning usually looks like** -- further, straighter
+and less wandering. **0.65 is adopted**: it puts the hexapod at Froude 0.131 against the *already
+collected* B1 clips at `--vx 0.30` (0.135), so the two robots match at a speed **neither has to
+crawl to reach**, and the 66-frame clip length is preserved (0.8 finishes the travel gate early and
+loses a fifth of its transitions).
+
+**Two consequences to carry.** The body rides at **0.176 m against the recorded animal's 0.129**, so
+this gait is matched to the B1 rather than to the insect it is modelled on -- a deliberate choice,
+not a drift. And the **extend-joint headroom nearly triples, 0.29 to 0.51 rad**, which withdraws the
+conclusion below that `A[2]` cannot be raised: it was clipped because the standing pose was
+compressed, not because the robot ran out of joint.
+
+**Superseded: `--cycles 9.3` also reaches the animal's Froude.** At the default 6 it walks
+at **0.100** against the recorded wave's 0.161 and the B1's 0.17, and a clip that differs from its
+cross-robot partner in two channels at once screens neither. `--cycles` scales it cleanly and the
+body height does not move, which matters because Froude divides by it:
+
+| `--cycles` | Froude | heading | travel | hip |
+|---|---|---|---|---|
+| 6 | 0.100 +/- 0.000 | -6 +/- 2 | 0.38 | 0.132 |
+| 9 | 0.164 +/- 0.000 | -14 +/- 0 | 0.62 | 0.134 |
+| **9.3** | **0.161 +/- 0.004** | **-5 +/- 0** | 0.61 | 0.134 |
+| 10 | 0.197 +/- 0.006 | +11 +/- 5 | 0.74 | 0.134 |
+| 12 | 0.225 +/- 0.003 | -0 +/- 0 | 0.79 | 0.129 |
+
+**9.3 lands on 0.161, the recorded animal's own value, and within 5% of the B1's 0.17**, but it
+drifts more on video and `--scale` gets the same speed with every metric improving instead. The
+heading column is not noise -- its spread inside a row is zero and only the row changes -- so it is set by
+where in the stride the clip happens to end, not by instability.
+
+**The sideways gait cannot follow.** It runs at Froude **0.119** and `--cycles` above 6 destroys it
+(9 travels 0.05 m, 12 reverses), so the sideways condition sits at a different speed from the
+forward one by construction. Anything comparing sideways across the two robots has to match speed
+some other way, or accept the mismatch and say so.
+
+**The speed ladder, matched level by level to the B1's own clips.** At `--scale 0.65`, `--cycles`
+spans the quadruped's whole measured Froude range with the body height staying flat (0.176 to 0.171,
+3%), which `--scale` could not do -- it moved the hip 0.176 to 0.219, and a hexapod whose height
+tracks its speed against a B1 whose does not would plant that correlation straight in the body-pose
+channel being screened.
+
+| `--cycles` | hexapod Fr | B1 `--vx` | B1 Fr | gap | heading | frames |
+|---|---|---|---|---|---|---|
+| 5.8 | 0.121 +/- 0.002 | 0.30 | 0.128 | -5% | +4 +/- 1 | 66 |
+| 6.4 | 0.136 +/- 0.001 | 0.34 | 0.143 | -5% | -7 +/- 0 | 66 |
+| 7.1 | 0.155 +/- 0.006 | 0.38 | 0.161 | -4% | -4 +/- 1 | 66 |
+| 8.15 | 0.172 +/- 0.001 | 0.40 | 0.170 | **+1%** | -4 +/- 3 | 66 |
+| 8.5 | 0.187 +/- 0.002 | 0.46 | 0.194 | -4% | -1 +/- 2 | 66 |
+| 8.8 | 0.206 +/- 0.005 | 0.50 | 0.209 | **-1%** | +3 +/- 8 | 59 |
+
+The hexapod runs about **5% slow throughout** -- a systematic offset rather than scatter, so it is a
+consistent bias and not a per-level mismatch.
+
+**The response has a plateau, and reading it as a ceiling would have cost two levels.** Between
+`--cycles` 7.1 and 7.7 the Froude barely moves: 7.4 and 7.7 both return **0.159**, which is 2.6%
+above 7.1's 0.155 while 7.1's own scatter is +/- 4%. Two clips there would be one speed wearing two
+B1 labels, which is worse than a gap because the gap is honest. **The climb resumes immediately
+after**, and 8.15 gives the tightest pair in the table. Levels have to be placed by measuring the
+response, not by interpolating between its ends.
+
+**There is a second plateau at 8.3-8.65 and a narrow bad spot at 8.9, and both were found only by
+sweeping finely.** 8.3, 8.5 and 8.65 all return ~0.188, so the level there is a choice of *which*
+point on a flat region -- 8.5 is the one to take, heading **-1 +/- 2** against 8.3's +6 +/- 1 and
+keeping 66 frames where 8.3 drops to 61. And 8.9 reads heading **-14 +/- 13** while 8.8, 0.1 away,
+reads **+3 +/- 8** at a *better* speed match. Reading 8.9 as the ceiling would have truncated the
+range at `vx 0.46` for no reason; it is a single unstable point with clean ground on both sides.
+
+The top level's heading spread, +/- 8, is still the loosest in the table against +/- 1 to 3
+elsewhere. It is the cost of covering `vx 0.50` and is declared rather than hidden.
+
+**The behaviour set is therefore: straight, `--spin` at four levels (turn), the two sideways gaits,
+and `--cycles` at six levels (speed) -- all at `--scale 0.65`.**
+
+**All three are one equation, and the `cpg_commands` docstring now derives it.** Three oscillators
+share a clock; each joint takes a mirrored drive plus an un-mirrored one; and because the two sides
+of the body are mirror images, **whether a term is mirrored is what decides the behaviour** -- a
+mirrored term moves both sides the same way through the world and the robot walks, an un-mirrored
+one cancels the fore-aft parts and what is left depends on which joint received it. The useful
+question about any of these gaits is therefore *which joint carries a left-right amplitude
+imbalance*, in radians per leg:
+
+| | TC sweep | CF lift | FT extend | imbalance |
+|---|---|---|---|---|
+| straight | 0.250 both | 0.200 both | 0.300 both | none |
+| `--spin 0.8` | **0.450 / 0.050** | 0.200 both | 0.300 both | **9:1 at TC** |
+| sideways | 0.037 both | 0.200 both | **0.060 / 0.540** | **1:9 at FT** |
+
+**CF is identical in all three** -- it is the clock, not a drive. `spin` and `strafe` are balance
+knobs rather than throttles, giving `|left| = A(1 + knob)` against `|right| = A(1 - knob)`, so at
+`knob = 1` one side's joint stops moving altogether. That is the mechanism behind the narrow
+optimum: `--strafe 1.0` collapses to 0.12 m from 0.8's 0.33 because at 1.0 one side is switched
+off.
+
+**Three things had to be right, and the metric that caught the last one was the video.**
+
+*Oscillate around the animal's walking pose, not the model's spawn pose.* Using the scene's default
+joint angles put the abdomen at **0.284 m against the recording's 0.129**, and at a different height
+for every behaviour -- 0.248 turning, 0.103 backing. Froude divides by that height, so a posture
+that moves between behaviours makes the one quantity both robots share incomparable. The mean of
+the IK commands is the pose the recording walks in, and costs one IK pass to get.
+
+*Mirror **every** joint between the sides, not just the sweep.* Whether a joint angle swings a leg
+forwards or backwards depends on which way its axis points, and the two sides of a mirrored body
+point opposite ways. Mirroring only the fore-aft joint left the lift joints fighting each other
+across the midline and the robot walked a **90 degree arc** while its start-and-end displacement
+still passed `walk_check`. Mirroring all three took the heading change from **-89° to -1°**.
+
+*`walk_check` cannot see this, and neither could the metric added to replace it.* Start-and-end
+distance passes a body that yaws its way across the floor; a path-length ratio passes a smooth
+curve. **Watching the clip is what caught it** -- the body turns to face the camera by two thirds of
+the way through, which no number being printed at the time reflected. Net heading change is now
+printed per clip, and it is the number to read.
+
+**And a separate finding that applies to every clip ever collected here.** IK was solved with **one**
+solver call per frame, which is a fixed number of steps and not a solution. On the recorded path it
+keeps up; on any re-timed path it does not, and reports as if the target were unreachable when it is
+simply not converged. `--ik_iters 8` takes the recorded gait's residual from **0.28 / 36.97 mm to
+0.00 / 0.00** with no change to how it walks. Every dataset before 2026-08-21 carries the residual.
+
+**The four routes that failed, because the reasons generalise.** The code for all of them was
+removed from `collect_ik.py` on 2026-08-22 -- `--gait tripod` with `synth_tripod`, `--no_rephase`,
+`--trim`, and `--strafe_gain` -- so this table is the only remaining record. A measured failure left
+in an argument list reads like an option.
+
+| tried | measured | why |
+|---|---|---|
+| ellipse built from the recording's mean and range | residual **365 mm** | a leg's reachable set is a curved shell; a box measured around it includes corners that are not in it |
+| the same, with the sweep taken from planted frames only | **343 mm** | still a box, and lowering the stance line to the ground made it worse |
+| re-timing the recorded wave into a tripod | residual **0.00 mm**, travel **-0.43 m**, body at forty degrees | leg paths authored for a gait that lifts one leg at a time do not support a body when three lift together. **A gait has to be designed as a whole; re-phasing one does not give another** |
+| levelling the planted feet so three could support the body | **345 mm** | the abdomen frame is pitched with the body, so flat ground appears as a slope in it and the recorded feet already lie on that slope |
+
+**The tripod is a second gait, not a replacement.** The recording is a variable wave -- one leg's
+phase barely predicts the others, 0.07-0.24 concentration against a B1's 0.99-1.00 (F56) -- and that
+looseness is what F45 cites for why no cross-robot frame pairing exists. A hexapod that walks both
+against a quadruped that only trots is more coverage, not less contrast. **Collect them as separate
+conditions**, or a later alignment gain will not be attributable to behaviour rather than to the
+insect's gait having been made more B1-like.
+
+---
+
+### F72. Yaw is commandable on both robots, and their dimensionless ranges overlap
+
+F70 left the shared target at one channel because the other five are constants in our data. The
+hexapod now turns (F71's `--spin`), the B1 always could (`--wz`), and the question is whether the
+two can be made to do **the same thing** rather than merely both do something.
+
+**Nondimensionalise the turn the way Froude nondimensionalises the speed**: `ŵ = ω sqrt(h/g)`, with
+`h` the hip height. Two robots at the same `ŵ` are turning at the same rate relative to their own
+scale.
+
+**Re-derived 2026-08-22 at `--scale 0.65`** (F71: the foot path was widened, which moves the standing
+pose and roughly triples the turn rate per unit of `--spin` -- 0.4 gave 0.0180 at the old scale and
+gives 0.0557 at the new one). The B1 side is untouched, since its clips are already collected and
+its four levels already measured; only the hexapod commands move:
+
+| ŵ | hexapod `--spin` | ŵ measured | B1 `--wz` | ŵ measured | gap |
+|---|---|---|---|---|---|
+| ~0.007 | 0.05 | 0.0081 +/- 0.0006 | 0.00 | 0.0067 | +21% |
+| ~0.021 | 0.15 | 0.0200 +/- 0.0007 | 0.08 | 0.0209 | -4% |
+| ~0.041 | 0.29 | 0.0388 +/- 0.0009 | 0.19 | 0.0407 | -5% |
+| ~0.077 | 0.56 | 0.0736 +/- 0.0004 | 0.40 | 0.0772 | -5% |
+
+Three of four match within 5%; the first row's 21% is a small denominator -- the absolute gap is
+0.0014, inside the gait's own wander, and both rows are "walking straight". **The hexapod holds
+Froude 0.132 / 0.131 / 0.122 / 0.121 across the whole yaw range against the B1's 0.120-0.135**, so
+speed and yaw are still separable channels rather than one confounded behaviour.
+
+*Superseded, for the record -- the same table at the old `--scale 0.5`:*
+
+| ŵ | hexapod `--spin` | ŵ measured | B1 `--wz` | ŵ measured |
+|---|---|---|---|---|
+| ~0.007 | 0 | 0.0075 | 0.00 | 0.0067 |
+| ~0.019 | 0.4 | 0.0180 | 0.08 | 0.0209 |
+| ~0.042 | 0.8 | 0.0428 | 0.19 | 0.0407 |
+| ~0.082 | 1.2 | 0.0872 | 0.40 | 0.0772 |
+
+**The ranges overlap across their whole span**, and the hexapod side is repeatable to a standard
+deviation of **0.002 rad/s or better** over two runs at each level. **This is the first pair of
+matched commands this project has for any channel other than forward speed.**
+
+**Turning does not disturb the speed on either robot, within the range actually used.** At the
+adopted scale the hexapod holds 0.121-0.132 across the four matched levels and the B1 0.120-0.135.
+Pushed further it does bite -- `--spin 1.2` at `--scale 0.65` drops Froude to **0.054** -- so the
+independence is a property of this range, not of the gait. At the old scale the hexapod held
+0.095-0.112 and the B1 0.166-0.170, so yaw and forward vary independently and can be
+screened as separate channels rather than as one confounded behaviour.
+
+**The speed gap is closed by slowing the B1, not by speeding the hexapod.** The oscillator walks at
+Froude ~0.10 against the B1's ~0.17, and a clip that differs from its partner in two channels at
+once screens neither. Both directions were measured on 2026-08-22:
+
+*The hexapod can be sped up, at a cost.* `--cycles 9.3` reaches Froude **0.161 +/- 0.004** -- the
+recorded animal's own value -- with the body height unchanged. On video it walks, but it drifts
+more, and the sideways gait cannot follow at all (it runs at 0.119 and `--cycles` above 6 destroys
+it: 9 travels 0.05 m, 12 reverses).
+
+*The B1 can be slowed for free.* `--vx 0.22` gives Froude **0.101**, against the hexapod's 0.100 at
+its default `--cycles 6`. Tracking is linear across 0.18-0.30, the trot is intact -- **2.08 feet
+down**, hip 0.561 m unchanged -- and the lateral drift ratio stays at **-0.32**, which happens to be
+the hexapod's straight-walk figure exactly.
+
+*And it costs nothing in the table above, because turn rate and speed are independent on the B1:*
+
+| `--wz` | w_hat at `--vx 0.22` | w_hat at `--vx 0.40` |
+|---|---|---|
+| 0.08 | 0.020 | 0.021 |
+| 0.19 | 0.040 | 0.040 |
+| 0.40 | 0.078 | 0.077 |
+
+**So the matched set is the hexapod at `--cycles 6` with `--spin` 0 / 0.4 / 0.8 / 1.2 against the B1
+at `--vx 0.22` with `--wz` 0.00 / 0.08 / 0.19 / 0.40 -- the pairing above, unchanged, now at a
+matched Froude of ~0.10 as well.** Slowing the quadruped keeps the hexapod on the settings its gait
+was tuned and watched at, and leaves this whole table valid rather than re-deriving it.
+
+**Measuring this at all took three corrections, and each was giving confident wrong numbers.**
+
+| measured from | read straight walking as | why |
+|---|---|---|
+| `/head` orientation | -151 deg of turn | the head segment sways 129 deg every stride |
+| `/abdomen`, Euler angles | -99 deg | beta sits at -84 deg, a hand's breadth from gimbal lock |
+| **`/abdomen`, quaternion, unwrapped trend** | **+15 deg, 16 deg of sway** | matches the video |
+
+`collect_ik.py` now records `body_quat` per frame. Nothing before 2026-08-21 has it, which is why
+roll, pitch and yaw could not be screened at all (F70).
+
+
+---
+
+### F73. Equal feet do not give equal contacts: the body decides, not the legs
+
+F71's oscillator leaves the middle legs' contact bars short and broken, and the kinematics say why.
+The three leg pairs measure **0.771, 0.489 and 0.638** long, so one amplitude gives three strokes:
+measured on `c10f10t10`, the front feet lift **0.111** and the middle feet only **0.045**, and the
+front feet reach **0.038** deeper than the middle pair and **0.056** deeper than the hind. Whichever
+feet reach lowest carry the robot, so the contact pattern follows leg length rather than the phase
+the oscillator asks for.
+
+**The obvious fix was built, and it made the gait worse.** `scripts/diagnostics/tune_legs.py` solves
+two numbers per leg against the kinematics -- a gain on the lift and extend amplitudes so every foot
+rises the same distance, an offset on the same joints so every stroke bottoms out at the same height
+-- and it converges cleanly, closing the lift spread from **0.072 to 0.0000** and the depth spread
+from **0.056 to 0.0001**. Three repeats each, same settings otherwise:
+
+| | in-group | across | feet down | duty spread | forward |
+|---|---|---|---|---|---|
+| untuned | **0.641** +/- 0.008 | **0.691** +/- 0.007 | 3.21 | **0.227** | **0.37 m** |
+| feet levelled and lifts equalised | 0.451 +/- 0.010 | 0.511 +/- 0.003 | 2.90 | 0.465 | 0.22 m |
+
+Every column is worse, the repeats are tight enough that none of it is noise, and **the duty spread
+-- the very quantity the correction targets -- doubles**. Only MR's own duty improves, 0.41 to 0.57,
+which is what makes this worth writing down rather than deleting: the intervention did exactly what
+it was designed to do to the leg it was aimed at, and the gait still got worse.
+
+**Why: the correction is computed in the body frame, and the body does not hold still.** Foot
+heights are equalised relative to the abdomen, which is the same mistake F71's fourth failed route
+made -- flat ground appears as a slope in a frame that pitches with the body. Under the tuned
+settings the body's attitude swings **3.5x more** over a stride than untuned and the hip sits
+**0.114 m** against **0.132 m**. Equalising six feet against a rocking frame does not put them on
+one plane; it feeds the rocking.
+
+The general form, which is F71's third failure again from another direction: **a gait is a
+closed loop through the body, and per-leg geometry is an open-loop correction to it.** Getting a
+clean tripod out of this animal needs the pose solved against the *world*, or the timing adapted
+from contact -- which is what the lab's actual CPG (Larsen et al. 2023) does and this ported
+demonstration oscillator does not.
+
+**Kept as it stands.** `--legtune` is wired into `cpg_commands` and off by default. The settings that
+stand are `--gait cpg --ik_iters 8 --amps 0.25 0.20 0.30 --ft_phase 0.125 --symmetric`, now confirmed
+over three repeats rather than a single clip.
+
+---
+
+### F74. The two robots' clips were recorded at different frame rates, and every cross-embodiment number was computed across that gap
+
+The insect collector records at **20 Hz** and `render_b1_replay.py` rendered **one frame per MuJoCo
+rollout step, which is 50 Hz**. Both sides then stored a clip as a sequence of frames with no rate
+written down, so the mismatch never surfaced:
+
+| | frames | duration | **per stored transition** |
+|---|---|---|---|
+| hexapod | 66 | 3.30 s | **50 ms** |
+| B1 (`data/b1_framed`, and today's first pass) | 99-126 | ~2.0-2.5 s | **20 ms** |
+
+The ITM is handed `(e_t, e_t+1)` and asked for the latent of "the transition". **On one robot that
+transition is 2.5x longer than on the other.** Everything computed across the pair inherits it --
+F43/F46's below-chance cross-embodiment sharing, F51's forward model that does worse than predicting
+no motion, F58's per-channel AUCs, F45's pairing feasibility. None of those numbers are wrong about
+the data they were given; the data was not comparable.
+
+**It also interacts with a finding we already had.** F70 measured that the body channels only cross
+robots once averaged over a stride rather than a frame -- forward speed goes from **-1.45 raw to
++0.54 stride-averaged**. A stride-length window is 19 frames on the hexapod and 48 on the B1, so
+stride-averaging was partly *correcting for this* without anyone knowing, which is consistent with
+why it helped so much more than the size of the effect seemed to warrant.
+
+**Fixed by subsampling frames, not by changing the physics.** `--fps 20` on the replay keeps the
+rollout at 50 Hz -- the policy is untouched and still runs at the rate it was trained at -- and
+renders every 2.5th step. Two details that were wrong in the first attempt and are worth stating
+because both are silent:
+
+*Index the proprioception by the frames actually rendered.* The save block sliced `T[k][:n]`, which
+equals "the steps that became frames" **only** when every step became one. Under subsampling it
+pairs frame `i` with a different moment's joint angles, desynchronising vision from proprioception
+without any error.
+
+*Derive `dt` from the requested rate, not from the first gap.* A 2.5-step stride rounds to gaps of
+2 and 3 alternately, so `idx[1] - idx[0]` reports **0.04 s** where the mean interval is 0.05 -- a
+20% timing error inside the fix for a timing error.
+
+`--max_frames` was added alongside it so every condition yields the same clip length whatever its
+speed. The B1 set is now **66 frames at 3.30 s**, identical to the insect, with Froude back on
+calibration (0.133 against the 0.128 expected, 0.217 against 0.209).
+
+**`data/b1_framed` still carries the old rate.** It is not deleted, because the results that cite it
+have to remain reproducible, but nothing new should be measured against it.
+
+
+---
+
+### F75. Matching a magnitude is not matching a channel: the two robots were turning opposite ways
+
+F72 pairs the hexapod's `--spin` to the B1's `--wz` on the dimensionless turn rate **w_hat**, and
+w_hat is defined as a magnitude. The pairing therefore says nothing about which way each robot
+turns, and they turn opposite ways:
+
+| | speed conditions | sideways | turn conditions | sign consistent |
+|---|---|---|---|---|
+| hexapod | +0.49 +/- 2.66 | -0.51 +/- 0.76 | **-14.89 +/- 10.41** | yes, negative |
+| B1 | +2.16 +/- 0.29 | +1.28 +/- 0.61 | **+8.74 +/- 6.16** | yes, positive |
+
+signed yaw rate, deg/s. **The calibration could not see this**, because every table built to match
+the two sides reported `|w_hat|` and the two columns agreed to within 5%.
+
+**What it costs.** Pooled over the twelve conditions, signed yaw separates the robots at **AUC
+0.871** -- the yaw value alone says which robot it came from, which is the exact gate F69 added
+after lateral speed failed it at 0.788. A shared 6-DOF body target would then be trained on a
+channel where `+w_hat` means "turning left" on one robot and "turning right" on the other, so the
+head could reduce its loss by learning which robot it is looking at instead of how fast it is
+turning -- the same shortcut F43/F46 measured the trunk already taking.
+
+**A second, smaller version of the same thing.** The B1's yaw is positive in *every* condition,
+including the ones commanded straight: **+2.16 deg/s walking forwards, +1.28 sideways**, with a
+standard deviation of 0.29 -- a constant bias, not scatter. The hexapod's straight conditions
+scatter about zero instead (+0.49 +/- 2.66). Even with the turn sign fixed, a constant offset in
+one robot's yaw is a free embodiment cue.
+
+**Fixed** by re-collecting the hexapod's four turn conditions at negative `--spin`, since positive
+`--spin` yaws negative. The B1 bias is left in and declared; removing it means either retraining the
+policy or subtracting a per-robot mean, and subtracting a per-robot mean is exactly the kind of
+per-embodiment correction this project exists to avoid.
+
+**The general lesson, and it has now bitten twice in one day.** F71 read left and right swapped by
+taking the abdomen's fore-aft axis as pointing forward when it points aft. Here a magnitude-only
+match hid a sign flip. **A quantity matched across two robots has to be matched as a signed vector
+in a shared world frame, and the direction convention has to be checked against something physical
+-- which way the robot actually travelled -- rather than assumed from an axis name.**
+
+
+---
+
+### F76. Re-screening the channels on matched behaviour: the frozen encoder holds two, the trained latent holds none
+
+F70 screened the body channels and only forward speed passed, and it named the cause: **the other
+five were constants in our data**, because both robots only ever walked forwards. `data/beh12_*`
+removes that -- twelve matched conditions per robot spanning speed, turn and sideways travel,
+balanced 4/4/4, 48 clips a side. This is the re-test.
+
+`screen_behaviour_channels.py` scores four channels (F70's three plus **yaw**, which the old screen
+had no rotational channel for) at two timescales against F69's three gates, on the frozen encoder --
+`stage2speed7body` predates both F71's wider foot path and F74's frame rate and has never seen
+either robot's current data, so its `z` says nothing here.
+
+**A held-out clip is not a held-out behaviour, and the difference reverses the result.** Within a
+condition the four clips agree to **2-10% of the between-condition spread** on both robots -- they
+are one behaviour recorded four times, not four samples. A clip-level 70/30 split therefore leaves
+near-duplicates of a training behaviour in the test set, and a readout can score by recognising a
+behaviour it has already seen. Splitting on **condition** holds whole behaviours out. Five seeds
+each, smoothed rows, frozen encoder:
+
+| channel | robot AUC | hex->b1 | b1->hex | | by clip: b1->hex |
+|---|---|---|---|---|---|
+| **forward** | 0.66 +/- 0.11 | **+0.36 +/- 0.10** | -1.08 +/- 1.34 | | -0.56 +/- 0.39 |
+| lateral | 0.68 +/- 0.04 | -0.16 +/- 0.44 | +0.04 +/- 0.45 | | +0.20 +/- 0.19 |
+| vertical | 0.63 +/- 0.03 | -1.72 +/- 0.57 | -1.94 +/- 0.49 | | -1.74 +/- 0.36 |
+| yaw | 0.72 +/- 0.10 | -0.82 +/- 0.23 | **+0.10 +/- 0.19** | | **+0.31 +/- 0.06** |
+
+**Yaw's clip-split result was the artefact.** It read +0.31 +/- 0.06, positive on all five splits and
+the tightest number in the table, and it was reported as the one finding that survived. Held out by
+behaviour it is **+0.10 +/- 0.19** -- zero. The tightness was the duplicates: five splits of the same
+leak agree with each other.
+
+**Forward is the opposite** -- it gets *stronger and tighter* under the harder split, +0.21 +/- 0.13
+to **+0.36 +/- 0.10**, hexapod to B1. A readout for walking speed fitted on the insect generalises to
+a quadruped performing behaviours it never saw. That is a real cross-embodiment transfer, and it is
+the same single channel F70 already had.
+
+**Withdrawn 2026-08-22, see F77: this section originally concluded that the collection had failed.**
+Everything below is measured on the **frozen encoder**, which is the state *before* any training --
+and F66 measures forward speed at 0.31 frozen against 0.85-0.92 once the body head is trained. Judged
+by its frozen number the one channel that works would have been condemned too. The correct reading
+of what follows is "no new channel is shareable **without being taught to be**", which is not the
+same claim and does not answer whether the collection helped.
+
+**With that caveat, what the frozen encoder says.** F70's stated cause was
+that five of six channels were constants in our data. They are not constants any more -- yaw spans
+w_hat 0.007-0.076 and lateral spans Froude 0.07-0.19, on both robots, matched to within 10%, with
+speed held apart from yaw so the channels are separable. **Coverage was supplied, and untrained the new channels
+still sit at zero**: lateral and yaw at chance, vertical strongly negative and not varying once
+smoothed. What training would do to them is untested.
+
+**Three ways to read that, and the first was missed for several hours.** Either **the channels have
+simply not been taught** -- the frozen encoder is the before condition and F66 shows a 3x gap
+between before and after on the only channel ever trained (F77, and this is the live one). Or
+forward speed is genuinely the only body quantity a hexapod and a quadruped share, a result about
+morphology rather than about our pipeline. Or twelve behaviours is too few to resolve effects of
+this size, since holding out by condition leaves about four test behaviours against spreads of
++/- 0.2 to 1.3. **The way to tell
+them apart is more distinct behaviours, not more clips**: adding repeats of the twelve we have adds
+copies, as the 2-10% within-condition figure shows.
+
+
+---
+
+---
+
+### F77. The screen measured the untrained baseline, and a length scale cannot move it
+
+F76 reported that supplying matched behaviour left no new channel shareable. **That conclusion was
+drawn from the frozen encoder**, because `stage2speed7body` predates both F71's wider foot path and
+F74's frame rate and has never seen either robot's current data. The frozen encoder is the *before*
+condition, and this project's own measurement of what training does to that condition is F66:
+
+| forward speed | readout correlation |
+|---|---|
+| frozen encoder | **0.31** |
+| trained, no body term | -0.01 |
+| trained, shared body head | **0.85 / 0.90 / 0.92** |
+
+**Judging forward speed by its frozen value of 0.31 would have condemned the one channel that
+works.** Yaw's frozen value is 0.10. Nothing has yet asked what training would do to it, so "matched
+behaviour did not make any new channel shareable" should have read "no new channel is shareable
+*without being taught to be*", which is a different claim and a much weaker one.
+
+**Two hypotheses were on the table for why yaw sits at zero, and one is now dead.**
+
+*That the dimensionless group is wrong.* w_hat = omega sqrt(h/g) uses hip height, which is the right
+scale for walking -- an inverted pendulum over its own height -- but turning acts through the moment
+arm of the planted feet, not through height. The two disagree sharply: measured from each model, the
+B1 is **3.19x taller** and the hexapod's stance is **1.39x wider** (mean stance radius 0.576 m
+against 0.414 m), so the two candidate scales differ by a factor of **4.4** in the ratio between the
+robots.
+
+**It cannot be the explanation, and the reason is structural.** `transfer()` standardises both target
+vectors before fitting, and a length scale is an affine rescale of omega, so it cancels exactly.
+Measured, held out by condition:
+
+| yaw, smoothed | hex->b1 | b1->hex | robot AUC |
+|---|---|---|---|
+| height scale | -0.630 | +0.270 | 0.637 |
+| stance-radius scale | -0.640 | +0.269 | **0.571** |
+
+Transfer identical to three decimals. **The scale does matter for the robot gate** -- stance radius
+hides the embodiment better, 0.637 to 0.571 -- and for choosing which `--spin` levels to collect,
+but not for whether the channel transfers.
+
+**And the obvious test of the scaling is circular.** Comparing how well each scale makes the
+*collected* conditions line up says only that the data was collected to match one of them: under
+height the four levels agree to -33/-19/-3/+5%, under stance radius to +41/+70/+105/+119%, because
+the `--spin` values were solved against the height version. A choice of dimensionless group is a
+modelling decision; the only non-circular test is to collect under each and compare what transfers.
+
+**So the live question is the one not yet asked: train on this data and measure again.** F66 is the
+precedent -- the body term moved forward speed from 0.31 to 0.90, and the gap between the frozen and
+trained columns is larger than the gap between any two channels in the frozen column.
+
+
+---
+
+### F78. The B1's heading controller was proportional-only, and both the bias and the fix for it were traps
+
+With yaw a candidate for the shared target, the B1's yaw had to be checked rather than assumed. It
+is **positive in every condition**, including the ones commanded straight: **+2.16 deg/s walking
+forwards, +1.28 sideways, sd 0.29** -- a constant, not scatter, where the hexapod's straight walking
+scatters about zero (+0.49 +/- 2.66). Pooled over conditions that constant separates the robots, so
+a shared yaw target would let the head read "which robot is this" instead of "how fast is it
+turning" -- the shortcut F43/F46 measured the trunk already taking.
+
+**The cause is structural, not a tuning accident.** `rollout_b1_mujoco.py` commanded yaw as
+`HEAD_K * yaw_err` with `HEAD_K = 0.5`: proportional only. A P controller cannot reject a constant
+disturbance below `disturbance / gain`, and the policy has a slight inherent turn. Every clip ever
+rolled out carries it.
+
+**The obvious fix produced a number that matched and data that did not.** Adding an integral term at
+`ki = 5.0` took the standing drift to +0.33 deg/s and the steady turn rate to **0.0732 against a
+target of 0.0736** -- a 0.5% match, and wrong. Inside a clip the turn rate ran **0.19, 0.017, 0.024,
+0.15, 0.035**: a lightly damped oscillation with a ~3 s period against a 162-step clip. Only the
+average over a much longer window matched. **The clips would have been controller ringing labelled
+as steady turns.**
+
+The check that caught it was reading the signal *within* the clip rather than its summary. That is
+the same shape as F74 (a frame rate nobody wrote down) and F75 (a magnitude that hid a sign): a
+single aggregate agreeing while what it summarises does not. **Three times in one day, so it is a
+habit rather than an incident -- verify a matched quantity by its time course inside one clip, not
+only by its mean.**
+
+**Tuned against three requirements at once**, since satisfying one alone is what produced the trap:
+
+| kp / ki | standing drift | turn level 3 | ringing (sd/mean in a clip) |
+|---|---|---|---|
+| 0.5 / 0 (shipped) | 0.0064 | 0.0604 | 0.06 |
+| 0.5 / 5.0 | 0.0001 | 0.0616 | **oscillates, ~3 s period** |
+| **2.5 / 1.0** | **0.0000** | **0.0743** | **0.04** |
+| 4.0 / 1.5 | -0.0005 | 0.0720 | 0.02 |
+
+`--head_kp 2.5 --head_ki 1.0`: no standing drift, turn matched to +1% with the `--wz` levels
+unchanged, and **less ringing than the hexapod's own gait** (0.04 against 0.10). Re-collected on it,
+the target reads hexapod 0.0148 / 0.0353 / 0.0736 against B1 0.0146 / 0.0346 / 0.0714 -- within 3%
+-- and the non-turning conditions sit at +/-0.002 on both robots instead of +0.007 on one.
+
+**One asymmetry survives and is real.** At the hardest turn the hexapod's forward speed falls to
+**0.028** while the B1 holds **0.096**: a sharp turn costs the insect its speed and costs the
+quadruped nothing. That is morphology, not a defect, but it means the *forward* channel carries some
+embodiment information at that condition, and the robot-AUC gate should be read with it in mind.
+
+
+---
+
+### F79. The body target was measured in the world frame, so "forward speed" was partly a rotation measurement
+
+Reviewing the collected conditions, the hexapod's forward speed appeared to collapse when it turned
+hard -- **0.132 to 0.026** across the four turn levels -- while the B1 held 0.131 to 0.102. That was
+written up as morphology: a sharp turn costs the insect its speed and costs the quadruped nothing.
+**It is not morphology. It is not a controller difference either. It is the frame.**
+
+`body_motion` differenced **world x and y**. Its "forward" channel was therefore walking speed
+multiplied by how much the robot still happened to point along world x. Straight walking hides this
+completely, since both robots start along +x -- and every dataset before `data/beh12_*` contained
+only straight walking, which is why it survived this long. Projected onto each robot's own heading:
+
+| | world-x | **body forward** | | world-x | **body forward** |
+|---|---|---|---|---|---|
+| | hexapod | hexapod | | B1 | B1 |
+| turn level 0 | 0.132 | **0.135** | | 0.131 | **0.131** |
+| turn level 3 | 0.026 | **0.128** | | 0.102 | **0.132** |
+
+**Neither robot slows down when turning.** Both walk at a constant speed through all four turn
+levels. Supervised on the world-frame version, the shared body head would have been taught that
+turning means slowing down, by different amounts on the two robots -- a difference between their
+turn rates wearing the label "speed", and a free embodiment cue in the one channel that works.
+
+**Fixing the frame also rescued the channel that had been written off.** In the body frame the
+sideways conditions read **-0.114 against -0.114** and **+0.162 against +0.159**, signs and
+magnitudes agreeing. In the world frame lateral could never match, because it meant "world y"
+regardless of which way each robot faced -- which is a large part of why F58 measured it separating
+the robots at AUC 0.788 and concluded it was "an embodiment label in disguise". That conclusion was
+drawn about a quantity that was partly an orientation measurement.
+
+**And the forward direction is not the same as the fore-aft axis.** Projecting onto the hexapod's
+abdomen axis gives **-0.135** where the B1 gives **+0.131** for the same behaviour -- the abdomen's
+z points aft, so it must be negated. Same behaviour, opposite sign, and a shared head could only fit
+both by learning which robot it was looking at. `forward_axis()` now carries the correction, checked
+against the direction straight walking actually travels.
+
+**That is the third time in one day that an unchecked convention produced a wrong sign or frame**
+(F71 swapped left and right, F75 hid a sign inside a magnitude, this one measured in the wrong
+frame). All three were invisible in summary statistics and all three surfaced only when a quantity
+was checked against something physical.
+
+**Credit where due: this one was caught by the user disbelieving the morphological explanation.**
+The number was internally consistent and had a plausible story attached to it.
+
+
+---
+
+### F80. Two B1 policies separate the robot from its controller, and most of the B1's "character" was the controller
+
+`sim/assets/b1_policy/` holds two trained policies -- `base_gait3` at 2.0 Hz and `base_1.7hz_sym`
+at 1.7 -- and only the first had ever been used. Running both is the only way this project has to
+ask whether a B1 property belongs to the **robot** or to **one training run**, and the answer for
+several of them is the latter.
+
+| at `--vx 0.30` | `gait3` | `sym` | hexapod |
+|---|---|---|---|
+| lateral drift | **-0.022** | **+0.004** | -0.04 to +0.01 |
+| standing yaw | 0.0049 | **0.0008** | 0.0029 |
+| stride rate | 2.00 Hz | 1.67 Hz | -- |
+
+**The B1's constant sideways drift is `gait3`, not the B1.** It had been carried since the first
+collection and treated as a property of the quadruped.
+
+**So is its lean into turns**, which had a plausible morphological story attached -- a narrow stance
+leaning in against the hexapod's wide stance swinging out:
+
+| turn level | `gait3` lateral | `sym` lateral | hexapod |
+|---|---|---|---|
+| w_hat 0.0006 | -0.025 | +0.005 | -0.003 |
+| w_hat 0.0148 | -0.029 | +0.005 | +0.001 |
+| w_hat 0.0353 | -0.033 | +0.005 | +0.017 |
+| w_hat 0.0736 | **-0.040** | **+0.004** | **+0.044** |
+
+`gait3` leans further in the harder it turns; `sym` is flat through all four. **Two policies on the
+same body disagreeing settles it: the body is not doing this.** The hexapod's outward swing, which
+neither B1 policy reproduces, survives as the one real difference.
+
+`sym` also tracks the matched turn levels to **1.5%** (0.0147 / 0.0347 / 0.0726 against 0.0148 /
+0.0353 / 0.0736) where `gait3` runs +3 to +23% high.
+
+**Both are kept, two clips each per condition, and the reason is not fairness.** Every clip of a
+condition had been the same limit cycle at a different phase -- within-condition spread was 2-10% of
+between-condition spread, so four clips said one thing four times and the effective sample size was
+**twelve behaviours, not forty-eight clips** (F76). Two policies at different stride rates give the
+B1 genuinely different dynamics within a condition: forward spread rises to 0.112-0.122 while the
+condition mean stays on target, because the commands are solved **per policy** against the same
+hexapod-side target.
+
+**The cost is that half the clips carry `gait3`'s lateral bias.** That is acceptable only because
+lateral is excluded from the target -- and this makes the exclusion permanent rather than pending a
+re-test, since the channel now mixes a real quantity with a known per-policy artefact.
+
+**Credit: the second policy was the user's, and the conclusion is theirs too** -- they proposed that
+both the drift and the turn lean were policy quality rather than the robot, before either was
+measured.
+
+
+---
+
 ## Files
 
+- `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
+  gait plus steering and a speed range, without IK (F71)
+- `scripts/diagnostics/inspect_scene.py` -- list a CoppeliaSim scene's joints and read out any
+  attached script; how the Olaf controller was recovered
+- `scripts/diagnostics/tune_legs.py` -- solves a gain and an offset per leg so six unequal legs
+  trace the same stroke; converges, and makes the gait worse, which is the point of F73
+- `results/wm/dataset/figures/gait_legtune.png` -- the contact raster with and without it (F73)
 - `data/ik_walk_speed7` -- five constant speeds plus both ramp directions, 91 clips (F60)
 - `scripts/diagnostics/body_head_ablation.py` -- zero `z` or zero the frame on a trained body head
   and see which input the loss actually depends on (F64)
@@ -4135,3 +4931,4 @@ ratio has to say which of the two it means. Steps 2m and 2n.
   femur/tibia boundary, from recorded frames (F42)
 - `results/wm/dataset/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
 - `results/wm/README.md` -- per-run metrics
+

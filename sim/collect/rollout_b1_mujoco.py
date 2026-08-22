@@ -108,6 +108,14 @@ def main():
                     help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
                          "walk, stand for a fifth of the clip, then walk. Rate multiplies "
                          "--vx/--vy/--wz. Same syntax as sim/collect/collect_ik.py.")
+    ap.add_argument("--head_kp", type=float, default=HEAD_K,
+                    help="proportional gain on heading error. Too low against --head_ki and the "
+                         "response rings: at kp 0.5 / ki 5.0 the turn rate oscillates with a ~3 s "
+                         "period and a 162-step clip samples the ringing, not the turn")
+    ap.add_argument("--head_ki", type=float, default=0.0,
+                    help="integral gain on heading error. 0 reproduces the P-only controller that "
+                         "leaves a ~2 deg/s standing drift")
+    ap.add_argument("--head_ki_clip", type=float, default=2.0, help="anti-windup bound on the integral")
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--warmup", type=int, default=25, help="hold DEFAULT pose (settle) before policy")
     ap.add_argument("--policy_warmup", type=int, default=45,
@@ -130,7 +138,7 @@ def main():
 
     plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
         if args.schedule else None
-    last = np.zeros(12, np.float32); step_i = 0; heading_target = None
+    last = np.zeros(12, np.float32); step_i = 0; heading_target = None; yaw_int = 0.0
     L = {k: [] for k in ("base_pos", "base_quat", "joint_pos", "joint_vel",
                          "action", "command", "foot_contact")}
     for _i in range(args.policy_warmup + args.steps):
@@ -145,7 +153,18 @@ def main():
                       else (args.vx, args.vy, args.wz))
         heading_target += wz * (DECIMATION * m.opt.timestep)
         yaw_err = float(np.arctan2(np.sin(heading_target - cur_yaw), np.cos(heading_target - cur_yaw)))
-        cmd = np.array([vx, vy, float(np.clip(HEAD_K * yaw_err, -1, 1))], np.float32)
+        # **Proportional alone leaves a standing offset, and it shows up as an embodiment cue.**
+        # The policy has a slight inherent turn; a P controller can only reject a constant
+        # disturbance down to disturbance/gain, so every clip -- including the ones commanded
+        # straight -- drifts about +2 deg/s in the same direction. Pooled over conditions that
+        # constant separates the B1 from the hexapod, whose straight walking scatters about zero,
+        # and a shared yaw target would let the head read it as "which robot is this".
+        # An integral term removes a constant disturbance outright, which P cannot.
+        yaw_int += yaw_err * (DECIMATION * m.opt.timestep)
+        yaw_int = float(np.clip(yaw_int, -args.head_ki_clip, args.head_ki_clip))
+        cmd = np.array([vx, vy,
+                        float(np.clip(args.head_kp * yaw_err + args.head_ki * yaw_int, -1, 1))],
+                       np.float32)
 
         lin = d.sensordata[adr["base_linvel"]:adr["base_linvel"]+3]
         ang = d.sensordata[adr["base_angvel"]:adr["base_angvel"]+3]
