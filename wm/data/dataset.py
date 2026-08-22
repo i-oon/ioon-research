@@ -230,7 +230,10 @@ def embodiment_split(specs, val_fraction, root="", exclude=True, heldout_bodies=
     validation metric blind to the other five. Taking the fraction from each body separately
     fixes both.
     """
-    caps = dict(s.split("=") for s in clips_per_body) if clips_per_body else {}
+    # Empty entries are dropped rather than parsed: `--clips_per_body ""` on the command line
+    # arrives as `[""]`, not as an empty list, and "no caps" is the natural thing to want when a
+    # collection is already balanced by construction.
+    caps = dict(s.split("=") for s in (clips_per_body or ()) if s and "=" in s)
     caps = {k: int(v) for k, v in caps.items()}
     train, val = [], []
     for name, data_dir in specs:
