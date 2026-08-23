@@ -4981,6 +4981,238 @@ necessarily changing the *trade*.
 
 ---
 
+### F84. Transfer R^2 is not comparable across these two datasets, and three attempts each found a different confound
+
+F83 reports a control at -28.9 where the published control (F66) reads **-7.083**. The obvious
+question is whether the behaviour collection made things worse. **It cannot be answered by comparing
+those numbers**, and the record of trying is worth keeping, because the attempt is the natural one.
+
+| attempt | result | why it does not compare |
+|---|---|---|
+| as published | control -28.9 vs -7.083 | F83 holds out **whole behaviours**; F66 held out clips of behaviours it had trained on. F76 measured that gap directly -- yaw read +0.31 by clip and +0.10 by condition on identical data |
+| same split protocol | control -16.7 vs -7.083 | the new data asks for forward speed while the robot is **turning or strafing** in eight of twelve conditions. The old data was forward walking only, so "predict forward speed" meant predicting the one thing that varied |
+| same split, speed conditions only | body head **-0.98 / +0.32** vs +0.54 / +0.44 | the restriction **removes variance rather than isolating the comparison** |
+
+The third is the instructive one. Restricting to the four speed conditions looks like the clean
+match and is the worst of the three:
+
+| subset | forward sd | clips |
+|---|---|---|
+| all twelve conditions | 0.066 | 48 |
+| speed conditions only | **0.040** | **16** |
+| old `ik_walk_speed7` | 0.045 | 91 |
+
+**R^2 is variance explained.** The speed-only subset has *less* forward variance than the old data
+and a third of the clips, so after a 70/30 split it tests on about five clips over a narrower range.
+The same representation scores worse on it -- +0.70 on the full set against -0.98 here -- with
+nothing about the model changed.
+
+**The two datasets differ in composition, dynamic range, clip count, frame rate and split protocol
+at once**, and each of those moves R^2 independently. There is no slice that holds them all fixed,
+and each fix for one introduced another. **Stop looking for one.**
+
+**What replaces the comparison.** Every claim in F83 is measured inside a single dataset with one
+loss term as the only difference -- same script, same clips, same split, same seed set. That is a
+controlled comparison and the cross-dataset one never was. The result does not need to beat the old
+number: it rests on the shared head turning **-16.7 into +0.70** on data where both robots perform
+matched behaviours across three modes, which the old dataset could not have tested at all because it
+contained only forward walking.
+
+**The general rule.** A transfer R^2 is a statement about a representation **and** the distribution
+it was scored on. Quoting one across datasets is quoting half a measurement -- the same trap as
+`motion` MSE being incomparable across datasets and `action_lag` settings, which this project already
+records in `wm/README.md`.
+
+
+---
+
+### F85. Yaw fails in the noise floor, not in the behaviour, and the noise floor is an asymmetry we introduced
+
+F83 leaves yaw at +0.367 +/- 0.274 one way and -0.415 +/- 0.556 the other, after supervision moved it
+from -5.2. The obvious question is whether that ceiling is the data. It is, and the mechanism is
+specific.
+
+**Yaw is matched where it is signal and mismatched where it is noise.**
+
+| | hexapod | B1 | tell the robot from yaw alone |
+|---|---|---|---|
+| turn conditions (4 of 12) | -- | -- | **AUC 0.506** |
+| speed conditions | -0.0003 +/- **0.0160** | +0.0019 +/- **0.0050** | |
+| sideways conditions | -0.0010 +/- 0.0058 | +0.0014 +/- 0.0029 | |
+| all eight non-turning | | | AUC 0.588 |
+
+In the four conditions where both robots actually turn, the calibration holds and the channel is
+indistinguishable between them. In the eight where neither turns -- **two thirds of the dataset** --
+the hexapod's yaw has **three times the spread**. This is after stride-window smoothing, so it is
+between-stride wander rather than gait rocking.
+
+**That explains the direction asymmetry exactly.** A readout fitted on the B1, whose yaw is nearly
+constant when not turning, has little to learn, and fails on the hexapod's wander: -0.415, negative
+in four of five seeds. Fitted on the hexapod, part of what it learns is real turn signal, which
+carries: +0.367.
+
+**"The asymmetry is ours" was the hypothesis, and it is refuted.** The B1 was given a PI heading
+controller on 2026-08-22 (F78) while the hexapod's oscillator was open loop, so the obvious reading
+was that we closed one robot's heading loop and not the other's. `--head_kp/--head_ki` were added to
+the insect collector to test it, modulating the oscillator's own `--spin`. Measured:
+
+| gains | yaw sd | lateral | forward | wander |
+|---|---|---|---|---|
+| open loop | **0.0130** | 0.04 | +0.55 | 1.76 |
+| kp 0.5 ki 0.2 | 0.0141 | 0.02 | +0.57 | 1.72 |
+| kp 1.0 ki 0.4 | 0.0149 | 0.02 | +0.56 | 1.70 |
+| kp 2.5 ki 1.0 | **0.0177** | **0.00** | **+0.70** | **1.48** |
+| B1 | 0.0050 | | | |
+
+**Every gain makes travel better and the yaw channel worse.** The controller holds heading by
+steering continuously, so net drift falls while the instantaneous yaw *rate* becomes more variable --
+it optimises net heading, and the target is a rate. There is no setting that closes the gap: the
+floor is the open-loop 0.0130, still **2.6x the B1**.
+
+**So the gap is the gait, not a missing controller.** The hexapod's sprawling wide stance swings its
+body more per stride than a compact trot, and the residual survives stride-window smoothing. **This
+is a real difference between the two robots and cannot be collected away.**
+
+**That collapses the two-arm design proposed below** -- there is no artefact to remove, so a "clean"
+arm and a "dirty" arm would differ in nothing relevant. The conclusion transfers to the objection
+that prompted it: **the pipeline has to tolerate a difference like this, because collecting better
+does not remove it.** And it currently cannot -- F44's three invariance methods moved nothing, the
+adversary shifts `probe` without changing transfer, and the body head leaves identity fully decodable.
+
+**The controller is kept and defaulted off.** It genuinely improves the walk -- lateral 0.04 to 0.00,
+forward +27%, wander 1.76 to 1.48 -- but it raises the noise in the channel it was built to clean and
+shifts Froude 0.126 to 0.162, which would force re-calibrating the whole speed ladder. Net negative
+for the experiment it exists to serve.
+
+**A second one the same test exposes, which is not ours.** Forward separates the robots at **AUC
+0.869** in the sideways conditions: the hexapod still creeps forward while strafing (0.013-0.029)
+where the B1 does not (0.002-0.009). That is a real capability difference, and it means the *forward*
+channel identifies the robot in a third of the conditions.
+
+**The design this was going to justify, kept because the reasoning survives the refutation.** The
+objection to simply cleaning the data is correct -- a method that needs datasets matched to 2% is not
+a method, since real cross-robot data is whatever each robot's controller produced. Two kinds of
+difference have to be separated before deciding anything:
+
+    behaviour differences    the robots doing different things -- the method exists to handle these
+    collection artefacts     one robot has heading control and the other does not -- ours, not theirs
+
+Leaving an artefact in does not test robustness; it tests whether the method survives our own
+inconsistency. The plan was to collect both arms and read the gap between them as the robustness
+number. **The test above removed the premise: the yaw gap is the second kind of difference, not the
+first**, so there is no artefact to remove and the two arms would be the same dataset twice.
+
+**What was explicitly ruled out, and still is: matching the two robots' noise floors after the fact.**
+Forcing the hexapod's yaw to resemble the B1's would be fitting the dataset to the method. Since
+giving both robots the same heading controller does not close the gap either, **nothing at the
+collection level closes it**, and the difference has to be either tolerated by the model or declared
+as a limit on the channel.
+
+**And the deeper gap this exposes.** The pipeline has **no working mechanism for suppressing a
+nuisance difference**: F44 tried three invariance methods and none moved transfer, the adversary
+moves `probe` without changing what transfers, and the body head creates shared meaning while leaving
+identity fully decodable (`probe` 0.94-0.99 in every arm including the control). Removing artefacts
+by collecting better is currently the only lever we have, which is worth stating plainly rather than
+presenting clean data as a design choice.
+
+
+---
+
+### F86. Within-condition diversity has to be measured on the input, not on the target
+
+The B1 was given a second policy so its clips within a condition would be genuinely different
+gaits (F80). The hexapod never got the equivalent: `--episodes 6,926,521,625` selects four expert
+episodes, but the expert **is one gait** -- F57 measured 1.9% speed variation across a thousand
+episodes -- so the four standing poses differ by **0.0007 rad**, four hundredths of a degree.
+
+**Two measurements disagree about whether that matters, and only one of them is asking the right
+question.**
+
+| | hexapod | B1 |
+|---|---|---|
+| within-condition sd of the **target** (forward) | 0.0016-0.0062 | 0.0006-0.0088 |
+| mean pairwise correlation of the **joint commands** | **1.000** | **0.127** |
+
+By the target the two robots look equivalent, and this was reported as "no asymmetry to fix". By the
+input they are not remotely equivalent: **the hexapod's four clips are the identical command
+sequence**, and the target varies only because the simulation's physical response does. The B1's
+four are two genuinely different gaits.
+
+**The target measure cannot see this and never could.** Two clips can decode to the same Froude from
+completely different images, which is precisely the invariance a shared readout is supposed to learn.
+Spread in the target is not evidence of diversity in the input -- and if anything, *matched* clips
+with *different* gaits are the ideal, while spread in the target means the condition has been
+smeared into two.
+
+**That also re-reads F80.** The B1's larger target spread was written up as its two policies
+providing diversity. Half of it is the two policies not being speed-matched -- `sym` travels less
+than `gait3` at the same command -- which smears the condition. The diversity is real and visible in
+the command correlation; the target spread is a separate and mildly unwanted thing.
+
+**The fix, and why it is not the same fix as the yaw one.** These are two different problems that
+were briefly conflated:
+
+    input diversity   the hexapod walks one way, the B1 two      -> a second parameterisation
+    yaw instability   only ~4 test conditions survive a split    -> more turn levels
+
+More clips per condition does not add test conditions, so it cannot address the second. More
+conditions does not make the hexapod's gait more varied, so it cannot address the first.
+
+**How large the asymmetry actually is, measured where the model works.** Command correlation is the
+wrong scale to judge it on, because it standardises per column and so reports shape rather than
+values -- the four hexapod clips differ by a constant **0.0007 rad** of bias, which it erases. That
+difference is not nothing: legged contact dynamics amplify it, and the same configuration run three
+times gave heading changes of **+21, +21 and -5 degrees**. In V-JEPA2 embeddings:
+
+| | within condition | between conditions | ratio |
+|---|---|---|---|
+| hexapod, one gait | 6.430 | 16.518 | **0.389** |
+| B1, two policies | 16.888 | 27.151 | **0.622** |
+
+**The B1's two policies buy real diversity** -- 2.6x further apart in absolute terms, 1.6x relative
+to its own spread -- so this is not what any four clips of a legged robot look like. **But the
+hexapod is not degenerate**: at 0.389 the encoder sees four meaningfully different clips, not one
+repeated. The asymmetry is moderate and real, not the near-duplication that command correlation
+implied.
+
+**And it is not what limits yaw.** A readout fitted on the B1 sees more varied views of the same
+behaviour and should generalise better, yet `b1->hex` is the direction that fails (-0.415). F85's
+noise-floor mismatch explains that; diversity does not. **Two separate problems, and conflating them
+cost three collection attempts.**
+
+**Second parameterisation, chosen so the pair is matched on the target and different in the gait:**
+
+    speed and turn (8 conditions)   A: --ft_phase 0.125    B: --ft_phase 0.0
+                                    Froude 0.126 against 0.123, hip 0.176 against 0.171
+    sideways (4 conditions)         A: lift 0.20           B: lift 0.24
+                                    sideways travel 0.48 both, Froude 0.114 against 0.113
+
+Two axes were rejected by measurement. **Stride rate** works and is the closest analogue to the B1's
+2.0/1.67 Hz -- `cycles 5.8 / amps 0.25` and `cycles 7.2 / amps 0.21` both give Froude 0.117 exactly
+-- but the faster variant needs `cycles` above 10 at the top of the speed ladder, past where drift
+sets in. **Lead** is inert: Froude 0.124-0.127 across `--lead` 0.20 to 0.35. And `ft_phase` cannot be
+the sideways axis, since 0.5 is the antiphase that makes that gait work at all -- 0.375 and 0.625
+collapse it to 0.15 and 0.06 m.
+
+**Both parameterisations were collected and both failed.** `ft_phase` 0.125 against 0.0 moved command
+correlation only **1.000 to 0.935** against the B1's 0.127 -- an eighth-cycle phase shift is a
+perturbation of one gait, not a second one -- and the pairing does not survive the speed ladder:
+matched at `cycles 5.8` (-7%), it reads **-39% at c8.8**, smearing the condition far worse than the
+duplication it was meant to fix. The sideways variant did not vary anything: lift 0.20 to 0.24 is a
+pure amplitude scale, the same gait louder, and correlation stayed at exactly 1.000.
+
+**The failure is structural, not a bad choice of axis.** The B1's diversity comes from **two
+independently trained controllers**. The CPG is one generator whose every parameter is coupled to the
+behaviour -- stride rate and amplitude set the speed directly, `lead` does nothing, `ft_phase` couples
+unpredictably. **You cannot change how this gait walks without changing how fast it walks.** What
+would work is a different *phase pattern* rather than a different parameter -- a metachronal wave
+against the current tripod ordering, which is also what stick insects actually do at low speed --
+and that is an implementation rather than a sweep. Left undone; the failed collection is in
+`data/beh12_hex2/` and was not merged.
+
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not

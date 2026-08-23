@@ -265,8 +265,11 @@ frozen encoder is the *before* condition, and forward speed itself reads **0.31 
 1. **Does training on yaw make it transfer?** Three arms running: control, body head forward-only,
    body head forward+yaw. The middle arm is what makes the third attributable to the channel rather
    than to the new dataset.
-2. **Does F66's 0.85-0.92 survive the frame-rate fix?** It was measured across the F74 mismatch.
-   Arm 2 settles it, and this is the number the deck currently claims.
+2. ~~**Does F66's 0.85-0.92 survive the frame-rate fix?**~~ **Settled, and re-asking it is a trap.**
+   The runs give +0.701 / +0.667 by clip and +0.610 / +0.573 by condition, at the top of the old
+   range and under a harder test -- but **the two datasets are not comparable** and three attempts to
+   force it each found a different confound (F84). The claim rests on the controlled within-dataset
+   comparison instead: -16.7 to +0.70 from the body term alone.
 3. **Is twelve behaviours enough to resolve effects of this size?** Held out by condition, about
    four test behaviours remain and the spreads run +/- 0.2 to 1.3. If the arms disagree weakly the
    answer may be power rather than substance.

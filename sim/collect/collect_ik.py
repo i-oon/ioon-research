@@ -47,6 +47,12 @@ TRACK = "/head"
 ROBOT_ROOT = "/abdomen"
 FORCE_NAMES = [f"/forceSensor_{leg}" for leg in LEGS]
 EP = 66
+
+# Seconds per recorded step. The insect expert runs at 20 Hz (`sim_time` in
+# expert_66k_aug3c_fcontact.csv), so a 66-step clip is 3.30 s. Written down rather than left
+# implicit: F74 was a frame rate nobody had recorded, and it made every cross-embodiment number
+# compare 20 ms on one robot against 50 ms on the other.
+STEP_DT = 0.05
 CHAIN_NAMES = ("m1", "coxa", "m2", "femur", "m3", "tibia", "tibial", "forceSensor", "foot")
 
 
@@ -188,6 +194,38 @@ def stride_period(paths, lo=6, hi=None):
     return best
 
 
+def cpg_frame(recipe, leg_gain, leg_off, t, spin):
+    """One frame of the oscillator, with `spin` supplied per step rather than fixed.
+
+    **This exists so the hexapod can hold a heading the way the B1 does.** The B1's rollout runs a
+    PI controller on heading error (F78) and drifts 0.33 deg/s; the insect's oscillator is open loop
+    and wanders 3x more (yaw sd 0.016 against 0.005 in the conditions where neither robot is
+    turning). That difference is not a property of the two robots -- it is a controller we gave one
+    and not the other -- and it lands in the yaw channel's noise floor, where two thirds of the
+    conditions live. Closing the loop on both sides removes it at the source instead of matching
+    the noise afterwards, which would be fitting the dataset to the method.
+    """
+    r = recipe
+    ph = 2 * np.pi * r["cycles"] * t / r["frames"]
+    o = (np.sin(ph + 2 * np.pi * r["lead"]), np.sin(ph),
+         np.sin(ph + 2 * np.pi * r["ft_phase"]))
+    cmd = r["bias"].astype(np.float64).copy()
+    for i, leg in enumerate(LEGS):
+        sign = 1.0 if leg in TRIPOD_A else -1.0
+        mirror = 1.0 if leg.endswith("L") else -1.0
+        for k in range(3):
+            axis = mirror if k in r["mirror_joints"] else 1.0
+            span = r["amps"][k] * (leg_gain[i] if k > 0 else 1.0)
+            cmd[i * 3 + k] += sign * axis * span * o[k]
+            if k > 0:
+                cmd[i * 3 + k] += leg_off[i]
+        if spin:
+            cmd[i * 3] += sign * spin * r["spin_amp"] * o[0]
+        if r["strafe"]:
+            cmd[i * 3 + 2] += sign * r["strafe"] * r["amps"][2] * o[2]
+    return cmd
+
+
 def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20),
                  lead=0.25, mirror_joints=(0, 1, 2), strafe=0.0, spin=0.0,
                  spin_amp=None, ft_phase=0.0, symmetric=False, legtune=None):
@@ -308,6 +346,12 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
                   np.sin(ph + 2 * np.pi * ft_phase)], axis=1)
 
     cmds = np.tile(bias, (frames, 1))
+    # Kept so the collector can regenerate one frame with a different spin, which is what closing
+    # the heading loop needs. Everything below writes into `cmds`; this records what it took.
+    recipe = dict(bias=bias.copy(), amps=tuple(amps), lead=lead, ft_phase=ft_phase,
+                  mirror_joints=tuple(mirror_joints), strafe=strafe, spin=spin,
+                  spin_amp=amps[0] if spin_amp is None else spin_amp, cycles=cycles,
+                  frames=frames)
 
     # **One amplitude on six unequal legs does not give six equal strokes.** The pairs measure
     # 0.771, 0.489 and 0.638 long, so the same joint angles swing the front feet 0.111 and the
@@ -371,7 +415,8 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
             cmds[:, i * 3 + 2] += sign * strafe * amps[2] * o[:, 2]
 
     return cmds, dict(target_leg_length=leg_length(sim), scale=1.0,
-                      residual_mean_mm=0.0, residual_max_mm=0.0)
+                      residual_mean_mm=0.0, residual_max_mm=0.0,
+                      leg_gain=leg_gain.copy(), leg_off=leg_off.copy(), **recipe)
 
 
 def parse_schedule(spec):
@@ -518,8 +563,17 @@ def precompute_commands(sim, simIK, scene, brel, scale, ik_iters=1):
 
 
 def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None,
-                     active_legs=None, remove_legs=None, yaw=0.0):
-    """Open-loop drive of cmds with the FIXED camera; returns frames/actions/forces/head.
+                     active_legs=None, remove_legs=None, yaw=0.0, heading=None):
+    """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
+
+    **`heading` closes the loop on body direction, and exists to remove an asymmetry we created.**
+    The B1's rollout runs a PI controller on heading error and drifts 0.33 deg/s (F78); the insect's
+    oscillator was open loop and wandered three times as much -- yaw sd 0.016 against 0.005 in the
+    eight conditions where neither robot turns, which is two thirds of the dataset. That difference
+    is not a property of the two animals, it is a controller given to one and not the other, and it
+    lands squarely in the yaw channel's noise floor (F85). Pass
+    `dict(kp=, ki=, recipe=, leg_gain=, leg_off=)` to correct it the same way, by modulating the
+    oscillator's own `--spin` term rather than by matching the noise afterwards.
 
     cam_dx/cam_dy shift the camera in the world plane on top of the scene's authored offset.
     With the authored offset alone the robot starts against the right image edge and stays
@@ -597,8 +651,22 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
 
     frames, actions, forces, heads, oris = [], [], [], [], []
     start_xy = None
+    yaw0, yaw_int, prev = None, 0.0, None
     for t in range(len(cmds)):
-        for h, v in zip(joints, cmds[t]):
+        step_cmd = cmds[t]
+        if heading is not None and prev is not None:
+            # **Error is (current - start), and the sign is not free.** Positive `--spin` yaws
+            # *negative* -- measured, `spin 0.4` gives omega -0.416, and F75 had to re-collect the
+            # turn set at negative spin to make both robots turn the same way. So a body that has
+            # drifted positive needs a *positive* trim to come back, which means the error must be
+            # (current - start). Written the other way round it is positive feedback: the first
+            # attempt drove lateral travel from 0.04 m to 0.41 and failed the walk check.
+            err = float(np.arctan2(np.sin(prev - yaw0), np.cos(prev - yaw0)))
+            yaw_int = float(np.clip(yaw_int + err * STEP_DT, -2.0, 2.0))
+            trim = float(np.clip(heading["kp"] * err + heading["ki"] * yaw_int, -1.0, 1.0))
+            step_cmd = cpg_frame(heading["recipe"], heading["leg_gain"], heading["leg_off"],
+                                 t, heading["recipe"]["spin"] + trim).astype(np.float32)
+        for h, v in zip(joints, step_cmd):
             sim.setJointTargetPosition(h, float(v))
         for leg in remove_legs:
             for jn in SEG:
@@ -613,7 +681,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             sim.setObjectPosition(cam, sim.handle_world,
                                   [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
         frames.append(capture(sim, cam))
-        actions.append(cmds[t, active_cols].copy())
+        actions.append(step_cmd[active_cols].copy())
         forces.append(read_forces(sim, force_h))
         heads.append(p)
         # **Body orientation, which was never recorded and is why strafing cannot be checked.**
@@ -628,7 +696,13 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         # breadth from gimbal lock, where recovering a yaw from three Euler numbers amplifies any
         # convention mismatch into nonsense: straight walking read as 99 degrees of turn with 128
         # degrees of sway, on a body the video shows holding steady.
-        oris.append(sim.getObjectQuaternion(body, sim.handle_world))
+        q = sim.getObjectQuaternion(body, sim.handle_world)
+        oris.append(q)
+        if heading is not None:
+            x, y, z, w = q
+            prev = float(np.arctan2(-2 * (y * z - w * x), -2 * (x * z + w * y)))
+            if yaw0 is None:
+                yaw0 = prev
         if travel > 0 and float(np.linalg.norm(p[:2] - start_xy)) >= travel:
             break
     sim.stopSimulation(); settle(sim)
@@ -706,6 +780,17 @@ def main():
     ap.add_argument("--legtune", default="",
                     help="npz from scripts/diagnostics/tune_legs.py: per-leg gain and offset that "
                          "make six unequal legs trace the same stroke. --gait cpg only")
+    ap.add_argument("--head_kp", type=float, default=0.0,
+                    help="proportional gain of a heading controller on the oscillator's own --spin. "
+                         "0 leaves the gait open loop, which is how every clip before 2026-08-23 "
+                         "was recorded. The B1 has had PI heading control since F78 and drifts 0.33 "
+                         "deg/s where the insect wanders three times as much; that asymmetry is a "
+                         "controller we gave one robot and not the other, and it lands in the yaw "
+                         "channel's noise floor (F85). --gait cpg only")
+    ap.add_argument("--head_ki", type=float, default=0.0,
+                    help="integral gain. Proportional alone cannot reject a constant disturbance "
+                         "below disturbance/gain, which is exactly how the B1's standing bias "
+                         "survived for so long")
     ap.add_argument("--spin_amp", type=float, default=None,
                     help="rad; swing amplitude --spin scales, when the gait's own is zero. "
                          "Defaults to --amps[0]")
@@ -853,10 +938,19 @@ def main():
                 cmds = np.tile(cmds, (args.loops, 1))
             pre = "" if args.behavior == "walk" else f"{args.behavior}_"
             for rep in range(args.repeats):
+                # only the oscillator can be steered this way: the recorded gait replays a fixed
+                # foot path and has no spin term to modulate
+                loop = None
+                if args.gait == "cpg" and (args.head_kp or args.head_ki):
+                    loop = dict(kp=args.head_kp, ki=args.head_ki,
+                                recipe={k: ikdiag[k] for k in
+                                        ("bias", "amps", "lead", "ft_phase", "mirror_joints",
+                                         "strafe", "spin", "spin_amp", "cycles", "frames")},
+                                leg_gain=ikdiag["leg_gain"], leg_off=ikdiag["leg_off"])
                 f, a, fc, h, o = drive_and_record(
                     sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
                     active_legs=active_legs, remove_legs=remove_legs,
-                    yaw=args.yaw)  # fresh draw each
+                    yaw=args.yaw, heading=loop)  # fresh draw each
                 tag = f"{morph}_{pre}ep{ep}_r{rep}" if args.repeats > 1 else f"{morph}_{pre}ep{ep}"
                 np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                                     frames=f, actions=a, forces=fc, head=h, body_quat=o,

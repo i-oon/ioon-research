@@ -41,11 +41,12 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import (BODY_WINDOW_S, G, HEXAPOD_DT,  # noqa: E402
-                                body_velocity)
+                                forward_axis)
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 CHANNELS = ("forward", "lateral", "vertical", "yaw")
+_WINDOW = [0.0]
 
 # Mean distance of the standing feet from the stance centroid: the moment arm a turn acts through,
 # measured from each robot's own model. Height and stance radius disagree about which robot is
@@ -88,8 +89,15 @@ def targets(position, quat, dt, embodiment, smooth):
     """
     height = float(np.median(position[:, 2]))
     scale = np.sqrt(G * max(height, 1e-6))
-    fl = body_velocity(position, quat, dt, embodiment)     # body frame, already stride-averaged
-    out = [fl[:, 0].astype(np.float64), fl[:, 1].astype(np.float64),
+    # **Unsmoothed here, smoothed once below.** `body_velocity` applies its own stride window, so
+    # calling it and then smoothing again gave forward and lateral roughly two strides of averaging
+    # against yaw's one -- a quiet advantage to forward in every channel comparison, introduced with
+    # the F79 frame fix. The body frame comes from the same `forward_axis`, so nothing about F79 is
+    # undone; only the double smoothing is.
+    f = forward_axis(quat, embodiment)
+    left = np.stack([-f[:, 1], f[:, 0]], axis=1)
+    v = np.gradient(position[:, :2].astype(np.float64), dt, axis=0)
+    out = [(v * f).sum(1) / scale, (v * left).sum(1) / scale,
            np.gradient(position[:, 2].astype(np.float64), dt) / scale]
     # yaw rate is made dimensionless by sqrt(h/g), not by sqrt(g h): it is a rate, not a speed.
     # This is the w_hat that F72's matched-turn table is built on, so the two agree by construction.
@@ -98,7 +106,7 @@ def targets(position, quat, dt, embodiment, smooth):
     out.append(np.gradient(heading(quat, embodiment), dt) * yaw_scale)
     out = np.stack(out, axis=1)
     if smooth:
-        window = max(3, int(round(BODY_WINDOW_S / dt)))
+        window = max(3, int(round((_WINDOW[0] or BODY_WINDOW_S) / dt)))
         k = np.ones(window) / window
         out = np.stack([np.convolve(out[:, c], k, mode="same") for c in range(out.shape[1])], 1)
     return out
@@ -173,6 +181,11 @@ def main():
     ap.add_argument("--b1_dir", default="data/beh12_b1_flat")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)
+    ap.add_argument("--window", type=float, default=0.0,
+                    help="smoothing window in seconds, overriding BODY_WINDOW_S. F70 established "
+                         "these channels only cross robots at stride scale; whether every channel "
+                         "needs the *same* scale was never tested, and yaw's noise floor is 2.6x "
+                         "forward's (F85), so it may need a longer one")
     ap.add_argument("--behaviours", default="",
                     help="comma-separated behaviour axes to keep, e.g. 'speed'. **Needed to compare "
                          "against any pre-2026-08-22 number**: the old datasets were forward "
@@ -202,6 +215,7 @@ def main():
     itm.eval()
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
+    _WINDOW[0] = args.window
     keep = tuple(b for b in args.behaviours.split(",") if b)
     data = {n: load(n, os.path.join(ROOT, d), encoder, itm, checkpoint, cache, args.chunk,
                     args.features, keep)
