@@ -5243,6 +5243,63 @@ and that is an implementation rather than a sweep. Left undone; the failed colle
 
 ---
 
+### F87. The forward model barely reads the latent, and `L_recon` is most of the reason
+
+`L_recon` asks the FTM to predict `e_{t+1}` from `e_t` and `z_t`. For a periodic gait at constant
+speed, `e_{t+1}` is largely guessable from `e_t` alone -- so nothing forces the model to read `z`.
+Measured with `ftm_uses_z.py`, holding one input fixed and sweeping the other:
+
+| control arm | sweep z | sweep e | frame dominates | z / one step |
+|---|---|---|---|---|
+| speed conditions | 1.376 | 38.567 | **28x** | **0.027** |
+| turn conditions | 1.654 | 37.985 | 23x | 0.033 |
+| sideways conditions | 3.163 | 35.392 | 11x | 0.068 |
+
+**The latent accounts for 2.7% of the distance the embedding actually moves in one frame.** And
+replacing it with a latent from a *different behaviour* costs almost nothing:
+
+| control, hexapod, speed | correct | wrong behaviour | difference |
+|---|---|---|---|
+| one step | 1.6333 | 1.6374 | **0.25%** |
+| rollout at 8 | 3.1603 | 3.1804 | **0.6%** |
+
+**Without the body term, `L_recon` is not training the latent in any meaningful sense.**
+
+**And forward walking is the worst case, exactly as predicted.** `sweep z` runs **speed 1.376 <
+turn 1.654 < sideways 3.163** -- the harder the behaviour is to guess from the previous frame, the
+more the model is forced to read the latent. This is the strongest argument yet for the behaviour
+collection, and a better one than the transfer numbers: variety is not decoration, it is what puts
+pressure on the objective.
+
+**The body term partly fixes it, and this is invisible in the training log.**
+
+| | control | forward body head | change |
+|---|---|---|---|
+| sweep z (speed) | 1.376 | 4.257 | **3.1x** |
+| frame dominance | 28x | 9.3x | 3.0x better |
+| correct vs wrong behaviour | 0.25% | 3.5% | **14x** |
+| rollout, real vs shuffled | 0.6% | 5.3% | 8.8x |
+
+`recon` moves 1.5580 to 1.5400 between these two runs -- a 1% change that looks like nothing.
+Underneath it, the forward model's dependence on the latent **triples**. **`L_body` is not only
+reshaping the decoder; it is what makes the world model read its own conditioning input.**
+
+**It also explains why the cross-embodiment rollout looks so flat.** `cross_latent_rollout.py` on
+the body-head arm reads own 1.7010, other 1.7565, random 1.7659 -- **the entire dynamic range is
+3.8%**, because `z` barely moves the prediction to begin with. A gap-closed of 0.145 / 0.183 is not
+evidence that the latent fails to cross robots; it is a measurement with almost no room to move.
+(The control reads 0.222 and **-0.420**, wildly inconsistent, which is what a near-ignored input
+looks like.)
+
+**Consequence for the closed loop, and the reason this was run before building it.** A planner
+samples candidate actions, projects them to latents, rolls the FTM and picks a winner. If changing
+`z` moves the prediction by 3-8%, every candidate scores nearly the same and there is little to
+choose between them. Not fatal -- the body-head arm is 3x better than the control, and sideways is
+1.6x better than forward -- but a planner built on the control arm would have had no signal at all.
+
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not
