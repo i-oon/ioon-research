@@ -4884,6 +4884,188 @@ winner directly.
 
 ---
 
+### F83. The shared body head is what creates cross-embodiment transfer, and it creates it channel by channel
+
+Three arms on `data/beh12_*`, identical except for the body term. Held out by condition, frozen
+`best.pt`, smoothed rows -- the behaviour rather than the gait phase:
+
+| | forward hex->b1 | forward b1->hex | yaw hex->b1 | yaw b1->hex |
+|---|---|---|---|---|
+| control, no body term | **-28.918** | **-43.075** | -45.254 | -29.550 |
+| body head, forward only | **+0.761** | **+0.641** | -8.872 | -9.791 |
+| body head, forward + yaw | +0.482 | +0.323 | **+0.606** | -0.031 |
+
+**Without the term nothing transfers, and not merely at zero.** A readout fitted on one robot applied
+to the other is dozens of times worse than predicting a constant. F43/F46 measured the trunk becoming
+a switch; this is what that costs, on data where the two robots perform matched behaviours at matched
+speeds. **Matched behaviour alone does not produce a shared code.**
+
+**F66's result survives the frame-rate fix and improves.** The published figure is +0.54 / +0.68 /
++0.75 in one direction; here the same term gives **+0.761 and +0.641, positive in both**. F74's
+mismatch -- 20 ms of B1 against 50 ms of insect per stored transition -- did not manufacture that
+result.
+
+**A channel transfers when it is supervised and not otherwise.** Yaw is -8.9 / -9.8 in the arm where
+it is absent from the target and **+0.606** in the arm where it is present, on identical data and an
+identical architecture. This is the question `data/beh12_*` was built to ask, and the answer is that
+the collection was necessary but not sufficient: **behaviour has to vary *and* the channel has to be
+taught.** F76 measured the first half alone and found nothing, correctly.
+
+**The channels compete.** Adding yaw roughly halves forward: +0.761 / +0.641 to +0.482 / +0.323. A
+6-DOF shared target is therefore not free, and "widen the target" is a trade rather than an upgrade.
+Whether the cost is capacity, gradient share, or the near-zero yaw of eight of the twelve conditions
+is untested.
+
+**Training loss cannot see any of this.** The two body-head arms are indistinguishable on every
+logged number -- val 1.7602 against 1.7596, motion 0.2183 against 0.2186 -- while their transfer rows
+differ completely. And **`probe` saturates in all three arms** (0.936 control, 0.982, 0.994), so it
+cannot discriminate either; `z` is near-perfectly separable by embodiment even with no body term.
+Identity in `z` and shared readout direction are independent properties, and only the post-hoc screen
+measures the second.
+
+**A side effect worth its own line: the term cuts per-embodiment action error by 38%** -- val motion
+0.3517 to 0.2183 at no cost to reconstruction (1.5580 to 1.5400). One dimensionless number shared
+across two robots makes each robot's own 18-D and 12-D joint decoding substantially better, which is
+LAC-WM's stated "mitigates shortcuts" mechanism measured rather than asserted.
+
+**Five condition-level splits, and they change what can be claimed.**
+
+| arm | channel | hex->b1 | b1->hex | seeds positive |
+|---|---|---|---|---|
+| forward-only | forward | **+0.610 +/- 0.140** | **+0.573 +/- 0.240** | 5/5, 5/5 |
+| forward-only | yaw | -5.230 +/- 2.383 | -10.268 +/- 3.059 | 0/5, 0/5 |
+| forward+yaw | forward | +0.196 +/- 0.278 | +0.400 +/- 0.107 | 3/5, 5/5 |
+| forward+yaw | yaw | +0.367 +/- 0.274 | -0.415 +/- 0.556 | 4/5, 1/5 |
+
+**The causal claim survives completely.** Supervising yaw moves it **-5.23 to +0.37** and **-10.27 to
+-0.42**, with **no overlap between the two arms in either direction** -- the worst seed of the
+supervised arm beats the best seed of the unsupervised one by a wide margin. Identical data,
+identical architecture, one term different.
+
+**Yaw does not reach usable transfer.** It goes from catastrophic to approximately zero: +0.367 with
+a spread of 0.274, and negative in four of five seeds the other way. The single-seed reading of
++0.606 / -0.031 overstated it.
+
+**The cost is larger than one seed showed.** Forward hex->b1 falls **68%**, 0.610 to 0.196, and from
+five seeds positive to three. **The practical conclusion is to use the forward-only target**: adding
+yaw sacrifices most of the channel that works to buy one that merely stops being harmful.
+
+**"Yaw carries less signal" was proposed as the cause and is refuted.** Both channels are
+standardised pooled across robots, each by its own statistics, and the loss weights them equally.
+Decomposing the standardised targets into between-condition and within-clip variance:
+
+| channel | between-condition sd | within-clip sd | signal share |
+|---|---|---|---|
+| forward | 0.828 | 0.339 | **0.86** |
+| lateral | 0.746 | 0.286 | 0.87 |
+| yaw | **0.972** | 0.387 | **0.86** |
+
+Identical signal share, and yaw's between-condition spread is the **larger** of the two. Its gradient
+is not noise and the competition is not explained by signal quality.
+
+**What the distribution does explain is the instability, which is a different question.** Forward's
+variance is spread across the conditions; yaw's is concentrated in about six of them, with fourteen
+sitting within +/-0.4 of zero:
+
+    forward  -1.34 -1.30 -1.21 -1.19 | +0.31 ... +1.40
+    yaw      -1.97 -1.30 | -0.39 ... +0.32  (fourteen conditions) | +0.65 +0.90 +1.99
+
+The screen holds out about four of twelve conditions, so **a split that removes two or three turn
+levels removes most of yaw's test signal**. That is why the yaw row reads +/-0.274 and +/-0.556 where
+forward reads +/-0.140 -- leverage in the evaluation, not instability in the model.
+
+**So the competition remains unexplained**, with capacity and optimisation the remaining candidates,
+and it is separable from the variance: more turn levels would tighten the *measurement* without
+necessarily changing the *trade*.
+
+
+---
+
+### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
+
+F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not
+their number or size. Reading their evaluation sections sharpens what that costs us and what it buys.
+
+**Their embodiments differ in degrees of freedom but share a physical space.** The motion decoder's
+targets are wrist poses, fingertip positions and camera poses -- a fingertip at `(x, y, z)` means the
+same thing for a human hand and a robot gripper. The unified latent action space is therefore
+unifying representations of quantities that are **already commensurable**.
+
+**A weak version of our claim, and why it fails.** It is tempting to say ours are "one or two
+dimensionless numbers rather than a 6-DOF pose in a common frame". That is a description of a data
+limitation dressed as a design principle: **body pose is shared by every embodiment** -- a rigid body
+has a pose whatever moves it -- and nothing in principle stops us supervising all six. We supervise
+two because the oscillator does not populate the rest: vertical fails the variation gate at **0.13**
+by construction, since `--scale` is held fixed precisely so body height does not track speed, and
+roll and pitch were never varied at all. Populating them needs a controller that can command body
+attitude, which means the kinematic knowledge this project exists to avoid needing.
+
+**A second weak version, also wrong.** An earlier draft said "there is no command for travel at
+Froude 0.16". **There is** -- the B1's policy is commanded in m/s and `--vx 0.30` means exactly that.
+Velocity-conditioned control is the standard interface for a legged policy. What is true is much
+narrower: *our hexapod's* oscillator takes stride frequency, so `--cycles -> Froude` had to be
+calibrated empirically (F71). That is a property of the controller we built, not of locomotion.
+
+**The version that survives, and it inverts the argument.** Body velocity is not merely shared, it is
+**commandable on both robots** -- which is precisely why it is not our action space. Two observations
+follow.
+
+*Commensurable is not equivalent.* 0.3 m/s on a 0.176 m insect and a 0.561 m quadruped are not the
+same behaviour; one is near its limit and the other is strolling. Same units, different meaning. The
+dimensionless form is what makes them the same behaviour, which is why every match in
+`data/beh12_*` is on Froude and w_hat rather than on m/s and rad/s.
+
+*Decoding the shared space would dissolve the problem.* If the Motion Decoder emitted body velocity,
+both robots would share a 3-DOF action space, the correspondence would be **given rather than
+learned**, and there would be nothing for a latent action to bridge. **We decode joint angles
+because the disjoint space is the one worth crossing** -- 18-D against 12-D with no correspondence
+between any pair of dimensions.
+
+That is the real difference from LAC-WM, and it is a choice rather than a limitation. Their targets
+-- end-effector and camera poses -- live in the space a manipulator is naturally commanded in, so
+their latent maps onto something directly actuable and the hard part is unifying *representations* of
+commensurable quantities. Ours maps onto a space where **no dimension of one robot corresponds to any
+dimension of the other**, and the shared quantity is carried by a separate head whose only job is to
+stop the trunk becoming a switch. F83 measures what that head is worth: without it, transfer is
+-28.9.
+
+**What we can and cannot reproduce from their evaluation.**
+
+| their section | ours | status |
+|---|---|---|
+| 5.1 UMAP of action embeddings | `scripts/figures/plot_z_umap.py` | have it |
+| 5.2 **action latent transfer**, scored in pixels (PSNR/LPIPS/FID/FVD) | same measurement as our readout R^2, in a better medium | **worth building** -- see below |
+| 6.1 action-conditioned imagined rollout, 8 frames | `scripts/diagnostics/latent_rollout.py` (F51) | have it, different metrics |
+| 6.2 planning by action selection, task success rate | nothing | the closed loop, F81 |
+| 6.3 **scaling with number of embodiments** | **cannot** -- we have two | state as a limitation |
+
+**5.2 is the one to build.** They condition the FDM on observations from one embodiment while
+feeding action embeddings derived from **another**, and score the generated frames. That is exactly
+what our cross-embodiment readout measures, except **theirs can be looked at**. With the body head at
++0.76 against a control at -28.9 (F83), the pixel version shows a B1 frame rolled forward by a
+hexapod's latent, which is more convincing than a ratio.
+
+**6.3 is a limitation to declare, not to attempt.** Their headline is that LAC-WM's downstream
+performance **scales positively** with the number of pretraining embodiments while EAC-WM's degrades.
+Two embodiments cannot produce that curve, and adding hexapod bodies would not count: that is
+within-family, which this project already established solves the wrong problem.
+
+**Success metrics for a locomotion analogue of 6.2**, since theirs (contact, lift, place) are
+manipulation-specific. The twelve matched conditions are already the task set:
+
+    S.R. speed       |Fr_achieved - Fr_commanded| / Fr_commanded  < 15%
+    S.R. behaviour   correct class by dominant channel: forward / turn / sideways
+    S.R. survival    body height held above threshold, did not fall
+
+Two departures from their protocol. **Report the graded error beside the binary rate** -- "0.14
+against a commanded 0.16" carries more than pass/fail, and twelve conditions give a binary rate very
+few points. And **survival is not optional for us**: a manipulator that fails a grasp is still
+standing, a legged robot that fails falls over, and a success rate that ignores it flatters a
+controller that reaches the speed by lunging.
+
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

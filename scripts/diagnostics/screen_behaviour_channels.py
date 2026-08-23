@@ -130,10 +130,12 @@ def bands(tokens, n=4):
     return np.concatenate([t[:, r].mean((1, 2)) for r in rows], axis=1)
 
 
-def load(name, directory, encoder, itm, checkpoint, cache, chunk, features="z"):
+def load(name, directory, encoder, itm, checkpoint, cache, chunk, features="z", behaviours=()):
     Z, Y, C, cond = [], {False: [], True: []}, [], []
     for i, path in enumerate(sorted(glob.glob(os.path.join(directory, "*.npz")))):
         with np.load(path, allow_pickle=True) as clip:
+            if behaviours and str(clip["behaviour"]) not in behaviours:
+                continue
             frames = clip["frames"]
             position = clip["head"] if "head" in clip.files else clip["base_pos"]
             quat = clip["body_quat"] if "body_quat" in clip.files else clip["base_quat"]
@@ -171,6 +173,13 @@ def main():
     ap.add_argument("--b1_dir", default="data/beh12_b1_flat")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)
+    ap.add_argument("--behaviours", default="",
+                    help="comma-separated behaviour axes to keep, e.g. 'speed'. **Needed to compare "
+                         "against any pre-2026-08-22 number**: the old datasets were forward "
+                         "walking only, so 'predict forward speed' there meant predicting the one "
+                         "thing that varied. Here eight of twelve conditions are turning or "
+                         "strafing, and a harder question is not the same as a worse "
+                         "representation")
     ap.add_argument("--split", default="clip", choices=("clip", "condition"),
                     help="what a held-out unit is. 'clip' leaves near-duplicates of a training "
                          "behaviour in the test set -- within-condition spread is 2-10%% of "
@@ -193,8 +202,9 @@ def main():
     itm.eval()
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
+    keep = tuple(b for b in args.behaviours.split(",") if b)
     data = {n: load(n, os.path.join(ROOT, d), encoder, itm, checkpoint, cache, args.chunk,
-                    args.features)
+                    args.features, keep)
             for n, d in (("hexapod", args.hex_dir), ("b1", args.b1_dir))}
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
