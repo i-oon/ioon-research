@@ -53,6 +53,12 @@ def main():
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--clips", type=int, default=8)
+    ap.add_argument("--batch", type=int, default=64,
+                    help="transitions to estimate the gradient on. Training uses batch_size 8, so "
+                         "this is already generous -- and the whole set will not fit: retaining "
+                         "the graph for three backward passes over 520 transitions of 256x1408 "
+                         "tokens needs about 15 GB")
+    ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -95,7 +101,14 @@ def main():
     e_t, e_next = torch.cat(E), torch.cat(N)
     a = (torch.cat(A) - mean) / std
     b = torch.cat(Bm)
+    # standardised on the full set before subsampling, so the batch does not define its own scale
     b = (b - b.mean(0)) / (b.std(0) + 1e-6)
+
+    if len(e_t) > args.batch:
+        idx = torch.as_tensor(
+            np.random.default_rng(args.seed).choice(len(e_t), args.batch, replace=False),
+            device=device)
+        e_t, e_next, a, b = e_t[idx], e_next[idx], a[idx], b[idx]
 
     z = itm(e_t, e_next)
     z.retain_grad()
