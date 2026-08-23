@@ -101,8 +101,15 @@ def main():
     e_t, e_next = torch.cat(E), torch.cat(N)
     a = (torch.cat(A) - mean) / std
     b = torch.cat(Bm)
-    # standardised on the full set before subsampling, so the batch does not define its own scale
-    b = (b - b.mean(0)) / (b.std(0) + 1e-6)
+    # **The checkpoint's own statistics, never this batch's.** `train.py` stores them because they
+    # are pooled across *both* embodiments and so cannot be recomputed from one robot's clips.
+    # Standardising here on a hexapod-only batch put the body loss at 0.7837 against the training
+    # log's 0.0362 -- 21x too large -- and inflated its share of the gradient with it.
+    if "body_stats" not in ck:
+        raise SystemExit("checkpoint has no body_stats; it is not a cross-embodiment run")
+    bm, bs = ck["body_stats"]
+    b = (b - torch.as_tensor(bm, dtype=torch.float32, device=device)) / \
+        torch.as_tensor(bs, dtype=torch.float32, device=device)
 
     if len(e_t) > args.batch:
         idx = torch.as_tensor(

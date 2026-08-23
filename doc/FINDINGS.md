@@ -5291,6 +5291,37 @@ evidence that the latent fails to cross robots; it is a measurement with almost 
 (The control reads 0.222 and **-0.420**, wildly inconsistent, which is what a near-ignored input
 looks like.)
 
+**Which loss term is training the latent -- and the loss values say the opposite of the truth.**
+At convergence the objective reads `recon` 1.5400, `motion` 0.0110, `body` 0.7837 on a held batch,
+so by value it is 79% reconstruction. Taking each term's gradient with respect to the **same** `z`
+(`loss_gradient_balance.py`):
+
+| term | lambda | share of loss | \|dL/dz\| x lambda | **share of gradient** |
+|---|---|---|---|---|
+| recon | 1.00 | 79.3% | 0.0004 | **5.1%** |
+| motion | 1.00 | 0.6% | 0.0011 | 12.3% |
+| body | 0.50 | 20.2% | 0.0071 | **82.5%** |
+
+**Reconstruction is most of the loss and almost none of the gradient into the latent**, and the two
+measurements confirm each other from opposite directions: the FTM barely reads `z`, so barely any
+gradient flows back through it. The smallest term by weight is doing nearly all of the work on `z`.
+
+*The 82.5% is overstated and the direction is not.* That run standardised `body_motion` on its own
+hexapod batch, giving a body loss of 0.7837 against the training log's 0.0362 -- `train.py` stores
+`body_stats` precisely because they are pooled across both embodiments and cannot be recomputed from
+one robot. Rescaling puts it near **body 50%, motion 37%, recon 13%**. Recon is small either way.
+
+**This decides what to fix, and rules out the obvious move.** Lowering `lambda_recon` or normalising
+it would do nothing, because reconstruction was never dominating the gradient. **The weighting is not
+the problem; the prediction task being too easy is** -- which is F54's finding and step 2i, already
+measured and never acted on: at 20 Hz `t -> t+1` is 50 ms, a nineteenth of a stride, and stride-scale
+pairs roll better at every horizon. LAC-WM does the same thing by chunking actions into five-step
+sequences, *"which we found in practice improves world model learning"*.
+
+**And it explains the control arm's collapse.** With no body term, `z` receives gradient only from
+`motion` and `recon` -- the two smallest contributors -- which is why its cross-embodiment transfer
+reads -28.9 while its `recon` looks indistinguishable from the body-head arm's.
+
 **Consequence for the closed loop, and the reason this was run before building it.** A planner
 samples candidate actions, projects them to latents, rolls the FTM and picks a winner. If changing
 `z` moves the prediction by 3-8%, every candidate scores nearly the same and there is little to
