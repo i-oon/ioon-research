@@ -22,6 +22,38 @@ joint space, so proprioception transfers between them too and vision wins only o
 **12-DOF quadruped against an 18-DOF hexapod share no joint correspondence**, while one camera
 describes both in `256×256×3` whatever the body.
 
+## What it is for
+
+**A robot about which nothing is known.** No kinematic tree, no URDF, no action labels — only video
+of it moving. Morphology-agnostic *proprioceptive* control exists, but those methods must be handed
+the kinematic graph. A camera has to be handed nothing.
+
+What the world model supplies is knowledge of **how to drive joints so that the result is
+locomotion** — the expensive part of bringing up a new robot, and the part that otherwise costs a
+training run per body.
+
+## The contribution, and the result
+
+The action target is **joint space**, not task space. LAC-WM's targets — end-effector poses,
+fingertip positions — live in one physical frame shared by every embodiment, so a fingertip at
+`(x,y,z)` already means the same thing for a human hand and a gripper. **An 18-DOF hexapod and a
+12-DOF quadruped share no such frame**: no dimension of one corresponds to any dimension of the
+other. Decoding into the shared space would hand us the correspondence instead of making the model
+learn it.
+
+That poses the question the experiments answer — *can a joint-space action target work at all when
+no shared action space exists?*
+
+| | within-robot joint error | cross-robot transfer |
+|---|---|---|
+| joint target, no body term | 0.3517 | **−28.9 / −43.1** |
+| joint target + shared body term | **0.2183** | **+0.610 / +0.573** |
+
+**A joint-space target works within a robot on its own; it crosses robots only with a shared
+body-motion term** — which also improves the within-robot decoding by 38%. The term supervises one
+dimensionless number both robots share, and transfer appears **channel by channel**: yaw sits at
+−5.2 when it is not supervised and +0.37 when it is, on identical data and architecture.
+
 ## The two stages
 
 | | question | bodies |

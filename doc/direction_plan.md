@@ -1170,6 +1170,17 @@ script rather than an experiment, and it does not wait on the closed loop.
    cannot hold a gait on the body it learned from, cross-body is not worth attempting. Score in
    **`z`-space, not `e`-space** -- V-JEPA2 encodes morphology almost completely, so matching raw
    embeddings across bodies is confounded by shape.
+
+   **And score at behaviour scale, not per frame.** `z_t` describes a *transition*, so its fast
+   component is where the robot is in its gait cycle -- and F56 measured that the two robots have no
+   correspondence there at all (phase concentration 0.07-0.24 against 0.99-1.00). A planner matching
+   latents frame by frame would be asking a quadruped to be at the same point of a hexapod's stride,
+   which is not a thing. F70 measured the consequence directly: forward reads **-1.45 per frame and
+   +0.54 stride-averaged**. **What crosses is what the robot is doing, not how it is moving its
+   legs** -- so the target robot supplies its own gait, and the claim is "the new body performs the
+   same behaviour with its own gait", never "the new body walks like the source". The latter is
+   impossible when no dimension of one action space corresponds to any dimension of the other, and
+   the former is the stronger claim anyway.
 3. **Close the loop across bodies.** Fit a projector on the target robot's actions -- this is
    LAC-WM's finetuning step, and the honest cost of a new body. Only here does the OOD risk below
    apply.

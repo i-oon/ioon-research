@@ -4881,6 +4881,21 @@ collected, and it replaces both the latent-space selector and the requirement th
 The closed loop becomes: sample candidate actions, project them, roll the FDM, score, execute the
 winner directly.
 
+**Correction: the FDM is fine-tuned too, and the paper says so explicitly.** An earlier version of
+this entry flagged as unknown whether adaptation touches the FDM's weights. Section 3.2 states the
+procedure -- **three stages, LoRA rank 2**:
+
+> "First, we fine-tune the IDM and FDM of LAC-WM end-to-end using LoRA with rank 2. Second, we
+> freeze the FDM and train the action projector from scratch to map explicit actions into the latent
+> space. Third, we jointly fine-tune the projector and FDM end-to-end using LoRA with rank 2. At
+> inference time, we use only the action projector and FDM to perform action-conditioned imagined
+> rollouts."
+
+So **a new robot costs a projector *and* LoRA adapters on the FDM**, not a projector against a frozen
+world model. `fit_projector.py` freezes both, which is the conservative version -- if it works
+frozen, the cheaper option suffices; if it does not, LoRA is the documented fallback rather than an
+invention.
+
 
 ---
 
@@ -4973,6 +4988,21 @@ sitting within +/-0.4 of zero:
 The screen holds out about four of twelve conditions, so **a split that removes two or three turn
 levels removes most of yaw's test signal**. That is why the yaw row reads +/-0.274 and +/-0.556 where
 forward reads +/-0.140 -- leverage in the evaluation, not instability in the model.
+
+**A longer smoothing window was the one free option, and it is refuted.** F70 established that these
+channels cross robots only at stride scale, but never that every channel needs the *same* scale, and
+yaw's noise floor is 2.6x forward's -- so a slower window might have recovered it. Measured on the
+forward+yaw arm, seed 0:
+
+| window | yaw smoothed | forward smoothed | yaw "varies" |
+|---|---|---|---|
+| **1.0 s** (default) | **+0.606 / -0.031** | +0.826 / +0.328 | 0.35 |
+| 1.5 s | +0.594 / -1.063 | +0.564 / +0.396 | 0.34 |
+| 2.5 s | -0.116 / -0.465 | -0.116 / +0.448 | 0.33 |
+
+**Monotonically worse.** The `varies` column says why: on a 3.30 s clip a 2.5 s window averages the
+signal away along with the noise -- vertical collapses from 0.14 to 0.07 -- and `mode="same"`
+convolution pulls both ends toward zero on top. The default is already at the useful limit.
 
 **So the competition remains unexplained**, with capacity and optimisation the remaining candidates,
 and it is separable from the variance: more turn levels would tighten the *measurement* without
@@ -5223,6 +5253,29 @@ targets are wrist poses, fingertip positions and camera poses -- a fingertip at 
 same thing for a human hand and a robot gripper. The unified latent action space is therefore
 unifying representations of quantities that are **already commensurable**.
 
+**Where the value actually is, and it is not the coordinate on its own.** The setting this method is
+for is a robot about which **nothing is known** -- no kinematic tree, no URDF, no action labels, only
+video of it moving. Morphology-agnostic *proprioceptive* control exists but must be handed the
+kinematic graph; a camera has to be handed nothing. What the world model supplies is knowledge of
+**how to drive joints so the result is locomotion**, which is the expensive part of bringing up a new
+robot. The coordinate argument below explains *why the problem is hard*; this is what makes it worth
+solving.
+
+**And it sets the research question, which the three arms answer.** Can a pipeline work with a
+**joint-space action target** at all, given no shared action space exists? Measured:
+
+| | within-robot joint error | cross-robot transfer |
+|---|---|---|
+| joint target, no body term | 0.3517 | **-28.9 / -43.1** |
+| joint target + body term | **0.2183** | **+0.610 / +0.573** |
+
+**A joint-space target works within a robot on its own** -- the control arm decodes 18-D and 12-D
+commands without any shared supervision. **It does not cross robots without the body term**, and the
+term also improves the within-robot decoding by 38%. So the defensible conclusion is not "joint
+targets work" or "joint targets fail", but the conditional one: **a joint-space action target
+transfers across incomparable embodiments only when a shared body-motion term is present** -- and
+that is a result, not a caveat.
+
 **A weak version of our claim, and why it fails.** It is tempting to say ours are "one or two
 dimensionless numbers rather than a 6-DOF pose in a common frame". That is a description of a data
 limitation dressed as a design principle: **body pose is shared by every embodiment** -- a rigid body
@@ -5271,11 +5324,24 @@ stop the trunk becoming a switch. F83 measures what that head is worth: without 
 | 6.2 planning by action selection, task success rate | nothing | the closed loop, F81 |
 | 6.3 **scaling with number of embodiments** | **cannot** -- we have two | state as a limitation |
 
-**5.2 is the one to build.** They condition the FDM on observations from one embodiment while
-feeding action embeddings derived from **another**, and score the generated frames. That is exactly
-what our cross-embodiment readout measures, except **theirs can be looked at**. With the body head at
-+0.76 against a control at -28.9 (F83), the pixel version shows a B1 frame rolled forward by a
-hexapod's latent, which is more convincing than a ratio.
+**5.2 is the one to build, and the measurement needs no decoder.** They condition the FDM on
+observations from one embodiment while feeding action embeddings derived from **another**. That is a
+question about the *latent*, where F51 asked about the *forward model* -- different component.
+`scripts/diagnostics/cross_latent_rollout.py` does it in embedding space with two bracketing
+baselines, because the clips are not phase-synchronised (F45) and a raw error would mostly measure
+that.
+
+**Correction: their FDM predicts an embedding, exactly as ours does.** An earlier version of this
+entry said it was a video generator, which is why image metrics were available. It is not. Section
+3.1: *"to predict the next visual embedding x_hat_{t+1}, such that x_hat_{t+1} = FDM(x_t, z_t)"*,
+with `L_recon` an MSE on embeddings. **The image metrics come from a separate component**:
+
+> "Both models use a pretrained V-JEPA2 RGB tokenizer for image encoding, which is frozen. **We use
+> a custom V-JEPA2 RGB decoder to decode the predicted image embeddings into RGB image space.**"
+
+So the architectural distance is smaller than it looked: **frozen V-JEPA2 tokenizer, FDM predicting
+embeddings, and a 64-dimensional action embedding -- all three identical to ours.** The only piece we
+lack is the RGB decoder, and it is needed for *presentation*, not for the measurement.
 
 **6.3 is a limitation to declare, not to attempt.** Their headline is that LAC-WM's downstream
 performance **scales positively** with the number of pretraining embodiments while EAC-WM's degrades.

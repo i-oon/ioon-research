@@ -270,16 +270,21 @@ frozen encoder is the *before* condition, and forward speed itself reads **0.31 
    range and under a harder test -- but **the two datasets are not comparable** and three attempts to
    force it each found a different confound (F84). The claim rests on the controlled within-dataset
    comparison instead: -16.7 to +0.70 from the body term alone.
-3. **Is twelve behaviours enough to resolve effects of this size?** Held out by condition, about
+3. **Why do the channels compete?** Adding yaw costs forward 68% (F83). Three explanations were
+   tested and rejected -- yaw carrying less signal (identical signal share, 0.86 both), a mismatched
+   length scale (an affine rescale cancels against a standardised target, F77), and a longer
+   smoothing window (degrades monotonically, F83). **Capacity is the remaining candidate and the
+   cheapest test is one training run with a wider body head**, data held fixed.
+4. **Is twelve behaviours enough to resolve effects of this size?** Held out by condition, about
    four test behaviours remain and the spreads run +/- 0.2 to 1.3. If the arms disagree weakly the
    answer may be power rather than substance.
-4. **Should the yaw length scale be the stance radius rather than hip height?** Physically the
+5. **Should the yaw length scale be the stance radius rather than hip height?** Physically the
    moment arm of a turn is where the feet meet the ground, and the two scales differ 4.4x in the
    ratio between the robots. It does not change what transfers -- an affine rescale cancels against
    a standardised target -- but it does change how much the channel identifies the robot, 0.637
    against 0.571 (F77). Switching means re-solving the four `--spin` levels first, since the
    collection is matched on the height version.
-5. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
+6. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
    frame corrected, and half the B1 clips carry a per-policy lateral artefact (F79, F80). Excluded
    for now; the exclusion is a measurement, not a principle.
 
