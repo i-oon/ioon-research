@@ -281,13 +281,13 @@ def build_cross_embodiment(cfg, root):
                                                   clips_per_body=tuple(cfg.clips_per_body))
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
-                                     body_channels=_channels(cfg))
+                                     body_channels=_channels(cfg), frame_stride=cfg.frame_stride)
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                    body_stats=train_set.body_stats,
-                                   body_channels=_channels(cfg))
+                                   body_channels=_channels(cfg), frame_stride=cfg.frame_stride)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 

@@ -98,7 +98,8 @@ class IKWalkPairs(Dataset):
     action sequence and near-identical frames, so holding one out measures nothing."""
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
-                 frame_range=None, within_body_std=True, cross_augment=True, action_lag=1):
+                 frame_range=None, within_body_std=True, cross_augment=True, action_lag=1,
+                 frame_stride=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if episodes is not None:
             keep = set(episodes)
@@ -138,10 +139,26 @@ class IKWalkPairs(Dataset):
                     "pair is undefined. Rebuild with scripts/dataset/build_stage1_dirs.py, which "
                     "selects from episodes shared by all training bodies.")
 
-        # The target sits action_lag steps past t, so a transition is only usable when that
-        # index exists: t+1 for the frames and t+action_lag for the command.
+        # The target sits action_lag steps past t, so a transition is only usable when both
+        # indices exist: t+frame_stride for the frames and t+action_lag for the command.
+        #
+        # **`frame_stride` is how far apart the ITM's two frames are, and 1 is the wrong default
+        # for this data.** At 20 Hz `t -> t+1` is 50 ms -- one nineteenth of a 0.95 s stride, and
+        # 19% of the pose change half a stride carries (F54). At that spacing `e_{t+1}` is largely
+        # guessable from `e_t`, so nothing forces the forward model to read `z`: F87 measured the
+        # frame outweighing the latent **28x**, and a latent drawn from a different behaviour
+        # costing **0.25%**. LAC-WM chunks to five steps for the same reason, "which we found in
+        # practice improves world model learning".
+        #
+        # **The risk, from the same finding.** F54's long-baseline arm won every multi-step horizon
+        # in-domain and *lost* at every horizon across robots -- "across robots the little that
+        # survives is the one-step structure". That arm sampled partners uniformly within a clip
+        # (0-65 frames apart) rather than at a fixed spacing, and it predates the body head, which
+        # is now known to supply most of the gradient reaching `z`. So the risk is real and not
+        # settled: **measure transfer as well as z-usage after changing this**.
         self.action_lag = action_lag
-        reach = max(1, action_lag)
+        self.frame_stride = max(1, int(frame_stride))
+        reach = max(self.frame_stride, action_lag)
         start, stop = frame_range or (0, 0)
         self.index = [
             (i, t)
@@ -165,7 +182,7 @@ class IKWalkPairs(Dataset):
     def __getitem__(self, i):
         clip_idx, t = self.index[i]
         clip = self.clips[clip_idx]
-        frame_t, frame_next = clip["frames"][t], clip["frames"][t + 1]
+        frame_t, frame_next = clip["frames"][t], clip["frames"][t + self.frame_stride]
 
         rng = np.random.default_rng((self.seed, self.epoch, i))
         height, width = frame_t.shape[:2]
@@ -295,7 +312,7 @@ class MultiEmbodimentPairs(Dataset):
     """
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
-                 body_stats=None, body_channels=BODY_CHANNELS):
+                 body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -337,7 +354,10 @@ class MultiEmbodimentPairs(Dataset):
         self.morph_index = {name: i for i, name in enumerate(self.morphs)}
 
         self.action_lag = action_lag
-        reach = max(1, action_lag)
+        # the pair reaches t+frame_stride and the command reaches t+action_lag; the guard has to
+        # cover whichever is further, or the last frames of every clip index past the end
+        self.frame_stride = max(1, int(frame_stride))
+        reach = max(self.frame_stride, action_lag)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
@@ -374,7 +394,7 @@ class MultiEmbodimentPairs(Dataset):
     def __getitem__(self, i):
         clip_idx, t = self.index[i]
         clip = self.clips[clip_idx]
-        frame_t, frame_next = clip["frames"][t], clip["frames"][t + 1]
+        frame_t, frame_next = clip["frames"][t], clip["frames"][t + self.frame_stride]
 
         rng = np.random.default_rng((self.seed, self.epoch, i))
         height, width = frame_t.shape[:2]
@@ -455,13 +475,16 @@ class EmbodimentBatchSampler(Sampler):
 class IKWalkFrames(Dataset):
     """Un-augmented frames for evaluation and probing."""
 
-    def __init__(self, data_dir, morphs, mean=None, std=None, action_lag=1):
+    def __init__(self, data_dir, morphs, mean=None, std=None, action_lag=1, frame_stride=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if mean is None or std is None:
             mean, std = action_stats(self.clips)
         self.mean, self.std = mean.astype(np.float32), std.astype(np.float32)
         self.action_lag = action_lag
-        reach = max(1, action_lag)
+        # the pair reaches t+frame_stride and the command reaches t+action_lag; the guard has to
+        # cover whichever is further, or the last frames of every clip index past the end
+        self.frame_stride = max(1, int(frame_stride))
+        reach = max(self.frame_stride, action_lag)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)

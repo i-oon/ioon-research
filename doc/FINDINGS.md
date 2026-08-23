@@ -5322,6 +5322,20 @@ sequences, *"which we found in practice improves world model learning"*.
 `motion` and `recon` -- the two smallest contributors -- which is why its cross-embodiment transfer
 reads -28.9 while its `recon` looks indistinguishable from the body-head arm's.
 
+**What to change, and what not to.** Lowering `lambda_recon` is the obvious move and is ruled out:
+reconstruction is 99% of the loss and 18% of the gradient, so weakening it removes gradient without
+rebalancing anything. Two changes are supported by the measurement:
+
+*Raise `lambda_body`.* It has the **largest raw `|dL/dz|` of the three terms** -- 0.0019 against
+motion's 0.0011 and recon's 0.0004 -- and is then halved by `lambda_body 0.5`, landing at 38.8%.
+At 1.0 it would lead outright. Per unit of loss it pulls on `z` **78x** harder than recon does.
+
+*Widen the pair.* `cfg.frame_stride` now sets how far apart the ITM's two frames sit (implemented
+2026-08-24). This attacks the cause rather than the balance: at stride 1 the next frame is guessable,
+so no weighting can make a latent necessary that the task does not need. F54 already measured
+stride-scale pairs rolling better in-domain, and **also measured them losing at every horizon across
+robots**, so this must be scored on transfer as well as on z-usage.
+
 **Consequence for the closed loop, and the reason this was run before building it.** A planner
 samples candidate actions, projects them to latents, rolls the FTM and picks a winner. If changing
 `z` moves the prediction by 3-8%, every candidate scores nearly the same and there is little to

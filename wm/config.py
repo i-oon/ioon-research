@@ -24,6 +24,7 @@ def from_checkpoint(saved):
 # What each field did before it existed, for runs recorded without it.
 LEGACY_DEFAULTS = {
     "action_lag": 0,
+    "frame_stride": 1,
     "cross_augment": True,
     "within_body_std": False,
     "lambda_cross": 0.0,
@@ -177,6 +178,15 @@ class Config:
     # action_lag 1 asks for the action that caused the transition, which is what z is defined to
     # represent. The decoder never sees e_{t+1}, so that answer can only arrive through z.
     # 0 reproduces every run recorded before 2026-08-09.
+    # How far apart the ITM's two frames sit. **1 is the default and is measured to be the wrong
+    # unit for this data**: at 20 Hz `t -> t+1` is 50 ms, one nineteenth of a 0.95 s stride and 19%
+    # of the pose change half a stride carries (F54). At that spacing the next frame is largely
+    # guessable from the current one, so nothing forces the forward model to read `z` -- F87
+    # measured the frame outweighing the latent 28x, and a latent from a different behaviour
+    # costing 0.25%. LAC-WM down-samples the observation frequency by chunking to five steps for
+    # the same reason. **F54 also found the long baseline losing at every horizon across robots**,
+    # so raising this must be checked against transfer, not only against z-usage.
+    frame_stride: int = 1
     action_lag: int = 1
 
     # Two independently augmented views of each pair, which is what stops the ITM smuggling
