@@ -33,6 +33,7 @@ without `z` having to ask.
 import torch
 import torch.nn as nn
 
+from ..config import chunk_of
 from .blocks import CrossAttentionBlock
 
 HEAD_MODES = ("mlp", "linear", "probe", "pooled")
@@ -91,8 +92,18 @@ class MotionDecoder(nn.Module):
                 self.pooled_proj = nn.Sequential(
                     nn.LayerNorm(cfg.token_dim), nn.Linear(cfg.token_dim, cfg.hidden), nn.GELU())
 
+        # **The head predicts a window of commands, not one.** With `frame_stride` k the pair
+        # e_t -> e_{t+k} is caused by k commands, so scoring `z` against a single one asks the
+        # latent to summarise an interval and then grades it on an instant. Measured (F88):
+        # widening the frames alone took validation motion from 0.218 to 0.928, roughly the level
+        # of predicting the training mean. LAC-WM chunks both sides for this reason.
+        #
+        # `chunk_of` returns 1 whenever `frame_stride` is 1, so every checkpoint recorded before
+        # this existed rebuilds with identical parameter shapes and loads unchanged.
+        self.action_chunk = chunk_of(cfg)
         spec = heads or {"default": cfg.action_dim}
-        self.heads = nn.ModuleDict({name: _head(self.mode, self.width, dim)
+        self.action_dims = dict(spec)
+        self.heads = nn.ModuleDict({name: _head(self.mode, self.width, dim * self.action_chunk)
                                     for name, dim in spec.items()})
 
         # **One head, no embodiment key, and blind to the frame.** Both properties are load-bearing
@@ -137,7 +148,7 @@ class MotionDecoder(nn.Module):
         # per-embodiment because action spaces differ in dimension, but one linear layer each,
         # so the share of the decoder that transfers to a new embodiment barely moves
         self.offsets = nn.ModuleDict(
-            {name: nn.Linear(cfg.hidden, dim) for name, dim in spec.items()}
+            {name: nn.Linear(cfg.hidden, dim * self.action_chunk) for name, dim in spec.items()}
         ) if self.mode == "pooled" else None
         if self.offsets is not None:
             for layer in self.offsets.values():
@@ -152,13 +163,28 @@ class MotionDecoder(nn.Module):
         tokens = self.downsample(tokens).flatten(2).transpose(1, 2)
         return self.cross(self.query_proj(z).unsqueeze(1), tokens)
 
-    def forward(self, x_t, z, embodiment="default"):
+    def chunk(self, x_t, z, embodiment="default"):
+        """The whole predicted command window, `(batch, action_chunk, action_dim)`.
+
+        This is what `L_motion` trains on. `forward` returns only the first step, so that the
+        dozen diagnostics and refit scripts written against a 2-D output keep working -- a 3-D
+        prediction would broadcast against their 2-D targets rather than raise, and report a
+        plausible wrong number.
+        """
         action = self.heads[embodiment](self.features(x_t, z)).squeeze(1)
         if self.offsets is not None:
             # starts at exactly zero, so training begins identical to the mlp decoder and any
             # departure from it is the pooled route being used
             action = action + self.offsets[embodiment](self.pooled_proj(x_t.mean(dim=1)))
-        return action
+        return action.reshape(action.shape[0], self.action_chunk, -1)
+
+    def forward(self, x_t, z, embodiment="default"):
+        """The command at `t + action_lag`: the first step of the window, shape `(batch, dim)`.
+
+        Identical to the pre-chunking output whenever `action_chunk` is 1, which is every run
+        with `frame_stride` 1.
+        """
+        return self.chunk(x_t, z, embodiment)[:, 0]
 
     def body(self, x_t, z):
         """Body motion from `z` alone. `x_t` is accepted and ignored unless body_sees_frame."""
@@ -170,10 +196,11 @@ class MotionDecoder(nn.Module):
 
     def add_head(self, name, hidden, action_dim, device=None):
         """A body with a new action space needs its own head; the backbone stays frozen."""
-        head = _head(self.mode, self.width, action_dim)
+        head = _head(self.mode, self.width, action_dim * self.action_chunk)
+        self.action_dims[name] = action_dim
         self.heads[name] = head.to(device) if device else head
         if self.offsets is not None:
-            offset = nn.Linear(hidden, action_dim)
+            offset = nn.Linear(hidden, action_dim * self.action_chunk)
             nn.init.zeros_(offset.weight); nn.init.zeros_(offset.bias)
             self.offsets[name] = offset.to(device) if device else offset
         return self.heads[name]

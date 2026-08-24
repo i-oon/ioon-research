@@ -5345,6 +5345,65 @@ choose between them. Not fatal -- the body-head arm is 3x better than the contro
 
 ---
 
+### F88. Widening the pair without chunking the action target is half a change, and it breaks the decoder
+
+F87 ended with *"widen the pair"* as the supported fix and `cfg.frame_stride` as the implementation.
+Two arms were trained on `data/beh12_*` at stride 5 and stride 10, against `beh12_body_fwd` at
+stride 1, everything else matched.
+
+**The hypothesis was right.**
+
+| | stride 1 | stride 5 | stride 10 |
+|---|---|---|---|
+| sweep z (hexapod, speed) | 4.257 | 3.728 | **6.764** |
+| z per step | 0.083 | 0.073 | **0.132** |
+| correct vs wrong behaviour | 3.5% | 1.2% | 2.6% |
+
+At stride 10 the forward model's use of the latent rises **1.6x**. Making the prediction task harder
+does put pressure on `z`, which is what F87 predicted and what no reweighting could have achieved.
+
+**And the objective's other half collapsed.**
+
+| | stride 1 | stride 5 | stride 10 |
+|---|---|---|---|
+| best val `motion` | **0.2183** | 0.9112 | 0.9283 |
+| best val `recon` | 1.5400 | 2.0120 | 2.1874 |
+
+**A standardised target scored at 0.93 is a decoder predicting the training mean.** The joint-command
+result -- the one thing in Stage 2 that is a contribution rather than a diagnostic -- was gone.
+
+**The cause is not the stride. It is that only one side of the pair was widened.** With `frame_stride`
+k the transition `e_t -> e_{t+k}` is caused by **k** commands. `z` is therefore asked to summarise an
+interval, while `L_motion` still scored it against the single command at `t + action_lag`. The latent
+was being graded on an instant it no longer describes. LAC-WM does not hit this because it chunks
+both sides: *"we chunk the actions into 5-step sequences"* -- the phrase F87 quoted for the frames
+applies to the actions in the same sentence.
+
+**Fixed 2026-08-24** by `cfg.action_chunk`, which defaults to 0 meaning *follow `frame_stride`*, so
+the two halves cannot drift apart again by omission. The Motion Decoder's per-embodiment heads emit
+`action_dim x chunk` and `MotionDecoder.chunk()` returns `(batch, chunk, action_dim)`; the dataset
+returns the k commands from `t + action_lag`. At chunk 1 every shape is bit-identical to before, so
+each recorded run reproduces and each existing checkpoint loads strict.
+
+**Two guards, both against the same failure.** `MotionDecoder.forward` still returns the *first*
+command only, shape `(batch, action_dim)`, because a dozen diagnostics and the two head-refit scripts
+compare against a 2-D target -- a 3-D prediction would **broadcast** against them and report a
+plausible wrong number rather than raise. `compute_losses` asserts the two motion shapes are equal
+for the same reason. This class of silent-broadcast bug has already cost this project four separate
+findings.
+
+**What is still unmeasured.** Whether the paired change keeps the z-usage gain *and* recovers
+`motion`. Both are needed: stride 10 alone bought 1.6x on the latent at the cost of the decoder, and
+a fix that only restores the decoder has bought nothing. **Transfer must be scored too** -- F54
+measured stride-scale pairs winning in-domain and losing at every horizon across robots, and the
+single-seed screen on these arms is consistent with that risk being real (stride 5 forward-smoothed
+-1.142 / -0.028 against stride 1's +0.826 / +0.328, stride 10 back to +0.598 / +0.400).
+
+**Nothing in the slide deck depends on this.** Every reported Stage 2 number is stride 1, which is
+untouched by the change.
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not

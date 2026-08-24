@@ -6,6 +6,16 @@ scaled down for a single 2080 Ti; the paper used 64 H200s with batch size 512.
 from dataclasses import dataclass, fields
 
 
+def chunk_of(cfg):
+    """How many commands the Motion Decoder predicts per pair.
+
+    0 follows `frame_stride`, which is what pairs the action target with the interval the latent
+    actually spans; see `Config.action_chunk`. Read through `getattr` so a Config rebuilt from a
+    checkpoint recorded before either field existed still answers 1.
+    """
+    return max(1, int(getattr(cfg, "action_chunk", 0) or getattr(cfg, "frame_stride", 1) or 1))
+
+
 def from_checkpoint(saved):
     """Rebuild a Config from a checkpoint, keeping the behaviour that checkpoint was trained with.
 
@@ -25,6 +35,7 @@ def from_checkpoint(saved):
 LEGACY_DEFAULTS = {
     "action_lag": 0,
     "frame_stride": 1,
+    "action_chunk": 1,
     "cross_augment": True,
     "within_body_std": False,
     "lambda_cross": 0.0,
@@ -188,6 +199,22 @@ class Config:
     # so raising this must be checked against transfer, not only against z-usage.
     frame_stride: int = 1
     action_lag: int = 1
+
+    # How many consecutive joint commands the Motion Decoder is asked for, starting at
+    # `t + action_lag`. **0 means "follow frame_stride", which is the only setting that keeps the
+    # two halves of the objective describing the same interval.**
+    #
+    # Widening `frame_stride` without this is measurably wrong, not merely suboptimal. The pair
+    # e_t -> e_{t+k} is caused by k commands, so `z` is asked to summarise k steps while
+    # `L_motion` still scores it against one. Measured (F88): stride 10 raised the forward model's
+    # use of the latent 1.6x (sweep z 4.257 -> 6.764) and simultaneously took validation motion
+    # from 0.218 to 0.928 -- about the level of predicting the training mean, i.e. the decoder
+    # stopped working. LAC-WM does not hit this because it chunks both: "we chunk the actions into
+    # 5-step sequences".
+    #
+    # At chunk 1 the target keeps its old shape (action_dim,) exactly, so every run recorded
+    # before this existed is reproduced bit-for-bit.
+    action_chunk: int = 0
 
     # Two independently augmented views of each pair, which is what stops the ITM smuggling
     # x_{t+1} into z. Measured cost: the FTM's target becomes 4.39x more augmentation noise than

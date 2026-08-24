@@ -284,7 +284,13 @@ frozen encoder is the *before* condition, and forward speed itself reads **0.31 
    a standardised target -- but it does change how much the channel identifies the robot, 0.637
    against 0.571 (F77). Switching means re-solving the four `--spin` levels first, since the
    collection is matched on the height version.
-6. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
+6. **Does pretraining on two embodiments make a third one cheap?** Unanswerable as things stand and
+   the most valuable thing left. LAC-WM's scaling result -- downstream performance rising with the
+   number of pretraining embodiments -- needs at least three, and we have two, so it is declared as
+   a limitation rather than attempted (F82, step 2o). A third body chosen for **incomparable
+   topology** (a biped, or a different leg count) rather than for convenience would turn the claim
+   from "these two robots transfer" into "these two are pretraining data". Costs what the B1 cost.
+7. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
    frame corrected, and half the B1 clips carry a per-policy lateral artefact (F79, F80). Excluded
    for now; the exclusion is a measurement, not a principle.
 

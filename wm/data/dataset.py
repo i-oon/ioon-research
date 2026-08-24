@@ -63,6 +63,18 @@ def load_clip(path):
         }
 
 
+def action_window(actions, t, lag, chunk, mean, std):
+    """The `chunk` commands starting at `t + lag`, standardised.
+
+    Shape is `(action_dim,)` at chunk 1 and `(chunk, action_dim)` above it. The squeeze is not
+    cosmetic: every consumer written before chunking -- the projector fit, the head-refit
+    scripts, `predict_actions` -- indexes a 2-D target, and a 3-D one would broadcast against it
+    silently rather than raise.
+    """
+    window = (actions[t + lag:t + lag + chunk] - mean) / std
+    return (window[0] if chunk == 1 else window).astype(np.float32)
+
+
 def action_stats(clips, within_body=True):
     """Per-joint mean and scale used to standardise the motion target.
 
@@ -99,7 +111,7 @@ class IKWalkPairs(Dataset):
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
                  frame_range=None, within_body_std=True, cross_augment=True, action_lag=1,
-                 frame_stride=1):
+                 frame_stride=1, action_chunk=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if episodes is not None:
             keep = set(episodes)
@@ -158,7 +170,11 @@ class IKWalkPairs(Dataset):
         # settled: **measure transfer as well as z-usage after changing this**.
         self.action_lag = action_lag
         self.frame_stride = max(1, int(frame_stride))
-        reach = max(self.frame_stride, action_lag)
+        # the pair reaches t+frame_stride and the command window ends at t+action_lag+chunk-1;
+        # the guard has to cover whichever is further, or the last frames of every clip index
+        # past the end
+        self.action_chunk = max(1, int(action_chunk))
+        reach = max(self.frame_stride, action_lag + self.action_chunk - 1)
         start, stop = frame_range or (0, 0)
         self.index = [
             (i, t)
@@ -192,13 +208,14 @@ class IKWalkPairs(Dataset):
         else:
             a1 = a2 = identity_params(height, width)
 
-        action = (clip["actions"][t + self.action_lag] - self.mean) / self.std
+        action = action_window(clip["actions"], t, self.action_lag, self.action_chunk,
+                               self.mean, self.std)
         sample = {
             "view1_t": apply(frame_t, a1),
             "view1_next": apply(frame_next, a1),
             "view2_t": apply(frame_t, a2),
             "view2_next": apply(frame_next, a2),
-            "action": action.astype(np.float32),
+            "action": action,
             "morph_id": self.morph_index[clip["morph"]],
         }
         if "body_motion" in clip:
@@ -215,8 +232,8 @@ class IKWalkPairs(Dataset):
             a3 = sample_params(rng, height, width) if self.cross_augment \
                 else identity_params(height, width)
             sample["cross_x_t"] = apply(partner["frames"][t], a3)
-            sample["cross_action"] = (
-                (partner["actions"][t + self.action_lag] - self.mean) / self.std).astype(np.float32)
+            sample["cross_action"] = action_window(
+                partner["actions"], t, self.action_lag, self.action_chunk, self.mean, self.std)
             sample["cross_morph_id"] = self.morph_index[partner["morph"]]
         return sample
 
@@ -312,7 +329,7 @@ class MultiEmbodimentPairs(Dataset):
     """
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
-                 body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1):
+                 body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1, action_chunk=1):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -354,10 +371,12 @@ class MultiEmbodimentPairs(Dataset):
         self.morph_index = {name: i for i, name in enumerate(self.morphs)}
 
         self.action_lag = action_lag
-        # the pair reaches t+frame_stride and the command reaches t+action_lag; the guard has to
-        # cover whichever is further, or the last frames of every clip index past the end
+        # the pair reaches t+frame_stride and the command window ends at t+action_lag+chunk-1;
+        # the guard has to cover whichever is further, or the last frames of every clip index
+        # past the end
         self.frame_stride = max(1, int(frame_stride))
-        reach = max(self.frame_stride, action_lag)
+        self.action_chunk = max(1, int(action_chunk))
+        reach = max(self.frame_stride, action_lag + self.action_chunk - 1)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
@@ -410,7 +429,8 @@ class MultiEmbodimentPairs(Dataset):
             "view1_next": apply(frame_next, a1),
             "view2_t": apply(frame_t, a2),
             "view2_next": apply(frame_next, a2),
-            "action": ((clip["actions"][t + self.action_lag] - mean) / std).astype(np.float32),
+            "action": action_window(clip["actions"], t, self.action_lag, self.action_chunk,
+                                    mean, std),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
             **({"body_motion": ((clip["body_motion"][t, self.body_channels] - self.body_stats[0])
@@ -475,16 +495,19 @@ class EmbodimentBatchSampler(Sampler):
 class IKWalkFrames(Dataset):
     """Un-augmented frames for evaluation and probing."""
 
-    def __init__(self, data_dir, morphs, mean=None, std=None, action_lag=1, frame_stride=1):
+    def __init__(self, data_dir, morphs, mean=None, std=None, action_lag=1, frame_stride=1,
+                 action_chunk=1):
         self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
         if mean is None or std is None:
             mean, std = action_stats(self.clips)
         self.mean, self.std = mean.astype(np.float32), std.astype(np.float32)
         self.action_lag = action_lag
-        # the pair reaches t+frame_stride and the command reaches t+action_lag; the guard has to
-        # cover whichever is further, or the last frames of every clip index past the end
+        # the pair reaches t+frame_stride and the command window ends at t+action_lag+chunk-1;
+        # the guard has to cover whichever is further, or the last frames of every clip index
+        # past the end
         self.frame_stride = max(1, int(frame_stride))
-        reach = max(self.frame_stride, action_lag)
+        self.action_chunk = max(1, int(action_chunk))
+        reach = max(self.frame_stride, action_lag + self.action_chunk - 1)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
@@ -497,11 +520,12 @@ class IKWalkFrames(Dataset):
     def __getitem__(self, i):
         clip_idx, t = self.index[i]
         clip = self.clips[clip_idx]
-        action = (clip["actions"][t + self.action_lag] - self.mean) / self.std
+        action = action_window(clip["actions"], t, self.action_lag, self.action_chunk,
+                               self.mean, self.std)
         return {
             "frame_t": clip["frames"][t],
             "frame_next": clip["frames"][t + 1],
-            "action": action.astype(np.float32),
+            "action": action,
             "raw_action": clip["actions"][t + self.action_lag],
             "contact": contact_labels(clip["forces"][t]),
             "morph": clip["morph"],

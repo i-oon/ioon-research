@@ -22,7 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from wm.config import Config  # noqa: E402
+from wm.config import Config, chunk_of  # noqa: E402
 from wm.data.dataset import (  # noqa: E402
     EmbodimentBatchSampler,
     IKWalkPairs,
@@ -138,7 +138,10 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
 
     z = models["itm"](views["view1_t"], views["view1_next"])
     pred_next = models["ftm"](views["view2_t"], z, embodiment)
-    pred_action = models["md"](views["view1_t"], z, embodiment)
+    # `.chunk`, not `.__call__`: the decoder's public output is the first command only, so
+    # every diagnostic keeps its 2-D contract while the loss sees the whole window. The reshape
+    # is the guard -- it raises on a mismatch instead of broadcasting.
+    pred_action = models["md"].chunk(views["view1_t"], z, embodiment).reshape(action.shape)
 
     cross_pred = cross_target = None
     if "cross_x_t" in batch and cfg.lambda_cross > 0:
@@ -147,8 +150,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
             # the partner body is a different morphology of the same embodiment, so it shares
             # this batch's offset
             cross_views = cross_views - offset
-        cross_pred = models["md"](cross_views, z, embodiment)
         cross_target = batch["cross_action"].to(device)
+        cross_pred = models["md"].chunk(cross_views, z, embodiment).reshape(cross_target.shape)
 
     body_pred = body_target = None
     if models["md"].body_head is not None and "body_motion" in batch:
@@ -281,13 +284,15 @@ def build_cross_embodiment(cfg, root):
                                                   clips_per_body=tuple(cfg.clips_per_body))
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
-                                     body_channels=_channels(cfg), frame_stride=cfg.frame_stride)
+                                     body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
+                                     action_chunk=chunk_of(cfg))
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                    body_stats=train_set.body_stats,
-                                   body_channels=_channels(cfg), frame_stride=cfg.frame_stride)
+                                   body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
+                                   action_chunk=chunk_of(cfg))
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -362,11 +367,13 @@ def main():
         frame_range = (cfg.frame_start, cfg.frame_stop)
         train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
                                 frame_range=frame_range, within_body_std=cfg.within_body_std,
-                                cross_augment=cfg.cross_augment, action_lag=cfg.action_lag)
+                                cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
+                                frame_stride=cfg.frame_stride, action_chunk=chunk_of(cfg))
         val_set = IKWalkPairs(
             data_dir, cfg.train_morphs, val_episodes,
             mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,
             cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
+            frame_stride=cfg.frame_stride, action_chunk=chunk_of(cfg),
         )
         print(f"train episodes {train_episodes} | val episodes {val_episodes}")
         loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)
@@ -503,6 +510,12 @@ def main():
             f"(recon {train_metrics['recon']:.4f} motion {train_metrics['motion']:.4f}) | "
             f"val {val_metrics['total']:.4f} "
             f"(recon {val_metrics['recon']:.4f} motion {val_metrics['motion']:.4f})"
+            # `motion` above averages over the whole command window at action_chunk > 1, so it
+            # is not comparable to a chunk-1 run. This is the column that is. Printed rather than
+            # left in tensorboard because it is the number that says whether chunking worked.
+            + (f" | motion@1 {train_metrics['motion_first']:.4f}/"
+               f"{val_metrics['motion_first']:.4f}"
+               if "motion_first" in train_metrics else "")
             + (f" | cross {train_metrics['cross']:.4f}"
                if "cross" in train_metrics else "")
             # Printed because it was not. `lambda_body 0.5` ran for 60 epochs contributing 0.002

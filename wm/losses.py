@@ -13,9 +13,19 @@ def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
                    cross_action=None, cross_target=None,
                    body_pred=None, body_target=None):
     recon = F.mse_loss(pred_next, target_next)
+    # **Checked, not assumed.** `F.mse_loss` broadcasts, so a (batch, chunk, dim) prediction
+    # against a (batch, dim) target returns a finite, plausible number computed over the wrong
+    # pairing. Every shape bug this file could have is that one.
+    assert pred_action.shape == target_action.shape, \
+        f"motion shapes disagree: {tuple(pred_action.shape)} vs {tuple(target_action.shape)}"
     motion = F.mse_loss(pred_action, target_action)
     total = cfg.lambda_recon * recon + cfg.lambda_motion * motion
     parts = {"recon": recon.item(), "motion": motion.item()}
+    if pred_action.dim() == 3:
+        # The first command of the window on its own, so `motion` above -- which averages over a
+        # k-step horizon and is therefore harder by construction -- can still be compared against
+        # a chunk-1 run. Reported only; nothing selects on it.
+        parts["motion_first"] = F.mse_loss(pred_action[:, 0], target_action[:, 0]).item()
 
     if cross_action is not None and cross_target is not None and cfg.lambda_cross > 0:
         # same latent, another body's frame, that body's command as the target

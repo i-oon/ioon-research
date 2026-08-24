@@ -43,6 +43,24 @@ it specifically. `cfg.body_channels` selects which columns it supervises: `(0,)`
 `(0, 2)` forward and yaw. Lateral is column 1 and is excluded -- it fails the embodiment gate, and
 half the B1 clips carry a per-policy artefact in it (F79, F80).
 
+### The training window is a pair of settings, not one
+
+`cfg.frame_stride` is how far apart the ITM's two frames sit. `cfg.action_chunk` is how many
+commands `L_motion` asks for, and **it defaults to 0, meaning follow `frame_stride`** -- because
+widening one without the other is not a weaker version of the change, it is a broken objective. The
+pair `e_t -> e_{t+k}` is caused by k commands, so a `z` that summarises k steps was being graded
+against the single command at `t + action_lag`. Measured (F88): stride 10 raised the forward model's
+use of the latent 1.6x and simultaneously took val `motion` from 0.218 to 0.928, which is the level
+of predicting the training mean. Both defaults are 1-equivalent, so runs recorded before this exist
+unchanged.
+
+At chunk > 1 the log gains `motion_first` -- the first command of the window alone -- because
+`motion` then averages over a k-step horizon and is not comparable to a chunk-1 run.
+
+`MotionDecoder.forward` returns the **first** command, shape `(batch, action_dim)`, whatever the
+chunk. The full window is `MotionDecoder.chunk()`. The split exists so the diagnostics and refit
+scripts keep a 2-D contract: a 3-D prediction broadcasts against a 2-D target rather than raising.
+
 ## Reading a training log
 
 **Stage 1 and Stage 2 runs print different lines.** Stage 1 trains several hexapod bodies and holds
@@ -63,7 +81,8 @@ epoch   4 | train 1.9036 (recon 1.7027 motion 0.0326) | val 1.8759 (recon 1.6826
 | Field | Unit | What it means |
 |---|---|---|
 | `recon` | MSE on V-JEPA2 embeddings, unnormalised | how well the FTM predicts the next frame's embedding. No absolute meaning; only compare between runs |
-| `motion` | MSE on standardised actions | joint-command error. **1.0 means predicting the training-set mean** |
+| `motion` | MSE on standardised actions | joint-command error. **1.0 means predicting the training-set mean**. At `action_chunk` > 1 this averages over the whole command window |
+| `motion_first` | same | present only at `action_chunk` > 1: the first command alone, so the run stays comparable to a chunk-1 one |
 | `train` / `val` | weighted sum | `lambda_recon * recon + lambda_motion * motion`. Dominated by recon, so read the parts, not the total |
 | `heldout <body>` | same units as `motion` | the number the whole project is about |
 | `zero_z` | same | heldout error with the latent replaced by zeros |
