@@ -66,7 +66,7 @@ def panel(ax, title, verdict, verdict_colour, shared_head=None, source=False):
                 fontsize=7.8, color="#4c6ef5", ha="center")
         ax.text(7.65, 5.8, "→ one target, shared by construction\n→ nothing to align alongside it",
                 fontsize=7.8, color="#4c6ef5", ha="center", va="top")
-        ax.text(5.0, 1.5, verdict, fontsize=10, color=verdict_colour,
+        ax.text(5.0, 1.4, verdict, fontsize=10.5, color=verdict_colour, linespacing=1.6,
                 ha="center", va="center", weight="bold")
         return
 
@@ -95,7 +95,7 @@ def panel(ax, title, verdict, verdict_colour, shared_head=None, source=False):
         ax.text(7.55, 4.6, "nothing asks $z$ to mean\nthe same thing twice",
                 fontsize=7.8, color=GREY, ha="center", va="top")
 
-    ax.text(5.0, 1.5, verdict, fontsize=10, color=verdict_colour,
+    ax.text(5.0, 1.4, verdict, fontsize=10.5, color=verdict_colour, linespacing=1.6,
             ha="center", va="center", weight="bold")
 
 
@@ -105,15 +105,26 @@ def main():
     args = ap.parse_args()
 
     fig, axes = plt.subplots(1, 3, figsize=(15.5, 4.6))
-    panel(axes[0], "What we had", "insect→b1   −7.08", GREY, shared_head=None)
+    # F83, on the matched behaviour data and held out by condition. The earlier -7.08 / +0.54 was
+    # measured on forward-walking-only clips at the wrong B1 frame rate and is not comparable
+    # (F74, F84), so it is not shown even as a second row.
+    panel(axes[0], "Joint targets alone — what we had",
+          "own robot  0.3517\ncross-robot  −28.9", GREY, shared_head=None)
     panel(axes[1], "Ours: one shared head, reading $z$ alone",
-          "insect→b1   +0.54", TEAL, shared_head="z")
+          "own robot  0.2183   (−38%)\ncross-robot  +0.61", TEAL, shared_head="z")
     panel(axes[2], "LAC-WM: one decoder, one shared target",
-          "not run", "#4c6ef5", source=True)
-    fig.suptitle("Every variant we ran keeps joint angles as the main target. "
-                 "The source method has none.",
-                 fontsize=12, color=INK, y=0.99)
-    fig.tight_layout(rect=[0, 0, 1, 0.94])
+          "no joint head to fix\nnot run", "#4c6ef5", source=True)
+    fig.suptitle("A joint-space target works within one robot on its own. It crosses robots only "
+                 "with the body term —\nand the body term also cuts joint error by 38%.",
+                 fontsize=12, color=INK, y=0.995)
+    # The two rows of every verdict are different quantities, and a reader who assumes one scale
+    # will read -28.9 as catastrophically bad joint error rather than as a readout correlation.
+    fig.text(0.5, 0.035,
+             "own robot = validation joint-command MSE, standardised (1.0 = predicting the mean)"
+             "        cross-robot = body-speed readout fitted on one robot, applied to the other "
+             "(0 = no better than a constant)",
+             ha="center", fontsize=8.2, color=GREY)
+    fig.tight_layout(rect=[0, 0.055, 1, 0.94])
     out = os.path.join(ROOT, args.out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     fig.savefig(out, dpi=170)

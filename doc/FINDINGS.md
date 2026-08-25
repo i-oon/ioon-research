@@ -5345,62 +5345,120 @@ choose between them. Not fatal -- the body-head arm is 3x better than the contro
 
 ---
 
-### F88. Widening the pair without chunking the action target is half a change, and it breaks the decoder
+### F88. Widening the training pair buys the latent and sells everything else
 
-F87 ended with *"widen the pair"* as the supported fix and `cfg.frame_stride` as the implementation.
-Two arms were trained on `data/beh12_*` at stride 5 and stride 10, against `beh12_body_fwd` at
-stride 1, everything else matched.
+F87 ended with *"widen the pair"* as the supported fix. Implemented as `cfg.frame_stride`, then a
+second time as `cfg.action_chunk` after the first attempt broke the decoder. **Both are now
+measured, and the conclusion is not the one either implementation was written to reach.**
 
-**The hypothesis was right.**
-
-| | stride 1 | stride 5 | stride 10 |
+| hexapod, speed conditions | stride 1 | stride 5 + chunk | stride 10 + chunk |
 |---|---|---|---|
-| sweep z (hexapod, speed) | 4.257 | 3.728 | **6.764** |
-| z per step | 0.083 | 0.073 | **0.132** |
-| correct vs wrong behaviour | 3.5% | 1.2% | 2.6% |
+| `sweep z` -- how much the FTM reads the latent | 4.257 | 7.662 | **12.279** |
+| `z` per step | 0.083 | 0.150 | **0.240** |
+| cost of a latent from another behaviour | 3.5% | 6.0% | 5.6% |
+| **joint decoder**, val motion at one step | **0.218** | 0.906 | 0.879 |
+| **transfer**, forward smoothed, seed 0 | **+0.826 / +0.328** | -0.102 / +0.050 | -0.447 / +0.102 |
 
-At stride 10 the forward model's use of the latent rises **1.6x**. Making the prediction task harder
-does put pressure on `z`, which is what F87 predicted and what no reweighting could have achieved.
+**F87's prescription works on exactly the thing it was prescribed for.** The forward model's use of
+the latent nearly **triples**, and a latent from the wrong behaviour now costs more than it did at
+stride 1. LAC-WM's chunking is not a detail of their pipeline; it does what they say it does.
 
-**And the objective's other half collapsed.**
+**And it costs both of the things this project is about.** The joint decoder goes to the level of
+predicting the mean, and cross-embodiment transfer goes to zero -- not catastrophically negative
+like the no-body-term control, simply **absent**.
 
-| | stride 1 | stride 5 | stride 10 |
-|---|---|---|---|
-| best val `motion` | **0.2183** | 0.9112 | 0.9283 |
-| best val `recon` | 1.5400 | 2.0120 | 2.1874 |
+**The intermediate diagnosis was wrong, and its own fix refuted it.** The first arm widened only the
+frames, and the collapse was attributed to the mismatch: `z` summarising k steps while `L_motion`
+scored it against one. Chunking the action target fixes that mismatch exactly, and it moved the
+decoder **0.911 to 0.906** -- nothing -- while doubling `sweep z` from 3.728 to 7.662. **The
+mismatch was real and was not the cause.**
 
-**A standardised target scored at 0.93 is a decoder predicting the training mean.** The joint-command
-result -- the one thing in Stage 2 that is a contribution rather than a diagnostic -- was gone.
+**What the numbers say the cause is.** Four independent readings point one way: a wider pair turns
+`z` into a **clip identifier** rather than a movement code.
 
-**The cause is not the stride. It is that only one side of the pair was widened.** With `frame_stride`
-k the transition `e_t -> e_{t+k}` is caused by **k** commands. `z` is therefore asked to summarise an
-interval, while `L_motion` still scored it against the single command at `t + action_lag`. The latent
-was being graded on an instant it no longer describes. LAC-WM does not hit this because it chunks
-both sides: *"we chunk the actions into 5-step sequences"* -- the phrase F87 quoted for the frames
-applies to the actions in the same sentence.
+| observation | consistent with a clip code |
+|---|---|
+| `sweep z` rises 2.9x | a clip identifier predicts that clip's future very well |
+| decoder trains to 0.06 and validates at 1.28 | it memorises the identifier, it does not generalise from it |
+| transfer falls to zero | an identifier is robot-specific by construction |
+| `probe` rises 0.94 to **0.997** | `z` becomes *more* separable by embodiment, not less |
 
-**Fixed 2026-08-24** by `cfg.action_chunk`, which defaults to 0 meaning *follow `frame_stride`*, so
-the two halves cannot drift apart again by omission. The Motion Decoder's per-embodiment heads emit
-`action_dim x chunk` and `MotionDecoder.chunk()` returns `(batch, chunk, action_dim)`; the dataset
-returns the k commands from `t + action_lag`. At chunk 1 every shape is bit-identical to before, so
-each recorded run reproduces and each existing checkpoint loads strict.
+At stride 1 the pair difference is dominated by gait phase (F19: 64%), which is generic. At stride 5
+to 10 it is dominated by which clip this is.
 
-**Two guards, both against the same failure.** `MotionDecoder.forward` still returns the *first*
-command only, shape `(batch, action_dim)`, because a dozen diagnostics and the two head-refit scripts
-compare against a 2-D target -- a 3-D prediction would **broadcast** against them and report a
-plausible wrong number rather than raise. `compute_losses` asserts the two motion shapes are equal
-for the same reason. This class of silent-broadcast bug has already cost this project four separate
-findings.
+**This is F54, confirmed with a mechanism.** F54 measured a long-baseline arm winning every
+in-domain horizon and losing every cross-robot one, and could not say why. The why is that the
+information a wider pair adds is not shared between robots.
 
-**What is still unmeasured.** Whether the paired change keeps the z-usage gain *and* recovers
-`motion`. Both are needed: stride 10 alone bought 1.6x on the latent at the cost of the decoder, and
-a fix that only restores the decoder has bought nothing. **Transfer must be scored too** -- F54
-measured stride-scale pairs winning in-domain and losing at every horizon across robots, and the
-single-seed screen on these arms is consistent with that risk being real (stride 5 forward-smoothed
--1.142 / -0.028 against stride 1's +0.826 / +0.328, stride 10 back to +0.598 / +0.400).
+**Consequence for the objective, and it is a real constraint rather than a bug.** `z` being weakly
+read by the forward model (F87) and `z` transferring across robots (F83) are **in tension**. Every
+route to making the latent more predictive of the next frame that we have measured makes it more
+robot-specific. The body term is the one intervention that moved both in the same direction --
+`sweep z` 1.376 to 4.257 **and** transfer -28.9 to +0.610 -- and it did so by adding a shared
+target, not by making the prediction task harder.
 
-**Nothing in the slide deck depends on this.** Every reported Stage 2 number is stride 1, which is
-untouched by the change.
+**So the planner's problem stands and this does not solve it.** Rolling a forward model that moves
+3-8% under changes to `z` gives a planner little to choose between candidates. Widening the pair
+raises that number and destroys the transfer the plan is supposed to cross with. **The remaining
+direction is a shared target the frame does not already supply**, not a harder prediction task.
+
+**What is kept.** `cfg.frame_stride` and `cfg.action_chunk` stay in the code, defaulting to 1 and
+"follow frame_stride". They are measured, documented and off. No number in the deck or in any other
+finding uses them.
+
+
+---
+
+### F89. Which kind of variety a backbone was pretrained on does not change how it adapts to a new robot
+
+Two hexapod-only backbones, matched on everything except the axis this project is built around:
+
+| | bodies | behaviours | clips | transitions |
+|---|---|---|---|---|
+| `beh12_hexonly` | **1** | **12** | 48 | 2,779 |
+| `m3d_body` | **4** | **1** (forward) | 48 | 2,860 |
+
+Both frozen, both with the shared body head, both adapted to the same 48-clip B1 set by
+`finetune_ftm.py` at identical budgets and splits.
+
+| 9 clips | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|
+| 1 body, 12 behaviours | 1.25x | 1.12x | 1.01x | 0.86x |
+| 4 bodies, 1 behaviour | 1.25x | 1.11x | 0.99x | 0.81x |
+
+**Indistinguishable, and closer to each other than either is to its own spread across splits** --
+the h=10 ranges are 0.76-0.96 and 0.76-0.87. The whole curve matches, at every budget from one clip
+to nine, and so does the displacement profile: at 9 clips the predicted-versus-actual motion runs
+0.54 / 0.82 / 0.97 / 1.17 against 0.53 / 0.82 / 0.97 / 1.23.
+
+**What transfers to a genuinely different robot is generic, not morphological and not behavioural.**
+F13 measured that adding *episodes* of the same bodies changes nothing while adding *bodies* does;
+that held within the hexapod family and on the motion decoder. It does not extend to a forward model
+crossing to a quadruped: there, neither axis moves the number.
+
+**Consequence, and it saves work.** Collecting more hexapod bodies, or more behaviours per body,
+will not improve few-shot adaptation to a new robot. A third embodiment is still needed -- for the
+scaling claim and for testing whether the shared body head helps a *new* robot (F82, F83) -- but
+**not for this**, and it should not be justified on this basis.
+
+**What this does not say.** It compares two pretraining sets, not pretraining against nothing. The
+gap to random initialisation is large and grows with budget: at one step, 1.25x against 0.92x, and
+scratch never clears break-even at any budget measured. Pretraining is worth a great deal; *which*
+variety it contains is what makes no difference.
+
+**A second reading of the same run: the better one-step model is the less stable roller.**
+
+| 9 clips, predicted displacement / actual | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|
+| pretrained | **0.54** | 0.82 | 0.97 | **1.17** |
+| scratch | 0.88 | 0.85 | 0.86 | 0.91 |
+
+The pretrained arm is conservative at one step -- moving half as far as it should, and being right
+about the direction, which is why it scores 1.25x. Closed on its own output ten times that becomes
+an overshoot at 1.17, and it falls to 0.86x. Scratch holds ~0.9 throughout and lands near the
+hold-still baseline by default. **A hypothesis that scratch had simply learned to predict no motion
+is refuted**: predicting no motion scores exactly 1.00x by construction and would show a
+displacement near 0.
 
 ---
 

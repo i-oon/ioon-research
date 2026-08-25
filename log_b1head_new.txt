@@ -1,0 +1,19 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+checkpoint : wm/runs/beh12_hexonly/best.pt
+b1 clips   : 48  (7 fitted, rest held out, 3 splits)
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  89%|████████▉ | 754/843 [00:00<00:00, 7520.05it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7370.71it/s]
+  split 0  pretrained/real   28.15 deg   R2 +0.030
+  split 0  random        28.90 deg   R2 -0.007
+  split 1  pretrained/real   27.31 deg   R2 +0.114
+  split 1  random        29.04 deg   R2 +0.019
+  split 2  pretrained/real   28.82 deg   R2 -0.020
+  split 2  random        29.03 deg   R2 -0.046
+
+model                      deg       R2
+pretrained/real          28.09   +0.041   (+/- 0.62)
+random                   28.99   -0.011   (+/- 0.07)
+
+margin over a random backbone: 1.03x
+The 4-leg body scores 2.85x on this protocol. A margin near 1.0x here means the insect features
+carry nothing to the quadruped, which is what F41b and F45 predict.

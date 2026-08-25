@@ -44,8 +44,18 @@ from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
 def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device):
-    """Per clip: the frozen latent, the action that caused it, and the current embedding."""
-    E, Z, A = [], [], []
+    """Per clip: the frozen latent, the action that caused it, and the current embedding.
+
+    **Embeddings come back on the CPU in half precision.** One clip is 65 x 256 x 1408 floats,
+    about 94 MB; 48 of them per embodiment is 4.5 GB, and holding both robots' plus the encoder on
+    an 11 GB card runs out inside the ITM's attention. Only the final rollout needs them, and it
+    reads them in batches.
+
+    Also returns a **clip index per transition**. The split below has to be by clip, and clips are
+    not all the same length here -- 57 to 65 transitions -- so no fixed block size recovers the
+    boundaries.
+    """
+    E, Z, A, C, P = [], [], [], [], []
     for path in sorted(glob.glob(os.path.join(directory, "*.npz"))):
         clip = load(path, REGISTRY[name])
         if path not in cache:
@@ -63,8 +73,12 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device)
         # padded, since a padded action is a wrong label and F45 measured what wrong labels cost
         if len(actions) < n + lag:
             continue
-        E.append(e[:n]); Z.append(z); A.append(actions[lag:lag + n])
-    return torch.cat(E), torch.cat(Z), torch.cat(A)
+        E.append(e[:n].cpu().half()); Z.append(z); A.append(actions[lag:lag + n])
+        C.append(torch.full((n,), len(C), dtype=torch.long))
+        P.append(path)
+        del e
+        torch.cuda.empty_cache()
+    return torch.cat(E), torch.cat(Z), torch.cat(A), torch.cat(C), P
 
 
 def main():
@@ -103,26 +117,38 @@ def main():
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         torch.save(cache, cache_path)
+    # 300M frozen parameters that nothing below uses; on an 11 GB card that is the difference
+    # between the rollout batching fitting and not
+    del encoder, cache
+    torch.cuda.empty_cache()
 
     proj = ActionProjector(cfg, {n: v[2].shape[1] for n, v in data.items()}).to(device)
-    for name, (_, _, a) in data.items():
+    for name, (_, _, a, _c, _p) in data.items():
         proj.set_stats(name, a.mean(0).cpu(), a.std(0).cpu())
 
     # **Split by clip, not by frame.** Consecutive frames of one clip are near-duplicates, so a
     # frame-level split leaves the training data in the test set -- the leak that made yaw look
     # like it transferred at +0.31 until it was held out by condition instead (F76).
-    splits = {}
-    for name, (e, z, a) in data.items():
-        g = torch.arange(len(z), device=device) // 60
-        ids = torch.unique(g)
-        cut = ids[torch.randperm(len(ids), generator=torch.Generator().manual_seed(0))]
-        val_ids = cut[:max(1, int(args.val_frac * len(cut)))]
-        splits[name] = torch.isin(g, val_ids)
+    # **`// 60` was not a clip boundary.** Clips here run 57 to 65 transitions, so a fixed block
+    # size straddles them: every block held out shared a clip with the training set, which is the
+    # frame-level leak this comment exists to prevent. Grouped on the index `gather` records.
+    splits, val_paths = {}, {}
+    for name, (e, z, a, c, paths) in data.items():
+        ids = torch.unique(c)
+        order = torch.randperm(len(ids), generator=torch.Generator().manual_seed(0))
+        val_ids = ids[order[:max(1, int(args.val_frac * len(ids)))]]
+        splits[name] = torch.isin(c, val_ids).to(device)
+        # **Recorded, not recomputed.** Anything scoring this projector afterwards has to know which
+        # clips it never saw, and re-deriving the split elsewhere would silently drift the moment a
+        # clip is added, renamed, or dropped for being too short.
+        val_paths[name] = [paths[i] for i in val_ids.tolist()]
+        print(f"{name:<10} {len(ids)} clips, {int(splits[name].sum())} of {len(c)} "
+              f"transitions held out")
 
     opt = torch.optim.Adam(proj.parameters(), lr=args.lr)
     for epoch in range(args.epochs):
         proj.train(); opt.zero_grad(); loss = 0.0
-        for name, (_, z, a) in data.items():
+        for name, (_, z, a, _c, _p) in data.items():
             m = ~splits[name]
             loss = loss + torch.nn.functional.mse_loss(proj(a[m], name), z[m])
         loss.backward(); opt.step()
@@ -131,24 +157,35 @@ def main():
 
     print(f"\n{'embodiment':<12}{'z MSE':>10}{'vs mean-z':>11}{'rollout gap':>14}{'vs mean-z':>11}")
     proj.eval()
-    for name, (e, z, a) in data.items():
+    for name, (e, z, a, _c, _p) in data.items():
         m = splits[name]
         with torch.no_grad():
             zp = proj(a[m], name)
             base = z[~m].mean(0, keepdim=True).expand_as(z[m])
             z_mse = torch.nn.functional.mse_loss(zp, z[m]).item()
             z_base = torch.nn.functional.mse_loss(base, z[m]).item()
-            # what planning actually consumes: does the FDM answer the same way for this z?
-            true_next = ftm(e[m], z[m])
-            gap = torch.nn.functional.mse_loss(ftm(e[m], zp), true_next).item()
-            gap_base = torch.nn.functional.mse_loss(ftm(e[m], base), true_next).item()
+            # What planning actually consumes: does the FDM answer the same way for this z?
+            # Batched, and the embeddings arrive from the CPU -- the whole held-out set at once is
+            # a 512-token attention over ~600 transitions and does not fit alongside the model.
+            idx = torch.nonzero(m.cpu(), as_tuple=True)[0]
+            gap_num = gap_den = 0.0
+            for i in range(0, len(idx), 32):
+                sl = idx[i:i + 32]
+                e_b = e[sl].to(device).float()
+                truth = ftm(e_b, z[m][i:i + 32])
+                gap_num += ((ftm(e_b, zp[i:i + 32]) - truth) ** 2).mean().item() * len(sl)
+                gap_den += ((ftm(e_b, base[i:i + 32]) - truth) ** 2).mean().item() * len(sl)
+                del e_b, truth
+            gap, gap_base = gap_num / len(idx), gap_den / len(idx)
         print(f"{name:<12}{z_mse:>10.4f}{z_mse / max(z_base, 1e-9):>11.3f}"
               f"{gap:>14.4f}{gap / max(gap_base, 1e-9):>11.3f}")
     print("\nRatios are against predicting the mean z: below 1.0 is better than knowing nothing,")
     print("and the rollout column is the one that decides whether planning can use this.")
 
     out = args.out or os.path.join(os.path.dirname(os.path.join(ROOT, args.ckpt)), "projector.pt")
-    torch.save({"projector": proj.state_dict(), "ckpt": args.ckpt}, out)
+    torch.save({"projector": proj.state_dict(), "ckpt": args.ckpt,
+                "val_paths": val_paths, "action_dims": {n: v[2].shape[1] for n, v in data.items()}},
+               out)
     print(f"-> {os.path.relpath(out, ROOT)}")
 
 

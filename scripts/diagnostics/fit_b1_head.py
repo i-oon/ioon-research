@@ -124,6 +124,29 @@ def build_features(encoder, itm, md, paths, mean, std, action_lag, chunk, device
     return torch.cat(xs), torch.cat(ys), torch.cat(raw)
 
 
+def condition_groups(paths):
+    """Clips grouped by behaviour condition, so a split can cover every behaviour on both sides.
+
+    Reads the `condition` field the matched collection writes into each npz. Falls back to the
+    `_vx` filename convention of `data/b1_framed`, which predates that field and carries commanded
+    speed in the name -- without the fallback this reads one group and silently stops stratifying.
+    """
+    groups = {}
+    for path in paths:
+        name = os.path.basename(path)
+        if "_vx" in name:
+            key = name.split("_vx")[1]
+        else:
+            with np.load(path, allow_pickle=True) as data:
+                if "condition" not in data.files:
+                    raise SystemExit(
+                        f"--stratify needs a behaviour label: {name} has neither a `_vx` name nor "
+                        "a `condition` field. Rebuild with scripts/dataset/merge_behaviour_dirs.py.")
+                key = str(data["condition"])
+        groups.setdefault(key, []).append(path)
+    return groups
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/stage1_m3d_cross/best.pt")
@@ -131,11 +154,11 @@ def main():
     ap.add_argument("--train_clips", type=int, default=5)
     ap.add_argument("--splits", type=int, default=3)
     ap.add_argument("--stratify", action="store_true",
-                    help="pair clips by commanded velocity and put one policy's clip of each "
-                         "speed in train and the other in test. Both sides then cover the same "
-                         "velocities, so a residual margin cannot be a speed-generalisation "
-                         "effect -- the random split leaves unseen speeds in the test set and "
-                         "conflates the two questions.")
+                    help="split within each behaviour condition, so both sides cover every "
+                         "behaviour. `--train_clips` becomes a per-condition budget. Without this, "
+                         "a random draw of 7 from 48 clips spanning 12 conditions leaves whole "
+                         "behaviours unseen at test time, and 'does the backbone transfer' cannot "
+                         "be separated from 'does the head extrapolate to a new behaviour'.")
     ap.add_argument("--epochs", type=int, default=300)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
@@ -159,17 +182,18 @@ def main():
     rows = {}
     for split in range(args.splits):
         if args.stratify:
-            by_speed = {}
-            for path in paths:
-                by_speed.setdefault(os.path.basename(path).split("_vx")[1], []).append(path)
+            groups = condition_groups(paths)
             rng = np.random.default_rng(args.seed + split)
+            # `train_clips` is now per condition, not in total: the whole point is that both sides
+            # cover the same behaviours, and a global budget cannot guarantee that.
+            per = max(1, args.train_clips // len(groups))
             train, test = [], []
-            for speed, group in sorted(by_speed.items()):
+            for _, group in sorted(groups.items()):
                 order = rng.permutation(len(group))
-                train.append(group[order[0]])
-                test.extend(group[i] for i in order[1:])
+                train.extend(group[i] for i in order[:per])
+                test.extend(group[i] for i in order[per:])
             print(f"  split {split}  stratified: {len(train)} train / {len(test)} test, "
-                  f"{len(by_speed)} speeds on both sides")
+                  f"{len(groups)} conditions on both sides ({per} fitted each)")
         else:
             order = np.random.default_rng(args.seed + split).permutation(len(paths))
             train = [paths[i] for i in order[:args.train_clips]]

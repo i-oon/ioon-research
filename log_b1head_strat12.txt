@@ -1,0 +1,5 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+checkpoint : wm/runs/beh12_hexonly/best.pt
+b1 clips   : 48  (12 fitted, rest held out, 3 splits)
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  94%|█████████▍| 796/843 [00:00<00:00, 7903.40it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7843.16it/s]

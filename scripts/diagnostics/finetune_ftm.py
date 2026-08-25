@@ -114,8 +114,16 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
 
 @torch.no_grad()
 def rollout(itm, ftm, clips, horizons, device):
-    """Close the forward model on its own output; score against holding the frame still."""
-    scores = {"model": {k: [] for k in horizons}, "hold": {k: [] for k in horizons}}
+    """Close the forward model on its own output; score against holding the frame still.
+
+    Returns the ratio per horizon and, alongside it, **how far the model predicts the embedding
+    moves** as a fraction of how far it really moves. That second number is what separates a model
+    that learned the dynamics from one that learned to sit still: an arm predicting no motion
+    scores exactly 1.00x by construction, so a ratio near 1.0 is ambiguous until you know whether
+    the prediction moved at all.
+    """
+    scores = {"model": {k: [] for k in horizons}, "hold": {k: [] for k in horizons},
+              "moved": {k: [] for k in horizons}, "truth": {k: [] for k in horizons}}
     for e_cpu in clips:
         e = e_cpu.to(device)
         n = len(e)
@@ -128,9 +136,15 @@ def rollout(itm, ftm, clips, horizons, device):
                     truth = e[start + step]
                     scores["model"][step].append(((predicted[0] - truth) ** 2).mean().item())
                     scores["hold"][step].append(((e[start] - truth) ** 2).mean().item())
+                    # displacement from the frame the rollout started at, predicted and actual
+                    scores["moved"][step].append(((predicted[0] - e[start]) ** 2).mean().item())
+                    scores["truth"][step].append(((truth - e[start]) ** 2).mean().item())
         del e
-    return {k: float(np.mean(scores["hold"][k])) / float(np.mean(scores["model"][k]))
-            for k in horizons}
+    ratio = {k: float(np.mean(scores["hold"][k])) / float(np.mean(scores["model"][k]))
+             for k in horizons}
+    moved = {k: float(np.mean(scores["moved"][k])) / float(np.mean(scores["truth"][k]))
+             for k in horizons}
+    return ratio, moved
 
 
 def main():
@@ -168,6 +182,7 @@ def main():
     results = []
     for n in args.clips:
         rows = {a: [] for a in args.arms}
+        motion = {a: [] for a in args.arms}
         # `train = order[:n]` and `test = order[-test_clips:]` silently overlap once
         # n + test_clips exceeds the pool, and the ratio then scores partly on clips the model was
         # fitted on. With 14 B1 clips and 4 held out, budget 11 leaked exactly one of the four.
@@ -185,7 +200,9 @@ def main():
                 pretrained = name == "pretrained"
                 _, itm, ftm = build(args.ckpt, pretrained, device)
                 adapt(itm, ftm, train, args.steps, args.lr, args.seed + split, device)
-                rows[name].append(rollout(itm, ftm, test, args.horizons, device))
+                ratio, moved = rollout(itm, ftm, test, args.horizons, device)
+                rows[name].append(ratio)
+                motion[name].append(moved)
                 del itm, ftm
                 torch.cuda.empty_cache()
         # Report the spread, not only the mean. A 1.05x that a reader cannot separate from the
@@ -193,6 +210,7 @@ def main():
         # number that settles it.
         for name in args.arms:
             mean = {h: float(np.mean([r[h] for r in rows[name]])) for h in args.horizons}
+            move = {h: float(np.mean([r[h] for r in motion[name]])) for h in args.horizons}
             lo = {h: float(np.min([r[h] for r in rows[name]])) for h in args.horizons}
             hi = {h: float(np.max([r[h] for r in rows[name]])) for h in args.horizons}
             results.append((n, name, mean, lo, hi))
@@ -200,10 +218,17 @@ def main():
                   + "".join(f"{mean[h]:>9.2f}x" for h in args.horizons), flush=True)
             print(f"{'':>6} {'  range':<12}"
                   + "".join(f"{lo[h]:>5.2f}-{hi[h]:.2f}" for h in args.horizons), flush=True)
+            print(f"{'':>6} {'  moves':<12}"
+                  + "".join(f"{move[h]:>9.2f}" for h in args.horizons), flush=True)
 
     print("\nAbove 1.00x means the adapted forward model beats holding the frame still on the")
     print("target robot. Below it, the rollout is worse than predicting no motion and cannot")
     print("support planning however low its training loss went.")
+    print()
+    print("`moves` is the predicted displacement from the starting frame as a fraction of the")
+    print("actual one. **An arm that predicts no motion scores exactly 1.00x by construction**, so")
+    print("a ratio near 1.0 with `moves` near 0 is a model that learned to sit still, not one that")
+    print("learned the dynamics -- and it cannot support planning either.")
 
 
 if __name__ == "__main__":

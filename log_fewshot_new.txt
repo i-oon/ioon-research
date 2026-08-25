@@ -1,0 +1,39 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8862.45it/s]
+48 target clips, encoder frozen, ITM+FTM adapted
+
+ clips model             h=1      h=3      h=5     h=10
+  ... 1 clips, split 1/2
+  ... 1 clips, split 2/2
+     1 pretrained       0.87x     0.75x     0.71x     0.68x
+         range      0.83-0.91 0.71-0.79 0.67-0.75 0.64-0.72
+     1 scratch          0.76x     0.67x     0.66x     0.67x
+         range      0.71-0.81 0.65-0.70 0.64-0.68 0.67-0.68
+  ... 3 clips, split 1/2
+  ... 3 clips, split 2/2
+     3 pretrained       1.06x     0.90x     0.82x     0.74x
+         range      1.05-1.06 0.88-0.91 0.80-0.84 0.72-0.76
+     3 scratch          0.89x     0.94x     0.92x     0.87x
+         range      0.88-0.90 0.90-0.97 0.89-0.95 0.86-0.88
+  ... 5 clips, split 1/2
+  ... 5 clips, split 2/2
+     5 pretrained       1.13x     0.97x     0.89x     0.78x
+         range      1.08-1.19 0.91-1.04 0.83-0.95 0.74-0.81
+     5 scratch          0.90x     0.98x     0.98x     0.93x
+         range      0.89-0.91 0.94-1.02 0.93-1.02 0.88-0.98
+  ... 7 clips, split 1/2
+  ... 7 clips, split 2/2
+     7 pretrained       1.21x     1.06x     0.96x     0.81x
+         range      1.18-1.23 1.04-1.09 0.94-0.97 0.81-0.82
+     7 scratch          0.92x     1.02x     1.01x     0.96x
+         range      0.91-0.93 1.00-1.04 0.99-1.04 0.93-0.99
+  ... 9 clips, split 1/2
+  ... 9 clips, split 2/2
+     9 pretrained       1.25x     1.11x     1.01x     0.87x
+         range      1.20-1.29 1.02-1.20 0.91-1.11 0.78-0.96
+     9 scratch          0.92x     1.01x     1.01x     0.96x
+         range      0.91-0.94 0.96-1.06 0.95-1.06 0.92-1.00
+
+Above 1.00x means the adapted forward model beats holding the frame still on the
+target robot. Below it, the rollout is worse than predicting no motion and cannot
+support planning however low its training loss went.
