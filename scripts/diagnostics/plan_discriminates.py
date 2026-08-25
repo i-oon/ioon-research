@@ -94,6 +94,15 @@ def main():
                     help="override the held-out clips recorded in the projector checkpoint. Using "
                          "clips the projector was fitted on inflates the projector arm.")
     ap.add_argument("--candidates", type=int, default=8)
+    ap.add_argument("--distractors", default="cross", choices=["cross", "within"],
+                    help="cross: candidates from other behaviour conditions -- can it tell walking "
+                         "from turning. within: same behaviour, a different level -- can it tell "
+                         "vx 0.30 from vx 0.38, which is the resolution a planner actually needs.")
+    ap.add_argument("--align_phase", action="store_true",
+                    help="draw every distractor at the same frame index as the true candidate. "
+                         "Without this a distractor can be rejected for being at the wrong point of "
+                         "the gait cycle rather than for being the wrong behaviour, and the score "
+                         "reads higher than the behaviour question deserves.")
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 3, 5, 10])
     ap.add_argument("--trials", type=int, default=200, help="start frames sampled across clips")
     ap.add_argument("--seed", type=int, default=0)
@@ -131,8 +140,13 @@ def main():
     torch.cuda.empty_cache()
 
     conds = sorted({c["cond"] for c in clips})
+    # `speed_vx0.30` -> `speed`; used only by --distractors within
+    for c in clips:
+        c["family"] = c["cond"].rsplit("_", 1)[0] if "_" in c["cond"] else c["cond"]
     print(f"{name}: {len(clips)} held-out clips over {len(conds)} conditions"
-          f"{'  (--data override)' if args.data else '  (projector held-out set)'}")
+          f"{'  (--data override)' if args.data else '  (projector held-out set)'}"
+          f"  | distractors {args.distractors}"
+          f"{', phase-aligned' if args.align_phase else ''}")
     if len(conds) < 2:
         raise SystemExit("every held-out clip is the same condition; distractors would be "
                          "near-duplicates of the answer. Widen the split or pass --data.")
@@ -153,14 +167,22 @@ def main():
 
         # the true candidate, then distractors drawn from *other* conditions
         picks = [(ci, t)]
-        others = [i for i, c in enumerate(clips) if c["cond"] != clip["cond"]]
+        if args.distractors == "cross":
+            others = [i for i, c in enumerate(clips) if c["cond"] != clip["cond"]]
+        else:
+            # same behaviour family, a different level of it -- the fine distinction
+            others = [i for i, c in enumerate(clips)
+                      if c["family"] == clip["family"] and c["cond"] != clip["cond"]]
         if len(others) < args.candidates - 1:
+            if args.distractors == "within":
+                continue  # this clip's family is too small; try another trial
             raise SystemExit(f"only {len(others)} clips of a different condition; "
                              f"--candidates {args.candidates} cannot be filled")
         for j in rng.choice(len(others), size=args.candidates - 1, replace=False):
             other = clips[others[j]]
             ospan = min(len(other["e"]) - hmax - 1, len(other["a"]) - lag - hmax)
-            picks.append((others[j], int(rng.integers(1, max(2, ospan)))))
+            pt = t if args.align_phase else int(rng.integers(1, max(2, ospan)))
+            picks.append((others[j], min(pt, max(1, ospan - 1))))
 
         e0 = clip["e"][t:t + 1].to(device).float()
         for h in args.horizons:

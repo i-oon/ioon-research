@@ -1014,17 +1014,36 @@ a **shared target**, not by making the prediction harder.
 
 > No number elsewhere in this deck uses a widened pair. Everything reported is stride 1.
 
-### Why this was measured before building the planner
+### And then we asked the planner's question directly, and it answers
 
-A planner samples actions, projects them to latents, rolls the model and picks a winner. **If
-changing `z` moves the prediction by 3%, every candidate scores the same.** The body-head arm is 3x
-better than the control, so there is signal — but a planner built on the control arm would have had
-none.
+The ratios above say how far the prediction **moves** when the latent changes. A planner needs
+something else: that the movement be **consistently in the right direction**, so candidates can be
+ordered. Those are close to independent, and we had been reading the wrong one.
+
+Give the model 4 candidate action sequences — the true one and three **other speeds of the same
+behaviour**, every distractor taken at the same point of the gait cycle — project each through the
+action projector, roll from the same frame, and score. **No inverse model: this is the deployment
+path.**
+
+| | chance | top-1 | top-2 |
+|---|---|---|---|
+| the candidate's own latent — the ceiling | 25% | 72.8% | 88.4% |
+| **through the action projector** | 25% | **57.8%** | **76.2%** |
+
+**Nine standard errors above chance, on the hardest version of the question.** The forward model
+carries usable ranking signal even though the frame outweighs the latent 9x. **The planner has
+something to choose between** — the precondition the closed loop needed, and one no sensitivity
+ratio on this slide could have told us.
+
+> **The projector costs 15 points.** That gap is the price of LAC-WM's stage 3, which is not built.
 
 ### So
 
 **The alignment is real, the forward model is untouched, and we know why: we aligned something the
 frame already gives away.** The next target has to be something a single frame does not determine.
+
+**And the forward model is good enough to plan with anyway** — which the ratios on this slide would
+have talked us out of.
 
 ---
 
@@ -1086,16 +1105,19 @@ PRETRAIN   video ──► V-JEPA2 (frozen) ──► e_t
                                           └── MotionDecoder ──► joints    done
                                               + shared body head
 
-FINETUNE   action projector   a ──► z        per robot        code written, never fitted
+FINETUNE   action projector   a ──► z        per robot       fitted, ranks at 57.8%
+           + LoRA adapters on the FDM (their stage 3)              NOT BUILT
 
 CONTROL    sample actions ──► project ──► roll FTM ──► score ──► execute   NOT BUILT
+                                          └─ measured: it ranks ─┘
 
 DEPLOY     distil to a proprioception-only student                          NOT BUILT
 ```
 
 **`z_t = ITM(e_t, e_{t+1})` needs the next frame — which at control time is the thing being
 decided. The inverse model can never run in the loop.** Every number in this deck reads `z` off two
-ground-truth frames: that is reconstruction, not control.
+ground-truth frames — that is reconstruction, not control — **with one exception, and it is the
+ranking result above**, which uses the projector and the forward model only.
 
 LAC-WM states the same constraint and the same answer — *"since future observations, required by
 the IDM, are unavailable at inference time, we train an **action projector** that maps explicit
@@ -1111,13 +1133,11 @@ adapters:
 | **3** | fine-tune projector and FDM **jointly**, LoRA rank 2 | **not built** |
 
 Stage 3 takes **35k of their 60k iterations** — more than the other two together. Freezing the FDM
-and making the projector chase `z` exactly is not enough; **the FDM has to move to meet it.** Our
-stage 2 alone reads a rollout gap of **0.30** against a mean-`z` baseline: better than nothing, and
-not zero.
+and making the projector chase `z` exactly is not enough; **the FDM has to move to meet it.**
 
-> **And that is measured inside a narrow band.** The FDM's entire response to `z` is **5% of its own
-> prediction error**, so this metric cannot yet separate a good projector from an ignored input —
-> the same finding as slide 18, arriving where it costs us something.
+**And we have priced it.** Ranking 4 candidate actions, the projector reaches **57.8%** top-1 where
+the candidate's own latent — the ceiling any projector could hit — reaches **72.8%**. Stage 3 is
+worth about **15 points of planning accuracy**, and that is the reason to build it.
 
 ### Why sampling happens in action space, not latent space
 
@@ -1153,11 +1173,12 @@ S.R. survival    body height held, did not fall
 Reported with the **graded error** beside the binary rate. Survival is not optional for us: a
 manipulator that fails a grasp is still standing.
 
-### The next milestone, and what it decides
+### The next milestone, and it is now unblocked
 
-**Close the loop on the body it was trained on** — same robot, no transfer. If the loop cannot hold
-a gait on the body it learned from, cross-body is not worth attempting, and that is worth knowing
-now rather than in October.
+**Close the loop on the body it was trained on** — same robot, no transfer. The precondition was
+whether the forward model can rank candidate actions at all; **measured, it can.** If the loop
+cannot hold a gait on the body it learned from, cross-body is not worth attempting, and that is
+worth knowing now rather than in October.
 
 ---
 
@@ -1250,11 +1271,13 @@ and 18% of the gradient** reaching `z`; the body term is **0.5% of the loss and 
 1% change in the training log corresponds to the forward model **tripling** its use of its own
 conditioning input — and why loss values were never the right thing to read.
 
-**3. The forward model barely reads the latent, and the objective is why.** At 20 Hz the next frame
-is 50 ms away and largely guessable from the current one, so the frame outweighs the latent **28×**
-and a latent from a different behaviour costs **0.25%**. Not a weighting problem — the prediction
-task is too easy. Widening the pair does raise it — and breaks the joint decoder unless the action
-target is widened with it, which is now implemented and retraining.
+**3. The forward model barely reads the latent — and can still be planned with.** The frame
+outweighs the latent **28×** in the control and 9.3× with the body term, and widening the training
+pair raises that threefold while destroying both the joint decoder and cross-robot transfer. **But
+asked the planner's question directly** — rank four candidate actions of the same behaviour at
+different speeds — it answers at **57.8% against 25% chance**, nine standard errors. *Sensitivity
+ratios measure how far the prediction moves; ranking needs only that it move the right way.* We had
+been reading the wrong number, and the alarm it raised was false.
 
 **4. Four defects in our own pipeline, and every cross-embodiment number predates at least one.**
 The two robots were recorded at different frame rates; they were turning in opposite directions
@@ -1266,12 +1289,13 @@ were invisible in summary statistics. **The result survived all four and came ba
 
 | | |
 |---|---|
-| a controller | **not built.** The inverse model needs the next frame and can never run in the loop; the action projector that replaces it is written and unfitted |
+| a controller | **not built.** The inverse model needs the next frame and can never run in the loop; the action projector that replaces it is written, fitted, and measured to rank candidate actions at **57.8% against 25% chance** — the loop itself is what remains |
 | yaw as a usable channel | it stops being harmful, it does not start working — and four explanations for that were tested and rejected |
 | the scaling claim | needs a third embodiment. **We have two** — and so does measuring whether the shared body head makes a *new* robot cheaper, since the term needs two robots in pretraining and the test needs one held out |
 
 **The next milestone is not another measurement.** It is closing the loop on the body it was
-trained on — because if that fails, everything downstream is moot, and it is worth knowing now.
+trained on. The precondition — can the forward model rank candidates at all — is now measured, and
+it can. If the loop still fails, everything downstream is moot, and it is worth knowing now.
 
 ---
 

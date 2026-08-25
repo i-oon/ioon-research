@@ -5462,6 +5462,59 @@ displacement near 0.
 
 ---
 
+### F90. The forward model can rank candidate actions, and the sensitivity ratios said it could not
+
+F87 measured the frame outweighing the latent **28x** in the control and **9.3x** with the body
+head, and concluded: *"if changing `z` moves the prediction by 3-8%, every candidate scores nearly
+the same and there is little to choose between them."* **That inference is wrong, and this is the
+measurement that shows it.**
+
+`plan_discriminates.py` asks the question the closed loop actually asks. Given K candidate action
+sequences, one of them the true one, project each through the fitted action projector, roll the FDM
+from the same starting frame, and score against the true future. **The inverse model is not used at
+all** -- this is the deployment path LAC-WM describes, projector and FDM only.
+
+`beh12_hexonly`, 19 held-out clips over 12 conditions, 200 trials, top-1 rate:
+
+| distractors drawn from | phase | chance | h=1 | h=3 | h=5 | h=10 |
+|---|---|---|---|---|---|---|
+| another behaviour | free | 12.5% | 74.5% | 82.5% | 80.0% | 63.5% |
+| another behaviour | **aligned** | 12.5% | 69.5% | 68.5% | 68.5% | 64.5% |
+| **same behaviour, other level** | free | 25% | 73.9% | 76.9% | 75.4% | 62.7% |
+| **same behaviour, other level** | **aligned** | 25% | **57.8%** | 55.1% | 57.8% | 53.1% |
+
+**The hardest row is the one that matters and it holds.** Telling `speed_vx0.30` from 0.38, 0.40 and
+0.50, with every distractor taken at the same frame index so the gait phase cannot break the tie:
+**57.8% against a 25% chance level over 147 trials -- about nine standard errors** -- with top-2 at
+76.2%. That is a planner with something to choose between.
+
+**Why the sensitivity ratios mislead.** `sweep z` measures the **magnitude** by which the prediction
+moves when the latent changes. Ranking needs only that the movement be **consistently in the right
+direction**. A small displacement that is reliably ordered ranks perfectly; a large one that is
+noisy does not. The two quantities are close to independent, and every alarm raised in F87 and F88
+about the planner was raised on the wrong one.
+
+**Two design conclusions, one of them a withdrawal.**
+
+*The horizon does not matter, and the apparent sweet spot was an artefact.* Free-phase distractors
+show a peak at h=3 (74.5 -> 82.5); phase-aligned distractors are flat (69.5, 68.5, 68.5, 64.5). The
+peak was the model rejecting distractors for being at the wrong point of the gait cycle, which a
+planner cannot rely on because its own candidates all start from the same frame. **Any planner tuned
+to h=3 on the first reading would have been tuned to nothing.**
+
+*The projector costs about 15 points and is worth fixing.* The `latent` arm -- the candidate's own
+`z` from the ITM, the best any projector could emit -- runs 10 to 17 points above the projector arm
+in every condition (hardest row: 72.8% against 57.8%). **This is the first number that prices
+LAC-WM's stage 3**, jointly fine-tuning the projector and the FDM, which takes 35k of their 60k
+adaptation iterations.
+
+**What this does not establish.** One robot, the one it was trained on, in simulation, ranking
+recorded action sequences rather than sampled ones, and scored against a true future rather than a
+goal. It says the forward model carries usable ranking signal, which is the precondition the closed
+loop needed and which nothing before this had tested. **It does not say the loop closes.**
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not
