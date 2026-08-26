@@ -43,7 +43,7 @@ from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
-def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device):
+def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=()):
     """Per clip: the frozen latent, the action that caused it, and the current embedding.
 
     **Embeddings come back on the CPU in half precision.** One clip is 65 x 256 x 1408 floats,
@@ -56,7 +56,11 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device)
     boundaries.
     """
     E, Z, A, C, P = [], [], [], [], []
+    skipped = 0
     for path in sorted(glob.glob(os.path.join(directory, "*.npz"))):
+        if any(os.path.basename(path).startswith(p) for p in exclude):
+            skipped += 1
+            continue
         clip = load(path, REGISTRY[name])
         if path not in cache:
             cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu().half()
@@ -78,6 +82,10 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device)
         P.append(path)
         del e
         torch.cuda.empty_cache()
+    if skipped:
+        print(f"{name}: excluded {skipped} clips matching {list(exclude)}")
+    if not E:
+        raise SystemExit(f"no clips left in {directory} after excluding {list(exclude)}")
     return torch.cat(E), torch.cat(Z), torch.cat(A), torch.cat(C), P
 
 
@@ -85,7 +93,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--hex_dir", default="data/beh12_hex_flat")
-    ap.add_argument("--b1_dir", default="data/beh12_b1_flat")
+    ap.add_argument("--b1_dir", default="data/beh12_b1_flat",
+                    help="empty string fits the hexapod alone, for a checkpoint that never saw a "
+                         "quadruped")
+    ap.add_argument("--exclude", nargs="*", default=[],
+                    help="clip-name prefixes to leave out, e.g. a body the checkpoint held out. "
+                         "**Without this the projector is fitted on the very body the run is "
+                         "meant to be blind to**, and the held-out claim quietly becomes a "
+                         "few-shot one.")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--epochs", type=int, default=200)
@@ -112,8 +127,12 @@ def main():
 
     data = {}
     for name, d in (("hexapod", args.hex_dir), ("b1", args.b1_dir)):
+        if not d:
+            continue
         data[name] = gather(name, os.path.join(ROOT, d), encoder, itm, checkpoint,
-                            cache, args.chunk, lag, device)
+                            cache, args.chunk, lag, device, tuple(args.exclude))
+    if not data:
+        raise SystemExit("no source directories given")
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         torch.save(cache, cache_path)

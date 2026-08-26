@@ -1029,6 +1029,32 @@ Deployment is the eventual use: a controller that makes a new body walk. **Broug
 2026-08-11**, on the judgement that there is time to close the loop. Several pretraining decisions
 were already only correct or incorrect relative to it, so it was recorded here throughout.
 
+**State, 2026-08-26. The loop is closed on the hexapod and cannot be closed on the B1 as built.**
+
+    hexapod    78% speed within 15%, 100% behaviour class, 100% survival over 56 planned steps,
+               three behaviours, nine runs (F92). Requires a warm start: from a standstill there
+               is no motion in the frame to read and it picks a turn, 1 in 5.
+
+    B1         blocked. The planner's candidates are recorded action sequences; the B1's gait is
+               a PPO policy reading state at 50 Hz, so its recorded actions are responses rather
+               than plans and 0 of 8 replay to the end (F93). Not a gap in the method -- ranking
+               and selection are both measured on B1 latents and the forward model adapts to it
+               in three clips. What fails is re-issuing a recorded sequence.
+
+    held-out    `c08f09t09`, the body every Stage 1 result withholds, with the world model
+    hexapod     entirely frozen. Refitting only the action projector -- a two-layer MLP, minutes,
+                no gradient through anything else -- gives **6/6 behaviour class, 6/6 survival,
+                median speed error 19.2%** against 37.1% with the trained body's projector (F95).
+                Speed accuracy does not recover: 2/6 against 7/9. The expensive component
+                transfers; the cheap one needs clips of the new robot and nothing else.
+
+**So a cross-embodiment demonstration needs one of two things, and neither is free**: command the
+B1's own policy in `(vx, vy, wz)`, which concedes the task-space question this project exists to
+avoid; or give the planner closed-loop primitives per robot instead of sequences, which adds the
+per-robot component the recorded-sequence design was chosen to avoid. **A held-out *hexapod* body
+is the cross-body test that stays inside the design**, and needs `data/beh12_*` collected for a
+second body.
+
 **What it can and cannot claim, decided in advance so the result is not over-read.**
 
 The forward model does roll the world forward -- 1.38x better than a frozen world at one step,

@@ -563,7 +563,7 @@ def precompute_commands(sim, simIK, scene, brel, scale, ik_iters=1):
 
 
 def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None,
-                     active_legs=None, remove_legs=None, yaw=0.0, heading=None):
+                     active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None):
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
 
     **`heading` closes the loop on body direction, and exists to remove an asymmetry we created.**
@@ -578,6 +578,12 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     cam_dx/cam_dy shift the camera in the world plane on top of the scene's authored offset.
     With the authored offset alone the robot starts against the right image edge and stays
     partly outside it for roughly the first two thirds of every clip.
+
+    **`policy` closes the loop on vision.** Called as `policy(frame, t)` before each step and its
+    return replaces `cmds[t]`; `cmds` then supplies only the clip length and the pose held during
+    warmup. The frame it receives is the **previous** step's capture, because this loop commands
+    before it observes -- which is the causal order a controller actually runs in, and the same
+    order the collector's `action_lag` convention already encodes.
     """
     sim.loadScene(f"{ENV}/{scene}")
     settle(sim)
@@ -652,8 +658,26 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     frames, actions, forces, heads, oris = [], [], [], [], []
     start_xy = None
     yaw0, yaw_int, prev = None, 0.0, None
+    # **The camera has to be placed before the policy's first look, not on the first loop step.**
+    # The loop anchors it to the robot's position after step 0; capturing before that leaves the
+    # first observation at the scene's authored pose, which is 0.6 m from where every training
+    # frame was taken (`--cam_dx`). Measured: the first closed-loop run chose `turn_s0.29` at
+    # t=0 from that frame and the correct behaviour from every frame after it.
+    #
+    # Anchored to the post-warmup pose instead of the post-first-step one, so `start_xy` is set
+    # here too and the loop does not move it again. The difference between the two anchors is a
+    # single step of travel, about a centimetre; the difference this fixes is sixty times that.
+    observation = None
+    if policy is not None:
+        p0 = np.array(sim.getObjectPosition(track, sim.handle_world))
+        start_xy = p0[:2].copy()
+        sim.setObjectPosition(cam, sim.handle_world,
+                              [p0[0] + off_xy[0] + cam_dx, p0[1] + off_xy[1] + cam_dy, cam_z])
+        observation = capture(sim, cam)
     for t in range(len(cmds)):
         step_cmd = cmds[t]
+        if policy is not None:
+            step_cmd = np.asarray(policy(observation, t), np.float32)
         if heading is not None and prev is not None:
             # **Error is (current - start), and the sign is not free.** Positive `--spin` yaws
             # *negative* -- measured, `spin 0.4` gives omega -0.416, and F75 had to re-collect the
@@ -681,6 +705,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             sim.setObjectPosition(cam, sim.handle_world,
                                   [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
         frames.append(capture(sim, cam))
+        if policy is not None:
+            observation = frames[-1]
         actions.append(step_cmd[active_cols].copy())
         forces.append(read_forces(sim, force_h))
         heads.append(p)

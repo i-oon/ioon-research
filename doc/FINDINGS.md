@@ -5515,6 +5515,677 @@ loop needed and which nothing before this had tested. **It does not say the loop
 
 ---
 
+### F91. A planner over recorded behaviours picks the right one, except for how hard to turn
+
+`plan_open_loop.py` runs the control-time path -- action projector and forward model, no inverse
+model -- over the frames of a held-out demonstration. At each step it scores all twelve recorded
+behaviours against the demonstration's frame `h` ahead and picks one. `beh12_hexonly`, 24
+demonstrations, 478 decisions, horizon 5, replanning every third frame.
+
+| | rate | chance |
+|---|---|---|
+| exact condition | **58.2%** | 8.3% |
+| right behaviour family | **90.0%** | 25.0% |
+
+**Split by family it stops being one number.** Counting the behaviour each demonstration was held in
+longest:
+
+| family | exact | what the failures are |
+|---|---|---|
+| speed | **9 / 9** | -- |
+| sideways | **6 / 6** | -- |
+| turn | **2 / 9** | every miss is turn -> turn at the wrong rate |
+
+**It knows it is turning and cannot say how hard.** `s0.05 -> s0.15`, `s0.29 -> s0.56`,
+`s0.56 -> s0.29`. No turn demonstration was ever taken for a walk or a strafe.
+
+**This is the yaw limitation arriving for the third time by a third route.** F83 measured yaw
+transfer going from catastrophic to approximately zero under supervision and never to usable. F85
+measured its noise floor as an asymmetry between the two robots' gaits. Neither predicted anything
+about a planner. **A planner built on the same latent resolves speed and lateral travel and does not
+resolve turn rate** -- three independent measurements, one conclusion, and this is the one that says
+what it costs at run time.
+
+**The cross-family confusions are one cell of the matrix.** 17 of the 20 are `speed_c5.8` taken for
+a turn -- the slowest walk against turning, which share a low forward speed. Nothing confuses fast
+walking with anything.
+
+**"The turn levels are too close together" is the obvious explanation and it is refuted.** Measuring
+how far apart the conditions actually sit in body-motion space, in units of their own spread across
+clips:
+
+| closest pairs in `data/beh12_hex_flat` | separation / own noise |
+|---|---|
+| `speed_c7.1` / `speed_c8.15` | **1.7x** |
+| `speed_c8.15` / `speed_c8.8` | 1.8x |
+| `turn_s0.05` / `turn_s0.15` | **2.7x** |
+| `turn_s0.29` / `turn_s0.56` | **6.6x** |
+| `turn_s0.15` / `turn_s0.29` | 6.8x |
+
+**The turn levels are two to four times better separated than the speed levels, and the planner
+resolves speed 9/9 and turn 2/9.** It succeeds on the closest axis and fails on the furthest one, so
+the failure is not about fine distinctions -- it is specific to **yaw**.
+
+That places this beside F83, where yaw goes from catastrophic to approximately zero under
+supervision and never to usable, and F85, where its noise floor is an asymmetry between the two
+gaits. **Three measurements, three methods, one channel.**
+
+**What this is not.** Open loop over recorded frames: the observations are the demonstration's, not
+the ones the planner's own actions would have produced, so error cannot accumulate. It is the
+necessary condition -- a planner that cannot pick the right behaviour from the demonstration's own
+frames cannot do it from frames it caused -- and it is cheap. **The closed loop is what remains.**
+
+---
+
+### F92. The loop closes, and the planner's accuracy does not survive being fed its own consequences
+
+**The loop runs.** `sim/control/close_loop_ik.py` drives the hexapod in CoppeliaSim from vision
+alone: camera -> V-JEPA2 -> twelve candidate behaviours projected and rolled through the forward
+model -> execute the winner -> step. **No inverse model, no kinematics, no human command.** Fifteen
+runs, three commitment settings, five repeats each, 20 steps against a `speed_c5.8` demonstration.
+
+| | commit 1 | commit 5 | commit 10 |
+|---|---|---|---|
+| S.R. survival | **5/5** | **5/5** | **5/5** |
+| S.R. behaviour class | **5/5** | **5/5** | **5/5** |
+| S.R. speed (within 15%) | 1/5 | 0/5 | 0/5 |
+| median speed error | **21.8%** | 40.2% | 35.4% |
+| behaviour changes per 20 steps | 12-13 | 3 | 1 |
+
+**It walks, it stays up, and it walks too slowly.** Every run holds the right behaviour *class* and
+none reaches the commanded speed.
+
+**A dithering explanation was proposed and refuted by its own fix.** Replanning every step produced
+12-13 behaviour changes in 20 steps, and the natural reading was that switching gait mid-stride
+costs distance. Committing to a choice removes the switching and makes the result **worse**, 21.8%
+to 40.2%. What commitment actually does is **lock in the first choice**, and the first choice is
+almost always wrong.
+
+**Two failures, and separating them is what the numbers show.**
+
+| turn picks, on a demonstration that never turns | steps 0-4 | steps 5-19 |
+|---|---|---|
+| commit 1 | 80% | 48% |
+| commit 5 | 80% | 67% |
+| commit 10 | **100%** | 39% |
+
+*The cold start is nearly all wrong.* After warmup the robot is standing still; there is no motion
+in the frame to read, and a slow turn is the behaviour that best explains a nearly static scene.
+Committing for ten steps then spends half the clip turning, which is where the extra 14 points of
+speed error come from.
+
+*And it does not recover to open-loop accuracy afterwards.* **F91 measured this same planner
+choosing the exact condition on 9 of 9 forward demonstrations when the frames came from the
+demonstration.** Here, on frames its own actions produced, 39-67% of steady-state picks are a turn.
+Same planner, same candidates, same demonstration -- **the only difference is who generated the
+observations.**
+
+**That is covariate shift, and open loop cannot see it by construction.** The planner's early
+mistakes move the robot into states its selection was never validated on, and the errors compound.
+It is the classic failure of behaviour cloning under closed-loop execution, and finding it is
+precisely what closing the loop was for: every measurement before this one -- F90's ranking, F91's
+selection -- scored the planner on trajectories it did not produce.
+
+**What this does and does not establish.** One robot, the one it trained on, one demonstration,
+20 steps. **It establishes that the loop closes and the robot survives**, which was the milestone,
+and it establishes the next problem precisely enough to act on. It does not establish that the
+controller works.
+
+**Started in motion, it works.** `--warm_start N` executes the demonstration's own commands for N
+steps, then hands over. Scored **only on the planned steps**, against the demonstration over the
+**same step window**:
+
+| | warm 0 | warm 5 | warm 10 |
+|---|---|---|---|
+| S.R. speed | 1/5 | 0/5 | **5/5** |
+| median speed error | 19.9% | 20.3% | **3.5%** |
+| worst | 23.0% | 26.9% | **7.0%** |
+| S.R. behaviour / survival | 5/5 | 5/5 | **5/5** |
+
+**Ten steps of warm start turns a 1-in-5 failure into 5-in-5 at a fifth of the error.**
+
+**And not because the planner chooses better.** Its pick distribution barely moves --
+`speed_c5.8` 40 / 43 / 48%, `turn_s0.05` 35 / 28 / 28% across the three settings. What changes is
+**the state it inherits**: handed a robot already walking, roughly-right behaviours maintain the
+speed; handed one accelerating from rest, its early wrong picks leave the robot slow and twenty
+steps is not enough to recover.
+
+**"Start it in motion" is a deployment assumption, not a defeat.** No gait controller is expected to
+go from a dead stop to a commanded speed inside one second.
+
+**Two defects in the scorer were found on the way, both ours and both in the flattering direction
+had they gone unnoticed.** It counted warm-start steps -- the demonstration replayed -- as the
+planner's own work, worth about 2 points. And it scored our 10-step window against the
+demonstration's whole 66 frames, comparing a start-up transient against a settled walk; correcting
+it moved warm 10 from 7.4% to **3.5%**, so that one was penalising the result rather than inflating
+it. Both are fixed and both are why the numbers above are quoted rather than the first ones.
+
+**Over a full clip and all three behaviours, it meets the criteria.** 66 steps with 10 warm, so
+**56 planned steps**, three demonstrations, three repeats each:
+
+| demonstration | channel scored | speed error, three repeats | passes |
+|---|---|---|---|
+| `speed_c5.8` | forward | 14.3% / 4.0% / 6.7% | **3/3** |
+| `turn_s0.05` | forward | 21.6% / 6.8% / 5.4% | 2/3 |
+| `side_R_lvl0` | lateral | 26.4% / 7.0% / 11.9% | 2/3 |
+
+| | rate |
+|---|---|
+| S.R. speed | **78%** (7/9) |
+| S.R. behaviour class | **100%** (9/9) |
+| S.R. survival | **100%** (9/9) |
+| median error | **7.0%** |
+
+**A third scorer defect, found here and in the punishing direction.** The criterion divided by the
+**forward** Froude whatever the behaviour. On a sideways clip that reference is 0.015 -- near zero by
+construction -- so the three `side` runs read 23-34% while tracking their *lateral* speed to within
+7%. Scored on the channel the demonstration is actually about, they read 26.4 / 7.0 / 11.9. The
+channel is chosen from the demonstration and never from the run, or a controller that drifted into
+another behaviour would be graded on the one it drifted to.
+
+**The behaviour selection holds up over the longer clip.** On the sideways demonstration the planner
+spends **0-2%** of steps on a turn and holds `side_R_lvl0` for 26-35 of 49; on the turn
+demonstration, 61-84% on turns. It switches often -- 16 to 36 changes over 49 steps -- and the modal
+choice is right every time.
+
+**What is still not established.**
+
+*The yaw channel was not tested.* `turn_s0.05` is gentle enough that forward motion still dominates
+it, so the scorer graded it on forward. **F91 predicts turn *rate* is what a planner on this latent
+cannot resolve, and that prediction remains untested in the loop** -- it needs `turn_s0.29` or
+`turn_s0.56` as the demonstration.
+
+*It must be started in motion.* Ten warm steps, and from a standstill it fails at 1/5.
+
+*One robot, one demonstration per behaviour, three repeats.* And the first repeat is the worst in
+all three families -- 14.3, 21.6, 26.4 against 4-12% for the later two -- which is unexplained.
+
+*Nobody has watched it.* The numbers say upright and on-speed. They do not say whether the gait
+looks like walking, and this project's own rule is to render before believing.
+
+
+---
+
+### F93. A planner over recorded action sequences cannot drive the B1, and the reason is the robot rather than the method
+
+The closed loop on the hexapod (F92) chooses among **recorded action sequences**. That is the design
+decision that lets it work on a robot whose kinematics are unknown: no gait generator to author, no
+IK, no URDF -- on a new robot you already have the few clips slide 15 adapts the forward model on,
+and those clips are the candidate set.
+
+**It requires the sequence to be a plan.** Replayed open loop, `data/b1_traj` at its native 50 Hz:
+
+| trajectory | steps | survived | |
+|---|---|---|---|
+| `fwd_vx0.2` | 300 | 289 | fell |
+| `fwd_vx0.3` | 300 | 154 | fell |
+| `fwd_vx0.4` | 300 | 72 | fell |
+| `fwd_vx0.5` | 300 | 58 | fell |
+
+**0 of 8, and survival falls monotonically with commanded speed.**
+
+**The two robots differ in what a recorded action *is*.**
+
+| | what writes the joint targets | replayable |
+|---|---|---|
+| hexapod | IK and a CPG, from a clock. **No state is read.** | **yes, exactly** |
+| B1 | a PPO policy reading base orientation, joint state and a phase clock at 50 Hz | **no** |
+
+The B1's action is a *response*; without the state it was responding to there is no reason for it to
+hold. The faster the gait the sooner the divergence bites, which is what the survival column shows.
+
+**So the closed loop is not portable to the B1 as built, and this is a property of the target robot,
+not a gap in the method.** Everything upstream of execution transfers -- F90's ranking and F91's
+selection are both measured on B1 latents, and the forward model adapts to the B1 in three clips
+(F92, slide 15). What does not transfer is the assumption that a recorded sequence can be re-issued.
+
+**What a B1 closed loop would need, and why neither option is free.**
+
+*Command its own policy.* Let the world model choose `(vx, vy, wz)` and let the PPO controller
+execute. That gets real physics and a stable robot -- **and it is a task-space action, which is
+precisely the thing this project argues you should not need** (slide 16). Using it concedes the
+question rather than answering it.
+
+*Replace the candidates with a closed-loop primitive.* A per-robot low-level controller the planner
+selects among, rather than a sequence it replays. That keeps the joint-space claim and adds a
+component per robot, which is the cost the recorded-sequence design existed to avoid.
+
+**Reported rather than worked around.** The measurement cost one script and no training, and it was
+run before anything was built for the B1 -- which is the point of asking whether something is
+possible before asking how well it works.
+
+---
+
+### F94. The twelve behaviours reproduce on a held-out body, and the weak sideways gait reverses on it
+
+`data/beh12_c08f09t09_flat`: the same twelve conditions collected on `c08f09t09`, the body every
+Stage 1 result holds out. The recipe is now in `scripts/dataset/collect_beh12.py` rather than in
+twelve commands nobody wrote down.
+
+| | c10f10t10, forward | c08f09t09, forward |
+|---|---|---|
+| `speed_c5.8` -> `c8.8` | 0.135 0.166 0.210 0.200 | **0.129 0.158 0.200 0.215** |
+| `turn_s0.05` -> `s0.56`, yaw | | **-0.007 -0.024 -0.037 -0.088** |
+
+Both ladders rise monotonically on the new body, and **64 of 66 condition pairs sit more than twice
+their own spread apart**. The two that do not -- `speed_c8.15`/`c8.8` at 1.2x and
+`turn_s0.05`/`s0.15` at 1.4x -- are the same two the original set is closest on.
+
+**The weak sideways gait travels the wrong way on this body.**
+
+| | c10f10t10 | c08f09t09 |
+|---|---|---|
+| `side_L_lvl0` | +0.019 | **-0.045** |
+| `side_L_lvl1` | +0.070 | +0.148 |
+| `side_R_lvl0` | -0.022 | **+0.017** |
+| `side_R_lvl1` | -0.124 | -0.131 |
+
+At `--strafe ±0.8` both bodies crab the way they are told. At `±0.4` the shorter-legged one crabs
+the other way. F71 recorded the direction reversing twice across an amplitude sweep and called the
+optimum narrow; this is that, appearing as a **morphology** dependence rather than a parameter one.
+**The gait's direction is not a property of the command alone.**
+
+*It does not invalidate the planning test and it does mislabel two conditions.* Demonstration and
+candidates both come from this body, so a planner that picks `side_L_lvl0` gets `side_L_lvl0`'s
+motion and the loop is self-consistent. What is wrong is the **name**: on this body it strafes
+right. Anything reading the label rather than the measured channel would be wrong.
+
+**Two collection notes worth keeping.** The collector's walk check is a *forward*-walking gate, so
+its `FAILS forward` and `BACKWARDS` flags fire on every sideways and hard-turning clip and mean
+nothing there -- except that here `BACKWARDS` on the two weak strafes turned out to be real, which
+is why flags get checked against measurements rather than dismissed. And the achieved values are not
+matched to `c10f10t10` and are not meant to be: a single-body planning test never compares across
+bodies, so **separability is the standard and value-matching is not** (`--separability` against
+`--verify` in the collection script).
+
+---
+
+### F95. A two-layer MLP restores control of a body the world model has never seen, halfway
+
+The closed loop of F92 run on `c08f09t09` -- the body every Stage 1 result holds out -- with the
+same backbone, same candidates, same demonstrations, same scene, same warm start. Three behaviours,
+two repeats, 49 planned steps each.
+
+| | S.R. speed | S.R. behaviour | S.R. survival | median error |
+|---|---|---|---|---|
+| the body it trained on | 7/9 | 9/9 | 9/9 | **7.0%** |
+| **held-out body**, projector from the trained body | 1/6 | 5/6 | 6/6 | 37.1% |
+| **held-out body**, projector refitted on it | 2/6 | **6/6** | 6/6 | **19.2%** |
+
+**Nothing in the world model is adapted.** V-JEPA2, the ITM and the forward model are frozen
+throughout; the only thing that changes between the last two rows is a **two-layer MLP mapping
+actions to latents**, fitted on the new body's own clips in a few minutes with no gradient through
+anything else.
+
+**It halves the error and restores the behaviour class outright.** Selection becomes decisive as
+well as correct: on the sideways demonstration the refitted arm holds `side_R_lvl1` for 30-34 of 49
+steps with 18-20 changes, where the un-refitted one settled on the *weak* strafe -- which on this
+body travels the wrong way (F94) -- and switched about 30 times.
+
+**And it does not restore the speed.** 2/6 against 7/9, median 19.2% against 7.0%. **The projector
+accounts for about half the degradation and the forward model's ignorance of this body accounts for
+the rest** -- which is the split LAC-WM's three-stage adaptation assumes, with stage 1 adapting the
+FDM before the projector is fitted at all.
+
+**Why this is the encouraging half.** The expensive component transfers: a forward model trained on
+one hexapod predicts a differently-proportioned one well enough to keep it upright 6/6 and to pick
+the right behaviour 6/6. The cheap component is what needs the new robot, and it needs only clips of
+it -- **no kinematics, no URDF, no gait authored for it**, which is the deployment claim this
+project is built on.
+
+**The failure mode is walking the wrong way, not falling over.** Median body speed in any
+direction, across all planned steps, is **0.097** zero-shot and **0.114** refitted against the
+demonstrations' 0.13-0.14. A stopped or fallen robot reads near zero. It keeps walking at 70-85% of
+the demonstrated speed throughout, and survival is 6/6 in both arms.
+
+**"It tracks at first and diverges" is the warm start, and it is worth saying because it is what a
+viewer sees.** Both arms replay the demonstration's own commands for ten steps, so up to the
+handover the two videos are the same trajectory. Measured on the planned steps alone, the
+zero-shot arm's pick accuracy is **flat** -- 42% over the first third, 39% over the last -- so it
+does not degrade with time; it is simply not tracking. The arm whose picks *do* decay is the
+refitted one, 48% to 21%, and its score improves anyway: on the turn demonstration it settles into
+`turn_s0.29`/`s0.56`, the wrong **level** of the right behaviour, which walks forward at the same
+speed. **What decays is level accuracy, not behaviour quality** -- F91's yaw limitation once more,
+in a form the three success criteria cannot see.
+
+**What is not established.** One held-out body, one family, three demonstrations, two repeats.
+Speed accuracy is not recovered and the obvious next step -- adapting the forward model on a few
+clips of the new body, then refitting the projector against the adapted ITM -- is the source
+method's stages 1 and 3 and is **not built**: `finetune_ftm.py` adapts and scores without saving a
+checkpoint to plan with.
+
+---
+
+### F96. Across embodiments the planner defaults instead of selecting, and the success criteria pass anyway
+
+The B1 cannot be driven by re-issuing recorded actions (F93), so the **selection** half was measured
+without the execution half: `sim/control/close_loop_kinematic.py` poses the body from per-step
+body-frame deltas of whichever behaviour the planner chose. **There is no physics; the robot cannot
+fall and its survival column is not evidence.** What the loop does test is the one thing open-loop
+scoring cannot -- the frames the planner sees next are produced by what it chose now.
+
+`beh12_hexonly` as the backbone: **the ITM and forward model have never seen a quadruped.** The
+projector's B1 head *has* been fitted on `beh12_b1_flat`, so this is projector-adapted and
+world-model-naive.
+
+| demonstration | speed error | class | verdict |
+|---|---|---|---|
+| `speed_vx0.30` | 8.6% | forward | S B . |
+| `turn_wz0.40` | 3.5% | forward | S B . |
+| `side_R_lvl1` | **83.1%** | forward | - - . |
+
+**Two of three pass and the passes are meaningless.** What the planner actually chose:
+
+| demonstration | most-chosen | second | family accuracy |
+|---|---|---|---|
+| `speed_vx0.30` | `speed_vx0.50` 17/49 | `turn_wz0.00` 14/49 | 53% |
+| `turn_wz0.40` | `speed_vx0.50` 21/49 | `side_L_lvl1` 7/49 | **8%** |
+| `side_R_lvl1` | `speed_vx0.50` 18/49 | `turn_wz0.00` 15/49 | **10%** |
+
+**`speed_vx0.50` is the top choice for every demonstration, including the sideways one.** The planner
+is not selecting; it is defaulting to the fastest forward walk. The first two demonstrations *are*
+forward walks, so a mixture of `speed_vx0.50` at 0.206 and `turn_wz0.00` at 0.126 averages onto
+their 0.126-0.130 by arithmetic rather than by choice. **The only demonstration whose right answer
+is not "walk forward" fails, at 83%.**
+
+**The criterion is insensitive whenever most candidates move the same way**, which on the B1 set is
+eight of twelve. Reported without the choice distribution beside it, this run reads as 67% success.
+It is 8-10% family accuracy on the two demonstrations that discriminate.
+
+**And it locates the binding constraint, which is the useful part.** On a held-out body of the *same
+family*, refitting the projector recovered half the degradation and restored the behaviour class
+outright (F95). Here the projector was already fitted on the target robot and selection still
+collapses -- so **across families it is the forward model's ignorance of the robot that binds, not
+the action-to-latent map.** That is what slide 15 measures from the other side: a frozen forward
+model scores 0.57-0.71x on the B1, worse than predicting no motion, and needs three clips of it to
+clear break-even.
+
+**The experiment that follows is therefore specific**: adapt the forward model on N B1 clips, refit
+the projector against the adapted ITM, and re-run this. It is LAC-WM's stages 1 and 3, and
+`finetune_ftm.py` adapts and scores without saving a checkpoint to plan with, so it is **not built**.
+
+---
+
+### F97. The action projector is 2.8x harder to fit on the B1, for the same reason its actions cannot be replayed
+
+Building LAC-WM's stage 1 (`wm/adapt.py`, which adapts the ITM and forward model and **saves a
+checkpoint**, where `finetune_ftm.py` adapted and discarded) made stage 2 measurable on the B1 for
+the first time. Both stages ran; they do not behave alike.
+
+**Stage 1 works on nine clips.** Rolling on held-out B1 clips, against holding the frame still:
+
+| horizon | frozen | after 9 clips | predicted / actual displacement |
+|---|---|---|---|
+| 1 | 0.68 | **1.16** | 0.55 |
+| 3 | 0.66 | 0.98 | 0.90 |
+| 5 | 0.69 | 0.86 | 1.10 |
+| 10 | 0.73 | 0.74 | 1.31 |
+
+From worse-than-nothing to better-than-nothing at one step, which is slide 15's curve reproduced
+with the weights kept.
+
+**Stage 2 does not.** The action projector fitted against the adapted ITM, scored as a rollout gap
+against a mean-`z` baseline where **below 1.0 is better than knowing nothing**:
+
+| projector fitted on | rollout gap |
+|---|---|
+| the same 9 clips | **1.301** -- worse than the baseline |
+| all 48 clips | 0.841 |
+
+**And more data is not the explanation.** The same script, the same clip count and the **unadapted**
+checkpoint, fitting both robots at once:
+
+| | rollout gap |
+|---|---|
+| hexapod, 48 clips | **0.230** |
+| B1, 48 clips | **0.640** |
+
+**2.8x harder on the same latent space, before any adaptation is involved.** The difficulty is a
+property of the robot.
+
+**The mechanism is narrower than it first looked, and F98 corrects the reading given here.** The
+tempting explanation -- the B1's action is a policy's response to state, so it carries nothing a
+planner can use -- is **wrong, and was measured rather than assumed**: a classifier reads the
+behaviour off B1 actions alone at 85% family accuracy against a 28% chance rate (F98). The
+information is in the action. What fails is the *target* stage 2 regresses onto: `z_ITM` encodes a
+particular frame-to-frame transition, which depends on gait phase and state as well as behaviour,
+so `a -> z` is one-to-many even where `a -> behaviour` is not. **The projector is not starved of
+signal; it is asked to resolve a distinction its input does not determine.**
+
+**Adapting the forward model does not rescue it, and that is the confirmation rather than a
+surprise.** Running the kinematic loop with the adapted checkpoint and the best projector available:
+
+| | frozen | adapted |
+|---|---|---|
+| S.R. speed | 2/3 *(by accident, F96)* | 0/3 |
+| S.R. behaviour | 2/3 | 1/3 |
+| family accuracy, `speed` / `turn` / `side` | 53% / 8% / 10% | 18% / 10% / 39% |
+| most-chosen, every demonstration | `speed_vx0.50` | `side_R_lvl1` |
+
+**It swapped one default for another.** The top choice is still the same candidate for all three
+demonstrations; adapting the forward model changed *which* behaviour it defaults to, not whether it
+selects. Sideways rises 10% to 39% and forward collapses 53% to 18%.
+
+Which is what a projector at 0.841 predicts: **the latent it emits is close to uninformative**, so
+the forward model is ranking candidates on something near noise, and improving the ranker cannot
+help. The chain is complete -- **response-shaped actions -> a one-to-many `a -> z` -> an
+unfittable projector -> nothing for the planner to rank** -- and the forward model is not the link
+that fails.
+
+**Consequence for the deployment claim, which has to be narrowed.** "Record a few clips of the new
+robot and control it" holds where the robot's own controller is open loop. Where it is a learned
+feedback policy, the action projector needs either far more data or LAC-WM's stage 3 -- joint
+fine-tuning of projector and FDM, 35k of their 60k adaptation iterations, and **still not built**.
+Stage 3 is not an optimisation in that setting; it is the step that lets the forward model move
+toward a latent the projector can actually reach. **It is now built (`wm/adapt3.py`) and its first
+result is in F98.**
+
+---
+
+### F98. The forward model refuses to use a quadruped's action, and the objective is why -- not the robot
+
+F97 read stage 2's failure on the B1 as a property of the robot. **Building stage 3 and measuring
+it says otherwise, and three results have to be read in order.**
+
+**1. The action is not the problem.** A classifier trained on actions alone, held out by clip, has
+to name which of twelve behaviours is being performed:
+
+| | one frame | five frames |
+|---|---|---|
+| hexapod joint targets | 68% | **100%** |
+| B1 policy actions | 61% | **80%** |
+| *chance* | 8% | 8% |
+
+By behaviour family the B1 reaches **85% against a 28% chance rate** (family chance is not 1/12 --
+the families hold unequal numbers of conditions, and reading it as 8% reports chance as success).
+The hexapod is cleaner, as a clock-driven action should be, but **the B1's action carries the
+behaviour plainly.** The explanation F97 reached for -- a response-shaped action has nothing a
+planner can use -- is measured and false.
+
+**2. Stage 3 with an honest budget still fails, and fails in a specific way.** `wm/adapt3.py`,
+15k steps, lr 1e-4, 24 clips, the faithful MSE form:
+
+| step | train | /hold | **/mean-z** | family |
+|---|---|---|---|---|
+| stage 2 | 2.05 | 0.830 | 1.005 | 25% |
+| 3000 | 0.80 | 0.799 | 0.994 | 19% |
+| 15000 | **0.35** | **0.805** | **0.993** | 19% |
+
+Training loss falls sixfold and held-out prediction genuinely improves -- **and `/mean-z` never
+moves.** The forward model's answer given the projected action equals its answer given the mean
+latent, to three decimals, at every checkpoint. **It learned B1 dynamics and discarded the action
+channel entirely**, and family selection sits at chance throughout.
+
+**3. Changing the objective fixes it, with everything else held constant.** Adding an InfoNCE term
+-- the true action must reach `e_t+1` more closely than actions from other behaviours, negatives
+drawn at the same time index so phase is not the giveaway:
+
+| | /mean-z | cond | family |
+|---|---|---|---|
+| stage 2 | 1.005 | 8% | 25% |
+| stage 3, MSE | 0.993 | 6% | 19% |
+| stage 3, **+ InfoNCE** | **0.62** | **29%** | **50%** |
+| *chance* | -- | 8% | 28% |
+
+Same data, same robot, same architecture, same budget. **Only the loss changed.**
+
+**Why MSE cannot get there from here.** The action-dependent part of `e_t+1` is a small fraction of
+its variance, and at adaptation time there is a large unconditional gap -- "what does a quadruped
+look like" -- available without touching the action at all. Gradient descent banks the large win
+and is never obliged to earn the small one. During *pretraining* no such shortcut exists, which is
+why the hexapod's forward model learned to use `z` and this one did not. **MSE rewards prediction;
+planning needs discrimination.** They coincide when training from scratch and separate under
+adaptation. This is Q7 -- the objective -- answered by measurement.
+
+**The boundary is the family, and it is not memorisation.** The same hexapod-only checkpoint, the
+same protocol, three sources:
+
+| | /hold | family (chance 28%) |
+|---|---|---|
+| hexapod, the trained body | 0.692 | **84%** |
+| hexapod, a body it has never seen | 0.776 | **62%** |
+| B1 | **1.476** | 35% |
+
+Arm 2 is the control F97 lacked: an unseen hexapod body still discriminates far above chance, so
+arm 1 is not recall. **And the comparison understates itself** -- the projector used here was
+fitted on `beh12_b1_flat`, so arm 3's projector had seen every clip it is tested on while arm 2's
+had never seen its body. The disadvantaged arm wins by 27 points.
+
+**What this changes.** Cross-family control is not blocked by the target robot's action space. It
+is blocked by an adaptation objective that permits a shortcut, and **LAC-WM's three stages are MSE
+throughout** -- the contrastive term is ours. It recovers about half the distance from B1's 35% to
+the within-family 62%. Not solved; no longer a wall.
+
+**A caveat that applies to every closed-loop number in this project, found while trying to add one
+here.** The same loop command, same checkpoint, same demonstration, run twice **inside one
+simulator session is identical to the pixel** -- and run against a *different* CoppeliaSim
+instance, is not. Two sessions gave **6% agreement** on the chosen candidates, with rendered frames
+differing (`frames.sum()` 1.4473e9 against 1.4649e9). The planner reads frames, so a rendering
+difference too small to see changes what it picks.
+
+Two consequences. **Loop results are comparable only within one simulator session** -- the hexapod
+runs behind F95 all came from one, 03:20-03:33, and are internally consistent. And **the decision
+margin is thin**: a planner whose answer turns on differences this small is not deciding with
+confidence, which is the same story the 30-57% selection rates tell. A B1 loop number was nearly
+written into the slides from a session that could not be reproduced, and the reproducible session
+was markedly worse. **It was pulled rather than reported**, and re-measured properly: one
+simulator, three demonstrations, run twice, **100% agreement between the repeats.**
+
+| demonstration | family accuracy | most-chosen |
+|---|---|---|
+| turning | **59%** | `turn_wz0.19` |
+| sideways | 24% | `turn_wz0.40` |
+| forward | 0% | `turn_wz0.00` |
+| *chance* | *28%* | |
+
+**One of three clears chance, and all three top choices are turns.** The amplitude tracks the
+demonstration; the behaviour does not. That is a step past the frozen and MSE-adapted models, which
+answer with one identical candidate for every demonstration, and it is not behaviour selection.
+
+**So 57% ranking on held-out clips did not convert, and the gap is the next problem.** The loop
+adds two things clip-level scoring does not have -- error compounding across steps, and a state the
+planner drove itself into rather than one that was recorded. The contrastive term fixed *what the
+forward model attends to*; nothing here yet addresses *what happens when its small errors
+accumulate under its own control*.
+
+---
+
+### F99. Evidence tables from the Stage 1 diagnostic slides, kept because the slides were cut
+
+The week-13 deck was reduced from twenty-five slides to thirteen so that it states results rather
+than the path to them. **Every conclusion on the cut slides is already written up above; some of
+the raw table rows were not, and existed only inside the deck file.** They are reproduced here so
+the record does not depend on a presentation document. Source: `report/update_slide_full.md`.
+
+**Cut slide 5 — Four changes that did not help, and the one that did**
+
+| frame from | latent from | matches `c10f10t10` | matches `c10f06t06` | follows |
+|---|---|---|---|---|
+| c10f10t10 | c10f06t06 | **4.79** | 21.64 | **the frame** |
+| c10f06t06 | c10f10t10 | 21.59 | **5.84** | **the frame** |
+
+**Cut slide 6 — What is inside the latent, with and without the cross-body loss**
+
+| | Without | With |
+|---|---|---|
+| variance explained by **gait phase** | 81.9% | **92.6%** |
+| variance explained by **which body it is** | 12.4% | **3.4%** |
+| variance explained by neither, the interaction | 5.7% | 4.1% |
+| **foot-contact pattern decodable from it** (8 patterns, majority class 0.172) | 0.729 | **0.732** |
+| which body it is, decodable from it (4 bodies, chance 0.250) | 0.764 | **0.694** |
+
+**Cut slide 8 — The limit: everything ties the femur to the tibia, because the data does**
+
+| the same weights, asked about | deg | **R²** |
+|---|---|---|
+| `c08f09t09` — femur 0.9, tibia 0.9, **inside the range** | **3.44** | **+0.81** |
+| `c10f10t08` — femur 1.0, **tibia 0.8**, the first time they differ | 13.35 | **−0.34** |
+
+| | coxa | femur | tibia |
+|---|---|---|---|
+| **The truth** | 1.00 | **1.00** | **0.80** |
+| The trained decoder, from its output commands | 1.000 | **0.681** | **0.681** |
+| The linear probe on the frozen encoder | 0.920 | **0.843** | **0.843** |
+| The best any mixture of training bodies could say | 0.809 | **0.600** | **0.600** |
+
+*Where the failure sits*
+
+| joint | what it moves | R² |
+|---|---|---|
+| **TC**, thorax-coxa | swings the leg fore and aft | **+0.46 to +0.83 — still works** |
+| **CF**, coxa-femur | lifts the leg | −0.53 to +0.05 |
+| **FT**, femur-tibia | the knee | **−0.45 to −3.99** |
+
+*Where the failure sits*
+
+| held out | femur/tibia | deg per joint | **R²** |
+|---|---|---|---|
+| c10f10t08 | 1.04 | 13.35 | **−0.34** |
+| c10f09t07 | 1.07 | 11.63 | **−0.14** |
+| c10f08t06 | 1.10 | 10.51 | **−0.33** |
+
+**Cut slide 9 — Testing the diagnosis instead of asserting it**
+
+With decoupled bodies added to training, the probe's femur-tibia gap opens to **0.182 against a
+true 0.200** -- the coupling the four tied bodies could not express is recovered once the data
+contains it.
+
+| | coxa | femur | tibia |
+|---|---|---|---|
+| the truth | 1.00 | **1.00** | **0.80** |
+| probe fitted on the 4 tied bodies | 0.955 | **0.819** | **0.819** |
+| probe fitted on all 6 | 0.973 | **0.954** | **0.772** |
+
+**Cut slide 10 — The same measurement predicts, before training, which bodies will transfer**
+
+| Training set | Held out | **Mixture gap** | **Probe error** | Model, deg | R² | Outcome |
+|---|---|---|---|---|---|---|
+| 4 bodies, spanning | `c08f09t09` | **0.000** | **0.021** | **3.44** | +0.81 | **beats copy-nearest, 3.47** |
+| 6 bodies, decoupled | `c10f10t08` | **0.063** | **0.034** | **3.27** | **+0.89** | **beats every baseline** |
+| 4 bodies, all tied at 0.83 | `c10f10t08` | **0.141** | **0.082** | 12.67 | −0.78 | loses to the body's own mean |
+
+**Cut slide 11 — One frame nearly determines the command**
+
+*The transition is worth about a third*
+
+| what the ITM is given as `e_{t+1}` | control | with the cross term |
+|---|---|---|
+| the real next frame | 3.71 deg | **3.37 deg** |
+| **a copy of `e_t`, no transition at all** | **1.28x** | **1.34x** |
+| `e_{t-1}`, a wrong transition | 1.67x | 1.65x |
+| a frame from a random other time | 3.54x | 3.44x |
+| the latent zeroed entirely | 2.88x | 3.48x |
+
+**Cut slide 12 — The forward model was being judged on the wrong task**
+
+| steps ahead | forward model | hold the frame still | constant velocity | **beats holding still by** |
+|---|---|---|---|---|
+| 1 | 1.39 | 2.11 | 5.78 | **1.52x** |
+| 3 | 1.78 | 3.05 | 27.6 | **1.72x** |
+| 5 | 2.12 | 3.57 | 66.0 | **1.69x** |
+| 10 | 2.98 | 4.36 | 236.5 | **1.46x** |
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not

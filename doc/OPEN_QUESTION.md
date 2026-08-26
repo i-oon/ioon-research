@@ -389,6 +389,39 @@ gait is fully valid (V-JEPA2 sees a hexapod walking either way). **Lean: keep CS
 
 ---
 
+## Q15. "How is this different from Diffusion?" (asked Week 11, answered — keep the answer)
+
+Asked in review and answered on a deck slide that has since been cut, so it is kept here. It comes
+back every time the work is described to someone new.
+
+**The latent is inferred, not sampled.** A diffusion model starts from noise that is isotropic
+Gaussian *by construction* -- structureless by design. Our `z` comes from the ITM given an observed
+pair of frames, with no sampling anywhere at inference. The pipeline is deterministic.
+
+Ask what a latent is made of and a diffusion prior answers "nothing, by design". Ours answers:
+
+| | share of `z`'s variance |
+|---|---|
+| gait phase | **92.6%** |
+| which body | **3.4%** |
+| interaction | 4.1% |
+
+**The requirement differs in kind.** A diffusion policy is trained for one robot and never has to
+satisfy a cross-body constraint. Ours must decode to *different joint values for different bodies
+from the same latent*, which is what `lambda_cross` enforces and the held-out body tests.
+
+**The part of the question that stands, and should be conceded rather than argued.** At the level
+of "a conditioned generator produces motion" the two are swappable, and swapping generators would
+be plumbing rather than a contribution. **The differentiator is the claim, not the architecture:
+transfer to a body, or an embodiment, never in the training set.** Diffusion policies, Sora and
+animation pipelines do not attempt that -- which is also why the evaluation is a held-out body
+rather than sample quality.
+
+The other two Week 11 questions -- sensor count against speed, and whether proprioception can be
+removed entirely -- are answered elsewhere in this file and in FINDINGS.
+
+---
+
 ## Settled, and where the evidence lives
 
 Each of these was an open question that a measurement closed. The full argument and the numbers
