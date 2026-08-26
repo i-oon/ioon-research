@@ -6186,6 +6186,52 @@ contains it.
 | 10 | 2.98 | 4.36 | 236.5 | **1.46x** |
 ---
 
+### F100. The forward model is doing the selecting, and one step of it is enough
+
+**The challenge this answers.** If the candidate library already contains recorded behaviours of
+the target robot, the world model may be doing very little -- picking whichever action most
+resembles what it was trained on, with the rollout as expensive decoration. The planner spends
+**sixty forward-model calls per control step** (twelve candidates, five steps) where a policy
+spends one, so this is worth settling rather than assuming.
+
+Three scoring rules, identical candidates, identical held-out clips, argmin of each
+(`scripts/diagnostics/does_rollout_matter.py`):
+
+| rule | how the goal enters |
+|---|---|
+| `rollout` | roll the FDM `h` steps on `proj(a)`, score the predicted frame against the goal frame |
+| `direct` | score `proj(a)` against `ITM(e_t, e_goal)` -- **no forward model at all** |
+| `blind` | score `proj(a)` against the mean latent -- **the goal is not used** |
+
+Behaviour-family accuracy on the B1, against a 28% chance rate:
+
+| horizon | rollout | direct | blind |
+|---|---|---|---|
+| 1 | **62%** | 38% | 33% |
+| 3 | **65%** | 36% | 32% |
+| 5 | **65%** | 38% | 32% |
+| 10 | **67%** | 37% | 34% |
+
+**The rollout carries the selection.** Deleting the forward model costs **24 points** and lands
+`direct` within five points of `blind`, which does not look at the goal at all. **The world model
+is predicting, not pattern-matching**, and an earlier reading of the horizon sweep that suggested
+otherwise was reading the wrong experiment: that sweep varied *how far* to roll, which is not the
+same question as *whether* to roll.
+
+**And one step is nearly all of it.** Going from one step to ten adds five points, where going
+from none to one adds twenty-four. The planner can be run at **twelve forward-model calls per
+control step instead of sixty** -- a fivefold cut for three points.
+
+**The gap this exposes is the one that matters.** These rules score 62-67% on recorded clips while
+the same checkpoint in the closed loop follows one demonstration of three. The difference is not
+the scoring rule -- it is that offline the current frame always comes from a real clip, and in the
+loop it comes from wherever the planner drove. **Compounding error under the planner's own control
+is the binding constraint**, not the choice of objective at a single step, and that is an argument
+for moving the search into training -- a policy distilled in imagination is trained on the states
+it actually reaches.
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not

@@ -202,6 +202,11 @@ def main():
         body_quat=np.asarray(quats, np.float32), dt=np.float32(0.05),
         embodiment=args.embodiment, condition=want, chosen=np.asarray(chosen),
         demo=os.path.basename(demo_path), kinematic=np.array(True),
+        # **Recorded, not inferred.** Runs before this stored no horizon, so reading an old result
+        # meant assuming nobody passed the flag -- and the planning horizon is a free parameter
+        # nothing in this project has justified, not a constant.
+        horizon=np.int32(planner.horizon), warm_start=np.int32(args.warm_start),
+        ckpt=os.path.relpath(args.ckpt, ROOT),
         candidates=np.asarray([c["condition"] for c in planner.candidates]))
     planned = [c for c in chosen if not c.startswith("warm:")]
     hit = sum(c == want for c in planned) / max(len(planned), 1)
