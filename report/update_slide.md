@@ -43,10 +43,11 @@ all, in the easy case where the joint spaces do match.
 | Slides 6-8 | a second robot, the term that makes one latent mean the same thing on both, and what we contribute |
 | Slide 9 | adapting to a genuinely different robot: zero-shot fails, a few clips buy one step |
 | Slides 10-11 | pretraining to a controller, and where the candidate actions come from |
-| Slide 12 | the loop closed on a body never seen |
+| Slide 12 | the loop closed, in physics, on two robots it was not trained on |
 | Slide 13 | crossing to a quadruped: what blocked it, and what unblocked it |
 | Slide 14 | what actually made things work, and what did not |
 | Slide 15 | conclusion: what was asked, what the measurements say, and the scope |
+| Slide 16 | where this goes next |
 
 ---
 
@@ -458,15 +459,38 @@ CONTROL    behaviours ──► project ──► roll FTM ──► score ─�
 DEPLOY     distil to a proprioception-only student                          NOT BUILT
 ```
 
+### One control step, in order
+
+```
+1  photograph the robot ──► encoder ──► e_t          "this is now"
+
+2  try all twelve candidates, in imagination
+   ┌────────────────────────────────────────────┐
+   │  e_t + candidate A's action ──► FTM ──► ê  │
+   │  e_t + candidate B's action ──► FTM ──► ê  │   nothing moves;
+   │  ...                                       │   the robot has not acted
+   │  e_t + candidate L's action ──► FTM ──► ê  │
+   └────────────────────────────────────────────┘
+
+3  score each ê against the goal image ──► take the closest
+
+4  send the winner's command to the robot       ← the only real motion
+
+5  photograph again, go to 1
+```
+
+**`ê` is not a picture.** The forward model predicts the *embedding* of the next frame, and the
+comparison happens there — we never render an imagined future, because ranking only needs to know
+which candidate lands closer.
+
+**No future frame appears anywhere above.** `e_t` was photographed and `z` comes from an action we
+chose to try, so both exist before the robot moves.
+
 **`z_t = ITM(e_t, e_{t+1})` needs the next frame — which at control time is the thing being
 decided. The inverse model can never run in the loop.** Most numbers in this deck read `z` off two
 ground-truth frames, which is reconstruction rather than control. **Everything from here on does
 not**: the CONTROL and ADAPT rows, and slides 11-13, use the action projector and the forward model
 only.
-
-LAC-WM states the same constraint and the same answer — *"since future observations, required by
-the IDM, are unavailable at inference time, we train an **action projector** that maps explicit
-actions into the latent action space"*.
 
 **Adapting to a new robot is three stages, not one.** A projector fitted against a frozen forward
 model is only the middle one:
@@ -478,13 +502,9 @@ model is only the middle one:
 | **3** | fine-tune projector and forward model **together** | freezing the forward model and making the projector chase `z` exactly is not enough — **the forward model has to move to meet it** |
 
 The source paper spends **35k of its 60k adaptation iterations on stage 3** — more than the other
-two together. All three are now built. **Ours are full fine-tunes**; the source paper uses LoRA
-adapters, which is an efficiency choice and not a difference in what is adapted.
-
-**Why stage 3 is worth the cost.** Ranking four candidate actions, a projector fitted against a
-frozen forward model reaches **57.8%** top-1, where the candidate's own latent — the ceiling any
-projector could hit — reaches **72.8%**. That gap is what stage 3 is for. **Slide 13 is what
-happened when we ran it, and the answer was not the one we expected.**
+two together. All three are now built. **Ours are full fine-tunes**; the paper uses LoRA adapters,
+an efficiency choice rather than a difference in what is adapted. **Slide 13 is what happened when
+we ran stage 3, and the answer was not the one we expected.**
 
 ---
 
@@ -495,8 +515,14 @@ the new robot, one of which is the one the demonstration performs. **This is che
 deliberate** — the planner is not searching for an action, it is choosing from ground truth we
 supplied.
 
-**It is the weakest test that can still fail, and it does fail**: on the quadruped the loop follows
-one demonstration of three with the answer sitting in the list.
+**It is the weakest test that can still fail, and it does fail**: on the quadruped the loop clears
+chance on two demonstrations of three, and the robot falls on the other two.
+
+**And it contradicts our own premise.** Slide 9 opens with *"a robot we know nothing about — no
+kinematics, no URDF, no calibration"*. **Recording twelve walking, turning and strafing clips means
+something already knew how to make that robot walk.** **Random motor babbling would close the gap** —
+flail the joints, record, let the planner find which fragments go where, with nothing having to know
+what *forward* means. Untested, and it is the experiment that would make the premise true.
 
 ### Is the world model doing anything, or just pattern-matching?
 
@@ -532,115 +558,142 @@ sample and we cannot.
 ### The source paper needs a prior too
 
 > *"we assume access to one demonstration trajectory for sampling a subgoal image every p
-> timesteps"* — **their goal comes from a demonstration, exactly like ours.**
-
-> *"random action sequence sampling... is inefficient for action optimization, especially for a
-> difficult dexterous manipulation task"* — so they draw **500 candidates from a pretrained VLA**.
+> timesteps"* — their goal comes from a demonstration, like ours. And *"random action sequence
+> sampling... is inefficient... especially for a difficult dexterous manipulation task"*, so they
+> draw **500 candidates from a pretrained VLA**.
 
 **Their prior is a policy; ours is twelve clips.** Both answer the same question — what does a
 plausible action look like — and **both have to come from somewhere.**
 
-### What this costs us
+**And a list of twelve is not a distribution.** We can choose a behaviour; we cannot compose a new
+one.
 
-**Recording forward, turning and sideways clips means something already made the robot do them**,
-so *"no kinematics needed"* is not yet earned. And a list of twelve is not a distribution: **we can
-choose a behaviour, we cannot compose a new one.**
+## Slide 12 — The loop, closed, on two robots it was not trained on
 
-Replacing curated clips with **random motor babbling** would remove both. Untested.
+> **How these are scored.** `speed` — achieved against commanded Froude, within 15%. `behaviour` —
+> right class by dominant channel: forward, turn, sideways. `survival` — body height held, did not
+> fall. Survival is not optional for locomotion: a manipulator that fails a grasp is still standing.
 
-## Slide 12 — The loop closes on a body the model has never seen
+### A hexapod of the training family, never seen
 
-> **How every loop result on this slide and the next is scored.** `speed` — commanded against
-> achieved Froude speed, within 15%. `behaviour` — right class by dominant channel: forward, turn,
-> sideways. `survival` — body height held, did not fall. Survival is not optional for locomotion:
-> a manipulator that fails a grasp is still standing.
-
-Slide 20 closed the loop on `c10f10t10`, the body it trained on. The same loop, unchanged, on
-**`c08f09t09`** — shorter coxa, shorter femur, shorter tibia, never in training. Full physics in
-CoppeliaSim: the robot carries its own weight and can fall.
+`c08f09t09` — shorter coxa, femur and tibia. Full physics in CoppeliaSim.
 
 | | trained body | unseen body, projector as-is | unseen body, projector refitted |
 |---|---|---|---|
-| S.R. survival | 100% | **100%** | **100%** |
-| S.R. behaviour class | 100% | 83% | **100%** |
-| S.R. speed, within 15% | 78% | 17% | 33% |
+| survival | 100% | **100%** | **100%** |
+| behaviour class | 100% | 83% | **100%** |
+| speed within 15% | 78% | 17% | 33% |
 | median speed error | 7.0% | 37.1% | **19.2%** |
 
-**Nothing in the world model moved.** The encoder, the inverse model and the forward model are the
-same weights that ran on the trained body. The only thing refitted between columns three and four
-is the action projector — a two-layer MLP, minutes of fitting, on clips of the new body.
+![the loop on a body it was never trained on](../results/wm/closed_loop/video_heldout_fewshot/closed_hexapod_ep1001_r0.mp4)
 
-**Read the rows separately, because they fail differently.** *Which behaviour* survives the body
-change outright: refit the projector and it is perfect again. *How fast* does not — 33% against
-78%. A new body changes what a given joint command produces, and the planner has no way to know
-that until the projector is told.
+> *Turning demonstration, held-out body, projector refitted. Left: the loop. Right: the
+> demonstration it was asked to reproduce. Speed error 8.9%, and it stays upright.*
 
-**What this buys and what it costs.** A new body of the same family needs no retraining of the
-world model — the expensive part, the part that took fifty epochs — and needs a small network
-fitted on its own clips. That is the deployment claim, tested rather than asserted, on a body that
-was held out from the start.
+**Nothing in the world model moved** — encoder, inverse model and forward model are the same
+weights that ran on the trained body. The only thing refitted is the action projector: a two-layer
+MLP, minutes of fitting, on clips of the new body.
 
-**Stated against what it is not.** One family. Six runs. And the speed row says the loop is
-*controlling* rather than *tracking* — it picks the right behaviour and then runs it at the wrong
-rate, which for a locomotion controller is a real gap and not a rounding error.
+**The two rows fail differently.** *Which behaviour* survives the body change outright. *How fast*
+does not — 33% against 78%. A new body changes what a joint command produces, and the planner
+cannot know that until the projector is told.
+
+### A quadruped, a different family
+
+MuJoCo carries the weight; CoppeliaSim poses the body from MuJoCo's state and returns the camera
+image, so both robots are still rendered by the same renderer. Slide 13 is how this became possible.
+
+| | survival | behaviour class | speed within 15% |
+|---|---:|---:|---:|
+| **B1, physics** | **3 / 3** | 2 / 3 | **0 / 3** |
+
+Behaviour-family accuracy over planned steps: **58% / 51% / 38%**, against 28% chance. Speed errors
+25%, 40%, 95%.
+
+**It holds itself up for a full episode and goes at a speed nobody asked for.**
+
+![B1 asked to walk forward](../results/wm/closed_loop/video_b1_physics2/phys_b1_ep2.mp4)
+
+![B1 asked to strafe right, and walking forward instead](../results/wm/closed_loop/video_b1_physics2/phys_b1_ep2301.mp4)
+
+> *Both clips run the full 65 steps without falling. The first is asked to walk forward and does,
+> 25% too fast. **The second is asked to strafe right and walks forward** — upright the whole way,
+> 95% off in the channel that was commanded. That pair is the result and the limit in one place.*
+
+> **We had called this impossible**, from a replay test where B1 actions fall — 0 of 8. That was
+> **six seconds**; this loop is three. **And our first version of it was wrong**: it started the
+> robot standing while the clips begin mid-stride, so the first command asked a leg to finish a
+> swing it never started and the body leapt a third above its own stance height. Seeding the
+> simulator from the demonstration's first frame took survival from **1/3 to 3/3**. *Found by
+> watching the video, not by reading the numbers.*
+
+### What this buys, and what it does not
+
+**A new body of the same family needs no world-model retraining** — the expensive part, fifty
+epochs — only a small network fitted on its own clips. **A body of a different family needs the
+world model adapted too**, on a few dozen of its clips.
+
+**Neither controls speed.** The loop picks the behaviour and runs it at the wrong rate, which for a
+locomotion controller is a real gap rather than a rounding error.
 
 ---
 
 ## Slide 13 — Crossing to a quadruped: what blocked it, and what unblocked it
 
-The same frozen world model, pointed at a Unitree B1. **It defaults instead of selecting** — one
-candidate answers every demonstration. Three measurements, in the order they have to be read.
+The same world model, pointed at a Unitree B1. **It answers with the same candidate no matter what
+it is shown.**
 
-**1. The B1's actions are not the problem.** A classifier trained on actions alone, held out by
-clip, naming which of twelve behaviours is being performed:
+> **What this model has seen.** Fifty epochs of hexapod video and **no quadruped at all**; then
+> **9 clips of the B1** to adapt the inverse and forward models, and **24** to fit the projector
+> against them. So the pretraining is cross-embodiment and the adaptation is not. Frozen, with no
+> B1 clips, it rolls **worse than assuming the frame does not move** — that arm is on slide 9.
 
-| | one frame | five frames | by behaviour family |
-|---|---|---|---|
+```
+demo: walk forward  ──►  planner  ──►  speed_vx0.50
+demo: turn          ──►  planner  ──►  speed_vx0.50
+demo: strafe        ──►  planner  ──►  speed_vx0.50
+```
+
+### 1. Blame the robot's actions? Measured, and no
+
+A classifier given **actions only** — no images — naming which of twelve behaviours is happening:
+
+| | 1 frame | 5 frames | by family |
+|---|---:|---:|---:|
 | hexapod joint targets | 68% | **100%** | 100% |
-| B1 policy actions | 61% | **80%** | **85%** *(chance 28%)* |
+| B1 policy actions | 61% | **80%** | **85%** |
+| *chance* | *8%* | *8%* | *28%* |
 
-The information is there. The tempting story — a reinforcement-learned policy's action is a
-response, so it carries nothing to plan with — is measured and false.
+**The behaviour is in the action.** A policy's action being a *response* does not empty it.
 
-**2. The forward model throws the action away.** Adapting it on B1 clips, 15k steps: training loss
-falls **sixfold**, held-out prediction genuinely improves — and its answer given the real action
-stays **identical to its answer given the average action**, to three decimals, at every checkpoint.
-It learned what a quadruped looks like and never learned to use the command.
+### 2. The forward model is throwing it away
 
-**3. The objective permitted that, and changing it fixes it.** MSE is satisfied by predicting well
-*on average*, and at adaptation time a large gap is available without reading the action at all.
-Adding a contrastive term — the true action must reach the next frame more closely than actions
-from other behaviours — removes the shortcut: a model that ignores the action scores every
-candidate identically and can never be right.
+```
+feed the real action    ──►  forward model predicts  X
+feed the average action ──►  forward model predicts  X      ← identical, 3 decimals
+```
 
-| behaviour selection, matched protocol | chance 28% |
+15k adaptation steps: training loss falls **6×**, held-out prediction improves, and that line never
+changes. **It learned what a quadruped looks like and never learned to read the command.**
+
+### 3. The objective allowed the shortcut
+
+```
+MSE          "predict the next frame"
+             next frame ≈ this frame  ──►  copying scores well  ──►  action unnecessary
+
+contrastive  "which of these 4 actions was the real one"
+             ignore the action  ──►  all 4 predictions identical  ──►  never right
+```
+
+| behaviour selection | chance 28% |
 |---|---|
 | hexapod, a body never seen | **60%** |
 | B1, before | 30% |
 | B1, after the contrastive term | **57%** |
 
-**Cross-family selection reaches within-family levels.** Same data, same robot, same architecture,
-same budget — **only the loss changed.** LAC-WM's three adaptation stages are MSE throughout; this
-term is ours.
-
-**And the loop does not yet follow.** Ranking is measured on held-out clips; run as a controller,
-repeated twice in one simulator session and identical both times:
-
-| demonstration | behaviour-family accuracy | most-chosen |
-|---|---|---|
-| turning | **59%** | `turn_wz0.19` |
-| sideways | 24% | `turn_wz0.40` |
-| forward | 0% | `turn_wz0.00` |
-| *chance* | *28%* | |
-
-**One of three clears chance, and every top choice is a turn** -- the amplitude varies with the
-demonstration, the behaviour does not. Better than the single repeated answer the frozen and
-MSE-adapted models give, and still not selection.
-
-**The gap between 57% ranking and this is the finding.** The loop adds what clip-level scoring does
-not have: error compounding step by step, and a state reached by the planner rather than recorded.
-Closing that is the next piece of work, and it is a different problem from the one the contrastive
-term solved.
+**Same data, same robot, same architecture, same budget — only the loss changed.** LAC-WM's three
+adaptation stages are MSE throughout; this term is ours.
 
 ---
 
@@ -698,75 +751,79 @@ tell apart** — and that is the only intervention in this project that has move
 given — separate *what movement is happening* from *which body is doing it*, well enough to drive a
 body the model has never seen?
 
-### Answered, at two scopes
+### Answered, at three scopes
 
-**Within one robot family the latent transfers with no retraining at all.** A held-out hexapod
-scores **3.44 deg per joint, R² +0.81** against a command spread of 11.7, and the commands walk when
-driven open-loop through physics.
+| | result |
+|---|---|
+| **within one robot family, no retraining** | held-out hexapod at **3.44 deg per joint, R² +0.81** against a command spread of 11.7; the commands walk through physics |
+| **a body of that family it has never seen, closed loop, physics** | **survival 100%, behaviour 100%**, median speed error 19.2% — world model frozen, only a two-layer projector refitted |
+| **a quadruped, closed loop, physics** | **stands through every episode, 3/3**; behaviour family 38-58% against 28% chance; **speed 0/3** |
 
-**A body of the same family it has never seen is controlled in closed loop, in physics**, with the
-world model frozen and only a two-layer projector refitted: **survival 100%, behaviour 100%, median
-speed error 19.2%.**
-
-**Across incomparable robots the blocker turned out to be the objective, not the robot.** A frozen
-forward model is worse than assuming the frame does not move; adapting it with MSE improves its
-predictions while it **discards the action channel entirely**; and a contrastive term — which asks
-for the ranking a planner actually performs — lifts behaviour selection on the quadruped from 30%
-to **57%, level with an unseen body of the training family.**
+**Across incomparable robots the blocker was the objective, not the robot.** Adapting the forward
+model with MSE improves its predictions while it **discards the action channel entirely**. A
+contrastive term — asking for the ranking a planner performs — lifts quadruped selection from 30%
+to 57%, and that is what the physics loop above runs on. **The quadruped now walks under the world
+model's control for a full episode without falling** — and at a speed nobody asked for.
 
 ### The contribution, in one line
 
 **A joint-space action target crosses incomparable embodiments only when a shared body-motion term
-is present — and it crosses channel by channel, for exactly the channels that term supervises.**
+is present.**
 
 | | within-robot joint error | cross-robot transfer |
 |---|---|---|
-| joint target alone | 0.3517 | **−28.9 / −43.1** |
-| joint target + shared body term | **0.2183** | **+0.610 / +0.573** |
+| joint target alone | 0.3517 | **−28.9** |
+| joint target + shared body term | **0.2183** | **+0.61** |
 
-Both robots perform twelve matched behaviours at matched speeds. **One loss term is the difference
-between a readout that is dozens of times worse than a constant and one that works in both
-directions on every split.**
-
-### One thing this round found that it did not set out to find
-
-**Variety is necessary and not sufficient.** We predicted the missing channels failed because they
-were constants, built matched turning and sideways travel, and measured that untrained they still
-sat at zero. **Yaw goes from −5.2 to +0.37 when it is supervised** — identical data, identical
-architecture, no overlap across five splits. Collecting the behaviour bought the possibility; the
-loss term is what realises it.
+Both robots perform twelve matched behaviours at matched speeds. **One loss term separates a
+readout dozens of times worse than a constant from one that works in both directions.**
 
 ### What is not done, stated plainly
 
 | | |
 |---|---|
-| speed as a controlled quantity | on a new body the loop picks the right behaviour and runs it at the wrong rate — **33% within 15%**, against 78% on the trained body |
-| the loop on a quadruped | ranking now works (57% against 28% chance); in the loop it picks the right behaviour on **one demonstration of three** — with the answer in the candidate list |
-| the candidate library | it holds recorded forward, turning and sideways clips, so something already made the robot do those. **"No kinematics needed" is not yet earned**; random motor babbling instead of curated behaviours is the untested fix |
-| yaw as a usable channel | it stops being harmful, it does not start working — and four explanations for that were tested and rejected |
-| the scaling claim | needs a third embodiment. **We have two** — and so does measuring whether the shared body head makes a *new* robot cheaper, since the term needs two robots in pretraining and the test needs one held out |
+| **speed, on both robots** | the loop picks the right behaviour and runs it at the wrong rate — **33%** within 15% on a new hexapod body, **0 of 3** on the quadruped |
+| **the candidate library** | it holds recorded forward, turning and sideways clips, so something already made the robot do those. **"No kinematics needed" is not yet earned** — random motor babbling is the untested fix |
+| **yaw** | it stops being harmful, it does not start working; four explanations tested and rejected |
+| **the scaling claim** | needs a third embodiment. **We have two** |
 
 ### What the planner result is, and is not
 
-**It is a viability result.** Selecting actions by rolling a world model — the source paper's
-approach, in its action-space form — **controls a body it has never seen, in physics.** That was
-not obvious and it is now measured.
+**It is a viability result, at two different costs.** Selecting actions by rolling a world model —
+the source paper's approach in its action-space form — **controls a hexapod it has never seen with
+the world model completely frozen**, and **keeps a quadruped walking after adapting that world model
+on 24 of its clips.** The world model earns its place either way: deleting the rollout costs **24
+points** of selection accuracy.
 
-**It is not an optimality result, and the shortfalls are consistent.** Speed lands at 33% on a new
-body. On the quadruped the loop follows one demonstration of three **even with the right answer in
-the candidate list.** The library has to be recorded by something that could already make the robot
-walk. And every control step costs **sixty forward-model rolls** where a policy costs one.
-
-**Those four are not separate bugs.** A planner searching a small recorded library, scoring with a
-model whose rollout is accurate for a fraction of a second, is doing the hardest possible version
-of the job at run time. **The next step moves that work into training**: use the world model as a
-teacher and distil a policy — Dreamer-style imagination, or teacher-student onto proprioception.
-The reward it needs is "reach this latent", which requires no kinematics and no behaviour library,
-and it removes the library, the run-time cost and the discrete action set at once.
-
-**The immediate milestone stays the same**: drive the B1 from a *hexapod* goal image. That is the
-demonstration that makes cross-embodiment a control result rather than a measurement — and it is
-the same test whether a planner or a distilled policy is doing the driving.
+**It is not an optimality result.** Every choice is made with the right answer already in the
+candidate list, the list has to be recorded by something that could already make the robot walk,
+speed is not controlled, and a control step costs **twelve forward-model rolls** where a policy
+costs one. **Those are not separate bugs** — a planner searching a small recorded library at run
+time is doing the hardest version of the job.
 
 ---
 
+## Slide 16 — Where this goes next: vision at learning time, not at run time
+
+**Vision is the medium that lets one model span incomparable bodies *during learning*. Nothing
+requires it to be the sensor at run time.** Our fixed side camera is a **research instrument** — it
+exists so two robots render comparably — and should not be read as the intended deployment.
+
+**So: use the world model as a teacher and distil a policy** — the student reads proprioception
+only, which is standard in legged locomotion. Its reward is *reach this latent*, so it needs no
+kinematics and no behaviour library.
+
+| what is wrong now | what distillation does to it |
+|---|---|
+| the candidate library must be recorded by something that can already walk | gone — the policy outputs continuous joint targets |
+| twelve forward-model rolls per control step | gone — one forward pass |
+| the planner meets states it drove itself into, having only been scored on recorded ones | the student is trained **on the states it reaches** |
+| a camera is needed at run time | gone — vision was only ever needed to learn |
+
+**None of this is built.** It is the direction tonight's measurements point at, not a result.
+
+**The immediate milestone**: drive the B1 from a *hexapod* goal image — the demonstration that makes
+cross-embodiment a control result rather than a measurement, and the same test whether a planner or
+a distilled policy is driving.
+
+---

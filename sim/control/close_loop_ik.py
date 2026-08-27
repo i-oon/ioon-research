@@ -37,6 +37,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from sim.collect.collect_ik import EP, LEGS, SEG, drive_and_record  # noqa: E402
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.policy.planner import LatentPlanner, condition_of  # noqa: E402
 
 
@@ -154,8 +155,10 @@ def main():
 
     # `cmds` supplies the clip length and the pose held during warmup; `policy` replaces every
     # value inside the loop. Seeded from the demonstration so the robot starts in its stance.
-    with np.load(demo_path, allow_pickle=True) as data:
-        seed_cmds = data["actions"].astype(np.float32)[:steps]
+    # **Through the embodiment loader, not `np.load` directly.** The hexapod clips store the joint
+    # commands under `actions` and the B1's under `action`; reading the key by hand worked for as
+    # long as this file only ever ran on the insect.
+    seed_cmds = load(demo_path, REGISTRY[args.embodiment])["actions"].astype(np.float32)[:steps]
 
     client = RemoteAPIClient("localhost", port=args.port)
     sim = client.getObject("sim")

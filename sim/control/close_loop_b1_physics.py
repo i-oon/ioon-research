@@ -1,0 +1,206 @@
+"""Closed loop on the B1 with real physics: MuJoCo is the world, CoppeliaSim is the camera.
+
+**Why two simulators, which is not a workaround.** The B1's policy walks only in its native MuJoCo
+physics -- CoppeliaSim's engines either freeze the imported base or cannot reproduce the gait -- so
+the B1 dataset was rolled out in MuJoCo and rendered in CoppeliaSim. That split has to be kept
+here: rendering the B1 from MuJoCo while the insect comes from CoppeliaSim would let V-JEPA2
+separate the two robots by **render style** rather than by morphology, and every cross-embodiment
+number in this project would be measuring the wrong thing.
+
+    MuJoCo      holds the physics -- weight, contacts, falling
+    CoppeliaSim poses a body from MuJoCo's state and returns the camera image
+    planner     reads that image and picks the next behaviour
+
+**This replaces `close_loop_kinematic.py`'s central compromise.** That file poses the body from a
+recorded clip, so the robot cannot fall and `S.R. survival` passes by construction. Here the robot
+carries its own weight and the survival column means something.
+
+**What it can and cannot reach, measured before building it.** Replaying single clips at the rate
+the planner runs them -- 50 ms per decision, not the policy's native 20 ms -- the forward clip
+survives all 66 steps and the turning and sideways clips fall at 28 and 27. So a full-length
+physics episode is available for forward travel and half an episode for the others, and **falling
+is a result to report rather than a reason not to run.** F93's "0 of 8" was measured over 300
+steps at 50 Hz, six seconds; this loop is three.
+
+    .venv/bin/python3 sim/control/close_loop_b1_physics.py \\
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce.pt \\
+        --projector wm/runs/beh12_hexonly/projector_stage3_nce.pt \\
+        --demo data/beh12_b1_flat/b1_ep2.npz --out results/wm/closed_loop/b1_physics
+"""
+import argparse
+import os
+import sys
+
+import numpy as np
+import torch
+from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+sys.path.insert(0, os.path.join(ROOT, "sim", "render"))
+sys.path.insert(0, os.path.join(ROOT, "sim", "collect"))
+import mujoco  # noqa: E402
+from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
+
+from render_b1_replay import JOINT_ALIASES_SDK, ROOT_ALIAS, SENSOR, capture, settle  # noqa: E402
+from rollout_b1_mujoco import (ACTION_SCALE, DEFAULT_IL, MODEL, SPAWN_Z,  # noqa: E402
+                               il_to_sdk, sdk_to_il)
+
+from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.policy.planner import LatentPlanner  # noqa: E402
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ckpt", required=True)
+    ap.add_argument("--projector", required=True)
+    ap.add_argument("--demo", required=True)
+    ap.add_argument("--candidates_dir", default="data/beh12_b1_flat")
+    ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
+    ap.add_argument("--embodiment", default="b1")
+    ap.add_argument("--horizon", type=int, default=5)
+    ap.add_argument("--warm_start", type=int, default=10,
+                    help="steps driven by the demonstration's own commands before the planner "
+                         "takes over. From a standstill there is no motion in the frame to read")
+    ap.add_argument("--steps", type=int, default=66)
+    ap.add_argument("--settle", type=int, default=25)
+    ap.add_argument("--fall_ratio", type=float, default=0.6,
+                    help="body height below this fraction of its settled height counts as fallen")
+    ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--out", default="results/wm/closed_loop/b1_physics")
+    args = ap.parse_args()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    demo_path = os.path.join(ROOT, args.demo)
+    demo = load(demo_path, REGISTRY[args.embodiment])
+    with np.load(demo_path, allow_pickle=True) as raw:
+        want = str(raw["condition"])
+
+    planner = LatentPlanner.from_checkpoint(
+        os.path.join(ROOT, args.ckpt), os.path.join(ROOT, args.candidates_dir),
+        embodiment=args.embodiment, projector_path=os.path.join(ROOT, args.projector),
+        horizon=args.horizon, device=str(device))
+    checkpoint = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
+    offset = offset_for(checkpoint, args.embodiment)
+    encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+
+    demo_e = encode_clip(encoder, demo["frames"], 2).float()
+    if offset is not None:
+        demo_e = demo_e - offset
+    demo_e = demo_e.to(device)
+
+    steps = min(args.steps, len(demo["actions"]) - 1,
+                min(len(c["actions"]) for c in planner.candidates) - 1)
+    print(f"demonstration {os.path.basename(demo_path)}  condition {want}")
+    print(f"{len(planner.candidates)} candidates, horizon {args.horizon}, {steps} steps")
+    print("PHYSICS: MuJoCo carries the weight. The robot can fall.\n")
+
+    # --- MuJoCo: the world -------------------------------------------------------------------
+    m = mujoco.MjModel.from_xml_path(MODEL)
+    d = mujoco.MjData(m)
+    # **Start where the demonstration starts, not from a standing pose.** The clips were recorded
+    # with the spawn-to-walk transient cropped, so their first action is a command for a robot
+    # already mid-stride. Applying it to a robot standing still asks a leg to continue a swing it
+    # never began: the body leapt from 0.435 to 0.665 in six steps, a third above its own stance
+    # height, before the gait recovered. Seeding the state from the demonstration's first frame
+    # removes the discontinuity at the only moment we can remove it.
+    with np.load(demo_path, allow_pickle=True) as raw0:
+        d.qpos[0:3] = [0.0, 0.0, float(raw0["base_pos"][0][2])]
+        d.qpos[3:7] = np.asarray(raw0["base_quat"][0], np.float64)
+        d.qpos[7:19] = np.asarray(raw0["joint_pos"][0], np.float64)
+        d.qvel[6:18] = np.asarray(raw0["joint_vel"][0], np.float64)
+        d.ctrl[:] = np.asarray(raw0["joint_pos"][0], np.float64)
+    mujoco.mj_forward(m, d)
+    for _ in range(args.settle):
+        mujoco.mj_step(m, d)
+    settled_z = float(d.qpos[2])
+    # **One decision covers 50 ms of physics, not the policy's 20 ms.** The clips are 20 Hz, so a
+    # planner step holds its command for two and a half policy steps; stepping only 20 ms would
+    # simulate 40% of the episode and report survival the robot never earned.
+    sub = int(round(0.05 / m.opt.timestep))
+
+    # --- CoppeliaSim: the camera -------------------------------------------------------------
+    sim = RemoteAPIClient("localhost", port=args.port).getObject("sim")
+    sim.loadScene(os.path.abspath(os.path.join(ROOT, args.scene)))
+    settle(sim)
+    jm = {sim.getObjectAlias(h): h
+          for h in sim.getObjectsInTree(sim.handle_scene, sim.object_joint_type)}
+    joints = [jm[a] for a in JOINT_ALIASES_SDK]
+    sm = {sim.getObjectAlias(h): h
+          for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)}
+    root, cam = sm[ROOT_ALIAS], sim.getObject("/" + SENSOR)
+    cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
+    root0 = np.array(sim.getObjectPosition(root, sim.handle_world))
+    off_xy, cam_z = cam0[:2] - root0[:2], cam0[2]
+
+    def render():
+        """Pose the CoppeliaSim body from MuJoCo's state and take the picture."""
+        p = d.qpos[0:3]
+        w, x, y, z = d.qpos[3:7]
+        sim.setObjectPosition(root, sim.handle_world, [float(p[0]), float(p[1]), float(p[2])])
+        sim.setObjectQuaternion(root, sim.handle_world, [float(x), float(y), float(z), float(w)])
+        sim.setObjectPosition(cam, sim.handle_world,
+                              [float(p[0]) + off_xy[0], float(p[1]) + off_xy[1], cam_z])
+        for h, a in zip(joints, d.qpos[7:19]):
+            sim.setJointPosition(h, float(a))
+        return capture(sim, cam)
+
+    frames, chosen, heads, quats, uprights = [], [], [], [], []
+    fell_at = None
+    observation = render()
+    for t in range(steps):
+        if t < args.warm_start:
+            action, label = demo["actions"][t], f"warm:{want}"
+        else:
+            e_t = encode_clip(encoder, np.asarray(observation)[None], 1).float()
+            if offset is not None:
+                e_t = e_t - offset.to(e_t.device)
+            h = planner.horizon_at(t)
+            action, i, _ = planner.act(e_t[0:1].to(device),
+                                       demo_e[min(t + h, len(demo_e) - 1)], t)
+            label = planner.candidates[i]["condition"]
+        chosen.append(label)
+
+        target = il_to_sdk(DEFAULT_IL + ACTION_SCALE * np.asarray(action, np.float32))
+        d.ctrl[:] = np.clip(target, m.actuator_ctrlrange[:, 0], m.actuator_ctrlrange[:, 1])
+        for _ in range(sub):
+            mujoco.mj_step(m, d)
+
+        observation = render()
+        frames.append(observation)
+        heads.append(np.array(d.qpos[0:3], np.float32))
+        quats.append(np.array(d.qpos[3:7], np.float32))
+        w, x, y, z = d.qpos[3:7]
+        uprights.append(float(1 - 2 * (x * x + y * y)))
+        if t % 10 == 0:
+            print(f"  step {t:3d}  -> {label}   z {float(d.qpos[2]):.3f}", flush=True)
+        if fell_at is None and (float(d.qpos[2]) < args.fall_ratio * settled_z
+                                or uprights[-1] < 0.5):
+            fell_at = t
+            print(f"  FELL at step {t}", flush=True)
+            break
+
+    out_dir = os.path.join(ROOT, args.out)
+    os.makedirs(out_dir, exist_ok=True)
+    out = os.path.join(out_dir, f"phys_{os.path.splitext(os.path.basename(demo_path))[0]}.npz")
+    np.savez_compressed(
+        out, frames=np.asarray(frames, np.uint8), head=np.asarray(heads, np.float32),
+        body_quat=np.asarray(quats, np.float32), upright=np.asarray(uprights, np.float32),
+        dt=np.float32(0.05), embodiment=args.embodiment, condition=want,
+        chosen=np.asarray(chosen), demo=os.path.basename(demo_path),
+        kinematic=np.array(False), horizon=np.int32(planner.horizon),
+        warm_start=np.int32(args.warm_start), settled_z=np.float32(settled_z),
+        fell_at=np.int32(-1 if fell_at is None else fell_at),
+        candidates=np.asarray([c["condition"] for c in planner.candidates]))
+    planned = [c for c in chosen if not c.startswith("warm:")]
+    hit = sum(c == want for c in planned) / max(len(planned), 1)
+    print(f"\n{hit:.0%} of {len(planned)} planned steps chose {want}")
+    print(f"survived {len(chosen)} of {steps} steps"
+          f"{'' if fell_at is None else f' -- fell at {fell_at}'}")
+    print(f"-> {os.path.relpath(out, ROOT)}")
+
+
+if __name__ == "__main__":
+    main()

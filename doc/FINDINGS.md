@@ -5734,6 +5734,13 @@ and those clips are the candidate set.
 The B1's action is a *response*; without the state it was responding to there is no reason for it to
 hold. The faster the gait the sooner the divergence bites, which is what the survival column shows.
 
+> **Superseded in part by F101, and the correction is about episode length.** This entry was read
+> afterwards as "no physics loop is available on the B1". The survival column above says something
+> narrower -- **289, 154, 72 and 58 steps at 50 Hz**, six seconds at the slowest command -- and the
+> closed loop is three. Run for three seconds, the forward behaviour survives a full episode and
+> the loop clears chance on two demonstrations of three. **The claim that holds is that a recorded
+> B1 sequence stops being re-issuable after about three seconds**, not that it never was.
+
 **So the closed loop is not portable to the B1 as built, and this is a property of the target robot,
 not a gap in the method.** Everything upstream of execution transfers -- F90's ranking and F91's
 selection are both measured on B1 latents, and the forward model adapts to the B1 in three clips
@@ -6229,6 +6236,69 @@ loop it comes from wherever the planner drove. **Compounding error under the pla
 is the binding constraint**, not the choice of objective at a single step, and that is an argument
 for moving the search into training -- a policy distilled in imagination is trained on the states
 it actually reaches.
+
+---
+
+### F101. The B1 closed loop runs in physics after all, and F93's "impossible" was an episode-length claim
+
+**F93 measured that replayed B1 actions fall -- 0 of 8 -- and that conclusion was carried forward as
+"a physics loop on the B1 is not available".** The table it reported says something narrower:
+survival of 289, 154, 72 and 58 steps at 50 Hz, which is **six seconds** at the slowest command.
+The closed loop is three. Nobody asked how long the robot stays up, only whether it eventually
+fell.
+
+**Replaying the beh12 clips at the rate the planner runs them** -- 50 ms per decision, not the
+policy's 20 ms, since the clips are 20 Hz:
+
+| clip | at 20 ms/step | **at 50 ms/step** |
+|---|---|---|
+| forward | 66 / 66 | **66 / 66** |
+| turning | 66 / 66 | 28 |
+| sideways | 66 / 66 | 27 |
+
+The first column is the trap: stepping 20 ms per row simulates 40% of the episode and reports
+survival the robot never earned. **An earlier version of this measurement did exactly that and
+concluded all three survive.**
+
+**So the loop was built** (`sim/control/close_loop_b1_physics.py`): **MuJoCo holds the physics,
+CoppeliaSim poses a body from MuJoCo's state and returns the camera image.** The split is
+mandatory rather than convenient -- the B1's policy walks only in MuJoCo, and rendering the B1
+from MuJoCo while the insect comes from CoppeliaSim would let the encoder separate the robots by
+render style instead of by morphology.
+
+**The first version of this loop started the robot standing, and that was a defect.** The clips
+were recorded with the spawn-to-walk transient cropped, so their first action is a command for a
+robot **already mid-stride**. Applying it to a robot standing still asks a leg to continue a swing
+it never began: body height leapt **0.435 -> 0.665** in six steps, a third above its own stance
+height, visible in the rendered video as a jump the demonstration never makes. Seeding MuJoCo from
+the demonstration's first frame -- joint angles, joint velocities, height, orientation -- removes
+it. **The numbers below are the seeded runs; the standing-start runs are reported only as the
+comparison.**
+
+| | seeded from the demonstration | standing start |
+|---|---|---|
+| forward | **65 / 65**, family 58% | 65 / 65, family 75% |
+| turning | **65 / 65**, family 51% | fell at 29, family 35% |
+| sideways | **65 / 65**, family 38% | fell at 37, family 68% |
+| peak body height | 0.57-0.60 | 0.67-0.70 |
+| *chance* | *28%* | *28%* |
+
+**The robot now stands through every episode**, and the artefact that inflated two of the
+standing-start scores is gone. Scored on the project's criteria: **survival 3/3, behaviour class
+2/3, speed 0/3** -- errors of 25%, 40% and 95%.
+
+**So the quadruped holds itself up under the planner and does not track speed.** Family accuracy
+averages 49% against 28% chance, above chance on all three and far from the 90% the hexapod reaches
+on recorded frames.
+
+**The planner is not what makes a robot fall.** In the standing-start runs sideways survived **37**
+steps under the planner against **27** replaying its own clip. Re-deciding every step holds the
+robot up slightly longer than re-issuing a recorded sequence.
+
+**What this replaces.** `close_loop_kinematic.py` exists because the physics loop was believed
+impossible; its survival column passes by construction and had to be reported as `n/a`. **The B1
+now has a survival number that means something**, and the honest form of F93 is that a recorded B1
+action sequence holds for about three seconds and not six.
 
 ---
 

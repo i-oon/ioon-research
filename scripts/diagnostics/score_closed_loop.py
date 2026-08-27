@@ -63,6 +63,7 @@ def summarise(path, window=None):
         chosen = d["chosen"] if "chosen" in d.files else None
         want = str(d["condition"]) if "condition" in d.files else ""
         kinematic = bool(d["kinematic"]) if "kinematic" in d.files else False
+        fell_at = int(d["fell_at"]) if "fell_at" in d.files else -1
     c = channels(head, quat, dt, embodiment)
     # **Steps driven by the warm start are the demonstration replayed, not the planner's work.**
     # Scoring them was worth 21 points of apparent speed accuracy on a run whose behaviour picks
@@ -82,6 +83,7 @@ def summarise(path, window=None):
     return {"path": path, "demo": demo, "condition": want, "dt": dt, "embodiment": embodiment,
             "forward": float(np.median(c[:, 0])), "lateral": float(np.median(c[:, 1])),
             "yaw": float(np.median(c[:, 2])),
+            "fell_at": fell_at, "planned_steps": len(c),
             "height0": float(np.median(head_p[:half, 2])),
             "height1": float(np.median(head_p[half:, 2])),
             "chosen": chosen, "steps": len(head_p), "warm": warm, "window": (lo, hi),
@@ -134,6 +136,13 @@ def main():
         ok_class = dominant(row) == dominant(ref)
         held = row["height1"] / max(row["height0"], 1e-6)
         ok_alive = held > HEIGHT_FLOOR
+        # **A run that stopped because it fell hides the fall from this test.** The loop truncates
+        # the recording at the fall, so the second half never contains the collapse and the height
+        # ratio reads as healthy. Two B1 physics runs scored `A` while having fallen at steps 29
+        # and 37. Where the loop recorded the step it fell on, that is the answer.
+        if row.get("fell_at", -1) >= 0:
+            ok_alive = False
+            held = float(row.get("fell_at")) / max(row.get("planned_steps", 1), 1)
         # **Survival is not a result in a kinematic run.** The body is posed frame by frame, so it
         # passes whatever the planner chose. Reported as `.` rather than `A` so a table cannot be
         # read as if the two kinds of run had earned the same column.
