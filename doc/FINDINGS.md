@@ -7349,12 +7349,19 @@ than the insect to 20% smaller. That is the better trade in one direction only: 
 information from the image, and a size difference does not** -- and the two robots genuinely differ
 in size fourfold, so rendering them to look equal would be erasing the fact the experiment is about.
 
-**`--cam_fov` is on both `render_b1_replay.py` and `close_loop_b1_physics.py`, defaulting to 25 on
-the latter.** They have to agree: a loop that plans on 25-deg frames after adapting on 15-deg ones
-is measuring the mismatch.
+**`--cam_fov` and `--floor_scale` are on both `render_b1_replay.py` and
+`close_loop_b1_physics.py`, defaulting to 24 and 3 on the latter.** They have to agree: a loop that plans on frames differing from its adaptation
+set in any static way -- angle, spawn, floor -- is measuring that difference.
+
+**One artefact is accepted rather than fixed.** Enlarging the floor removes the bright specular dots
+on the B1's feet, at every factor from 1.5 upward; sliding the floor instead makes the background
+worse, at 48.9 against 16.6. **The insect has no such highlights either** -- its brightest pixel is
+165 against the B1's 244 -- so losing them narrows a difference between the two robots rather than
+widening one. What it costs is human legibility of the feet at 99 px, and that is bounded by the
+256-px frame the encoder takes.
 
 **Re-rendered and verified, `data/beh12_b1_fov25`** (`scripts/dataset/rerender_b1_framing.py`,
-`--cam_fov 25 --spawn 0 0 --floor_scale 3`). Checking the framing turned up a second defect that had nothing to do
+`--cam_fov 24 --spawn 0 0 --floor_scale 3`). Checking the framing turned up a second defect that had nothing to do
 with it: **the B1's camera was never pinned to a fixed world point**, so every clip carried its own
 background, where the insect's is identical across all 48. `--spawn` exists for exactly that and was
 not used when the set was built. Both are fixed in the same pass:

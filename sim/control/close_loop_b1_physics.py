@@ -82,8 +82,10 @@ def main():
     ap.add_argument("--fall_ratio", type=float, default=0.6,
                     help="body height below this fraction of its settled height counts as fallen")
     ap.add_argument("--port", type=int, default=23000)
-    ap.add_argument("--cam_fov", type=float, default=25.0,
-                    help="perspective angle in degrees. **25, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 25 it is 0% everywhere (F113). Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
+    ap.add_argument("--floor_scale", type=float, default=3.0,
+                    help="scale the floor about the origin, as the dataset render does. At 24 degrees the camera reaches the far edge of the scene's 15 m floor and draws a band across the upper third of the frame; enlarging it removes the band. **Must match whatever `data/beh12_b1_fixed` was rendered with** -- a loop planning on frames that differ from its adaptation set in any static way is measuring that difference (F113).")
+    ap.add_argument("--cam_fov", type=float, default=24.0,
+                    help="perspective angle in degrees. **24, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 24 it is 0% on all 48 (F113). The floor also has to be enlarged -- see `render_b1_replay.py --floor_scale`. Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
     ap.add_argument("--out", default="results/wm/closed_loop/b1_physics")
     args = ap.parse_args()
 
@@ -170,6 +172,11 @@ def main():
     p0 = d.qpos[0:3].copy()
     sim.setObjectPosition(cam, sim.handle_world,
                           [float(p0[0]) + off_xy[0], float(p0[1]) + off_xy[1], cam_z])
+    if args.floor_scale > 0:
+        floors = [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
+                  if sim.getObjectAlias(h, 1).startswith("/Floor")]
+        if floors:
+            sim.scaleObjects(floors, float(args.floor_scale), False)
     if args.cam_fov > 0:
         sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
                                 float(np.deg2rad(args.cam_fov)))

@@ -43,6 +43,8 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--cam_dx", type=float, default=0.0, help="shift the fixed camera along world x")
     ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
+    ap.add_argument("--floor_dy", type=float, default=0.0,
+                    help="slide the floor along world y instead of scaling it. Scaling removes the far-edge band but also removes the bright specular dots on the feet, at every factor from 1.5 up; sliding is the alternative that leaves the shading alone.")
     ap.add_argument("--floor_scale", type=float, default=0.0,
                     help="scale the floor about the world origin. The scene ships 15 m of floor, and a 25-deg view reaches its far edge -- the straight band across the upper third of every wide B1 frame, which the insect's 15-deg view never reaches. Raising the lights does not remove it; only more floor does.")
     ap.add_argument("--light_z", type=float, default=0.0,
@@ -108,6 +110,11 @@ def main():
     sim.setObjectPosition(cam, sim.handle_world,
                           [base_pos[0, 0] + off_xy[0] + args.cam_dx,
                            base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
+    if args.floor_dy != 0.0:
+        for h in [x for x in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
+                  if sim.getObjectAlias(x, 1).startswith("/Floor")]:
+            q = sim.getObjectPosition(h, sim.handle_world)
+            sim.setObjectPosition(h, sim.handle_world, [q[0], q[1] + args.floor_dy, q[2]])
     if args.floor_scale > 0:
         floors = [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
                   if sim.getObjectAlias(h, 1).startswith("/Floor")]
