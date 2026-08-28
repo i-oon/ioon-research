@@ -35,10 +35,8 @@ PANELS = (
     ("turning", "turn_s0.56", "turn",
      ("hexapod_ep1300", "hexapod_ep1301", "hexapod_ep1302", "hexapod_ep1303")),
 )
-ARMS = (("frozen\nworld model", "b1_hexgoal_arm1_frozen", GREY),
-        ("adapted\nseparately", "b1_hexgoal_arm2_mse_separate", SAND),
-        ("adapted\njointly", "b1_hexgoal_arm3_mse_joint", SAND),
-        ("adapted jointly\n+ InfoNCE", "b1_hexgoal_arm4_nce_joint", TEAL))
+ARMS = (("MSE", "v2_arm3_mse", SAND),
+        ("+ InfoNCE", "v2_arm4_nce", TEAL))
 CHANCE = 1 / 3
 
 
@@ -62,10 +60,10 @@ def rate(run_dir, goal, want):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="results/wm/closed_loop/figures/adapt_objective.png")
+    ap.add_argument("--out", default="results/wm/closed_loop/figures/adapt_objective_v2.png")
     args = ap.parse_args()
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.0), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(7.4, 3.8), sharey=True)
     rng = np.random.default_rng(0)          # jitter only, never touches a measured value
 
     for ax, (title, condition, want, goals) in zip(axes, PANELS):
@@ -86,11 +84,6 @@ def main():
                         color=INK, fontsize=9.5, fontweight="semibold")
         ax.set_xlim(-.55, len(ARMS) - .45)
         ax.set_xticks(range(len(ARMS)), [a[0] for a in ARMS], fontsize=8.5)
-        # the first three arms are the source method's objective at three points; only the last differs
-        ax.plot([-.3, 2.3], [-.215, -.215], color=GREY, lw=1, clip_on=False,
-                transform=ax.get_xaxis_transform())
-        ax.text(1.0, -.26, "MSE, as the source method does at every stage", ha="center",
-                fontsize=8, color=GREY, transform=ax.get_xaxis_transform())
         ax.set_title(title, fontsize=10.5, color=INK, pad=14)
         ax.text(.5, 1.015, condition, transform=ax.transAxes, ha="center",
                 fontsize=8.5, color=GREY, family="monospace")
@@ -106,11 +99,11 @@ def main():
     axes[0].annotate("chance", (-.5, CHANCE), textcoords="offset points", xytext=(2, 4),
                      ha="left", color=GREY, fontsize=8.5)
     # the turning panel's conclusion is that nothing clears the line, which is easy to miss
-    axes[1].annotate("no arm clears chance", (1.5, .62), ha="center", color=GREY, fontsize=8.5)
-    fig.suptitle("Adaptation objective, not adaptation itself, is what crosses embodiments",
+    axes[0].annotate("both arms alike", (.5, .66), ha="center", color=GREY, fontsize=8.5)
+    fig.suptitle("The contrastive term buys turn selection, and nothing on forward",
                  fontsize=11, color=INK, y=1.0)
     fig.text(.5, -.10, "hexapod goal frames, B1 candidates and body, MuJoCo physics; "
-                       "one point per recorded goal clip, bars are $\\pm$1 s.d. (n=4)",
+                       "corrected B1 set; one point per recorded goal clip, bars are $\\pm$1 s.d. (n=4)",
              ha="center", fontsize=8, color=GREY)
     fig.tight_layout()
     out = os.path.join(ROOT, args.out)

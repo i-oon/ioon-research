@@ -7556,6 +7556,58 @@ is done.**
 
 ---
 
+### F116. On the corrected data the contrastive term buys turn selection and nothing on forward, and F112's headline does not reproduce
+
+**The whole pipeline was refitted on `data/beh12_b1_v2`** -- stage 1, stage 2, stage 3 -- because
+the set the original was fitted on turns the opposite way from the insect (F115), files the forward
+clip under `turn_wz0.00` (F114) and clips the robot in 61% of frames (F113). **The two stage-3 arms
+now differ in `--lambda_nce` and in nothing else**: same 24 clips, 12,000 steps each, batch 8. The
+original pair differed in batch and in budget as well, MSE having had 15,000 steps to the
+contrastive arm's 12,000.
+
+Ten cross-embodiment runs per arm, `--warm_start 0 --commit 3`, hexapod goals, four goal clips for
+forward and turning and two for sideways:
+
+| | forward | turning | sideways | upright | turn sign correct | yaw, last third |
+|---|---|---|---|---|---|---|
+| MSE | **53% +/- 5** | 22% +/- 3 | 19% +/- 1 | 10/10 | 4/4 | **-0.0475** |
+| **+ InfoNCE** | **54% +/- 0** | **43% +/- 11** | 20% +/- 3 | 10/10 | 4/4 | -0.0353 |
+| *chance* | *33%* | *33%* | *17%* | | *50%* | *-0.0878 commanded* |
+
+**Forward is identical under the two objectives.** 53% against 54%, both about 1.6x chance.
+**F112's 32% against 74% does not reproduce**, and the most likely reason is in F114: on the old
+set `turn_wz0.00` *was* the forward clip, so an arm that chose it on a forward goal walked forward
+correctly and was scored as a miss. The gap that made the contrastive term look decisive was partly
+a label.
+
+**What the term does buy is turn selection.** 43% against 22%, with MSE **below** its 33% chance
+rate, and the same ordering offline -- family 52% against 23% on held-out clips. That is a real
+effect and it is the one that survives.
+
+**But the body disagrees with the label count, and it is worth saying which is which.** Both arms
+turn the right way on 4 of 4 goals -- the first time this project has measured that at all, since
+before F115 the two robots turned opposite ways -- and **MSE achieves *more* rotation**, -0.0475
+against -0.0353 in the last third. The picks explain it:
+
+| on turn goals | MSE | + InfoNCE |
+|---|---|---|
+| `speed_vx0.50` (yaw +0.0007) | **35%** | 22% |
+| `turn_w0.075` (yaw -0.0750) | 15% | 9% |
+| `turn_w0.037` (yaw -0.0371) | -- | **27%** |
+
+**MSE alternates between the fastest straight clip and the hardest turn**; the contrastive arm picks
+the turn level nearest the goal's rate. Median yaw rewards the first strategy and behaviour-family
+accuracy rewards the second. **Neither reaches the commanded rate** -- 54% and 45% of it.
+
+**Turning crosses embodiments, weakly, and this is the first time the question could be asked.**
+Before the sign was fixed a hexapod goal turning one way was scored against a library that only
+turned the other, so every earlier turning number measured the dataset.
+
+**Sideways is at chance under both** -- 19% and 20% against 17% -- which is now the fourth
+independent measurement of the same failure and the first on data with no known defect in it.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
