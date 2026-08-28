@@ -7353,10 +7353,33 @@ in size fourfold, so rendering them to look equal would be erasing the fact the 
 the latter.** They have to agree: a loop that plans on 25-deg frames after adapting on 15-deg ones
 is measuring the mismatch.
 
-**What is left is a re-render and a re-fit, not a re-rollout.** Every `beh12_b1_flat` clip stores
-`base_pos`, `base_quat` and `joint_pos`, so MuJoCo does not run again; CoppeliaSim re-renders 48
-clips and stage 3 is refitted on them. **Until that is done every B1 number in this project stands
-on 15-deg frames**, including all of F112.
+**Re-rendered and verified, `data/beh12_b1_fov25`** (`scripts/dataset/rerender_b1_framing.py`,
+`--cam_fov 25 --spawn 0 0`). Checking the framing turned up a second defect that had nothing to do
+with it: **the B1's camera was never pinned to a fixed world point**, so every clip carried its own
+background, where the insect's is identical across all 48. `--spawn` exists for exactly that and was
+not used when the set was built. Both are fixed in the same pass:
+
+| | before | after | hexapod |
+|---|---|---|---|
+| frames touching an edge, mean | 61% | **0%** | 0% |
+| worst clip | 100% | **0%** | 0% |
+| background spread between clips | 2.79 | **0.22** | 0.14 |
+| bounding box | 136 px | 94 px | 118 px |
+
+**The clip-to-clip background variation was noise, not a shortcut** -- two clips of the *same*
+condition differed by 4.03 against 4.43 between conditions, so it never encoded the label. It is
+still worth removing: it was a nuisance the encoder had to absorb on one robot and not the other.
+
+**One number got worse and is reported rather than buried.** The B1's background against the
+*insect's* moved 5.47 to **6.41** grey levels, because a 25-degree view takes in a different amount
+of floor than the insect's 15. **While the two scenes use different angles that gap cannot close**;
+it buys a robot that is never cut in half. The within-robot consistency, which is what every clip of
+that robot shares, improved twelvefold.
+
+**What is left is a re-fit, not a re-rollout.** MuJoCo never ran again -- every clip stores `base_pos`,
+`base_quat` and `joint_pos`, so the physics was replayed from the file. **Stage 3 still has to be
+refitted on `beh12_b1_fov25`, and until it is, every B1 number in this project stands on 15-deg
+frames from unpinned cameras**, including all of F112.
 
 > **Fourth defect this project found by looking rather than reading**, after the standing-start
 > jump, the camera that followed the robot, and the loop turning the wrong way. The dataset's own
