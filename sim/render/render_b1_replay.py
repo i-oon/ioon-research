@@ -43,6 +43,14 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--cam_dx", type=float, default=0.0, help="shift the fixed camera along world x")
     ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
+    ap.add_argument("--cam_fov", type=float, default=0.0,
+                    help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
+                         "identical 15-deg cameras, and that is not the same as an identical view.** "
+                         "The field is 2.11 m wide at the robot; the B1 is 1.29 m across and travels "
+                         "up to 1.56 m, needing 2.85 m, while the insect needs 1.75 m and fits. "
+                         "Matched camera parameters produced a quadruped clipped in 36-100% of "
+                         "frames beside an insect clipped in none (F113). What has to match is that "
+                         "both robots stay whole, not that the two numbers agree.")
     ap.add_argument("--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
                     help="replay from this world x y; use the same value as the insect collector")
     ap.add_argument("--max_frames", type=int, default=0,
@@ -96,6 +104,9 @@ def main():
     sim.setObjectPosition(cam, sim.handle_world,
                           [base_pos[0, 0] + off_xy[0] + args.cam_dx,
                            base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
+    if args.cam_fov > 0:
+        sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
+                                float(np.deg2rad(args.cam_fov)))
 
     # Which rollout steps become frames. Round rather than slice: 50 Hz to 20 Hz is a stride of
     # 2.5, and an integer slice would give 25 Hz and silently leave a 25% timing error in place.

@@ -82,6 +82,8 @@ def main():
     ap.add_argument("--fall_ratio", type=float, default=0.6,
                     help="body height below this fraction of its settled height counts as fallen")
     ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--cam_fov", type=float, default=25.0,
+                    help="perspective angle in degrees. **25, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 25 it is 0% everywhere (F113). Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
     ap.add_argument("--out", default="results/wm/closed_loop/b1_physics")
     args = ap.parse_args()
 
@@ -168,6 +170,9 @@ def main():
     p0 = d.qpos[0:3].copy()
     sim.setObjectPosition(cam, sim.handle_world,
                           [float(p0[0]) + off_xy[0], float(p0[1]) + off_xy[1], cam_z])
+    if args.cam_fov > 0:
+        sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
+                                float(np.deg2rad(args.cam_fov)))
 
     def render():
         """Pose the CoppeliaSim body from MuJoCo's state and take the picture."""

@@ -7330,6 +7330,34 @@ but it is a tidy-up, not the reason to re-render.
 bounding box near **118 px** of 256 -- the insect's -- against its present 157, with **0%** of
 frames touching an edge, which is what the insect already achieves in all 48 of its clips.
 
+**Fixed, and verified against the target rather than by eye.** Both scenes ship an identical 15-deg
+camera at the same height and distance, which was deliberate -- but **an identical camera is not an
+identical view**. The field is 2.11 m wide at the robot; the insect is 0.97 m across and travels up
+to 0.78 m, needing 1.75 m and fitting, while the B1 is 1.29 m across and travels up to 1.56 m,
+needing 2.85 m. Widening the B1's perspective angle, one clip per condition re-rendered from the
+states already stored in `beh12_b1_flat`:
+
+| perspective angle | frames touching an edge | B1 bounding box |
+|---|---|---|
+| 15 deg (as shipped) | **62%** mean, 100% on all four sideways | 157 px |
+| 21 deg | 18% sideways, 2% forward | 119 px |
+| **25 deg** | **0% on all twelve conditions** | 94 px |
+| *hexapod, unchanged* | *0%* | *118 px* |
+
+**25 deg is the choice, and it trades apparent size for completeness.** The B1 goes from 33% larger
+than the insect to 20% smaller. That is the better trade in one direction only: **clipping removes
+information from the image, and a size difference does not** -- and the two robots genuinely differ
+in size fourfold, so rendering them to look equal would be erasing the fact the experiment is about.
+
+**`--cam_fov` is on both `render_b1_replay.py` and `close_loop_b1_physics.py`, defaulting to 25 on
+the latter.** They have to agree: a loop that plans on 25-deg frames after adapting on 15-deg ones
+is measuring the mismatch.
+
+**What is left is a re-render and a re-fit, not a re-rollout.** Every `beh12_b1_flat` clip stores
+`base_pos`, `base_quat` and `joint_pos`, so MuJoCo does not run again; CoppeliaSim re-renders 48
+clips and stage 3 is refitted on them. **Until that is done every B1 number in this project stands
+on 15-deg frames**, including all of F112.
+
 > **Fourth defect this project found by looking rather than reading**, after the standing-start
 > jump, the camera that followed the robot, and the loop turning the wrong way. The dataset's own
 > `--separability` check passes on all of these clips, because it measures where the *body* went and
