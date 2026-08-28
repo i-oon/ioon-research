@@ -23,8 +23,8 @@ is a result to report rather than a reason not to run.** F93's "0 of 8" was meas
 steps at 50 Hz, six seconds; this loop is three.
 
     .venv/bin/python3 sim/control/close_loop_b1_physics.py \\
-        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce.pt \\
-        --projector wm/runs/beh12_hexonly/projector_stage3_nce.pt \\
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt \\
+        --projector wm/runs/beh12_hexonly/projector_stage3_nce_v2.pt \\
         --demo data/beh12_b1_v2/b1_ep2.npz --out results/wm/closed_loop/b1_physics
 """
 import argparse

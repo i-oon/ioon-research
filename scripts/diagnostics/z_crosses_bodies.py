@@ -19,7 +19,7 @@ from each other, and the nearest one would be picked for reasons unrelated to th
 for.
 
     .venv/bin/python3 scripts/diagnostics/z_crosses_bodies.py \\
-        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce.pt
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt
 """
 import argparse
 import glob
@@ -62,7 +62,7 @@ def clip_latents(path, name, encoder, itm, ck, chunk, device):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", default="wm/runs/beh12_hexonly/stage3_b1_nce.pt")
+    ap.add_argument("--ckpt", default="wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt")
     ap.add_argument("--hex_dir", default="data/beh12_c08f09t09_flat")
     ap.add_argument("--b1_dir", default="data/beh12_b1_v2",
                     help="**`beh12_b1_v2`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")

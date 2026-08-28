@@ -41,8 +41,8 @@ the true next embedding, does the forward model rank the action that actually ca
 actions from other behaviours? A collapsed model scores at chance by construction, and a planner
 is exactly a discriminator, so this is the closed-loop result available without rendering.
 
-    .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1.pt \\
-        --projector wm/runs/beh12_hexonly/projector_b1_adapted.pt \\
+    .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1_v2.pt \\
+        --projector wm/runs/beh12_hexonly/projector_b1_adapted_v2.pt \\
         --data data/beh12_b1_v2 --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
 """
 import argparse
