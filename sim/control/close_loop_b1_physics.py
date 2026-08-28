@@ -64,7 +64,12 @@ def main():
                          "to take. Defaults to `--demo`, i.e. same-robot goals")
     ap.add_argument("--goal_embodiment", default="",
                     help="embodiment of `--goal`, for the centring offset. Defaults to --embodiment")
-    ap.add_argument("--candidates_dir", default="data/beh12_b1_flat")
+    ap.add_argument("--candidates_dir", default="data/beh12_b1_v2",
+                    help="**`beh12_b1_v2`, not `beh12_b1_flat`.** The original set clips the robot "
+                         "in 61% of frames, never pins its camera, files the forward clip under "
+                         "`turn_wz0.00`, and turns the opposite way from the insect -- so its "
+                         "turning conditions cannot be reached from an insect goal at all "
+                         "(F113-F115). Anything pointed at the old directory reproduces those.")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--horizon", type=int, default=5)
