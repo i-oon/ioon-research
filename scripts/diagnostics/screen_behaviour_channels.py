@@ -178,7 +178,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/stage2speed7body/last.pt")
     ap.add_argument("--hex_dir", default="data/beh12_hex_flat")
-    ap.add_argument("--b1_dir", default="data/beh12_b1_flat")
+    ap.add_argument("--b1_dir", default="data/beh12_b1_v2",
+                    help="**`beh12_b1_v2`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--window", type=float, default=0.0,

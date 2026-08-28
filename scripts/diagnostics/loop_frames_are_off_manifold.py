@@ -21,7 +21,7 @@ distribution shift is not the explanation** and the search should move elsewhere
 it is, and training a policy on the states it reaches is the fix that follows.
 
     .venv/bin/python3 scripts/diagnostics/loop_frames_are_off_manifold.py \\
-        results/wm/closed_loop/b1_physics3/*.npz --data data/beh12_b1_flat --embodiment b1
+        results/wm/closed_loop/b1_physics3/*.npz --data data/beh12_b1_v2 --embodiment b1
 """
 import argparse
 import glob

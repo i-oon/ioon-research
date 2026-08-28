@@ -22,7 +22,7 @@ robot every time the choice changes. The delta is rotated out of the source clip
 the current one, so a turn chosen after a walk continues from where the walk left off.
 
   .venv/bin/python3 sim/control/close_loop_kinematic.py --ckpt wm/runs/beh12_hexonly/best.pt \\
-      --demo data/beh12_b1_flat/b1_ep1.npz
+      --demo data/beh12_b1_v2/b1_ep1.npz
 """
 import argparse
 import os
@@ -86,7 +86,10 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--projector", default="")
     ap.add_argument("--demo", required=True)
-    ap.add_argument("--candidates_dir", default="data/beh12_b1_flat")
+    ap.add_argument("--candidates_dir", default="data/beh12_b1_v2",
+                    help="**`beh12_b1_v2`, not `beh12_b1_flat`.** The old set clips the robot in 61% "
+                         "of frames, files the forward clip under `turn_wz0.00`, and turns the "
+                         "opposite way from the insect (F113-F115).")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--horizon", type=int, default=5)

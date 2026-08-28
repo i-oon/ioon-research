@@ -22,7 +22,7 @@ rate reachable without using the goal, and any rule that fails to beat it is not
 
     .venv/bin/python3 scripts/diagnostics/does_rollout_matter.py \\
         --ckpt wm/runs/beh12_hexonly/stage3_b1_nce.pt \\
-        --projector wm/runs/beh12_hexonly/projector_stage3_nce.pt --data data/beh12_b1_flat
+        --projector wm/runs/beh12_hexonly/projector_stage3_nce.pt --data data/beh12_b1_v2
 """
 import argparse
 import os

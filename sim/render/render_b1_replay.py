@@ -9,6 +9,12 @@ proprioception come from the MuJoCo rollout (where the policy actually walks).
   python3 sim/render/render_b1_replay.py --scene sim/env/b1_flat.ttt \
       --traj /tmp/b1_traj/walk.npz --out data/b1_v1 --preview
 """
+# **The three camera flags default to the corrected setup, not to the scene as authored.** Rendered
+# the scene's own way, the B1 touches an image edge in 61% of frames against the insect's 0%, every
+# clip carries its own background because the camera is never pinned, and a 24-degree view reaches
+# the far edge of the 15 m floor. `--cam_fov 24 --spawn 0 0 --floor_scale 3` is what
+# `data/beh12_b1_v2` was built with, and anything rendered differently cannot be mixed with it
+# (F113). Pass `--cam_fov 15 --floor_scale 0` to reproduce the old, defective framing.
 import argparse
 import os
 import time
@@ -43,7 +49,7 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--cam_dx", type=float, default=0.0, help="shift the fixed camera along world x")
     ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
-    ap.add_argument("--floor_scale", type=float, default=0.0,
+    ap.add_argument("--floor_scale", type=float, default=3.0,
                     help="scale the floor about the origin so a wider view does not reach its far "
                          "edge. **`sim.scaleObjects` grows a box without moving its centre**, so a "
                          "3x floor lifts its surface from z=0.000 to z=+0.200 and the robot stands "
@@ -58,7 +64,7 @@ def main():
                          "frame, and the sideways clips stayed 100% clipped at 1.7x. Widening "
                          "the angle is the only motion that adds room on the side the robot is "
                          "leaving (F113). Left at 1.0 for every collected set.")
-    ap.add_argument("--cam_fov", type=float, default=0.0,
+    ap.add_argument("--cam_fov", type=float, default=24.0,
                     help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
                          "identical 15-deg cameras, and that is not the same as an identical view.** "
                          "The field is 2.11 m wide at the robot; the B1 is 1.29 m across and travels "
@@ -66,7 +72,7 @@ def main():
                          "Matched camera parameters produced a quadruped clipped in 36-100% of "
                          "frames beside an insect clipped in none (F113). What has to match is that "
                          "both robots stay whole, not that the two numbers agree.")
-    ap.add_argument("--spawn", type=float, nargs=2, default=None, metavar=("X", "Y"),
+    ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0), metavar=("X", "Y"),
                     help="replay from this world x y; use the same value as the insect collector")
     ap.add_argument("--max_frames", type=int, default=0,
                     help="stop after this many frames, so every condition yields the same clip "
