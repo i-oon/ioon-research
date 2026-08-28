@@ -453,7 +453,8 @@ ADAPT      1  fine-tune ITM and FDM on the new robot                       done
 CONTROL    behaviours ──► project ──► roll FTM ──► score ──► execute
            └── scored on recorded frames        90% right behaviour   done
            └── closed loop, trained body        78% speed, 100% up    done
-           └── closed loop, unseen body        100% behaviour, 100% up  done
+           └── closed loop, unseen body        15/15 behaviour, 15/15 up  done
+           └── closed loop, quadruped from an INSECT goal   67% forward   done
            └── closed loop, quadruped           1 of 3 demonstrations  partial
 
 DEPLOY     distil to a proprioception-only student                          NOT BUILT
@@ -580,10 +581,16 @@ one.
 
 | | the body it trained on | **unseen body**, old projector reused | **unseen body**, projector refitted on its own clips |
 |---|---|---|---|
-| survival | 100% | **100%** | **100%** |
-| behaviour class | 100% | 83% | **100%** |
-| speed within 15% | 78% | 17% | 33% |
-| median speed error | 7.0% | 37.1% | **19.2%** |
+| survival | 100% | **100%** | **15 / 15** |
+| behaviour class | 100% | 83% | **15 / 15** |
+| rate within 15% | 78% | 17% | **13%** |
+| median error | 7.0% | 37.1% | 36.2% |
+
+> **The last column is fifteen runs and the rate column was rescored.** `S.R. speed` used to grade
+> each run on whichever channel was largest in the demonstration -- and forward speed exceeds yaw in
+> **every** turn condition here, so turning was graded on forward speed and its **yaw error was
+> never measured**. Graded on the channel each behaviour is named for, the rate falls from 47% to
+> 13%. **Survival and behaviour class do not depend on that choice and are unchanged.**
 
 ![the loop on a body it was never trained on](../results/wm/closed_loop/video_heldout_fewshot/closed_hexapod_ep1001_r0.mp4)
 
@@ -604,10 +611,11 @@ image, so both robots are still rendered by the same renderer. Slide 13 is how t
 
 | | survival | behaviour class | speed within 15% |
 |---|---:|---:|---:|
-| **B1, physics** | **3 / 3** | 2 / 3 | **2 / 3** |
+| **B1, physics** | **3 / 3** | 2 / 3 | 1 / 3 |
 
-Speed errors **6.4%** forward, **13.1%** turning, 85.5% sideways. On the turning demonstration the
-planner picks the exact condition, not merely the family, on **52 of 55** steps.
+Errors on each behaviour's own channel: **6.4%** forward, 20.3% turn rate, 85.5% lateral. On the
+turning demonstration the planner picks the exact condition, not merely the family, on **52 of 55**
+steps -- it identifies the behaviour and misses the rate.
 
 > **One free parameter was doing this.** `--commit`, how many steps a chosen behaviour is held
 > before deciding again, defaulted to 1 -- re-decide every step -- and nothing had ever justified
@@ -782,7 +790,7 @@ body the model has never seen?
 | | result |
 |---|---|
 | **within one robot family, no retraining** | held-out hexapod at **3.44 deg per joint, R² +0.81** against a command spread of 11.7; the commands walk through physics |
-| **a body of that family it has never seen, closed loop, physics** | **survival 100%, behaviour 100%**, median speed error 19.2% — world model frozen, only a two-layer projector refitted |
+| **a body of that family it has never seen, closed loop, physics** | **survival 15/15, behaviour 15/15** — world model frozen, only a two-layer projector refitted. **Rate within 15% on 13%** of runs |
 | **a quadruped, closed loop, physics** | **stands through every episode, 3/3**; behaviour family 38-58% against 28% chance; **speed 0/3** |
 
 **Across incomparable robots the blocker was the objective, not the robot.** Adapting the forward
@@ -808,7 +816,7 @@ readout dozens of times worse than a constant from one that works in both direct
 
 | | |
 |---|---|
-| **speed, on both robots** | the loop picks the right behaviour and runs it at the wrong rate — **33%** within 15% on a new hexapod body, **0 of 3** on the quadruped |
+| **rate, on both robots** | the loop picks the right behaviour and runs it at the wrong rate — within 15% on **13%** of hexapod runs and **1 of 3** on the quadruped. Turn rate is the worst: 130% error at the gentlest turn, 79% at the strongest, and only the middle rate tracked |
 | **the candidate library** | it holds recorded forward, turning and sideways clips, so something already made the robot do those. **"No kinematics needed" is not yet earned** — random motor babbling is the untested fix |
 | **yaw** | it stops being harmful, it does not start working; four explanations tested and rejected |
 | **the scaling claim** | needs a third embodiment. **We have two** |

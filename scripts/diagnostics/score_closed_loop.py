@@ -100,6 +100,22 @@ def dominant(row):
     return max(order, key=lambda kv: kv[1])[0]
 
 
+def channel_for(condition, ref):
+    """The channel a condition is *named* for, falling back to the largest when the name says
+    nothing.
+
+    **Choosing by magnitude graded every turn as a walk.** Forward speed exceeds yaw in all four
+    turn conditions on both bodies -- 0.136 against 0.088 even at `turn_s0.56` -- so `S.R. speed`
+    measured forward travel on turning runs and **turn rate was never scored in any closed loop**
+    (F108). Shared with the renderer so a video's header cannot disagree with the table.
+    """
+    named = {"turn": "yaw", "side": "lateral", "speed": "forward"}
+    for prefix, ch in named.items():
+        if str(condition).startswith(prefix):
+            return ch
+    return CHANNEL[dominant(ref)]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+", help="closed-loop npz files")
@@ -130,7 +146,7 @@ def main():
         # figures: the first run of `side_R_lvl0` read 34.2% while tracking its lateral speed to
         # within a fifth of that. The channel is chosen from the demonstration, never from the run,
         # or a run that drifted into a different behaviour would be graded on the one it drifted to.
-        key = CHANNEL[dominant(ref)]
+        key = channel_for(row["condition"], ref)
         err = abs(row[key] - ref[key]) / max(abs(ref[key]), 1e-6)
         ok_speed = err < SPEED_TOLERANCE
         ok_class = dominant(row) == dominant(ref)

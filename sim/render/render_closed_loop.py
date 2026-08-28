@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "render"))
 from npz_to_video import write_mp4  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
-from diagnostics.score_closed_loop import CHANNEL, dominant, summarise  # noqa: E402
+from diagnostics.score_closed_loop import channel_for, dominant, summarise  # noqa: E402
 
 INK = (16, 17, 20)
 WHITE, DIM = (245, 245, 245), (150, 152, 158)
@@ -88,6 +88,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+")
     ap.add_argument("--demo_dir", default="data/beh12_hex_flat")
+    ap.add_argument("--goal_dir", default="data/beh12_c08f09t09_flat",
+                    help="where to find the goal clip when it came from another robot")
     ap.add_argument("--out", default="results/wm/closed_loop/video")
     ap.add_argument("--fps", type=int, default=20)
     args = ap.parse_args()
@@ -101,7 +103,18 @@ def main():
             chosen = np.asarray(d["chosen"], dtype=str)
             want = str(d["condition"])
             demo_name = str(d["demo"])
+            # **The right pane is what the planner was asked to reach**, which is not always the
+            # demonstration: a cross-embodiment run is driven by another robot's clip and showing
+            # the driven robot's own demonstration instead hides what the run was.
+            goal_name = str(d["goal"]) if "goal" in d.files else ""
         demo_path = os.path.join(ROOT, args.demo_dir, demo_name)
+        cross_goal = bool(goal_name) and goal_name != demo_name
+        if cross_goal:
+            found = [p for p in (os.path.join(ROOT, args.goal_dir, goal_name),
+                                 os.path.join(ROOT, args.demo_dir, goal_name)) if os.path.exists(p)]
+            if not found:
+                raise SystemExit(f"goal {goal_name} not found; pass --goal_dir")
+            demo_path, demo_name = found[0], goal_name
         if not os.path.exists(demo_path):
             raise SystemExit(f"demonstration {demo_name} not found under {args.demo_dir}")
         ref = np.load(demo_path, allow_pickle=True)["frames"]
@@ -109,10 +122,14 @@ def main():
         # the same numbers the scorer reports, so the video cannot drift from the table
         row = summarise(path)
         gold = summarise(demo_path, window=row["window"])
-        key = CHANNEL[dominant(gold)]
-        err = abs(row[key] - gold[key]) / max(abs(gold[key]), 1e-6)
+        # **Shared with the scorer, so a frame's header cannot contradict the table.** And when the
+        # goal came from another robot there is no rate to report: the two bodies walk at different
+        # scales, so comparing this one's speed against the other's is a number about nothing.
+        key = channel_for(row["condition"], gold)
+        err = (float("nan") if cross_goal
+               else abs(row[key] - gold[key]) / max(abs(gold[key]), 1e-6))
         held = row["height1"] / max(row["height0"], 1e-6)
-        verdict = "".join(("S" if err < 0.15 else "-",
+        verdict = "".join(("S" if (err == err and err < 0.15) else "-",
                            "B" if dominant(row) == dominant(gold) else "-",
                            "A" if held > 0.75 else "-"))
         warm = row["warm"]
@@ -120,8 +137,10 @@ def main():
         hit = sum(c == want for c in planned) / max(len(planned), 1)
 
         header = f"{os.path.splitext(os.path.basename(path))[0]}   demonstration: {want}"
+        tail = ("cross-embodiment goal, rate not comparable" if err != err
+                else f"error {err:.1%}")
         sub = [f"{key} Froude   demo {gold[key]:+.3f}  ->  ran {row[key]:+.3f}   "
-               f"error {err:.1%}   verdict {verdict}",
+               f"{tail}   verdict {verdict}",
                f"{hit:.0%} of planned steps chose {want}   |   warm start: {warm} steps"]
 
         # the travel gate can stop a run early; the demonstration is a fixed 66 frames
@@ -129,7 +148,8 @@ def main():
         out = os.path.join(out_dir, os.path.splitext(os.path.basename(path))[0] + ".mp4")
         write_mp4(out, (compose(ref[t], got[t], header, sub, chosen[t], want, t, n, warm)
                         for t in range(n)), args.fps)
-        print(f"{os.path.relpath(out, ROOT)}   {n} frames   {err:>6.1%}  {verdict}  {hit:.0%} on target")
+        shown = "  n/a " if err != err else f"{err:>6.1%}"
+        print(f"{os.path.relpath(out, ROOT)}   {n} frames   {shown}  {verdict}  {hit:.0%} on target")
 
 
 if __name__ == "__main__":

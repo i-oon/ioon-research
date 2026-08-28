@@ -22,3 +22,6 @@ here should be used for a new comparison.**
 configuration measured, speed 2/3), `b1_physics3` (the same with `--commit 1`, speed 0/3), `hex_rep5` and `hex_c3_rep5`
 (hexapod, five repeats each), `hex_side_fixed` (hexapod sideways after the dataset correction),
 `heldout_fewshot` (F95).
+| `hex_rep5` | five repeats of the hexapod held-out loop on the **defective** `c08f09t09` library, whose two `side_*_lvl0` clips travelled opposite their names. Re-run as `hex_rep5_fixed` after the library was corrected; the fix moved almost nothing (F106), so the numbers here are not wrong, only stale |
+| `video` | the trained-body videos, rendered before `render_closed_loop.py` showed a goal pane and before `channel_for` fixed which channel gets scored (F108). Re-render from `full/` if needed |
+| `video_b1_replay` | B1 replay clips from the era when `replay()` stepped 20 ms per row on 20 Hz data, so they show 40% of each episode (F101) |

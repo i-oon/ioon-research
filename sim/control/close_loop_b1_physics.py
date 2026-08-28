@@ -57,6 +57,13 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--projector", required=True)
     ap.add_argument("--demo", required=True)
+    ap.add_argument("--goal", default="",
+                    help="clip supplying the **goal frames**, which may be a different robot. The "
+                         "candidates stay B1 clips because only those are executable, and only the "
+                         "goal crosses -- which is the form a cross-embodiment control result has "
+                         "to take. Defaults to `--demo`, i.e. same-robot goals")
+    ap.add_argument("--goal_embodiment", default="",
+                    help="embodiment of `--goal`, for the centring offset. Defaults to --embodiment")
     ap.add_argument("--candidates_dir", default="data/beh12_b1_flat")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
@@ -92,10 +99,20 @@ def main():
     offset = offset_for(checkpoint, args.embodiment)
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
-    demo_e = encode_clip(encoder, demo["frames"], 2).float()
-    if offset is not None:
-        demo_e = demo_e - offset
+    # **The goal may come from another robot; the warm start and the seeding never can.** Those
+    # need executable commands and a physical state, so they stay with `--demo`.
+    goal_path = os.path.join(ROOT, args.goal) if args.goal else demo_path
+    goal_emb = args.goal_embodiment or args.embodiment
+    goal_clip = load(goal_path, REGISTRY[goal_emb]) if goal_path != demo_path else demo
+    demo_e = encode_clip(encoder, goal_clip["frames"], 2).float()
+    goal_off = offset_for(checkpoint, goal_emb)
+    if goal_off is not None:
+        demo_e = demo_e - goal_off
     demo_e = demo_e.to(device)
+    if goal_path != demo_path:
+        with np.load(goal_path, allow_pickle=True) as raw:
+            print(f"goal from {os.path.basename(goal_path)} ({goal_emb}, {str(raw['condition'])}) "
+                  f"-- body driven is {args.embodiment}")
 
     steps = min(args.steps, len(demo["actions"]) - 1,
                 min(len(c["actions"]) for c in planner.candidates) - 1)
@@ -216,13 +233,22 @@ def main():
 
     out_dir = os.path.join(ROOT, args.out)
     os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, f"phys_{os.path.splitext(os.path.basename(demo_path))[0]}.npz")
+    # **The goal belongs in the name.** Two runs differing only in which robot supplied the goal
+    # wrote the same file and the first was silently lost.
+    stem = os.path.splitext(os.path.basename(demo_path))[0]
+    if goal_path != demo_path:
+        stem += "__goal_" + os.path.splitext(os.path.basename(goal_path))[0]
+    out = os.path.join(out_dir, f"phys_{stem}.npz")
     np.savez_compressed(
         out, frames=np.asarray(frames, np.uint8), head=np.asarray(heads, np.float32),
         body_quat=np.asarray(quats, np.float32), upright=np.asarray(uprights, np.float32),
         dt=np.float32(0.05), embodiment=args.embodiment, condition=want,
         chosen=np.asarray(chosen), scores=np.asarray(all_scores, np.float32),
         demo=os.path.basename(demo_path),
+        # **What the planner was actually looking at.** When the goal comes from another robot the
+        # demonstration only supplies the warm start and the starting state; a video that shows the
+        # B1 beside a B1 clip hides the entire point of the run.
+        goal=os.path.basename(goal_path), goal_embodiment=goal_emb,
         kinematic=np.array(False), horizon=np.int32(planner.horizon),
         warm_start=np.int32(args.warm_start), commit=np.int32(args.commit),
         settled_z=np.float32(settled_z),

@@ -5838,16 +5838,24 @@ body travels the wrong way (F94) -- and switched about 30 times.
 > repeat.** Survival and behaviour class hold at **15/15 each** -- neither was a lucky draw. Speed
 > passes on **47%** of runs, median error **19.0%**, and the spread is the part a single run hides:
 >
-> | | speed error | within 15% |
+> | | error on **its own channel** | within 15% |
 > |---|---|---|
-> | turning | **7% ± 2**, range 4-11 | **5/5** |
 > | forward | 20% ± 12, range 2-36 | 2/5 |
+> | turning, `s0.05` | **130% ± 105**, range 50-331 | 0/5 |
+> | turning, `s0.29` | **13% ± 8**, range 4-27 | 4/5 |
+> | turning, `s0.56` | **79% ± 6**, range 68-83 | 0/5 |
 > | sideways | 39% ± 24, range 18-84 | 0/5 |
+>
+> **Turning was never scored on turning until now.** The criterion picked whichever channel was
+> largest in the demonstration, and forward speed exceeds yaw in *every* turn condition on this
+> body -- 0.136 against 0.088 even at `s0.56`. The 7% ± 2 this table used to report for turning was
+> a **forward-speed** measurement on a clip whose yaw error is 130%. Graded on yaw, the run-level
+> rate falls from **47% to 13%**, and only the middle turn rate is tracked at all.
 >
 > **Re-run again after F106 corrected two of the candidate library's twelve conditions**, since the
 > first fifteen used the broken library: survival and behaviour hold at 15/15 either way, speed
-> stays at 47%, median 19.0% to **17.7%**. **Turning improves to 7% ± 2 and passes all five.**
-> Sideways does not move, which is the same answer the direct test gave.
+> stays at 47% under the old criterion, median 19.0% to 17.7%. Sideways does not move, which is the
+> same answer the direct test gave.
 >
 > **Sideways is inconsistent rather than broken** -- across both sets of repeats it has landed as
 > low as 2% and as high as 84%. Earlier entries reporting a single sideways number near 74% were
@@ -6726,6 +6734,129 @@ robots, for a reason nothing measured has reached. **It is the open question thi
 
 ---
 
+### F107. A quadruped walks forward from a stick insect's video, and the diagnostic that was meant to predict this got it backwards
+
+**The demonstration the project exists for.** Every cross-embodiment number until now compares
+*representations*: a readout fitted on one robot applied to the other, a latent's transfer score.
+This is the control version -- **the goal image is a hexapod, the robot driven is the B1**. The
+candidates stay B1 clips, because only those are executable, so only the goal crosses. That is the
+only form this demonstration can take without a motion decoder that generalises across bodies,
+which nothing here has.
+
+Physics, MuJoCo, `--commit 3`, behaviour-family accuracy over planned steps against a **28%** chance
+rate:
+
+| behaviour asked for | goal is a **B1** clip | goal is a **hexapod** clip |
+|---|---|---|
+| forward | 42% | **67%** |
+| sideways, `lvl1` | 31% | 2% |
+
+**Forward walking crosses, and crosses better than the same robot's own video does.** The B1 stays
+upright for the full episode and spends two thirds of its steps on forward candidates while looking
+at a six-legged insect.
+
+**Turning crosses in proportion to how much turning there is**, which only became visible after the
+first attempt used the wrong clip. `turn_s0.05` is the gentlest of four turn rates and the scorer
+classifies it as a *forward* clip -- its yaw is -0.007 against `turn_s0.56`'s -0.088:
+
+| hexapod goal | its yaw | B1 chooses a turn |
+|---|---|---|
+| `turn_s0.05` | -0.007 | 18% -- **below chance** |
+| `turn_s0.29` | -0.037 | 38% |
+| `turn_s0.56` | **-0.088** | **47%** |
+
+**A dose-response, and stronger evidence than any single point.** The reading it replaces --
+"turning does not cross at all" -- came from testing turning with a clip that barely turns.
+
+> **This table is withdrawn by F109.** Every run in it was warm-started with the same *turning* B1
+> clip, and re-running with a forward warm start moves the two turn rows to 27% and 27% -- below
+> chance, and no longer ordered. The dose-response was a property of the warm start. **Forward and
+> sideways survive the change; turning does not.**
+
+**So the ordering is forward 67%, a real turn 47%, sideways 2%**, against 28% chance. (**The turn
+figure does not survive F109**; forward and sideways do.) **The split is
+physical rather than representational.** Forward travel looks the same from the side whatever the
+leg count: the body translates across the frame. A strong turn also reads across, because the whole
+body rotates. Strafing does not -- a hexapod crabs by twisting its middle joints and a quadruped
+does something else entirely. **The latent carries what the two robots share and not what they do
+differently**, which is what a morphology-agnostic action is supposed to mean and is the first time
+this project has shown it acting on a robot rather than in a readout.
+
+> **The same clip has been standing in for "turning" throughout.** `hexapod_ep1001` is
+> `turn_s0.05`, and it is the turn demonstration behind F95's hexapod loop as well -- where turning
+> scored best of the three behaviours at 7% ± 2. **That number is a forward-speed measurement on a
+> clip the scorer calls forward.** The hexapod loop has not been run on a real turn.
+
+**And the measurement built to predict this predicted the opposite.** `z_crosses_bodies.py` asks,
+for each hexapod clip, whether the nearest B1 clip shares its behaviour:
+
+| | clip-level retrieval | in the loop |
+|---|---|---|
+| turning | **100%** | 18% at `s0.05`, **47%** at `s0.56` |
+| forward | 19% | **67%** |
+| sideways | 0-50% | 2% |
+
+**Backwards on forward, and on turning it is right about the direction for the wrong reason** --
+retrieval pooled all four turn rates together, so its 100% is dominated by the strong turns the
+loop also handles best.** Averaging `z` over a clip and taking a nearest neighbour is not what the
+planner does: the planner scores `FDM(e_t, proj(a))` against the goal, so the B1's *current state*
+is inside every comparison, and a hexapod latent never has to sit near a B1 latent. **The cheap
+proxy was wrong in the direction that would have cancelled the experiment** -- it said to run
+turning, which fails, and not forward, which works.
+
+> **Three defects found while getting here, all in one file.** Two runs differing only in the goal
+> robot wrote the same output name and the first was lost; the goal's embedding was centred with
+> the driven robot's offset; and the automatic verdicts printed by both diagnostics -- "reachable",
+> "not reachable" -- were threshold comparisons of two overlapping means. **The numbers were right
+> and the sentences the scripts printed about them were not.**
+
+---
+
+### F108. Turn rate was never scored in any closed-loop run, and the criterion is why
+
+`S.R. speed` grades a run on **the channel largest in the demonstration**. That was written when
+every clip walked forwards and it has been wrong for turning ever since: **forward speed exceeds
+yaw in all four turn conditions on both bodies**, 0.136 against 0.088 even at the strongest,
+`turn_s0.56`. The criterion therefore graded every turning run on **forward speed** and yaw was
+never measured in a loop at all.
+
+Graded on yaw, on the held-out hexapod, five repeats each:
+
+| turn rate | demonstrated yaw | yaw error | within 15% |
+|---|---|---|---|
+| `s0.05` | -0.007 | **130% ± 105** | 0/5 |
+| `s0.29` | -0.037 | **13% ± 8** | 4/5 |
+| `s0.56` | -0.088 | **79% ± 6** | 0/5 |
+
+**Only the middle rate is tracked.** The gentlest is missed by more than its own magnitude; the
+strongest is missed by 79% with a spread of 6, so it fails consistently rather than noisily.
+
+**And `turn_s0.05` is the clip every turning claim in this project rests on.** It is the turn
+demonstration in F95's loop, in the commitment sweeps, and in the first cross-embodiment attempt in
+F107. **Its celebrated 7% ± 2 is a forward-speed measurement on a clip that barely turns.**
+
+| | before | graded on the named channel |
+|---|---|---|
+| `S.R. speed`, held-out hexapod, 15 runs | 47% | **13%** |
+| median error | 17.7% | 36.2% |
+
+**Survival and behaviour class are unaffected** -- 15/15 each -- because neither depends on the
+channel choice. **What falls is the claim that the loop tracks the commanded rate**, which was
+resting on turning passing 5/5.
+
+**This is F91 arriving in the loop.** F91 measured a planner over recorded behaviours resolving
+speed 9/9, sideways 6/6 and turn **2/9**, with every turn miss being a turn at the wrong rate --
+*it knows it is turning and cannot say how hard.* That was a ranking measurement on recorded
+frames. **The same shape now appears in physics**, and it was hidden for as long as the criterion
+looked at the wrong channel.
+
+**The fix is one line and it is semantic, not statistical**: a condition named `turn` is graded on
+yaw, `side` on lateral, `speed` on forward. Choosing by magnitude is what let a turn be graded as a
+walk -- the same failure mode as F106's separability check, which asked whether conditions differ
+without asking whether they differ **in the way their names claim**.
+
+---
+
 ### F82. Positioning against LAC-WM: the shared quantity is not the action space, and that is the whole difficulty
 
 F67 established that the divergence from LAC-WM is **the coordinate the heads decode into**, not
@@ -6847,6 +6978,137 @@ controller that reaches the speed by lunging.
 
 ---
 
+
+---
+
+### F109. The loop's turning is set by the ten steps that precede it, not by the goal
+
+**Found by watching, not by reading.** The cross-embodiment videos showed the B1's head drifting at
+the start of every run and then, on the `turn_s0.29` goal, arcing *left* while the insect in the
+goal pane turned right. Neither is visible in any number reported in F107, because
+behaviour-family accuracy counts **which label the planner picked** and says nothing about which
+way the robot went.
+
+**The confound is mine.** Every run in F107 passed `--demo data/beh12_b1_flat/b1_ep1301.npz`, which
+is `turn_wz0.40`. `--demo` supplies the starting state *and the first ten actions*, so the loop
+opens by executing a turn regardless of what the goal asks for.
+
+**The control: change only the warm start.** `b1_ep1301` (turning) versus `b1_ep2`
+(`speed_vx0.30`, forward), same checkpoint, same goals, same `--commit 3`. Yaw is the median over
+planned steps; family chance is 33% for `speed` and `turn`, 17% for `side_R`.
+
+| hexapod goal | goal yaw | turn warm: yaw / family | forward warm: yaw / family |
+|---|---|---|---|
+| `ep1` `speed` | +0.003 | +0.041 → **-0.031** / 67% | -0.019 → **-0.023** / **84%** |
+| `ep1200` `turn_s0.29` | -0.038 | +0.041 → **+0.004** / 38% | -0.020 → **-0.016** / 27% |
+| `ep1300` `turn_s0.56` | **-0.086** | +0.041 → **-0.025** / 47% | -0.021 → **+0.005** / 27% |
+| `ep2301` `side_R` | -0.003 | +0.041 → +0.002 / 2% | -0.019 → -0.022 / 0% |
+
+**The robot's yaw tracks the warm start and ignores the goal.** Shifting the warm start by 0.06
+shifts every planned yaw with it; varying the goal across a thirty-fold range of commanded yaw
+moves it by almost nothing. **`ep1300`'s correct sign under the turning warm start was a
+coincidence** -- it reverses when the warm start does.
+
+**And the family numbers move with the warm start too**, which is the more damaging half. The two
+turn goals fall from 47% and 38% to 27% and 27%, crossing from above their 33% chance rate to
+below it. **F107's turn dose-response was measuring the clip I chose to start the robot with.**
+
+| | turn warm | forward warm | verdict |
+|---|---|---|---|
+| forward | 67% | **84%** | above chance both ways -- **stands, and is stronger without the turning warm start** |
+| turning | 47% / 38% | 27% / 27% | crosses the chance line when the warm start changes -- **withdrawn** |
+| sideways | 2% | 0% | below chance both ways -- **fails, as already reported** |
+
+**What crosses embodiments in an actual control loop is forward travel, and only that.**
+
+**Cutting the warm start entirely does not rescue the turn, and the B1 walks fine without it.**
+`--warm_start 0` seeds the state from the demonstration's first frame and hands the planner a
+standing robot from step 0. All four goals survive **65 of 65 steps** at 0.054-0.119 m/s, so the ten
+steps were never load-bearing for locomotion. Family accuracy across all three settings:
+
+| | warm = turn clip | warm = forward clip | no warm start | chance |
+|---|---|---|---|---|
+| forward | 67% | 84% | 71% | 33% |
+| turning | 47% / 38% | 27% / 27% | 37% / 34% | 33% |
+| sideways | 2% | 0% | 0% | 17% |
+
+**Forward clears chance in all three and is the finding; turning straddles it in all three and is
+not.** Removing the warm start only changes *which* bias the yaw carries -- it is uniformly negative
+(-0.019 to -0.021) under the forward warm start and uniformly **positive** (+0.010 to +0.035)
+without one, where it is the robot's own drift. **Over all thirteen cross-embodiment runs, goal yaw
+and achieved yaw correlate at -0.33 with 46% sign agreement** -- no relationship, at chance.
+
+**So the warm start was concealing the turn failure rather than causing it.** What the planner
+controls is *forward or not forward*: the two turn goals do slow the robot down (0.054 and 0.084
+against 0.117 m/s for the forward goal), so the goal is read as "not straight ahead" -- and then
+nothing selects which way to rotate.
+
+**Two lessons for the measurement, both general.** *Family accuracy is a count of labels and cannot
+see direction* -- a run that turns the wrong way scores identically to one that turns the right
+way, so any condition with a sign (turning, strafing) needs sign agreement reported separately from
+magnitude. And **a warm start is an intervention, not setup**: ten steps of commanded motion at
+50 ms is half a second of the three-second episode, and the loop never escapes it. Every future
+closed-loop comparison holds the warm-start clip fixed *and* neutral, or varies it as a control.
+
+> **Third time in this project a defect surfaced from looking at the video rather than the table**
+> -- after the standing-start jump and the camera that followed the robot. The tables were
+> internally consistent in all three cases.
+
+
+### F110. The warm start replays the goal's own actions, and what it was hiding is an entry transient
+
+**The same-robot loops hand the planner the answer for ten steps.** `--demo` supplies both the goal
+clip and the warm-start actions, so a same-robot run opens by executing the correct behaviour. The
+scorer already excludes those steps (`lo = warm`, every run labels them `warm:`), **but it cannot
+exclude their consequence**: at step 11 the body is already in the state the right behaviour
+produces, and F109 showed the loop mostly continues whatever it was doing.
+
+**Measured by removing it.** `--warm_start 0` on the held-out body, five repeats per goal:
+
+| goal | family picks | speed error | behaviour class |
+|---|---|---|---|
+| `ep1` forward | 56% -> **75%** | 23.0% -> **12.9%** | 100% -> 100% |
+| `ep1001` `turn_s0.05` | 46% -> 23% | 86.8% -> 154.4% | 100% -> 100% |
+| `ep2301` `side_R_lvl1` | 91% -> 69% | 26.2% -> 58.1% | 100% -> 80% |
+| **all 15** | | 36.2% -> 58.8% | **15/15 -> 14/15** |
+
+**Forward improves when the hint is removed; everything else degrades.** So the line is not
+turning-versus-the-rest, it is **forward versus every departure from walking straight**. F95's
+15/15 is 14/15 without the warm start and its median speed error nearly doubles: the headline
+survives, its margin does not.
+
+**What the warm start was hiding is an entry transient, not an inability.** Splitting the planned
+window into thirds on the two real turn goals:
+
+| | yaw 1/3 | 2/3 | 3/3 | turn picks | switches |
+|---|---|---|---|---|---|
+| `ep1200`, warm start | -0.038 | -0.043 | -0.035 | 76% | 26 |
+| `ep1200`, none, `--commit 1` | -0.003 | -0.008 | -0.024 | 34% | 42 |
+| `ep1200`, none, `--commit 3` | +0.020 | -0.028 | **-0.031** | 47% | **18** |
+| goal | | | **-0.038** | | |
+
+**The planner enters the turn unaided, over roughly two thirds of the episode**, and committing for
+three steps halves the switching and gets it there faster -- 63% of the commanded yaw at `commit 1`,
+**82% at `commit 3`**. The whole-episode score barely moves (77.3% to 75.4%) because the median
+still includes the entry. **Fifty-nine steps shows the transient and not the settled turn**;
+whether it converges to the commanded rate needs longer episodes and is untested.
+
+**`ep1300` is the exception and is not evidence of control.** Without a warm start it reaches
+-0.026 while its last-third picks are 74 forward candidates against 10 turn ones, and those forward
+candidates have *positive* yaw of their own (+0.003 to +0.009). **The rotation cannot be attributed
+to what it chose** -- at 35 switches in 59 steps no candidate runs long enough to express its own
+behaviour, which is F102's stitching cost.
+
+**The initial pose is not the explanation, and it was the natural guess.** The robot holds
+`cmds[0]` -- the goal clip's first pose -- for 20 warmup steps, and that pose is identical within a
+condition and distinct between them, so it is a cue for all twelve. But its distance from the grand
+mean runs **the wrong way**: forward is the *least* distinctive at 0.159 rad, against `turn_s0.56`
+at 0.331 and `side_R` at 0.361. **If a distinctive starting pose helped, sideways would be the
+behaviour that worked.** What is left is that forward translation is simply the largest thing in
+the camera's view, which is the same reading F107 arrived at from the cross-embodiment side.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
@@ -6926,4 +7188,8 @@ controller that reaches the speed by lunging.
   femur/tibia boundary, from recorded frames (F42)
 - `results/wm/dataset/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
 - `results/wm/README.md` -- per-run metrics
-
+- `results/wm/closed_loop/b1_from_hexgoal/` -- cross-embodiment control, turning warm start (F107)
+- `results/wm/closed_loop/b1_hexgoal_fwdwarm/` -- the same goals with a forward warm start (F109)
+- `results/wm/closed_loop/b1_hexgoal_nowarm/` -- the same goals with no warm start at all (F109)
+- `results/wm/closed_loop/hex_rep5_nowarm/` -- the F95 configuration with no warm start (F110)
+- `results/wm/closed_loop/hex_realturn_nowarm{,_c3}/` -- real turns with no warm start, `--commit` 1 and 3 (F110)

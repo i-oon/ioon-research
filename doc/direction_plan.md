@@ -82,10 +82,24 @@ clear it at every horizon tested, about 7x fewer target clips than starting cold
 **Closed loop, in physics** (Stage 2, 2026-08-26/27) is now the third scope and the strongest one.
 An **unseen hexapod body** is controlled with the world model **completely frozen** -- only the
 two-layer action projector refitted -- at survival **15/15**, behaviour **15/15**, median speed
-error **19.0%** over fifteen runs
-(F95). A **quadruped** stands through every episode under the same planner after the world model is
+error **19.0%** over fifteen runs (F95). **With the ten warm-start steps removed** -- they replay
+the goal clip's own actions -- it is **14/15 and 58.8%**: the result survives, its margin is
+partly inherited, and forward is the only behaviour that *improves* without the hint (F110).
+
+A **quadruped** stands through every episode under the same planner after the world model is
 adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
 three speed targets** (F101).
+
+**Cross-embodiment control** (2026-08-28) is the fourth scope and the narrowest. Goal frames come
+from a **hexapod** clip, candidates stay B1 clips because only those are executable, and the B1
+walks: **67% / 84% / 71% of planned steps on forward candidates against 33% chance** under three
+warm-start settings (a turning clip, a forward clip, and none at all), upright for every step of
+every run. **Only forward travel crosses.** Sideways is at or below chance in all three, and turning
+straddles chance in all three -- it was reported as crossing and then withdrawn. Over thirteen
+cross-embodiment runs the goal's yaw and the robot's yaw correlate at **-0.33 with 46% sign
+agreement**: the loop controls *forward or not forward* and does not control direction (F107, F109).
+The defensible sentence is **"a quadruped walks forward from an insect's video"**, not "behaviours
+cross".
 
 **The adaptation objective is a claim in its own right.** LAC-WM's three stages are MSE throughout.
 Applied across families that fails in a specific way: the forward model improves its predictions
