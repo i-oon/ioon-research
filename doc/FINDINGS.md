@@ -7520,6 +7520,30 @@ dataset asks for a left turn and offers only right ones.
 **Forward and sideways are unaffected**: forward has no sign to disagree about, and the sideways
 conditions carry their own direction labels, which F106 already checked and corrected.
 
+**The replacement levels are calibrated, and the calibration is the part that was missing.** F72
+paired the two robots on *commanded* turn rate and reported agreement within 3%; what they *achieve*
+does not agree -- the insect's four levels reach 0.0072 / 0.0241 / 0.0372 / 0.0878 while the B1's
+reach 0.0008 / 0.0146 / 0.0359 / 0.0760, so only the third pair is matched. Sweeping the B1 at
+`--vx 0.30` gives an almost perfectly linear response, and the commands that land on the insect's
+achieved values are:
+
+| insect level | its achieved yaw | B1 command |
+|---|---|---|
+| `turn_s0.05` | -0.0072 | **`--wz -0.064`** |
+| `turn_s0.15` | -0.0241 | **`--wz -0.153`** |
+| `turn_s0.29` | -0.0372 | **`--wz -0.223`** |
+| `turn_s0.56` | -0.0878 | **`--wz -0.491`** |
+
+Forward Froude stays 0.120-0.129 across that range, so the speed match is not disturbed. **This also
+fixes F114 in the same pass**: the weakest level becomes a real turn instead of the forward clip.
+
+**What blocks the re-collection is not the physics.** `rollout_b1_mujoco.py` starts every run at
+(0, 0) deterministically, so four runs of one command are identical -- yet the four clips of each
+existing condition start at different points, which means they were cut as four windows from one
+longer rollout. **The script that cut them is not in the repository**, so reproducing the set means
+choosing the windowing again, and that choice decides how much the four clips of a condition
+overlap. It should be made deliberately rather than inferred.
+
 **The fix is a re-rollout of twelve clips, not a re-render.** `rollout_b1_mujoco.py --wz` takes a
 signed rate, so negating the three turn levels regenerates them; and F114 wants `wz0.00` replaced by
 a real fourth level in the same pass. **Nothing about turning can be claimed either way until that
