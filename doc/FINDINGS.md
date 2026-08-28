@@ -7354,17 +7354,28 @@ the latter.** They have to agree: a loop that plans on 25-deg frames after adapt
 is measuring the mismatch.
 
 **Re-rendered and verified, `data/beh12_b1_fov25`** (`scripts/dataset/rerender_b1_framing.py`,
-`--cam_fov 25 --spawn 0 0`). Checking the framing turned up a second defect that had nothing to do
+`--cam_fov 25 --spawn 0 0 --floor_scale 3`). Checking the framing turned up a second defect that had nothing to do
 with it: **the B1's camera was never pinned to a fixed world point**, so every clip carried its own
 background, where the insect's is identical across all 48. `--spawn` exists for exactly that and was
 not used when the set was built. Both are fixed in the same pass:
 
-| | before | after | hexapod |
+**And the first re-render was rejected on sight**, because widening the view reached the far edge of
+the scene's 15 m floor and drew a straight band across the upper third of every frame. **Both of the
+criteria written in advance passed on it** -- 0% clipping, backgrounds consistent to 0.22 -- because
+the band is identical in every clip, so a between-clip measure cannot see it. Raising the lights
+from 2.5 m to 6 and 12 changed nothing; only more floor did. `--floor_scale 3`:
+
+| | before, 15 deg | after, 25 deg + pinned + floor x3 | hexapod |
 |---|---|---|---|
 | frames touching an edge, mean | 61% | **0%** | 0% |
-| worst clip | 100% | **0%** | 0% |
-| background spread between clips | 2.79 | **0.22** | 0.14 |
+| background sd | 5.48 | **3.60** | 3.80 |
+| worst background edge | 6.34 | **3.58** | 4.32 |
+| background spread between clips | 2.79 | **0.21** | 0.14 |
 | bounding box | 136 px | 94 px | 118 px |
+
+**Every B1 column now sits at or inside the insect's**, where before it was worse on all four.
+**`worst background edge` is in the table because it is the one that caught the band**, and it was
+added only after the eye caught what the other two missed.
 
 **The clip-to-clip background variation was noise, not a shortcut** -- two clips of the *same*
 condition differed by 4.03 against 4.43 between conditions, so it never encoded the label. It is

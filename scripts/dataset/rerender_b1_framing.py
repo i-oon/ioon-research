@@ -7,6 +7,13 @@ conditions and in 100% of the sideways ones, while the insect never does in any 
 background differs by 2.8-4.4 grey levels from clip to clip where the insect's is identical to 0.00
 -- `--spawn` exists for exactly that and was not used.
 
+**Three flags, because widening the view exposed the next thing.** At 25 degrees the camera reaches
+the far edge of the scene's 15 m floor, which draws a straight band across the upper third of every
+frame -- worst edge 21.3 grey levels against the insect's 4.4, and the thing that made the wide shot
+look nothing like the insect's. Raising the lights does not touch it; only more floor does.
+`--floor_scale 3` brings the background to sd 3.60 and worst edge 3.45 against the insect's 3.77 and
+4.40, which is *closer to the insect than the original B1 render was*.
+
 **MuJoCo does not run again.** Every clip already stores `base_pos`, `base_quat` and `joint_pos`,
 so the physics is replayed from the file and only CoppeliaSim's camera changes.
 
@@ -35,13 +42,15 @@ def main():
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--cam_fov", type=float, default=25.0)
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0))
+    ap.add_argument("--floor_scale", type=float, default=3.0)
     args = ap.parse_args()
 
     src = os.path.join(ROOT, args.src)
     out = os.path.join(ROOT, args.out)
     os.makedirs(out, exist_ok=True)
     clips = sorted(glob.glob(os.path.join(src, "*.npz")))
-    print(f"{len(clips)} clips, fov {args.cam_fov} deg, spawn {tuple(args.spawn)}", flush=True)
+    print(f"{len(clips)} clips, fov {args.cam_fov} deg, spawn {tuple(args.spawn)}, "
+          f"floor x{args.floor_scale}", flush=True)
 
     for i, clip in enumerate(clips):
         tag = os.path.basename(clip)
@@ -49,7 +58,8 @@ def main():
                os.path.join(ROOT, "sim/render/render_b1_replay.py"),
                "--scene", args.scene, "--traj", clip, "--out", out,
                "--cam_fov", str(args.cam_fov),
-               "--spawn", str(args.spawn[0]), str(args.spawn[1])]
+               "--spawn", str(args.spawn[0]), str(args.spawn[1]),
+               "--floor_scale", str(args.floor_scale)]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
         if r.returncode != 0:
             print(f"  FAILED {tag}\n{r.stdout[-400:]}{r.stderr[-800:]}", flush=True)
