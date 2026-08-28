@@ -50,6 +50,7 @@ def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=
     picks = val if len(val) <= limit else [val[i] for i in
                                            torch.randperm(len(val), generator=g)[:limit].tolist()]
     hit = {k: 0 for k in ("rollout", "direct", "blind")}
+    per = {}
     n = 0
     z_bar = None
     for c, t in picks:
@@ -86,8 +87,14 @@ def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=
         truth = FAMILY(clips[c]["cond"])
         for key, err in (("rollout", err_roll), ("direct", err_direct), ("blind", err_blind)):
             hit[key] += FAMILY(keep[int(err.argmin())]) == truth
+        # **Split by the demonstration's own family.** An aggregate hides which behaviours the
+        # ranking resolves; the loop fails on sideways and succeeds on turning, and the question
+        # is whether that ordering is already present before any robot moves.
+        per.setdefault(truth, [0, 0])
+        per[truth][0] += FAMILY(keep[int(err_roll.argmin())]) == truth
+        per[truth][1] += 1
         n += 1
-    return {k: v / max(n, 1) for k, v in hit.items()}, n
+    return {k: v / max(n, 1) for k, v in hit.items()}, n, per
 
 
 def main():
@@ -135,8 +142,9 @@ def main():
           f"from clips no candidate came from\n")
     print(f"  {'horizon':>8}{'rollout':>10}{'direct':>9}{'blind':>8}{'n':>7}")
     for h in args.horizons:
-        r, n = evaluate(clips, val, cand, proj, itm, ftm, name, h, device)
-        print(f"  {h:>8}{r['rollout']:>10.0%}{r['direct']:>9.0%}{r['blind']:>8.0%}{n:>7}")
+        r, n, per = evaluate(clips, val, cand, proj, itm, ftm, name, h, device)
+        print(f"  {h:>8}{r['rollout']:>10.0%}{r['direct']:>9.0%}{r['blind']:>8.0%}{n:>7}"
+              + "   " + "  ".join(f"{k} {v[0]/max(v[1],1):.0%}" for k, v in sorted(per.items())))
     print(f"\n  chance for the family score is {fam_chance:.0%}.\n")
     print("`rollout` is the planner as built. `direct` deletes the forward model and matches the")
     print("projected action against the inverse model's reading of (now, goal). `blind` ignores the")

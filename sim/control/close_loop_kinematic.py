@@ -165,19 +165,24 @@ def main():
         next((c for c in planner.candidates if c["path"] == demo_path), planner.candidates[0])) \
         if any(c["path"] == demo_path for c in planner.candidates) else None
 
-    frames, chosen, heads, quats = [], [], [], []
+    # every candidate's score per step, `nan` while the warm start is driving -- which candidate
+    # won says nothing about how close the runner-up was, and that margin is what the open
+    # question about speed turns on
+    frames, chosen, heads, quats, all_scores = [], [], [], [], []
     observation = pose(demo_motion["jpos"][0])
     for t in range(steps):
         if t < args.warm_start:
             i, label = demo_index, f"warm:{want}"
             src = demo_motion
+            all_scores.append(np.full(len(planner.candidates), np.nan, np.float32))
         else:
             e_t = encode_clip(encoder, np.asarray(observation)[None], 1).float()
             if offset is not None:
                 e_t = e_t - offset.to(e_t.device)
             h = planner.horizon_at(t)
-            _, i, _ = planner.act(e_t[0:1].to(device),
-                                  demo_e[min(t + h, len(demo_e) - 1)], t)
+            _, i, sc = planner.act(e_t[0:1].to(device),
+                                   demo_e[min(t + h, len(demo_e) - 1)], t)
+            all_scores.append(np.asarray(sc, np.float32))
             label = planner.candidates[i]["condition"]
             src = motion[i]
         chosen.append(label)
@@ -201,6 +206,7 @@ def main():
         out, frames=np.asarray(frames, np.uint8), head=np.asarray(heads, np.float32),
         body_quat=np.asarray(quats, np.float32), dt=np.float32(0.05),
         embodiment=args.embodiment, condition=want, chosen=np.asarray(chosen),
+        scores=np.asarray(all_scores, np.float32),
         demo=os.path.basename(demo_path), kinematic=np.array(True),
         # **Recorded, not inferred.** Runs before this stored no horizon, so reading an old result
         # meant assuming nobody passed the flag -- and the planning horizon is a free parameter

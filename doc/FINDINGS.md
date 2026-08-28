@@ -5824,10 +5824,34 @@ throughout; the only thing that changes between the last two rows is a **two-lay
 actions to latents**, fitted on the new body's own clips in a few minutes with no gradient through
 anything else.
 
+> **`S.R. behaviour` is a whole-run verdict, and F102 measures the per-step version.** These runs
+> are in the right behaviour family on **47-71%** of their planned steps while scoring 100% here,
+> because the run as a whole stays dominated by the right channel even when a third of the
+> decisions go elsewhere. Both numbers are correct; this one is the flattering one.
+
 **It halves the error and restores the behaviour class outright.** Selection becomes decisive as
 well as correct: on the sideways demonstration the refitted arm holds `side_R_lvl1` for 30-34 of 49
 steps with 18-20 changes, where the un-refitted one settled on the *weak* strafe -- which on this
 body travels the wrong way (F94) -- and switched about 30 times.
+
+> **Repeated fifteen times (five per demonstration) after F105 showed CoppeliaSim physics does not
+> repeat.** Survival and behaviour class hold at **15/15 each** -- neither was a lucky draw. Speed
+> passes on **47%** of runs, median error **19.0%**, and the spread is the part a single run hides:
+>
+> | | speed error | within 15% |
+> |---|---|---|
+> | turning | **7% ± 2**, range 4-11 | **5/5** |
+> | forward | 20% ± 12, range 2-36 | 2/5 |
+> | sideways | 39% ± 24, range 18-84 | 0/5 |
+>
+> **Re-run again after F106 corrected two of the candidate library's twelve conditions**, since the
+> first fifteen used the broken library: survival and behaviour hold at 15/15 either way, speed
+> stays at 47%, median 19.0% to **17.7%**. **Turning improves to 7% ± 2 and passes all five.**
+> Sideways does not move, which is the same answer the direct test gave.
+>
+> **Sideways is inconsistent rather than broken** -- across both sets of repeats it has landed as
+> low as 2% and as high as 84%. Earlier entries reporting a single sideways number near 74% were
+> reporting one draw from that range.
 
 **And it does not restore the speed.** 2/6 against 7/9, median 19.2% against 7.0%. **The projector
 accounts for about half the degradation and the forward model's ignorance of this body accounts for
@@ -6219,6 +6243,13 @@ Behaviour-family accuracy on the B1, against a 28% chance rate:
 | 5 | **65%** | 38% | 32% |
 | 10 | **67%** | 37% | 34% |
 
+> **Measured on the B1 only, and the hexapod does not agree at one step.** Same three rules on the
+> held-out hexapod body: `rollout` **63%**, `direct` **89%**, `blind` 35% at horizon 1 -- deleting
+> the forward model *helps* by 26 points. At horizon 5 the order returns to normal, `rollout` 80%
+> against `direct` 59%. **The claim below holds for the quadruped at every horizon and for the
+> hexapod only beyond one step.** Why the inverse model's reading of (now, goal) should beat a
+> one-step rollout on one robot and not the other is unexplained.
+
 **The rollout carries the selection.** Deleting the forward model costs **24 points** and lands
 `direct` within five points of `blind`, which does not look at the goal at all. **The world model
 is predicting, not pattern-matching**, and an earlier reading of the horizon sweep that suggested
@@ -6275,21 +6306,39 @@ the demonstration's first frame -- joint angles, joint velocities, height, orien
 it. **The numbers below are the seeded runs; the standing-start runs are reported only as the
 comparison.**
 
-| | seeded from the demonstration | standing start |
+| | seeded | standing start |
 |---|---|---|
-| forward | **65 / 65**, family 58% | 65 / 65, family 75% |
-| turning | **65 / 65**, family 51% | fell at 29, family 35% |
-| sideways | **65 / 65**, family 38% | fell at 37, family 68% |
+| survival, all three | **65 / 65** | 65/65, fell at 29, fell at 37 |
 | peak body height | 0.57-0.60 | 0.67-0.70 |
+
+> **A second defect, larger than the first, found by F102's diagnostics.** Both earlier versions of
+> this loop **moved the camera with the robot**. Every clip the model trained on places the camera
+> once, from the trajectory's first frame, and never moves it -- so the robot travels across a
+> fixed view, and **the background sliding is the cue that says how far it went.** A following
+> camera keeps the robot centred and deletes that cue. Its one-step forward-model error on those
+> frames was **2.9x** the error on recorded clips while the frames themselves scored as barely
+> novel, because a pooled embedding hardly registers the difference and the forward model entirely
+> does. **`close_loop_kinematic.py` and `close_loop_ik.py` place the camera once and are
+> unaffected; the defect was in this file alone.**
+
+| | camera fixed | camera following *(discarded)* |
+|---|---|---|
+| turning | family **100%**, exact **95%** | family 51% |
+| forward | family **71%** | family 58% |
+| sideways | family 35% | family 38% |
 | *chance* | *28%* | *28%* |
 
-**The robot now stands through every episode**, and the artefact that inflated two of the
-standing-start scores is gone. Scored on the project's criteria: **survival 3/3, behaviour class
-2/3, speed 0/3** -- errors of 25%, 40% and 95%.
+**Turning is what the defect was suppressing, and it is now the strongest result on the
+quadruped**: the planner chooses `turn_wz0.40` -- the exact condition, not merely the family -- on
+**52 of 55** planned steps. It was the behaviour that had failed every previous measurement, and
+**rotation is read from the background turning**, which is exactly what a following camera
+destroys.
 
-**So the quadruped holds itself up under the planner and does not track speed.** Family accuracy
-averages 49% against 28% chance, above chance on all three and far from the 90% the hexapod reaches
-on recorded frames.
+**The robot stands through every episode.** Scored on the project's criteria: **survival 3/3,
+behaviour class 2/3, speed 0/3** -- errors of 18.7%, 25.3% and 91.7%.
+
+**So the quadruped holds itself up, resolves one behaviour outright, and tracks speed on none of
+them.**
 
 **The planner is not what makes a robot fall.** In the standing-start runs sideways survived **37**
 steps under the planner against **27** replaying its own clip. Re-deciding every step holds the
@@ -6299,6 +6348,381 @@ robot up slightly longer than re-issuing a recorded sequence.
 impossible; its survival column passes by construction and had to be reported as `n/a`. **The B1
 now has a survival number that means something**, and the honest form of F93 is that a recorded B1
 action sequence holds for about three seconds and not six.
+
+---
+
+### F102. The loop is in the right behaviour on about half its steps, and "behaviour 100%" was never measuring that
+
+**Every closed loop in this project reaches the right behaviour and the wrong speed** -- 33% within
+15% on a held-out hexapod body, 0 of 3 on the quadruped. Four explanations were tested from files
+already on disk, without running anything. **Three are refuted.**
+
+| tested | result |
+|---|---|
+| the candidate library is too coarse to hit the demonstrated speed | **refuted** -- a behaviour travelling at the right rate was in the list on **9 of 9** runs, and was chosen on 3 |
+| the score cannot see speed, only behaviour | **refuted** -- within-family score spread is **67%** of between-family spread |
+| the score sees speed but orders it wrongly | **refuted where it matters** -- rank correlation between score order and speed-match order, inside the correct family: **+0.88** sideways, +0.25 forward, **-0.06 turning** |
+| switching candidates often is what costs speed | **refuted** -- correlation between switch rate and achieved/demanded speed is **+0.14** |
+
+**What is left is not a speed problem.** Counting how often the planner is in the *right behaviour
+family*, step by step:
+
+| | per-step in-family |
+|---|---|
+| hexapod, held-out body, six runs | **47%, 55%, 61%, 61%, 67%, 71%** |
+| B1, physics, three runs | **35%, 71%, 100%** *(after the camera fix in F101; 38/51/58% before)* |
+| *what these runs report as "behaviour"* | *100%, and 2/3* |
+
+**Both numbers are correct and they answer different questions.** `S.R. behaviour` asks whether the
+*run as a whole* ended up dominated by the right channel; this asks how often the *decision* was
+right. A run can walk forward while a third of its steps chose something else, because the wrong
+picks scatter and the right family stays the plurality. **Only the flattering one has ever been
+reported.**
+
+**And when it is in the right family it picks the right amplitude.** Mean speed of the chosen
+candidates over the demonstration's, restricted to in-family steps: **0.90 to 1.35**, against
+**0.31 to 1.08** when out-of-family steps are included. The earlier reading that the planner
+"picks slow candidates" was an artefact of that averaging -- a forward candidate has near-zero
+lateral speed, so counting it against a sideways demonstration drags the mean toward zero.
+
+**A second term, which is F93 restated with a number rather than a new result.** Replaying a single
+B1 clip alone, seeded exactly as the loop seeds it and with no planner involved, reaches **0.84,
+0.76 and 0.99** of its own recorded speed. The B1's action is a policy's response to state, so
+replaying it open loop drifts and the drift costs travel -- known since F93; the contribution here
+is only the size. **The hexapod's actions come from IK and a clock and replay exactly, so this term
+should be absent there and has not been measured.**
+
+**The second term tested on the other robot, where F93 predicts it should vanish.** The hexapod's
+commands come from IK and a clock and read no state, so replaying them should reproduce the motion
+exactly. Replayed through the same physics the closed loop uses:
+
+| | hexapod | B1 |
+|---|---|---|
+| forward | **1.06** | 0.84 |
+| turning | **0.96** | 0.76 |
+| sideways | 0.82 | **0.99** |
+
+**The prediction holds for forward and turning and inverts for sideways.** Where the two robots
+differ in the way F93 describes -- a clock-written command against a policy's response -- the
+hexapod replays essentially exactly and the B1 loses a fifth to a quarter. **Sideways does the
+opposite on both robots and F93 does not explain it.** One clip per condition, and the hexapod's
+recording was made in a different simulator session from this replay, which F101's camera defect
+showed is not a neutral difference -- **0.82 may be session variance rather than replay loss, and
+separating them needs repeats inside one session.** Recorded as unresolved.
+
+**The obvious fix for the B1 does not work, and the reason is instructive.** If the loss comes from
+replaying a *response*, record the joint angles the robot actually reached and replay those as
+targets -- a fixed table, exactly like the insect's. Measured: the robot stays upright and
+**travels almost nowhere**, at 0.01, 0.06 and 0.28 of the recorded speed.
+
+**A motor makes force from the gap between the target and where the joint is.** Achieved positions
+lag their targets under load, so commanding the achieved position leaves no gap, no torque and no
+push. **And the table we already replay is the right one**: `DEFAULT_IL + ACTION_SCALE x action` is
+the sequence of *targets* the policy commanded, stored as 66 rows, structurally identical to the
+insect's IK table. The difference between the robots is not table against policy -- both are
+tables -- but that **the B1's table was written with reference to states the replay cannot
+recreate.**
+
+**A third term, first estimated as a residual and then measured directly.** Dividing the achieved
+speed by (picks x replay) left 1.08 forward, 0.59 turning, 0.20 sideways -- **a residual, which
+absorbs every error in the other terms**, so it was written down as a hypothesis. Tested directly
+(`scripts/diagnostics/what_stitching_costs.py`): replay the exact command sequence the loop
+executed, then replay the single candidate it chose most often, same seeding, same length, no
+planner and no vision in either.
+
+| B1 demo | switches | stitched | single clip | ratio | residual predicted |
+|---|---:|---:|---:|---:|---:|
+| forward | 44 | 0.122 | 0.102 | **1.19** | 1.08 |
+| turning | 36 | 0.059 | 0.118 | **0.50** | 0.59 |
+| sideways | 38 | -0.020 | -0.109 | **0.18** | 0.20 |
+
+**The direct measurement lands on the residual's estimate in all three**, so the term is real:
+**switching between recorded clips costs half the turning and four fifths of the lateral travel,
+and costs forward nothing.** Both arms are replays, so selection quality and replay fidelity are
+held out of the comparison -- the only difference is whether the sequence switches clips.
+
+**The mechanism is directional cancellation.** Every candidate in the library travels forward to
+some degree, so a stitched sequence still goes forward. Turning and strafing need the *direction*
+to be held; interleaving clips that turn at different rates leaves the rotations partly cancelling.
+This is why the sideways run misses its channel by 93% while picking the right amplitude whenever
+it is in the right family -- it is out of that family on 62% of steps, and what remains cancels.
+
+**And the diagnostics found a defect the metrics never would have.** Chasing why the loop's frames
+gave a forward-model error 2.9x the recorded one -- when a novelty check said those frames were
+barely unusual -- turned up a camera that followed the robot, which no summary statistic in this
+project reports on. Fixing it took the turning demonstration from 51% to **100%** family and 95%
+exact. **The contradiction between two measurements is what exposed it**, not either one alone.
+
+**What to do with this.** The per-step family rate is the number that predicts everything else and
+it is the one to improve. It is also the number that a distilled policy would attack directly,
+since the planner's wrong picks come from states it drove itself into and was never scored on.
+`scripts/diagnostics/why_speed_misses.py` and `does_score_see_speed.py` reproduce the table above.
+
+---
+
+### F103. Committing to a behaviour for three steps is the first thing that has hit a speed target
+
+F102 measured that switching between recorded clips costs travel -- half the turning and four
+fifths of the lateral, forward none -- by replaying the stitched sequence against a single clip.
+**The loop switches because nothing stops it: `--commit` defaults to 1, meaning re-decide every
+step, and no run in this project has ever used another value.** That default was never justified.
+
+Holding the chosen behaviour for `commit` steps before deciding again, B1, physics, three
+demonstrations:
+
+| commit | speed within 15% | behaviour | survival | speed errors |
+|---|---|---|---|---|
+| **1** | **0 / 3** | 2/3 | 3/3 | 18.7%, 25.3%, 91.7% |
+| **3** | **2 / 3** | 2/3 | 3/3 | **13.1%, 6.4%**, 85.5% |
+| **5** | 1 / 3 | 2/3 | 3/3 | 39.0%, 9.8%, 94.8% |
+
+**Three steps is the first setting anywhere in this project to clear the speed criterion on a
+quadruped**, and it does it on two demonstrations out of three. Forward goes from 25.3% error to
+**6.4%**, turning from 18.7% to **13.1%**.
+
+**It is a trade, and the other side of it is selection.** Per-step behaviour accuracy on the
+turning demonstration, which is the one the planner resolves best:
+
+| commit | family | exact condition |
+|---|---|---|
+| 1 | **100%** | **95%** |
+| 3 | 95% | 89% |
+| 5 | 91% | 76% |
+
+**Six points of exact-condition accuracy for two speed targets.** Re-deciding every step tracks the
+behaviour better and executes it worse, because every switch interrupts the stride; committing
+executes better and corrects later. **Five is past the optimum** -- it holds a choice long enough
+that the recovery arrives too late, and turning's error triples back to 39%.
+
+**Sideways does not move** -- 91.7% to 85.5% -- because its problem is not stitching. It is out of
+the right behaviour family on **65%** of steps (F102), and committing only holds a wrong choice for
+longer.
+
+**This was predicted by F102 and is the confirmation.** The stitching term was measured on replayed
+sequences with no planner involved; if it is real, reducing the switching should return the speed
+it costs, and it does. **The default of 1 was a free parameter nobody had questioned**, and on this
+robot it was costing the loop the one criterion it had never met.
+
+### It does not reverse on the hexapod -- the reversal was two tails of one distribution
+
+**Reported first from one run per setting**, forward at 0.4% under `commit 1` against 39.7% under
+`commit 3`, and read as a reversal driven by replayability. **Re-run five times per setting after
+F105:**
+
+| | commit 1 | commit 3 |
+|---|---|---|
+| forward | 23% ± 14, range **1-37** | 15% ± 13, range **4-40** |
+| turning | 11% ± 5, range 4-19 | 13% ± 16, range 2-45 |
+
+**The two distributions overlap almost entirely, and the original comparison took the bottom of one
+against the top of the other.** `commit 3` is if anything slightly better on forward. **There is no
+hexapod reversal**; the claim is withdrawn.
+
+**The B1 half stands**, because MuJoCo repeats bit for bit (F105) and one run is the answer there:
+speed 0/3 at `commit 1` against **2/3** at `commit 3`, errors 25.3% and 18.7% falling to 6.4% and
+13.1%.
+
+**So `commit` helps the quadruped and is neutral on the insect**, which is weaker than the
+symmetric story and is what the measurements support. The mechanism behind the B1 half -- switching
+clips costs travel, measured on replays with no planner in F102 -- is unaffected: that comparison
+is replay against replay inside one session.
+
+> **The lesson is procedural.** The reversal was an attractive result: it tied `commit` to F93's
+> replayability and explained both robots with one idea. **It came from two single runs of a
+> configuration whose spread was later measured at 1-37%.** Nothing about the story was wrong in a
+> way inspection would catch -- only repeats caught it.
+
+---
+
+### F104. Offline ranking accuracy predicts the loop backwards, and the two robots fail sideways for opposite reasons
+
+**Ranking on recorded clips and choosing inside the loop are not the same skill, and on the B1 they
+are close to inverted.** Behaviour-family accuracy, same checkpoint, same candidates:
+
+| behaviour | on recorded clips | inside the physics loop |
+|---|---|---|
+| sideways | **97-100%** | **35%** |
+| turning | 55-63% | **100%**, exact condition 95% |
+| forward | 32-36% | 71% |
+
+**Sideways is the behaviour the ranking resolves best and the loop resolves worst.** Anything
+inferred about the loop from clip-level scoring -- including the 62% headline in F100 -- describes
+a different problem.
+
+**The step sequences say what happens, and it is not lock-in.** Printing the first two dozen
+planned choices:
+
+    B1,      sideways demo    side turn turn turn side side side turn turn turn side turn turn ...
+    hexapod, sideways demo    side side side side side side side side side side side side side ...
+
+**The B1 oscillates; it does not commit to a wrong answer, it fails to hold the right one.** The
+hexapod holds it on roughly 96% of steps -- **and still misses the lateral speed by 73.8%.**
+
+**So the same behaviour fails on the two robots for different reasons.**
+
+| | choice | execution |
+|---|---|---|
+| B1, sideways | **cannot hold it** -- 35% in family | -- |
+| hexapod, sideways | holds it, ~96% | **cannot achieve it** -- 73.8% speed error |
+
+**The B1's half traces back to F93 once more.** Commanding a sideways candidate does not make the
+B1 strafe, because its recorded actions are policy responses and replay at 0.76-0.99 of their own
+motion; the next frame is therefore not a sideways frame, the ranking that scored 97% on real
+sideways frames no longer applies, and the choice flips. **The ranking is not wrong -- it is being
+asked about a state the robot failed to reach.** The hexapod's commands replay at 1.06 and 0.96,
+its frames stay sideways, and its choices stay correct.
+
+**The hexapod's half is unexplained.** It picks correctly and does not travel: F102 measured its
+sideways clip replaying at **0.82**, the worst of its three, and the loop reaches 0.26 of the
+demonstrated lateral speed. Neither number has an account yet.
+
+### Eight hypotheses tested and refuted in one day
+
+Kept as a list because each was plausible enough to have been built on:
+
+| | refuted by |
+|---|---|
+| the candidate library is too coarse | the right-speed behaviour was in the list on **9 of 9** runs |
+| the score cannot see speed | within-family spread is 67% of between-family |
+| the score orders amplitudes wrongly | rank correlation **+0.88** inside the correct family |
+| switching often is what costs speed | correlation with switch rate **+0.14** |
+| gait phase drift explains the prediction error | phase-broken control scored **1.33x**, below the in-phase control's 1.43x |
+| replaying achieved joint positions fixes the B1 | the robot stands still -- no tracking error, no torque |
+| sideways was already bad at ranking | it ranks at **97-100%**, the best of the four |
+| the loop locks into its first choice | the B1's sideways run oscillates rather than locking |
+
+**What survived is one root and one defect**: F93's replayability, which decides the frames the
+loop sees and therefore everything downstream, and a camera that followed the robot (F101).
+
+---
+
+### F105. CoppeliaSim physics does not repeat, MuJoCo does, and it decides which numbers in this project can be read from one run
+
+**Repeating one closed-loop configuration five times, changing nothing:**
+
+| | lateral speed error, five runs |
+|---|---|
+| hexapod, `--commit 1` | **50% ± 12**, range **37-71%** |
+| hexapod, `--commit 5` | 58% ± 23, range 23-92% |
+| hexapod, `--commit 10` | 68% ± 35, range 27-111% |
+| hexapod, `--commit 20` | 39% ± 30, range 10-87% |
+
+**Nothing here is significantly better than `commit 1`.** 39 ± 30 against 50 ± 12 at n=5 is under
+one standard error of the difference, and what longer commitment reliably does is **widen the
+spread** -- fewer decisions per episode, so the outcome rides on whether three or four choices
+happen to be right. **The single-run reading that suggested commitment fixes sideways (24.1% at
+commit 20) is the bottom of a range that reaches 87%.**
+
+**The two robots' loops are not equally repeatable, and it is the physics engine.**
+
+| | engine | same settings, two runs |
+|---|---|---|
+| B1 | **MuJoCo**, seeded from the demonstration's first frame each time | **identical** -- choices, frames and body track, bit for bit |
+| hexapod | **CoppeliaSim**, scene reloaded per run | 37-71% spread on the same configuration |
+
+CoppeliaSim reloads the scene for every run and its solver and contact state do not come back
+identical; MuJoCo is initialised explicitly here and does.
+
+**What this means for numbers already reported.**
+
+| | status |
+|---|---|
+| every B1 loop result -- F101, F103's B1 half, F104's B1 half | **safe from this.** MuJoCo repeats exactly, so one run is the answer |
+| F95's hexapod loop -- survival 100%, behaviour 100%, 19.2% median error | **re-run fifteen times since.** Survival and behaviour hold at 15/15; speed passes 47% with median 19.0%. **The headline survives; the per-behaviour spread is wide and is now reported with it** |
+| **F103's hexapod half** -- commit 1 at 0.4% forward against commit 3 at 39.7% | **one run each. Both are inside the spread measured here and the comparison does not stand as reported** |
+| F102's hexapod replay fidelity -- 1.06, 0.96, 0.82 | one clip each, **and the recording came from a different session.** The 0.82 outlier may be session variance |
+
+**The rule this sets.** A CoppeliaSim-physics number needs repeats before it carries a comparison;
+a MuJoCo one does not. **That was not known while most of this project's loop results were being
+collected**, and the hexapod ones were read as if a single run were the answer.
+
+---
+
+### F106. Two of the held-out body's four lateral conditions travel the wrong way -- a real defect, and not the one the loop was failing on
+
+The loop misses lateral speed on the held-out hexapod and the misses are inconsistent -- five
+repeats of one configuration span **2% to 64%** error (F105). Offline ranking pointed at an
+asymmetry: `side_L` **96%**, `side_R` **77%** at horizon 5, the weakest family and the only one
+that does not improve with a longer rollout. **A mirror-image pair should not differ by 19 points**,
+and the first explanation reached for was the single fixed viewpoint -- strafing toward the camera
+and away from it are not mirror images in the image.
+
+**That was wrong. The conditions are not mirror images because two of them travel the wrong way.**
+Median lateral speed per condition:
+
+| | `side_L_lvl0` | `side_L_lvl1` | `side_R_lvl0` | `side_R_lvl1` |
+|---|---|---|---|---|
+| `beh12_hex_flat` | +0.071 | +0.185 | -0.118 | -0.186 |
+| `beh12_b1_flat` | +0.066 | +0.152 | -0.119 | -0.169 |
+| **`beh12_c08f09t09_flat`** | **-0.045** | +0.148 | **+0.017** | -0.131 |
+
+**On the held-out body both `lvl0` conditions strafe opposite to their names**, with a standard
+deviation of 0.001 across clips -- consistent, not noise. The two robots the recipe was authored on
+are correct; only the body it was ported to is wrong.
+
+**`collect_beh12.py` predicts exactly this.** Its own docstring says the commands are not portable
+across bodies: a lateral recipe is a twist on the middle joint scaled about each body's hip, and
+what produces a gentle left strafe on the base geometry does not on shorter legs. **At `lvl1` the
+amplitude is large enough to survive the port; at `lvl0` it is small enough for the sign to flip.**
+
+**So the 77% is not a viewpoint limitation and not a model limitation.** The ranking was asked to
+separate `side_R_lvl0`, which travels **left**, from `side_L_lvl1`, which also travels left. They
+are the same behaviour under different names, and confusing them is correct.
+
+**Two things this invalidates, both of them mine.**
+
+| | |
+|---|---|
+| the camera explanation, written into this entry an hour earlier | withdrawn -- the asymmetry is in the labels, not the optics |
+| `corr(error, left-picks) = +0.72` over five runs | meaningless -- it counted `side_L_lvl0` as a left pick while that clip travels right |
+
+**And it reaches further than sideways.** Every `in-family` figure for the lateral behaviours on
+this body -- in F102, F104 and F105 -- groups conditions that move in opposite directions under one
+label. **The forward and turning numbers are unaffected**; the lateral ones need the conditions
+re-derived for this body before they mean anything.
+
+**And the two `lvl0` conditions are not strafing the wrong way so much as barely moving at all.**
+All three channels on the held-out body:
+
+| | forward | lateral | yaw |
+|---|---|---|---|
+| `side_R_lvl0` | -0.009 | **+0.017** | +0.021 |
+| `side_L_lvl0` | -0.012 | **-0.045** | -0.017 |
+| `side_R_lvl1` | +0.016 | -0.131 | -0.002 |
+
+**`side_R_lvl0` is motionless in every channel.** The recipe under-drives the shorter legs, and the
+sign that survives is the residue rather than a strafe in the opposite direction.
+
+**The check that exists does not catch this, and it was run.** `collect_beh12.py --separability`
+asks whether the twelve conditions are further apart than their own spread; on this body it passes
+-- **2 of 66 pairs below 2x, and the close pairs are speeds and turn rates, not the lateral ones.**
+A condition that barely moves is still comfortably separable from one that moves a lot. **The
+missing check is semantic: does `side_L` travel left, does `side_R` travel right, does each `lvl1`
+exceed its `lvl0`.** Three lines against the achieved channels, and it would have caught this
+before the body was used for the project's headline result.
+
+**The fix is collection, not modelling** -- re-derive the two lateral levels for this geometry, as
+`collect_beh12.py`'s own docstring says has to be done per body. **Done**: `--lvl0_strafe 0.7`
+(0.4 is the base body's value, 0.6 flips the sign back but leaves the motion at a fifth of `lvl1`),
+giving **+0.076 and -0.069** against a target of half of `lvl1`. The eight clips were replaced and
+the dataset now passes both checks.
+
+### And fixing it changed nothing in the loop
+
+| | sideways speed error, five repeats |
+|---|---|
+| before the fix | 34% ± 22, range 2-64, within 15% on **1/5** |
+| **after the fix** | **35% ± 23**, range 15-67, within 15% on **0/5** |
+
+**Identical.** The dataset was genuinely broken and is now correct, and **it was not what the loop
+was failing on.** The explanation offered above -- that the ranking was being asked to separate two
+conditions that travel the same way -- is measured and does not hold.
+
+**So the sideways failure survives every explanation tried today**: the library, the score, the
+amplitude ordering, switch frequency, gait phase, lock-in, the camera angle, and now the condition
+labels. What is left is that the loop resolves lateral travel worse than forward or turning on both
+robots, for a reason nothing measured has reached. **It is the open question this round ends on.**
+
 
 ---
 

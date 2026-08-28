@@ -79,9 +79,31 @@ predicting no motion), and adapting it on target data was always the design -- t
 itself finetunes on 7,265 target trajectories. Measured: **one B1 clip clears break-even, nine
 clear it at every horizon tested, about 7x fewer target clips than starting cold** (F52).
 
-> Do not write "transfers to a new robot without retraining". It was measured and it is false.
-> The defensible sentence is that the model is **cheap to adapt** to a robot it has never seen,
-> and that a camera is the only thing it has to be given about that robot.
+**Closed loop, in physics** (Stage 2, 2026-08-26/27) is now the third scope and the strongest one.
+An **unseen hexapod body** is controlled with the world model **completely frozen** -- only the
+two-layer action projector refitted -- at survival **15/15**, behaviour **15/15**, median speed
+error **19.0%** over fifteen runs
+(F95). A **quadruped** stands through every episode under the same planner after the world model is
+adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
+three speed targets** (F101).
+
+**The adaptation objective is a claim in its own right.** LAC-WM's three stages are MSE throughout.
+Applied across families that fails in a specific way: the forward model improves its predictions
+and **discards the action channel entirely** -- its answer given the real action equals its answer
+given the mean action to three decimals, at every checkpoint of a 15k-step run. A contrastive term,
+which asks for the ranking a planner performs rather than the prediction MSE asks for, lifts
+quadruped selection from 30% to 57% with data, robot, architecture and budget unchanged (F98).
+**That term is ours and is the second thing this project contributes.**
+
+> Do not write "transfers to a new robot without retraining". It was measured and it is false --
+> **except within the hexapod family in closed loop, where it is now true and measured.** Across
+> families the defensible sentence is that the model is **cheap to adapt** to a robot it has never
+> seen, and that a camera is the only thing it has to be given about that robot.
+
+> **And "a camera is the only thing" is not yet earned.** The planner chooses among twelve recorded
+> behaviours of the target robot, so something already made that robot walk, turn and strafe.
+> Replacing the recorded library with **random motor babbling** is the untested experiment that
+> would make the sentence true.
 
 ---
 
@@ -1332,9 +1354,12 @@ from a summary and got three things wrong.
 |---|---|---|
 | λ_recon, λ_motion | **open** | LAC-WM reports no numeric λ (nor LR, optimiser or schedule). Currently 1.0 / 1.0, but the terms sit on different scales — reconstruction ≈ 1.3, motion ≈ 0.002 — so equal weights do not mean equal influence. Ablate. |
 | `z_t` dimension | 64, following LAC-WM §4.2 | Also the lever for the invariance ablation: shrinking it should evict morphology first, since `e_t` already supplies body identity to both losses. |
-| Turn / stop behaviours | **missing, and now the main lever left** | Only forward walk exists on either robot, which caps what `z` can be asked to carry and is the root of F45's pairing failure -- the B1 spends 84.6% of its time in two trot patterns the insect visits 9.8% and 5.7% of the time. `sim/collect/collect_ik.py` already takes `--behavior turn`, `--turn_bias`, `--travel` and `--loops`, so the insect side is collectable without touching the RL branch. Adding turning to **one** robot only would make the two sides asymmetric; the useful version widens both. IK produces them as extra foot trajectories, but the earlier attempt let a probe separate them from a camera/path shortcut rather than from gait, so they need re-collecting before use. K-means(K=3) in Step 1.5 and the "≥3 behaviours" answer to the ICLR critique both depend on this. |
+| Turn / stop behaviours | **collected, and it was not the lever** | `data/beh12_hex_flat` and `data/beh12_b1_flat` hold twelve matched conditions per robot -- four speeds, four turn rates, two lateral levels each side -- forward matched to 4% and yaw to 2%. **Collecting them changed nothing on its own**: on the frozen encoder the new channels still read zero, and yaw only moves from -5.2 to +0.37 when a loss term supervises it. The variety bought the possibility; the term realises it (F83, slide 14). |
 | Step 2 evaluation metric | **settled and measured** | Sample efficiency, pretrained against from-scratch, at N = 1/3/5/7/9 clips rather than episodes -- the B1 set has 14 clips, so 10 is the largest budget that leaves a clean held-out four. Reported for the action head (F50) and the forward model (F52). |
-| Baseline exact setup | **open, and it is Step 1e** | Section 9 calls an EAC-WM analogue required rather than optional, and it has never been run. Either run it or write down why it is out of scope -- the frame/latent ablations answer a different question and do not stand in for it. |
+| Baseline exact setup | **open, and it is Step 1e** | Section 9 calls an EAC-WM analogue required rather than optional, and it has never been run. Either run it or write down why it is out of scope. |
+| **Pipeline: Dreamer or candidate scoring** | **open, and it is the decision Week 13 asked for** | The advisor's note is that we are sitting between two designs and should commit. *Candidate scoring* needs an answer to "where do the candidates come from that is not itself a controller" -- ours is a recorded library, the source paper's is a pretrained VLA sampled with 500 noise seeds, and **both are circular**. *Dreamer / teacher-student* moves the search into training: the reward is *reach this latent*, so no library and no kinematics are needed, the run-time cost drops from twelve forward-model rolls to one, and the student is trained on the states it actually reaches rather than on recorded ones. **The evidence collected on 2026-08-26/27 points at the second**, with the caveat that it leans on long-horizon rollout accuracy, which is this project's weakest measurement -- so it should be started on the hexapod, where the forward model holds to half a second, not on the B1, where it does not. |
+| **Where candidate diversity comes from** | **answered for the source paper, open for us** | The advisor asked how a fixed policy yields several candidates. LAC-WM's answer, from their §6: they inject different noise seeds into a VLA's flow-matching head to produce **N=500** sequences, having found that *"random action sequence sampling... is inefficient for action optimization, especially for a difficult dexterous manipulation task"*. Ours is twelve recorded clips. **Motor babbling is the proposal that removes the dependency**, untested. |
+| **The research gap, stated in one place** | **open, and the most important item** | See §1 and F98. Draft: LAC-WM demonstrates cross-embodiment latent actions where a **shared task space already exists** -- end-effector pose is meaningful for every arm in their corpus, so the alignment problem is solved by choosing the coordinate. Locomotion across leg counts has no such space: 18 and 12 joint targets share no dimension. Two things follow that are not in the source work, and both are measured -- **(a)** a joint-space target crosses only when a shared body-motion term is present (-28.9 to +0.61), and **(b)** MSE adaptation is insufficient across families because the forward model discards the action channel; a discriminative term is required (19% to 57%). Confirm the framing with the advisor before building on it. |
 | LAC-WM source code | not released | Rejected ICLR 2026, accepted ICML 2026; no public code. |
 ---
 

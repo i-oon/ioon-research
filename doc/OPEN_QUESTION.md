@@ -389,6 +389,112 @@ gait is fully valid (V-JEPA2 sees a hexapod walking either way). **Lean: keep CS
 
 ---
 
+## Q16. Dreamer or candidate scoring — the pipeline has to commit (new, Week 13 — blocking)
+
+**The advisor's framing.** We are sitting between two designs and should pick the one that spends
+its effort where it pays.
+
+| | what the world model does | what it needs |
+|---|---|---|
+| **Dreamer-style** | imagines rollouts to train an actor-critic, cutting sample complexity | long-horizon rollout accuracy |
+| **candidate scoring** | scores actions someone else proposed | **an answer to where the candidates come from** |
+
+**The second question is the one that bites, and it bit twice independently.** The advisor asked it
+as *"if the policy generating candidates is already an expert, why score it at all, and would we
+not have to train one policy per morphology?"* We reached the same place from the data: our
+candidate library is twelve recorded behaviours of the target robot, so **something already made
+that robot walk, turn and strafe** -- which contradicts the premise that the robot is unknown.
+
+**The source paper does not escape this either.** LAC-WM §6: *"random action sequence sampling...
+is inefficient for action optimization, especially for a difficult dexterous manipulation task"*,
+so they draw **N=500 candidates from a pretrained VLA** by injecting noise seeds into its
+flow-matching head. **Their prior is a policy; ours is a set of clips. Both have to come from
+somewhere.** That also answers the advisor's second question -- diversity from a fixed network
+comes from noise injection, not from the network being stochastic.
+
+**What the 2026-08-26/27 measurements say about the choice.**
+
+| | candidate scoring, as built | what distillation changes |
+|---|---|---|
+| library | required, and circular | not needed -- the policy emits continuous joint targets |
+| run-time cost | twelve forward-model rolls per step | one forward pass |
+| distribution | scored on recorded states, deployed on self-driven ones | trained on the states it reaches |
+| camera at run time | required | not required -- the student reads proprioception |
+
+**The world model is not the part in doubt.** Deleting the rollout from the scoring rule costs
+**24 points** of selection accuracy and lands within five of not using the goal at all (F100), so
+it is predicting rather than pattern-matching either way.
+
+**Recommendation, not yet a decision.** Go to teacher-student, and **start on the hexapod**: the
+approach leans on long-horizon rollout, which is this project's weakest measurement -- the hexapod
+forward model holds to half a second, the B1's does not. **Motor babbling is the experiment that
+would let either design claim the robot was unknown**, and it is untested.
+
+---
+
+## Q17. What is the research gap, in one sentence (new, Week 13 — the most important item)
+
+**The advisor's homework, stated as the thing to settle before building anything else.** What gap
+does this close, and how is the pipeline different from what exists?
+
+**Draft, for confirmation rather than as a settled answer.**
+
+> LAC-WM demonstrates cross-embodiment latent actions in a setting where **a shared task space
+> already exists**: end-effector pose is meaningful for every arm in their corpus, so the alignment
+> problem is answered by the choice of coordinate rather than by the method. **Locomotion across
+> leg counts has no such space** -- 18 and 12 joint targets share no dimension, and no coordinate
+> choice creates one without a kinematic model per robot, which is the cost the project exists to
+> avoid.
+
+**Two consequences follow that are not in the source work, and both are measured.**
+
+| | measured |
+|---|---|
+| **(a)** a joint-space action target crosses incomparable embodiments **only when a shared body-motion term is present** | cross-robot speed readout **-28.9 -> +0.61**, and per-robot joint error improves at the same time, 0.3517 -> 0.2183 |
+| **(b)** MSE adaptation is **insufficient across families**: the forward model improves its predictions while discarding the action channel entirely. A discriminative term is required | quadruped behaviour selection **19% -> 57%** against a 28% chance rate, everything else held fixed |
+
+**(b) was found rather than sought**, and it is the answer to Q7 -- the objective was what was left.
+
+**What weakens the claim, and should be said before it is asked.** The candidate library is
+circular (Q16). Speed is not controlled on either robot. And the scaling result LAC-WM leads with
+-- performance rising with the number of pretraining embodiments -- **cannot be reproduced with
+two.**
+
+### The axis the comparison should be made on
+
+**"Nobody did it exactly this way" is not a defence.** A difference only counts if it changes what
+the method has to be *told* about a new robot. Proposed axis, to be agreed with the advisor before
+the literature is read against it:
+
+| method family | what it must be given about the new robot |
+|---|---|
+| graph-based / modular policies | the kinematic tree -- which joint connects to which |
+| universal-morphology policies | a URDF or equivalent body description |
+| task-space latent actions (LAC-WM) | a shared coordinate that already means the same thing on both robots |
+| **ours, as claimed** | **video, and the joint count** |
+| **ours, as it actually stands** | video, the joint count, **and twelve clips of the robot already walking, turning and strafing** |
+
+**The last two rows are not the same, and the gap between them is the honest state of the work.**
+Anyone who knows this literature will find it immediately: a controller that can already produce
+those twelve behaviours is *more* than a URDF, not less. **Motor babbling is not an extension --
+it is what makes the fourth row true.**
+
+### Three novelty checks, unverified — IOON to confirm
+
+Believed clear as of Week 13 and **not yet checked against the literature.** Written down so the
+check is against a fixed list rather than a memory of a conversation.
+
+| | what to establish | what it costs us if it is already done |
+|---|---|---|
+| **1** | Do existing cross-morphology **locomotion** methods all require a kinematic graph or URDF? | If any works from video alone, the axis above stops separating us and the positioning has to change |
+| **2** | Has anyone learned a latent action space **across different leg counts** from video? | If yes, read how they handled the action space -- that is the whole problem here, and their answer either supersedes ours or contrasts with it |
+| **3** | Is a **contrastive term in an action-conditioned world model** already published? | Least damaging. The contribution would narrow from *the fix* to *the finding* -- that MSE adaptation silently discards the action channel across morphology families, invisible in its own loss curve. **That finding survives even if InfoNCE here is standard** |
+
+**Check 3 is the safe one; 1 and 2 are the ones that decide the framing.** Until they are done, the
+gap statement above is a hypothesis with measurements behind it, not a settled claim.
+
+---
+
 ## Q15. "How is this different from Diffusion?" (asked Week 11, answered — keep the answer)
 
 Asked in review and answered on a deck slide that has since been cut, so it is kept here. It comes

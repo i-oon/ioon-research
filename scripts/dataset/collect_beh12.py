@@ -75,10 +75,21 @@ TURN = [("turn_s0.05", ["--spin", "0.05"]),
 # lower level is set to reproduce the recorded lateral speeds. `--verify` is what checks it.
 SIDE_BASE = ["--amps", "0.00", "0.20", "0.30", "--ft_phase", "0.5", "--symmetric",
              "--spin_amp", "0.25", "--ik_iters", "8"]
-SIDE = [("side_L_lvl0", SIDE_BASE + ["--strafe", "-0.4", "--spin", "0.19"]),
-        ("side_L_lvl1", SIDE_BASE + ["--strafe", "-0.8", "--spin", "0.19"]),
-        ("side_R_lvl0", SIDE_BASE + ["--strafe", "0.4", "--spin", "-0.24"]),
-        ("side_R_lvl1", SIDE_BASE + ["--strafe", "0.8", "--spin", "-0.24"])]
+# **`lvl0`'s magnitude is per body, and 0.4 is the base body's value.** On `c08f09t09` the same
+# 0.4 produces a robot that barely moves -- +0.017 lateral against `lvl1`'s -0.131, with the sign
+# of the residue rather than of a strafe (F106). The recipe's own rule is that commands do not port
+# across geometries; this makes the one number that failed adjustable instead of baked in.
+LVL0_STRAFE = 0.4
+
+
+def side_conditions(lvl0=LVL0_STRAFE):
+    return [("side_L_lvl0", SIDE_BASE + ["--strafe", f"{-lvl0}", "--spin", "0.19"]),
+            ("side_L_lvl1", SIDE_BASE + ["--strafe", "-0.8", "--spin", "0.19"]),
+            ("side_R_lvl0", SIDE_BASE + ["--strafe", f"{lvl0}", "--spin", "-0.24"]),
+            ("side_R_lvl1", SIDE_BASE + ["--strafe", "0.8", "--spin", "-0.24"])]
+
+
+SIDE = side_conditions()
 
 CONDITIONS = SPEED + TURN + SIDE
 
@@ -148,6 +159,38 @@ def separability(root):
         f, l, w = mean[c]
         print(f"{c:<14}{f:>9.3f}{l:>9.3f}{w:>9.3f}{len(groups[c]):>7}")
 
+    # **Separable is not the same as correct, and separability alone passed a broken body.** On
+    # `c08f09t09` both `side_*_lvl0` conditions came out with the wrong sign -- `side_R_lvl0` at
+    # +0.017 lateral, motionless in all three channels -- because the strafe recipe under-drives
+    # shorter legs. Every pair was still 2x apart, so this function reported the set as fine, and
+    # the body went on to carry the project's headline closed-loop result (F106). A condition that
+    # barely moves is trivially separable from one that moves a lot; what has to be asked instead
+    # is whether each condition does **what its name says**.
+    print()
+    bad = []
+    for c, (f, l, w) in mean.items():
+        if c.startswith("side_L") and l <= 0:
+            bad.append(f"{c}: lateral {l:+.3f}, should travel left (positive)")
+        if c.startswith("side_R") and l >= 0:
+            bad.append(f"{c}: lateral {l:+.3f}, should travel right (negative)")
+        if c.startswith("turn") and abs(w) < 0.5 * abs(mean.get("turn_s0.56", (0, 0, 1))[2]):
+            pass
+    for fam, ch in (("side_L", 1), ("side_R", 1), ("turn", 2), ("speed", 0)):
+        levels = sorted((c for c in mean if c.startswith(fam)), key=str)
+        for a, b in zip(levels, levels[1:]):
+            if abs(mean[b][ch]) <= abs(mean[a][ch]):
+                bad.append(f"{b} is weaker than {a} on its own channel "
+                           f"({abs(mean[b][ch]):.3f} <= {abs(mean[a][ch]):.3f})")
+    if bad:
+        print("**FAILS the semantic check** -- separable, and not what the names claim:")
+        for line in bad:
+            print(f"  {line}")
+        print("\nRe-derive these for this body. The commands are not portable across geometries;")
+        print("what strafes gently on the base body may not move a shorter-legged one at all.")
+    else:
+        print("semantic check passed: every condition moves the way its name says, and each level")
+        print("exceeds the one below it on its own channel.")
+
     pairs = []
     for a, b in itertools.combinations(sorted(mean), 2):
         sep = np.linalg.norm(mean[a] - mean[b])
@@ -193,6 +236,9 @@ def main():
     ap.add_argument("--expert", type=int, default=0,
                     help="index into the 1000 expert episodes, 0-999. Same value for every "
                          "condition: the behaviour comes from the oscillator, not from this.")
+    ap.add_argument("--lvl0_strafe", type=float, default=LVL0_STRAFE,
+                    help="strafe magnitude for the two `lvl0` lateral conditions. 0.4 is the base "
+                         "body's value; a shorter-legged body needs more to move at all")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--dry_run", action="store_true", help="print the commands and collect nothing")
     ap.add_argument("--verify", action="store_true",
@@ -208,6 +254,11 @@ def main():
     ap.add_argument("--tolerance", type=float, default=0.15,
                     help="relative agreement required on the condition's dominant channel")
     args = ap.parse_args()
+    if args.lvl0_strafe != LVL0_STRAFE:
+        global CONDITIONS, SIDE
+        SIDE = side_conditions(args.lvl0_strafe)
+        CONDITIONS = SPEED + TURN + SIDE
+        print(f"lvl0 strafe {args.lvl0_strafe} (default {LVL0_STRAFE})")
 
     if args.separability:
         separability(os.path.join(ROOT, args.separability))

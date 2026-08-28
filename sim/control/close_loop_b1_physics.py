@@ -64,6 +64,12 @@ def main():
     ap.add_argument("--warm_start", type=int, default=10,
                     help="steps driven by the demonstration's own commands before the planner "
                          "takes over. From a standstill there is no motion in the frame to read")
+    ap.add_argument("--commit", type=int, default=1,
+                    help="hold the chosen behaviour for this many steps before deciding again. "
+                         "**1 is re-deciding every step, which is what every run so far used and "
+                         "what nothing has justified.** Switching clips was measured to cost half "
+                         "the turning and four fifths of the lateral travel (F102), so committing "
+                         "is the cheapest thing that could recover them")
     ap.add_argument("--steps", type=int, default=66)
     ap.add_argument("--settle", type=int, default=25)
     ap.add_argument("--fall_ratio", type=float, default=0.6,
@@ -135,31 +141,57 @@ def main():
     root0 = np.array(sim.getObjectPosition(root, sim.handle_world))
     off_xy, cam_z = cam0[:2] - root0[:2], cam0[2]
 
+    # **The camera is placed once and never moves again.** `render_b1_replay.py` sets it from the
+    # trajectory's *first* frame and leaves it, so in every clip the model was trained on the robot
+    # travels across a fixed view. An earlier version of this file moved the camera with the body,
+    # which keeps the robot centred and means the background never slides -- the one cue the
+    # forward model uses to predict travel. Its one-step error on those frames was **2.9x** the
+    # error on recorded clips while the frames themselves scored as barely novel, because a pooled
+    # embedding hardly notices the difference and the forward model entirely does.
+    p0 = d.qpos[0:3].copy()
+    sim.setObjectPosition(cam, sim.handle_world,
+                          [float(p0[0]) + off_xy[0], float(p0[1]) + off_xy[1], cam_z])
+
     def render():
         """Pose the CoppeliaSim body from MuJoCo's state and take the picture."""
         p = d.qpos[0:3]
         w, x, y, z = d.qpos[3:7]
         sim.setObjectPosition(root, sim.handle_world, [float(p[0]), float(p[1]), float(p[2])])
         sim.setObjectQuaternion(root, sim.handle_world, [float(x), float(y), float(z), float(w)])
-        sim.setObjectPosition(cam, sim.handle_world,
-                              [float(p[0]) + off_xy[0], float(p[1]) + off_xy[1], cam_z])
         for h, a in zip(joints, d.qpos[7:19]):
             sim.setJointPosition(h, float(a))
         return capture(sim, cam)
 
-    frames, chosen, heads, quats, uprights = [], [], [], [], []
+    # **Every candidate's score, not just the winner's.** Which candidate won says nothing about
+    # whether the runner-up was a hair behind or nowhere near, and the open question about speed is
+    # exactly that: the loop picks the right behaviour family and the wrong rate, so the scores
+    # within a family are what decide it. Stored per step, `nan` during warm start.
+    frames, chosen, heads, quats, uprights, all_scores = [], [], [], [], [], []
     fell_at = None
+    held_i, held_since = None, 0
     observation = render()
     for t in range(steps):
         if t < args.warm_start:
             action, label = demo["actions"][t], f"warm:{want}"
+            all_scores.append(np.full(len(planner.candidates), np.nan, np.float32))
         else:
             e_t = encode_clip(encoder, np.asarray(observation)[None], 1).float()
             if offset is not None:
                 e_t = e_t - offset.to(e_t.device)
             h = planner.horizon_at(t)
-            action, i, _ = planner.act(e_t[0:1].to(device),
-                                       demo_e[min(t + h, len(demo_e) - 1)], t)
+            if held_i is not None and t - held_since < args.commit:
+                # inside the commitment window nothing is decided, so nothing is scored
+                i = held_i
+                all_scores.append(all_scores[-1])
+                action = planner.candidates[i]["actions"][
+                    min(t, len(planner.candidates[i]["actions"]) - 1)]
+            else:
+                action, i, sc = planner.act(e_t[0:1].to(device),
+                                            demo_e[min(t + h, len(demo_e) - 1)], t)
+                all_scores.append(np.asarray(sc, np.float32))
+                if i != held_i:
+                    held_since = t
+                held_i = i
             label = planner.candidates[i]["condition"]
         chosen.append(label)
 
@@ -189,9 +221,11 @@ def main():
         out, frames=np.asarray(frames, np.uint8), head=np.asarray(heads, np.float32),
         body_quat=np.asarray(quats, np.float32), upright=np.asarray(uprights, np.float32),
         dt=np.float32(0.05), embodiment=args.embodiment, condition=want,
-        chosen=np.asarray(chosen), demo=os.path.basename(demo_path),
+        chosen=np.asarray(chosen), scores=np.asarray(all_scores, np.float32),
+        demo=os.path.basename(demo_path),
         kinematic=np.array(False), horizon=np.int32(planner.horizon),
-        warm_start=np.int32(args.warm_start), settled_z=np.float32(settled_z),
+        warm_start=np.int32(args.warm_start), commit=np.int32(args.commit),
+        settled_z=np.float32(settled_z),
         fell_at=np.int32(-1 if fell_at is None else fell_at),
         candidates=np.asarray([c["condition"] for c in planner.candidates]))
     planned = [c for c in chosen if not c.startswith("warm:")]

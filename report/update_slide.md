@@ -578,7 +578,7 @@ one.
 
 `c08f09t09` — shorter coxa, femur and tibia. Full physics in CoppeliaSim.
 
-| | trained body | unseen body, projector as-is | unseen body, projector refitted |
+| | the body it trained on | **unseen body**, old projector reused | **unseen body**, projector refitted on its own clips |
 |---|---|---|---|
 | survival | 100% | **100%** | **100%** |
 | behaviour class | 100% | 83% | **100%** |
@@ -587,16 +587,15 @@ one.
 
 ![the loop on a body it was never trained on](../results/wm/closed_loop/video_heldout_fewshot/closed_hexapod_ep1001_r0.mp4)
 
-> *Turning demonstration, held-out body, projector refitted. Left: the loop. Right: the
-> demonstration it was asked to reproduce. Speed error 8.9%, and it stays upright.*
+**Nothing in the world model moved in any column** — encoder, inverse model and forward model are
+the same weights throughout. The only difference between the last two columns is the **action
+projector**, the network that turns a joint command into a latent: a two-layer MLP, minutes of
+fitting on the new body's own clips.
 
-**Nothing in the world model moved** — encoder, inverse model and forward model are the same
-weights that ran on the trained body. The only thing refitted is the action projector: a two-layer
-MLP, minutes of fitting, on clips of the new body.
-
-**The two rows fail differently.** *Which behaviour* survives the body change outright. *How fast*
-does not — 33% against 78%. A new body changes what a joint command produces, and the planner
-cannot know that until the projector is told.
+**Why it has to be refitted at all.** The same 30° at a joint moves a short leg less far than a
+long one, so the old projector tells the forward model the wrong thing about what a command will
+do. **The expensive part — fifty epochs of world model — is reused untouched; the cheap part is
+replaced.**
 
 ### A quadruped, a different family
 
@@ -605,20 +604,27 @@ image, so both robots are still rendered by the same renderer. Slide 13 is how t
 
 | | survival | behaviour class | speed within 15% |
 |---|---:|---:|---:|
-| **B1, physics** | **3 / 3** | 2 / 3 | **0 / 3** |
+| **B1, physics** | **3 / 3** | 2 / 3 | **2 / 3** |
 
-Behaviour-family accuracy over planned steps: **58% / 51% / 38%**, against 28% chance. Speed errors
-25%, 40%, 95%.
+Speed errors **6.4%** forward, **13.1%** turning, 85.5% sideways. On the turning demonstration the
+planner picks the exact condition, not merely the family, on **52 of 55** steps.
+
+> **One free parameter was doing this.** `--commit`, how many steps a chosen behaviour is held
+> before deciding again, defaulted to 1 -- re-decide every step -- and nothing had ever justified
+> it. **Holding for three steps takes speed from 0/3 to 2/3** on this robot, because every switch
+> interrupts the stride and switching was measured to cost half the turning and four fifths of the
+> lateral travel. On the hexapod, whose commands replay exactly, the same change is neutral.
 
 **It holds itself up for a full episode and goes at a speed nobody asked for.**
 
-![B1 asked to walk forward](../results/wm/closed_loop/video_b1_physics2/phys_b1_ep2.mp4)
+![B1 asked to walk forward](../results/wm/closed_loop/video_b1_commit3/phys_b1_ep2.mp4)
 
-![B1 asked to strafe right, and walking forward instead](../results/wm/closed_loop/video_b1_physics2/phys_b1_ep2301.mp4)
+![B1 asked to strafe right, and walking forward instead](../results/wm/closed_loop/video_b1_commit3/phys_b1_ep2301.mp4)
 
-> *Both clips run the full 65 steps without falling. The first is asked to walk forward and does,
-> 25% too fast. **The second is asked to strafe right and walks forward** — upright the whole way,
-> 95% off in the channel that was commanded. That pair is the result and the limit in one place.*
+> *Both run the full 65 steps without falling. The first is asked to walk forward and does, within
+> **6.4%**. **The second is asked to strafe right and walks forward instead** — upright the whole
+> way, 85.5% off in the channel that was commanded. The pair is the result and the limit in one
+> place.*
 
 > **We had called this impossible**, from a replay test where B1 actions fall — 0 of 8. That was
 > **six seconds**; this loop is three. **And our first version of it was wrong**: it started the
@@ -629,12 +635,9 @@ Behaviour-family accuracy over planned steps: **58% / 51% / 38%**, against 28% c
 
 ### What this buys, and what it does not
 
-**A new body of the same family needs no world-model retraining** — the expensive part, fifty
-epochs — only a small network fitted on its own clips. **A body of a different family needs the
-world model adapted too**, on a few dozen of its clips.
-
-**Neither controls speed.** The loop picks the behaviour and runs it at the wrong rate, which for a
-locomotion controller is a real gap rather than a rounding error.
+**Same family: no world-model retraining.** Different family: the world model has to be adapted
+too, on a few dozen clips. **Neither controls speed** — the loop picks the behaviour and runs it at
+the wrong rate, which for a locomotion controller is a real gap and not a rounding error.
 
 ---
 
@@ -678,13 +681,36 @@ changes. **It learned what a quadruped looks like and never learned to read the 
 
 ### 3. The objective allowed the shortcut
 
-```
-MSE          "predict the next frame"
-             next frame ≈ this frame  ──►  copying scores well  ──►  action unnecessary
+**MSE — one action in, is the prediction close?**
 
-contrastive  "which of these 4 actions was the real one"
-             ignore the action  ──►  all 4 predictions identical  ──►  never right
 ```
+  e_t ─────────────────────┐
+                           ├──► FTM ──► ê ──► distance to the real e_t+1
+  a ──► projector ──► z ───┘
+```
+
+*The next frame looks like this one, so copying `e_t` already scores well.* **Nothing penalises
+ignoring `z`.**
+
+**Contrastive — four actions in, which one was real?**
+
+```
+  the real action ──► z₀ ──► FTM(e_t, z₀) ──► ê₀ ──► d₀
+  a wrong action  ──► z₁ ──► FTM(e_t, z₁) ──► ê₁ ──► d₁      loss: d₀ must be
+  a wrong action  ──► z₂ ──► FTM(e_t, z₂) ──► ê₂ ──► d₂      the smallest
+  a wrong action  ──► z₃ ──► FTM(e_t, z₃) ──► ê₃ ──► d₃
+```
+
+*Ignore `z` and all four predictions are identical, all four distances are equal, and the answer is
+never findable.* **The shortcut stops paying.**
+
+> Wrong actions are taken from **other behaviours at the same time index** — same point in the gait,
+> so the model cannot separate them by stride phase instead of by behaviour.
+
+**The point is the shape of the task, not the loss formula.** MSE trains on **one** action, the one
+that happened; the planner's job is to choose among **twelve**. Contrastive makes training look like
+the job — four options, one right answer — and four is enough, because ignoring `z` caps you at 25%
+whatever the pool size.
 
 | behaviour selection | chance 28% |
 |---|---|
