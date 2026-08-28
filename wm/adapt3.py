@@ -348,9 +348,20 @@ def main():
                     "action_stats": checkpoint.get("action_stats"),
                     "body_stats": checkpoint.get("body_stats"),
                     "adapted": checkpoint.get("adapted"),
+                    # **Every argument, not a chosen few.** The first run of this recorded `steps`
+                    # and the splits and nothing else, so months later `--lambda_nce` -- the one
+                    # flag the whole contrastive result turns on -- could not be read back off the
+                    # checkpoint that produced it. A rerun on different data then cannot be told
+                    # apart from a rerun with a different hyperparameter.
+                    "args": vars(args),
+                    "data": args.data,
                     "stage3": {"train_paths": [clips[i]["path"] for i in train_ids],
                                "val_paths": [clips[i]["path"] for i in val_ids],
                                "steps": args.steps, "embodiment": name,
+                               "lambda_nce": args.lambda_nce, "temp": args.temp,
+                               "negatives": args.negatives, "batch": args.batch,
+                               "lr_proj": args.lr_proj, "lr_ftm": args.lr_ftm,
+                               "data": args.data,
                                "candidates": args.candidates,
                                "candidate_paths": [clips[i]["path"] for i in cand.values()],
                                "top1": top1, "family": fam, "cond_chance": chance,
