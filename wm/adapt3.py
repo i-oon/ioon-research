@@ -324,8 +324,11 @@ def main():
                 top1, fam, _n, _c, fam_chance = discriminate(clips, val, cand, proj,
                                                                  ftm, name, device)
                 mse, r_hold, r_mean, moves = score(clips, val, proj, ftm, name, device)
+                # **flush**: redirected stdout is block-buffered, so without this a 12k-step run
+                # shows nothing at all until it exits -- and a crashed run shows more than a
+                # healthy one, because the crash flushes the buffer.
                 print(f"{step:>6}{run / args.every:>10.4f}{r_hold:>8.3f}{r_mean:>9.3f}"
-                      f"{moves:>8.2f}{top1:>7.0%}{fam:>8.0%}")
+                      f"{moves:>8.2f}{top1:>7.0%}{fam:>8.0%}", flush=True)
                 run = 0.0
             if step >= args.steps:
                 break
