@@ -7353,12 +7353,25 @@ in size fourfold, so rendering them to look equal would be erasing the fact the 
 `close_loop_b1_physics.py`, defaulting to 24 and 3 on the latter.** They have to agree: a loop that plans on frames differing from its adaptation
 set in any static way -- angle, spawn, floor -- is measuring that difference.
 
-**One artefact is accepted rather than fixed.** Enlarging the floor removes the bright specular dots
-on the B1's feet, at every factor from 1.5 upward; sliding the floor instead makes the background
-worse, at 48.9 against 16.6. **The insect has no such highlights either** -- its brightest pixel is
-165 against the B1's 244 -- so losing them narrows a difference between the two robots rather than
-widening one. What it costs is human legibility of the feet at 99 px, and that is bounded by the
-256-px frame the encoder takes.
+**The first enlarged floor buried the robot, and the metrics all passed anyway.** `sim.scaleObjects`
+grows a box without moving its centre, so a 3x floor -- 0.2 m thick at z=-0.1 -- became 0.6 m thick
+at the same centre and **lifted the walking surface from z=0.000 to z=+0.200**. The B1 stands at
+z=0, so it was rendered 20 cm below ground with its feet cut off. Clipping, background sd, worst
+background edge and between-clip spread all improved on that render; **not one of them can see a
+robot sunk into the floor**, because the floor is static and the robot's visible silhouette is still
+a robot. It was caught by looking at the picture, and the count of pixels above 200 -- the specular
+dots on the feet -- is the number that separates the two: 24 in the original render, **0** with the
+floor lifted, 9 with it put back.
+
+`--floor_scale` now measures the surface before and after and translates it back, printing
+`surface +0.000 -> +0.000` on every clip.
+
+**Moving the camera instead of widening it was tried first, on the grounds that it keeps the
+insect's exact lens, and it does not work.** The B1 sits at image y=0.35 where the insect sits at
+0.49, so it is framed high and clips the top edge; **pulling back along the optical axis shrinks the
+robot without moving it in frame**, leaving the sideways clips at 100% clipped even at 1.7x
+distance. Shifting the camera to recentre makes the robot *larger* and brings the floor edge into
+shot. Widening the angle is the only motion that adds room on the side the robot is leaving.
 
 **Re-rendered and verified, `data/beh12_b1_fov25`** (`scripts/dataset/rerender_b1_framing.py`,
 `--cam_fov 24 --spawn 0 0 --floor_scale 3`). Checking the framing turned up a second defect that had nothing to do

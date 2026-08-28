@@ -43,12 +43,16 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--cam_dx", type=float, default=0.0, help="shift the fixed camera along world x")
     ap.add_argument("--cam_dy", type=float, default=0.0, help="shift the fixed camera along world y")
-    ap.add_argument("--floor_dy", type=float, default=0.0,
-                    help="slide the floor along world y instead of scaling it. Scaling removes the far-edge band but also removes the bright specular dots on the feet, at every factor from 1.5 up; sliding is the alternative that leaves the shading alone.")
     ap.add_argument("--floor_scale", type=float, default=0.0,
-                    help="scale the floor about the world origin. The scene ships 15 m of floor, and a 25-deg view reaches its far edge -- the straight band across the upper third of every wide B1 frame, which the insect's 15-deg view never reaches. Raising the lights does not remove it; only more floor does.")
-    ap.add_argument("--light_z", type=float, default=0.0,
-                    help="raise the four default lights to this height. The scene ships them at 2.5 m, which lights a pool narrower than a 25-deg view, so the floor beyond it reads as a hard band across the top of every frame -- the thing that makes the wide shot look unlike the insect's. Widening the view without this trades a clipped robot for a visible lighting edge.")
+                    help="scale the floor about the origin so a wider view does not reach its far "
+                         "edge. **`sim.scaleObjects` grows a box without moving its centre**, so a "
+                         "3x floor lifts its surface from z=0.000 to z=+0.200 and the robot stands "
+                         "20 cm below ground with its feet buried -- which is what the first "
+                         "attempt did. The surface is put back at z=0 here (F113).")
+    ap.add_argument("--cam_back", type=float, default=1.0,
+                    help="multiply the camera's distance from the robot, keeping the scene's "
+                         "authored 15-degree angle so the B1 is shot exactly as the insect is. "
+                         "**Enlarging the floor was tried instead and was wrong**: `sim.scaleObjects` grows a box without moving its centre, so a 3x floor lifted its surface from z=0.000 to z=+0.200 and the robot stood 20 cm below ground with its feet buried (F113).")
     ap.add_argument("--cam_fov", type=float, default=0.0,
                     help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
                          "identical 15-deg cameras, and that is not the same as an identical view.** "
@@ -110,21 +114,29 @@ def main():
     sim.setObjectPosition(cam, sim.handle_world,
                           [base_pos[0, 0] + off_xy[0] + args.cam_dx,
                            base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
-    if args.floor_dy != 0.0:
-        for h in [x for x in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
-                  if sim.getObjectAlias(x, 1).startswith("/Floor")]:
-            q = sim.getObjectPosition(h, sim.handle_world)
-            sim.setObjectPosition(h, sim.handle_world, [q[0], q[1] + args.floor_dy, q[2]])
     if args.floor_scale > 0:
         floors = [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
                   if sim.getObjectAlias(h, 1).startswith("/Floor")]
         if floors:
+            top = sim.getObject("/Floor")
+            def surface():
+                q = sim.getObjectPosition(top, sim.handle_world)
+                bb = sim.getShapeBB(top)
+                return q[2] + (bb[0] if isinstance(bb[0], list) else bb)[2] / 2
+            before = surface()
             sim.scaleObjects(floors, float(args.floor_scale), False)
-    if args.light_z > 0:
-        for h in sim.getObjectsInTree(sim.handle_scene):
-            if sim.getObjectType(h) == sim.object_light_type:
+            drop = surface() - before
+            for h in floors:                      # put the walking surface back where it was
                 q = sim.getObjectPosition(h, sim.handle_world)
-                sim.setObjectPosition(h, sim.handle_world, [q[0], q[1], float(args.light_z)])
+                sim.setObjectPosition(h, sim.handle_world, [q[0], q[1], q[2] - drop])
+            print(f"    floor x{args.floor_scale}: surface {before:+.3f} -> {surface():+.3f}")
+    if args.cam_back != 1.0:
+        # push the camera away along the line it already looks down, so the framing widens without
+        # the lens changing -- the insect's shot, taken from further back
+        cam_now = np.array(sim.getObjectPosition(cam, sim.handle_world))
+        target = np.array([base_pos[0, 0], base_pos[0, 1], float(base_pos[0, 2])])
+        sim.setObjectPosition(cam, sim.handle_world,
+                              [float(v) for v in target + (cam_now - target) * args.cam_back])
     if args.cam_fov > 0:
         sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
                                 float(np.deg2rad(args.cam_fov)))
