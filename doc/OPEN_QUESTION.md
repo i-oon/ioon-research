@@ -425,10 +425,30 @@ comes from noise injection, not from the network being stochastic.
 **24 points** of selection accuracy and lands within five of not using the goal at all (F100), so
 it is predicting rather than pattern-matching either way.
 
-**Recommendation, not yet a decision.** Go to teacher-student, and **start on the hexapod**: the
-approach leans on long-horizon rollout, which is this project's weakest measurement -- the hexapod
-forward model holds to half a second, the B1's does not. **Motor babbling is the experiment that
-would let either design claim the robot was unknown**, and it is untested.
+**Decided 2026-08-28: teacher-student, and the reason is not efficiency.** Sampling `(vx, vy, wz)`
+from the B1's locomotion policy was proposed as a way to replace the twelve curated clips. It does
+not rescue the claim -- **it makes the pipeline identical to LAC-WM's**, which is the thing this
+project is supposed to improve on, and it still means a policy that already walks, turns and
+strafes exists for the "unknown" robot.
+
+**The distinction that settles it:**
+
+| | what it requires of the target robot |
+|---|---|
+| scoring candidates | **a policy that already performs the behaviours.** If no candidate turns, no scoring rule can produce a turn |
+| learning a policy | **only the ability to actuate.** Data where the robot falls is still data |
+
+**So the way to stop depending on a policy is to emit one, not to find a better one to sample
+from.** That also changes what has to be proven: not "what fraction of steps picked the right
+candidate", but **whether a robot the world model never saw ends up with a usable controller from
+video alone** -- which is a deliverable LAC-WM does not produce, since it stops at selecting among
+what its VLA proposed.
+
+**Start on the hexapod**: the approach leans on long-horizon rollout, this project's weakest
+measurement -- the hexapod forward model holds to half a second, the B1's does not. Motor babbling
+stops being a prerequisite under this design, because the policy is trained rather than selected
+from; it remains the experiment that would let the *candidate-scoring* results claim an unknown
+robot. See Q18 for why the same reasoning does not let us call turning and sideways failures.
 
 ---
 
@@ -494,6 +514,42 @@ check is against a fixed list rather than a memory of a conversation.
 gap statement above is a hypothesis with measurements behind it, not a settled claim.
 
 ---
+
+## Q18. The three limitations are untried, not established (new, Week 13)
+
+Three things are currently reported as failures. **None of them has been tested where it would
+actually be decided**, and saying "we cannot do X" before trying the one lever that addresses X is
+the wrong claim to put in front of a committee.
+
+| reported as | what was actually tested | what has never been tried |
+|---|---|---|
+| turning does not cross embodiments | the planner, the library, the scoring, three warm-start settings | **yaw has never been in the training target.** F83 moved it from -5.23 to +0.37 by supervising it, on a different checkpoint family, and that was never carried into a loop |
+| sideways is at or below chance | nine hypotheses: library coarseness, score blindness, amplitude, switch rate, gait phase, lock-in, camera angle, condition labels, joint replay | **all nine are on the deployment side.** Lateral has never been in the training target either |
+| the candidate library is recorded clips, so "a camera is the only thing it needs" is not earned | -- | **`rollout_b1_mujoco.py` takes `--vx --vy --wz`**, so a B1 library can be sampled without P'Jo's CPG -- but see below: this changes the prior rather than removing it |
+
+**The first two collapse into one run**: stage 2 on `beh12_hex_flat` + `beh12_b1_flat` with
+`body_channels ['0','1','2']` against a `lambda_body 0.0` control, then stage 3 and the loop on
+both. It is the run that would carry F83's mechanism into a controller for the first time, and it
+answers turning and sideways together. Heavy -- fibo7.
+
+**The third is cheap and runnable here, and it does not do what it first appears to.** Sampling
+`(vx, vy, wz)` still goes through the B1's trained locomotion policy, so the robot walks because a
+policy makes it walk, not because a camera does. **What changes is the *level* of the prior:**
+
+| prior | what it assumes | exposure |
+|---|---|---|
+| twelve curated conditions | a person decided what the behaviours *are* | "did you hand it the answer?" |
+| random `(vx, vy, wz)` | a velocity-conditioned locomotion policy exists | **the same assumption LAC-WM makes**, which samples 500 candidates from a pretrained VLA |
+| random joint-space actions | nothing | not achievable on a legged robot -- it falls immediately, and no published method does this |
+
+So the honest ceiling on "a camera is the only thing it needs" is **a generic prior instead of a
+task-specific one**, and the sentence has to be written that way rather than dropped or overclaimed.
+**It also relocates Q16**: if a policy already supplies the candidates, the question is not "policy
+or Dreamer" but *where in the pipeline the policy sits* -- generating candidates that a world model
+selects among, or being trained by the world model and acting alone.
+
+**And on all three, the honest present-tense sentence is "not yet demonstrated", not "does not
+transfer"** -- every slide that says otherwise is overclaiming a negative.
 
 ## Q15. "How is this different from Diffusion?" (asked Week 11, answered — keep the answer)
 

@@ -90,7 +90,16 @@ A **quadruped** stands through every episode under the same planner after the wo
 adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
 three speed targets** (F101).
 
-**Cross-embodiment control** (2026-08-28) is the fourth scope and the narrowest. Goal frames come
+**Cross-embodiment control** (2026-08-28) is the fourth scope and the narrowest, and it is a claim
+about the **adaptation objective**, not about the pretrained latent. The ladder, all arms at
+`--warm_start 0 --commit 3` against a 33% chance rate on the forward goal: frozen world model with
+only the projector fitted **5%**, adapted separately under MSE **32%**, adapted **jointly** under
+MSE **38%**, jointly with a contrastive term **71%**. **Only the loss term separates the last two**
+-- same file, same 24 clips, same code path, and the MSE arm ran 25% more steps. On four clips per
+condition the two do not overlap: **32% +/- 7 against 74% +/- 3**, with MSE exactly on chance.
+Turning clears chance under neither (2% +/- 2 and 32% +/- 5). **A world model pretrained on the insect cannot drive the quadruped at
+all, and MSE adaptation leaves it at chance** -- the contrastive term is what crosses the gap, which
+is F98's mechanism deciding a physics loop rather than a ranking on recorded clips (F112). Goal frames come
 from a **hexapod** clip, candidates stay B1 clips because only those are executable, and the B1
 walks: **67% / 84% / 71% of planned steps on forward candidates against 33% chance** under three
 warm-start settings (a turning clip, a forward clip, and none at all), upright for every step of
@@ -99,7 +108,21 @@ straddles chance in all three -- it was reported as crossing and then withdrawn.
 cross-embodiment runs the goal's yaw and the robot's yaw correlate at **-0.33 with 46% sign
 agreement**: the loop controls *forward or not forward* and does not control direction (F107, F109).
 The defensible sentence is **"a quadruped walks forward from an insect's video"**, not "behaviours
-cross".
+cross" -- and narrower still: **the loop transfers the kind of motion, not the amount.** Seven goals
+spanning a 1.72x range of commanded Froude produce achieved speeds correlating at **+0.074**, and
+the planner does not select faster candidates for faster goals (-0.167) although the library covers
+the range. The same loop tracks speed to a median 14.8% when the goal is the same robot (F111).
+
+> **The checkpoint that closes the loop has no shared body target.** `beh12_hexonly` trains on
+> `hexapod=data/beh12_hex_flat` alone, so `lambda_body` supervises forward *within the insect*; stage 3
+> trains only the projector and the forward model. A channel screen on that checkpoint transfers
+> **nothing**, forward included (-0.112 hex->b1), while forward crosses in the loop at 67-84%.
+> **The cross-embodiment result comes from V-JEPA2's features plus stage-3 adaptation, not from
+> `lambda_body`.** F83 is not contradicted -- it measured `stage2_*` checkpoints trained on two
+> robots, and those sit on pre-F74 data. **No checkpoint is both correct and cross-embodiment**, so
+> the loop has never used the mechanism this project identified as what creates transfer. The next
+> run is stage 2 on `beh12_hex_flat` + `beh12_b1_flat` against a `lambda_body 0.0` control, then
+> stage 3 and the loop on both (F110). Heavy -- fibo7.
 
 **The adaptation objective is a claim in its own right.** LAC-WM's three stages are MSE throughout.
 Applied across families that fails in a specific way: the forward model improves its predictions

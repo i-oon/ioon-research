@@ -38,14 +38,17 @@ Scores below are with the corrected channel selection (F108); anything quoted fr
 | `b1_from_hexgoal` | **cross-embodiment**: hexapod goal, B1 body. Turning warm start (F107) | n/a | 100% | n/a | n/a |
 | `b1_hexgoal_fwdwarm` | the same goals with a **forward** warm start -- the F109 control | n/a | 100% | n/a | n/a |
 | `b1_hexgoal_nowarm` | the same goals with **no warm start**; walks 65/65 regardless | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_speed` | seven forward goals over a 1.72x Froude range -- the speed-tracking test (F111) | n/a | 100% | n/a | n/a |
 
 **The three cross-embodiment directories cannot be scored for speed or behaviour by this script.** Its
 reference is the run's own `demo`, which for those runs is the B1 clip that supplied the warm start
 and not the hexapod clip that supplied the goal. Running it anyway measures how closely the robot
 kept doing what the warm start did -- which is the F109 finding, but it is not a success rate.
-Grade those three on behaviour-family accuracy against chance instead: forward is 67 / 84 / 71%
+Grade those on behaviour-family accuracy against chance instead: forward is 67 / 84 / 71%
 across the three warm-start settings against 33% chance, turning straddles chance in all three, and
-sideways is 2 / 0 / 0% against 17%.
+sideways is 2 / 0 / 0% against 17%. **Speed across embodiments is measurable via Froude, which is
+dimensionless** -- compute it against the *goal* clip, not the run's `demo`; `b1_hexgoal_speed` does
+this and finds no tracking at all (F111).
 
 ## Videos
 

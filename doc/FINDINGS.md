@@ -7099,6 +7099,52 @@ candidates have *positive* yaw of their own (+0.003 to +0.009). **The rotation c
 to what it chose** -- at 35 switches in 59 steps no candidate runs long enough to express its own
 behaviour, which is F102's stitching cost.
 
+**The closed-loop checkpoint has no shared body target at all, and that took two wrong answers to
+establish.** `wm/data/embodiment.py` computes three body channels -- forward, lateral, yaw -- while
+`BODY_CHANNELS = (0,)` and `wm/runs/beh12_hexonly/config.yaml` sets `body_dim: 1`,
+`body_channels: ['0']`, which reads as "forward is the only channel taught to cross". **It is not,
+because that run has only one robot in it**: `sources: hexapod=data/beh12_hex_flat`. `lambda_body`
+supervises forward *within the insect*, with no quadruped to share it with. Stage 3 then trains
+`proj` and `ftm` only (`wm/adapt3.py`), leaving the motion decoder and its body head untouched, so
+**the body head plays no part in the B1 path whatsoever.**
+
+`screen_behaviour_channels.py --split condition` on that exact checkpoint, smoothed rows:
+
+| channel | hex->b1 | b1->hex |
+|---|---|---|
+| forward | **-0.112** | -0.514 |
+| lateral | -2.763 | -5.485 |
+| yaw | -2.971 | -0.764 |
+| vertical | -7.005 | -1.549 |
+
+**Nothing transfers, forward included -- and forward crosses in the loop at 67 / 84 / 71%.** So
+whatever carries forward travel across the two robots is V-JEPA2's own features plus the stage-3
+adaptation, **not a shared body target**, and any sentence attributing the cross-embodiment result
+to `lambda_body` is wrong.
+
+**This does not contradict F83, it exposes a gap between them.** F83 asked whether `lambda_body`
+creates a shared code and answered yes, on `stage2_*` checkpoints trained on both robots. Today's
+probe asks whether *the checkpoint that closes the loop* has one, and answers no, because that
+checkpoint is stage 1. Both are right about different models, and F83's +0.761/+0.641 must not be
+quoted about the model that closes the loop.
+
+**The gap: no checkpoint is both correct and cross-embodiment.** `stage2_*` trains on two robots but
+on `ik_walk_*` + `b1_framed`, from before F74's frame-rate fix; `beh12_hexonly` is on the corrected
+data but has one robot. **So every closed-loop cross-embodiment number was produced without ever
+using the mechanism this project measured as the thing that creates transfer** -- and forward still
+crosses at 67-84%.
+
+**That makes the next run obvious rather than speculative**: stage 2 on `beh12_hex_flat` +
+`beh12_b1_flat`, `lambda_body 0.5` against an `0.0` control, then stage 3 and the loop on both. It
+is the first experiment that would carry the body-head result all the way to a controller, and
+widening `body_channels` becomes testable on top of it rather than instead of it. Heavy; it belongs
+on fibo7.
+
+**Fourth time a cheap proxy has failed to predict the loop**, after `z_crosses_bodies` ranked
+turning first and forward last (F107). A linear readout of pooled `z` is not what the planner
+computes -- it scores `FDM(e_t, proj(a))` against the goal, with the driven robot's own state inside
+every comparison. **Screens of this kind are not evidence about the loop in either direction.**
+
 **The initial pose is not the explanation, and it was the natural guess.** The robot holds
 `cmds[0]` -- the goal clip's first pose -- for 20 warmup steps, and that pose is identical within a
 condition and distinct between them, so it is a cue for all twelve. But its distance from the grand
@@ -7106,6 +7152,124 @@ mean runs **the wrong way**: forward is the *least* distinctive at 0.159 rad, ag
 at 0.331 and `side_R` at 0.361. **If a distinctive starting pose helped, sideways would be the
 behaviour that worked.** What is left is that forward translation is simply the largest thing in
 the camera's view, which is the same reading F107 arrived at from the cross-embodiment side.
+
+---
+
+### F111. Across embodiments the loop transfers the kind of motion and not the amount of it
+
+**The test forward travel needed, and it was available all along.** Froude is dimensionless by
+construction -- 0.18 m/s on a 0.13 m insect and 0.30 m/s on a 0.56 m quadruped are the same number
+(F56) -- so a cross-embodiment *speed* target is measurable even though the README had it as `n/a`.
+Seven hexapod forward goals spanning Froude **0.129 to 0.222**, a 1.72x range, driving the B1 with
+`--commit 3` and no warm start:
+
+| hexapod goal | goal Froude | mean `vx` picked | B1 Froude |
+|---|---|---|---|
+| `ep1` `speed_c5.8` | 0.1289 | 0.373 | 0.1170 |
+| `ep100` `speed_c7.1` | 0.1582 | 0.367 | 0.0718 |
+| `ep101` `speed_c7.1` | 0.1609 | 0.361 | 0.0526 |
+| `ep200` `speed_c8.15` | 0.2007 | 0.375 | 0.1490 |
+| `ep201` `speed_c8.15` | 0.1996 | 0.362 | 0.1290 |
+| `ep300` `speed_c8.8` | 0.2067 | 0.354 | 0.0692 |
+| `ep301` `speed_c8.8` | 0.2216 | 0.373 | 0.0771 |
+
+**corr(goal, achieved) = +0.074.** The B1 walks at an unrelated speed, and it is not the body
+failing to deliver: **corr(goal, mean `vx` selected) = -0.167**, so the planner does not even choose
+faster candidates for faster goals. Every goal draws the same mixture, mean `vx` between 0.354 and
+0.375 against a 1.72x spread in what was asked for.
+
+**The library is not the limit either.** The B1's forward candidates cover the goal range: `vx0.30`
+at Froude 0.126, `vx0.38` at 0.160, `vx0.40` at 0.174, `vx0.50` at 0.206, against goals of
+0.129-0.222.
+
+**And the same loop does control speed when the goal is the same robot.** `hex_c3_rep5`: 50% of runs
+inside the 15% band, median error **14.8%**. The graded control is present within an embodiment and
+absent across one, on the dimensionless quantity built to make the comparison fair.
+
+| | family selection | speed tracking |
+|---|---|---|
+| same robot | 100% behaviour class | **50% within 15%**, median 14.8% |
+| across embodiments | **66-80%** against 33% chance | **corr +0.074** -- none |
+
+**So the defensible cross-embodiment claim is narrower than "a quadruped walks forward from an
+insect's video" implies: the loop transfers the *kind* of motion, not the *amount*.** That answers
+the obvious objection to a one-behaviour result -- "isn't forward just the largest thing in the
+frame?" -- in the direction that concedes it. What crosses is a category, and category is what a
+large translation in the image can carry.
+
+**Reported against pre-registered criteria.** The three readings -- controlled, weakly tracked, not
+tracked -- were written down before the runs finished, after a day in which several of this
+project's own scripts printed verdicts that were threshold comparisons of overlapping means.
+
+---
+
+### F112. The pretrained latent does not cross embodiments at all -- the adaptation objective is what crosses it
+
+**Asked because the claim was worded to invite it.** "The model never saw the quadruped during
+pretraining" is true and reads as though a hexapod latent generalises to a four-legged robot. The
+ladder that tests it was already on disk: the same loop, the same goals, `--warm_start 0`,
+`--commit 3`, three checkpoints differing only in how much adaptation they received.
+
+| | `ep1` forward | `ep1300` turn | `ep2301` sideways | upright |
+|---|---|---|---|---|
+| **rung 1** frozen world model, projector fitted only | **5%** | 5% | 38% | 3/3 |
+| **rung 2** ITM+FDM adapted separately, MSE | **32%** | 9% | 29% | 3/3 |
+| **rung 3a** projector+FDM **jointly**, MSE | **38%** | 0% | 25% | 3/3 |
+| **rung 3b** projector+FDM jointly, **+ InfoNCE** | **71%** | 37% | 0% | 3/3 |
+| *chance* | *33%* | *33%* | *17%* |
+
+**Rung 1 is not weak, it is below chance.** A world model trained on the insect alone, with a
+two-layer projector fitted to map the quadruped's 12-D actions into it, selects forward candidates
+**5%** of the time against a 33% rate from guessing. **The pretrained latent does not transfer to
+this robot in any usable sense**, and every sentence implying otherwise has to go.
+
+**Rungs 2 and 3a are chance, and 3a is the control that makes the claim an ablation.** Adapting on
+24 B1 clips under MSE -- what the source method's three stages do throughout -- buys **32%**
+separately and **38%** jointly, against 33%. **Fine-tuning jointly is not what does it**, which was
+the obvious competing explanation and the first thing a reader would ask.
+
+**Rung 3b is the result.** The same file, the same 24 clips, the same architecture, the same
+`adapt3.py` code path; **only `--lambda_nce` differs**, and forward selection goes **38% to 71%**.
+The same arm reaches 84% with a forward warm start (F109).
+
+**With spread, on four recorded clips per condition** (MuJoCo repeats bit for bit, F105, so the
+variation has to come from the goal clip rather than from reruns):
+
+| | `speed_c5.8`, 4 clips | `turn_s0.56`, 4 clips |
+|---|---|---|
+| joint, MSE | **32% +/- 7** (25-38) | **2% +/- 2** (0-5) |
+| joint, **+ InfoNCE** | **74% +/- 3** (71-77) | 32% +/- 5 (28-37) |
+| *chance* | *33%* | *33%* |
+
+**Forward does not overlap**: the MSE arm's best run is 38% and the contrastive arm's worst is 71%.
+MSE sits exactly on chance. **Turning does not clear chance under either**, and MSE is far *below*
+it at 2% -- it avoids turn candidates systematically rather than failing to find them.
+
+**Training budget runs the wrong way to explain it.** `stage3_b1_full` (MSE) ran **15,000** steps
+and `stage3_b1_nce` **12,000** -- the losing arm got 25% more optimisation.
+
+**This relocates the contribution rather than reducing it, and it lands where the project already
+claimed one.** F98 measured MSE adaptation discarding the action channel -- `/mean-z` 0.993, family
+19% -- and a contrastive term restoring it to 50%, **on recorded clips**. Here the identical
+mechanism decides a physics loop:
+
+| | measured on | MSE | + InfoNCE | chance |
+|---|---|---|---|---|
+| F98 | recorded B1 clips | 19% | 50% | 28% |
+| F112 | **B1 walking in MuJoCo, goal from an insect** | 32% | **71%** | 33% |
+
+**So the cross-embodiment result is a claim about the adaptation *objective*, isolated to the loss
+term and not to the stage, the data, the architecture or the budget.** The defensible sentence: *a world model pretrained on a six-legged
+insect cannot drive a quadruped at all; adapting it on 24 target clips under MSE leaves it at
+chance; adding a contrastive term to that adaptation is what makes an insect's video steer the
+quadruped forward.* Sideways fails at every rung, and **turning does not clear chance at any rung** once four
+clips are measured -- the 37% that looked like a result is the top of a 28-37 band around a 33%
+chance rate.
+
+> **Rung 1's 38% on sideways is not a result.** With forward at 5% the loop is defaulting onto
+> `side_*` candidates, which is what a planner that cannot discriminate looks like when one family
+> happens to sit closest. F96 named this failure mode; the way to see it is that all four of rung
+> 1's columns are within the spread of "always pick the same thing".
 
 ---
 
@@ -7193,3 +7357,6 @@ the camera's view, which is the same reading F107 arrived at from the cross-embo
 - `results/wm/closed_loop/b1_hexgoal_nowarm/` -- the same goals with no warm start at all (F109)
 - `results/wm/closed_loop/hex_rep5_nowarm/` -- the F95 configuration with no warm start (F110)
 - `results/wm/closed_loop/hex_realturn_nowarm{,_c3}/` -- real turns with no warm start, `--commit` 1 and 3 (F110)
+- `results/wm/closed_loop/b1_hexgoal_speed/` -- seven hexapod forward goals spanning 1.72x in Froude (F111)
+- `results/wm/closed_loop/b1_hexgoal_rung{1,2,3mse}/` -- the adaptation ladder against `b1_hexgoal_nowarm` (F112)
+- `results/wm/closed_loop/spread_rung3{mse,nce}/` -- four clips per condition on the two contested arms (F112)
