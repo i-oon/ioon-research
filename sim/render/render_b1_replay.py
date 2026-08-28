@@ -58,9 +58,6 @@ def main():
                          "frame, and the sideways clips stayed 100% clipped at 1.7x. Widening "
                          "the angle is the only motion that adds room on the side the robot is "
                          "leaving (F113). Left at 1.0 for every collected set.")
-                    help="multiply the camera's distance from the robot, keeping the scene's "
-                         "authored 15-degree angle so the B1 is shot exactly as the insect is. "
-                         "**Enlarging the floor was tried instead and was wrong**: `sim.scaleObjects` grows a box without moving its centre, so a 3x floor lifted its surface from z=0.000 to z=+0.200 and the robot stood 20 cm below ground with its feet buried (F113).")
     ap.add_argument("--cam_fov", type=float, default=0.0,
                     help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
                          "identical 15-deg cameras, and that is not the same as an identical view.** "
