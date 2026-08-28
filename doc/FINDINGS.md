@@ -7365,13 +7365,35 @@ criteria written in advance passed on it** -- 0% clipping, backgrounds consisten
 the band is identical in every clip, so a between-clip measure cannot see it. Raising the lights
 from 2.5 m to 6 and 12 changed nothing; only more floor did. `--floor_scale 3`:
 
-| | before, 15 deg | after, 25 deg + pinned + floor x3 | hexapod |
+| | before, 15 deg | `data/beh12_b1_fixed` | hexapod |
 |---|---|---|---|
-| frames touching an edge, mean | 61% | **0%** | 0% |
-| background sd | 5.48 | **3.60** | 3.80 |
-| worst background edge | 6.34 | **3.58** | 4.32 |
-| background spread between clips | 2.79 | **0.21** | 0.14 |
-| bounding box | 136 px | 94 px | 118 px |
+| frames touching an edge, mean | 61% | **0.0%** | 0.0% |
+| worst single clip | 100% | **0%** | 0% |
+| background sd | 5.48 | **3.67** | 3.80 |
+| worst background edge | 6.34 | **3.50** | 4.32 |
+| background spread between clips | 2.79 | **0.23** | 0.14 |
+| bounding box | 136 px | 99 px | 115 px |
+| robot-to-floor contrast | 24.7 | 25.5 | 39.8 |
+
+**The angle was chosen by sweeping, and the sweep had to run on all 48 clips rather than one per
+condition.** At 23 degrees a representative clip from each of the twelve conditions gave 0%, and the
+full set gave 1% -- two `side_L_lvl1` clips that travel further than their condition's
+representative. **Within-condition spread is not visible in a one-per-condition check**, which is
+exactly the shortcut that made the sweep quick. 24 degrees clears all 48.
+
+| angle | clips still clipping | bbox |
+|---|---|---|
+| 15 (shipped) | 61% of frames | 136 px |
+| 21 | 16% | 112 px |
+| 23 | **2 of 48** | 103 px |
+| **24** | **none** | 99 px |
+| 25 | none | 92 px |
+
+**The remaining gap to the insect is colour, not framing.** The B1's grey against a grey floor gives
+a robot-to-background contrast of 25.5 where the insect's orange gives 39.8. That gap predates all
+of this -- the original render was 24.7 -- and widening the view improved it slightly. **Changing it
+means recolouring a robot, which would confound the framing fix with an appearance change in the
+same re-fit**, so it is left alone and recorded.
 
 **Every B1 column now sits at or inside the insect's**, where before it was worse on all four.
 **`worst background edge` is in the table because it is the one that caught the band**, and it was

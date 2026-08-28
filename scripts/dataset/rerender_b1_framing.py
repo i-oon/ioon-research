@@ -40,7 +40,7 @@ def main():
     ap.add_argument("--src", default="data/beh12_b1_flat")
     ap.add_argument("--out", default="data/beh12_b1_fov25")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
-    ap.add_argument("--cam_fov", type=float, default=25.0)
+    ap.add_argument("--cam_fov", type=float, default=24.0)
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0))
     ap.add_argument("--floor_scale", type=float, default=3.0)
     args = ap.parse_args()
