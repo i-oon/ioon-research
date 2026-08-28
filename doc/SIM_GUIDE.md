@@ -148,16 +148,57 @@ Output: one `.npz` per body per episode containing `frames (66,256,256,3)`, `act
 
 ### 4.2 Unitree B1 quadruped
 
-Rolled out in MuJoCo, then replayed kinematically in CoppeliaSim so it is rendered with the
-same camera and floor as the insect.
+Rolled out in MuJoCo, then replayed kinematically in CoppeliaSim. **MuJoCo is never re-run to
+change how a clip looks** -- every clip stores `base_pos`, `base_quat` and `joint_pos`, so the
+physics is replayed from the file and only the camera changes.
 
 ```bash
-cd $REPO && .venv/bin/python3 sim/collect/rollout_b1_mujoco.py
-cd $REPO && .venv/bin/python3 sim/render/render_b1_replay.py
+# speed and sideways: re-render the stored states
+cd $REPO && .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/beh12_b1_v2
+
+# turning: re-roll, because the commands themselves change
+cd $REPO && .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/beh12_b1_turns
 ```
 
-Output in `data/b1/`: `frames (300,256,256,3)`, `action (300,12)`, `foot_contact (300,4)`,
-`base_pos`, `base_quat`.
+The current set is **`data/beh12_b1_v2`**; `data/beh12_b1_flat` is the superseded one and the two
+must not be mixed. Its README lists what changed.
+
+#### The configuration that has to stay fixed
+
+**Every item below was wrong at some point, and none of the errors announced itself.** They are
+defaults now (§4.2.1); this table is here so a future change is a decision rather than a drift.
+
+| | value | what goes wrong otherwise |
+|---|---|---|
+| perspective angle | **24 deg** | the scene ships 15, at which the B1 touches an image edge in 61% of frames and 100% of every sideways clip, while the insect never does. The two scenes ship identical cameras and that is **not** the same as an identical view: the field is 2.11 m at the robot, the insect needs 1.75 m and the B1 needs 2.85 m |
+| spawn | **`--spawn 0 0`** | without it the camera is pinned to wherever that rollout happened to start, so every clip carries its own background -- 2.79 grey levels of spread against the insect's 0.00 |
+| floor | **`--floor_scale 3`** | a 24-deg view reaches the far edge of the scene's 15 m floor and draws a band across the upper third of every frame. `sim.scaleObjects` grows a box **without moving its centre**, so the surface must be translated back to z=0 or the robot stands 20 cm underground with its feet cut off -- the renderer prints `surface +0.000 -> +0.000` to show it did |
+| policies | **both**, two clips each | `base_gait3` at 2.0 Hz and `base_1.7hz_sym` at 1.7. Four clips of one policy are one limit cycle at four phases; the pair gives a condition genuine spread. `gait3`'s lateral drift and its lean into turns are the *controller*, not the robot |
+| turn commands | **per policy** | the same `--wz` gives different rates on the two policies -- at the weakest level `sym` needs -0.023 and `gait3` -0.081. Conditions are named for the **achieved** rate, never for a command |
+| turn direction | **negative**, matching the insect | the two robots turned opposite ways for six days after it was diagnosed, which made every cross-embodiment turning result meaningless |
+| clip windows | **non-overlapping**, rotated to a common heading | MuJoCo starts every run identically and is deterministic, so four runs of one command are one clip four times; windows of a longer rollout are the only source of variety, and each is rotated about its own first pose so it starts facing where the first one did |
+
+Camera and floor are **part of the data**, not of the viewing. A loop that plans on frames
+differing from its adaptation set in any static way measures that difference:
+`close_loop_b1_physics.py` carries the same three defaults and they have to agree.
+
+#### 4.2.1 Checking a collected set
+
+Numbers, not eyes -- but **look at the video too**: five defects this project found in its B1 data
+were caught by watching and none by the tables that were passing at the time.
+
+| check | pass | how it failed before |
+|---|---|---|
+| frames touching an image edge | 0% on all 48 | 61%, and the metric that catches a *static* band is `worst background edge`, not this one |
+| background spread between clips | < 0.5 grey levels | 2.79 |
+| worst background edge | < 5 | 21.3 with the floor edge in shot |
+| feet visible | bright pixels > 0 per frame | 0, with the robot buried under a lifted floor |
+| turn sign | negative on all four levels | positive, i.e. opposite the insect |
+| weakest turn | distinct from `speed_vx0.30` | identical in both channels |
+| conditions x clips | 12 x 4, two per policy | -- |
+
+Output per clip: `frames (66,256,256,3)`, `action (66,12)`, `foot_contact`, `base_pos`,
+`base_quat`, `joint_pos`, `condition`, `behaviour`, `level`, `expert_episode`, **`policy`**.
 
 ### 4.3 Generating a new morphology
 
@@ -316,6 +357,13 @@ Consequences:
   About 300 steps stays on the floor; 1000 steps walks off the edge.
 
 Engine settings: Bullet 2.78, 20 Hz, 10 substeps, 100 solver iterations, realtime off.
+
+**The two robots differ here and it decides where spread comes from.** The B1's physics is MuJoCo,
+seeded explicitly, and **repeats bit for bit** -- choices, frames and body track. Rerunning one B1
+configuration returns the identical number and carries no information; its spread has to come from
+**different goal clips**. The insect runs in CoppeliaSim with the scene reloaded per run and
+spreads 37-71% on one configuration, so its spread comes from **repeats**. Applying either recipe
+to the other robot produces error bars that mean nothing.
 
 ---
 
