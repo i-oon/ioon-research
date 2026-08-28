@@ -7497,6 +7497,41 @@ and the re-render is happening anyway.
 
 ---
 
+### F115. F75's sign flip was recorded as fixed and was not, and it decides every turning result
+
+**`direction_plan.md` says "all four are fixed".** Measured again on 2026-08-28, on the data every
+result in this project uses:
+
+| | `beh12_b1_flat` | `beh12_c08f09t09_flat` |
+|---|---|---|
+| weakest commanded turn | **+0.0146** | -0.0241 |
+| middle | **+0.0359** | -0.0372 |
+| strongest | **+0.0760** | -0.0878 |
+
+**The two robots still turn opposite ways.** F75 diagnosed this on 2026-08-22 and the fix was
+written down rather than applied.
+
+**This decides the turning result rather than influencing it.** A hexapod goal turning one way was
+scored against a B1 candidate library that only turns the other, so **"turning does not cross
+embodiments" was true by construction** -- F107's dose-response, F109's sign disagreement, F111,
+F112's 23-32% at chance. None of them is evidence about the model. They are evidence that the
+dataset asks for a left turn and offers only right ones.
+
+**Forward and sideways are unaffected**: forward has no sign to disagree about, and the sideways
+conditions carry their own direction labels, which F106 already checked and corrected.
+
+**The fix is a re-rollout of twelve clips, not a re-render.** `rollout_b1_mujoco.py --wz` takes a
+signed rate, so negating the three turn levels regenerates them; and F114 wants `wz0.00` replaced by
+a real fourth level in the same pass. **Nothing about turning can be claimed either way until that
+is done.**
+
+> **The lesson is about the document, not the data.** A finding recorded as fixed, with no
+> measurement re-run afterwards, was carried for six days and shaped four later findings. Anything
+> marked fixed should name the check that would fail if it regressed -- here, one line comparing the
+> sign of the two robots' turn conditions.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

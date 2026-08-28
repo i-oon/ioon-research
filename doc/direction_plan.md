@@ -334,7 +334,10 @@ mismatch that made a stored transition mean 20 ms on one robot and 50 ms on the 
 flip that had the robots turning opposite ways under a magnitude-only match (F75), a
 proportional-only heading controller leaving a standing yaw bias on the B1 (F78), and a body target
 differenced in the world frame, so "forward speed" was partly a rotation measurement once a robot
-turned (F79). All four are fixed; **every cross-embodiment number computed before 2026-08-22 was
+turned (F79). **Three of the four are fixed; F75's is not** -- measured again on 2026-08-28, the B1's turn
+conditions still read yaw +0.0146 / +0.0359 / +0.0760 against the insect's -0.0241 / -0.0372 /
+-0.0878, so the two robots still turn opposite ways in `beh12_*` (F115). Every cross-embodiment
+turning result compares a left turn with a right turn and could not have succeeded; **every cross-embodiment number computed before 2026-08-22 was
 measured across at least the first of them.**
 
 **Untrained, the new channels still do not transfer** -- forward +0.36 +/- 0.10, lateral and yaw at
