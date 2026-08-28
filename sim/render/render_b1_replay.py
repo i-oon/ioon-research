@@ -51,6 +51,14 @@ def main():
                          "attempt did. The surface is put back at z=0 here (F113).")
     ap.add_argument("--cam_back", type=float, default=1.0,
                     help="multiply the camera's distance from the robot, keeping the scene's "
+                         "authored angle. **Kept because it was tried and does not work, and "
+                         "the reason is worth not rediscovering**: the B1 sits at image y=0.35 "
+                         "where the insect sits at 0.49, so it is framed high and clips the top; "
+                         "moving along the optical axis shrinks the robot without moving it in "
+                         "frame, and the sideways clips stayed 100% clipped at 1.7x. Widening "
+                         "the angle is the only motion that adds room on the side the robot is "
+                         "leaving (F113). Left at 1.0 for every collected set.")
+                    help="multiply the camera's distance from the robot, keeping the scene's "
                          "authored 15-degree angle so the B1 is shot exactly as the insect is. "
                          "**Enlarging the floor was tried instead and was wrong**: `sim.scaleObjects` grows a box without moving its centre, so a 3x floor lifted its surface from z=0.000 to z=+0.200 and the robot stood 20 cm below ground with its feet buried (F113).")
     ap.add_argument("--cam_fov", type=float, default=0.0,
