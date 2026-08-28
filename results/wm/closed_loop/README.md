@@ -21,38 +21,47 @@ Scores below are with the corrected channel selection (F108); anything quoted fr
 
 | directory | what it is | behaviour | survival | speed | median error |
 |---|---|---|---|---|---|
-| `full` | hexapod, **trained** body, 9 runs | 100% | 100% | **56%** | **14.3%** |
-| `heldout` | hexapod, unseen body, projector as-is, 6 runs | 83% | 100% | 0% | 41.3% |
-| `heldout_fewshot` | hexapod, unseen body, projector refitted -- **F95's headline** | 100% | 100% | 0% | 23.0% |
-| `hex_rep5_fixed` | hexapod unseen body, `--commit 1`, 5 repeats x 3 goals | 100% | 100% | 13% | 36.2% |
-| `hex_c3_rep5` | the same at `--commit 3`, 10 runs | 100% | 100% | 50% | **14.8%** |
-| `hex_realturn` | hexapod on the two goals that actually turn, 10 runs | 100% | 100% | 40% | 47.3% |
-| `hex_rep5_nowarm` | the `hex_rep5_fixed` configuration with **no warm start** (F110) | 93% | 100% | 20% | 58.8% |
-| `hex_realturn_nowarm` | real turns, no warm start, `--commit 1` | 100% | 100% | 0% | 77.3% |
-| `hex_realturn_nowarm_c3` | the same at `--commit 3` -- half the switching, faster turn entry | 100% | 100% | 10% | 75.4% |
-| `hex_side_fixed` | hexapod sideways after the library correction, 5 runs | 100% | 100% | 0% | 18.0% |
-| `hexside_r1/5/10/20` | sideways commitment sweep, 5 runs each | 100/60/60/100% | 100% | 0/0/0/40% | 46.7/62.1/48.7/22.2% |
-| `b1_physics3` | B1 in MuJoCo physics, `--commit 1`, 3 goals | 67% | 100% | 33% | 25.3% |
-| `b1_commit3` | the same at `--commit 3` -- **the B1 configuration reported** | 67% | 100% | 33% | **20.3%** |
-| `b1_commit5` | the same at `--commit 5` | 67% | 100% | 33% | 24.5% |
-| `b1_from_hexgoal` | **cross-embodiment**: hexapod goal, B1 body. Turning warm start (F107) | n/a | 100% | n/a | n/a |
-| `b1_hexgoal_fwdwarm` | the same goals with a **forward** warm start -- the F109 control | n/a | 100% | n/a | n/a |
-| `b1_hexgoal_nowarm` | the same goals with **no warm start**; walks 65/65 regardless | n/a | 100% | n/a | n/a |
-| `b1_hexgoal_speed` | seven forward goals over a 1.72x Froude range -- the speed-tracking test (F111) | n/a | 100% | n/a | n/a |
+| `hex_trained` | hexapod, **trained** body, 9 runs | 100% | 100% | **56%** | **14.3%** |
+| `hex_unseen_zeroshot` | hexapod, unseen body, projector as-is, 6 runs | 83% | 100% | 0% | 41.3% |
+| `hex_unseen_fewshot` | hexapod, unseen body, projector refitted -- **F95's headline** | 100% | 100% | 0% | 23.0% |
+| `hex_unseen_commit1` | hexapod unseen body, `--commit 1`, 5 repeats x 3 goals | 100% | 100% | 13% | 36.2% |
+| `hex_unseen_commit3` | the same at `--commit 3`, 10 runs | 100% | 100% | 50% | **14.8%** |
+| `hex_unseen_turn` | hexapod on the two goals that actually turn, 10 runs | 100% | 100% | 40% | 47.3% |
+| `hex_unseen_nowarm` | the `hex_unseen_commit1` configuration with **no warm start** (F110) | 93% | 100% | 20% | 58.8% |
+| `hex_unseen_turn_nowarm` | real turns, no warm start, `--commit 1` | 100% | 100% | 0% | 77.3% |
+| `hex_unseen_turn_nowarm_commit3` | the same at `--commit 3` -- half the switching, faster turn entry | 100% | 100% | 10% | 75.4% |
+| `hex_unseen_side` | hexapod sideways after the library correction, 5 runs | 100% | 100% | 0% | 18.0% |
+| `hex_unseen_side_commit1/5/10/20` | sideways commitment sweep, 5 runs each | 100/60/60/100% | 100% | 0/0/0/40% | 46.7/62.1/48.7/22.2% |
+| `b1_selfgoal_commit1` | B1 in MuJoCo physics, `--commit 1`, 3 goals | 67% | 100% | 33% | 25.3% |
+| `b1_selfgoal_commit3` | the same at `--commit 3` -- **the B1 configuration reported** | 67% | 100% | 33% | **20.3%** |
+| `b1_selfgoal_commit5` | the same at `--commit 5` | 67% | 100% | 33% | 24.5% |
+| `b1_hexgoal_arm1_frozen` | **cross-embodiment ladder** (F112): frozen world model, projector fitted only | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_arm2_mse_separate` | ITM+FDM adapted separately, MSE | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_arm3_mse_joint` | projector+FDM adapted jointly, MSE | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_arm4_nce_joint` | the same **+ InfoNCE** -- the reported configuration | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_warmturn` | the warm-start control (F109): the same goals started with a **turning** clip | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_warmforward` | the same goals with a **forward** warm start -- the F109 control | n/a | 100% | n/a | n/a |
+| `b1_hexgoal_speedrange` | seven forward goals over a 1.72x Froude range -- the speed-tracking test (F111) | n/a | 100% | n/a | n/a |
 
-**The three cross-embodiment directories cannot be scored for speed or behaviour by this script.** Its
+**The cross-embodiment directories cannot be scored for speed or behaviour by this script.** Its
 reference is the run's own `demo`, which for those runs is the B1 clip that supplied the warm start
 and not the hexapod clip that supplied the goal. Running it anyway measures how closely the robot
 kept doing what the warm start did -- which is the F109 finding, but it is not a success rate.
 Grade those on behaviour-family accuracy against chance instead: forward is 67 / 84 / 71%
-across the three warm-start settings against 33% chance, turning straddles chance in all three, and
-sideways is 2 / 0 / 0% against 17%. **Speed across embodiments is measurable via Froude, which is
-dimensionless** -- compute it against the *goal* clip, not the run's `demo`; `b1_hexgoal_speed` does
+across the three warm-start settings against 33% chance, turning clears chance in no arm, and
+sideways is 2 / 0 / 0% against 17%. The four `arm*` directories are the adaptation ladder, four goal
+clips per condition; `plot_adapt_objective.py` draws them. **Speed across embodiments is measurable via Froude, which is
+dimensionless** -- compute it against the *goal* clip, not the run's `demo`; `b1_hexgoal_speedrange` does
 this and finds no tracking at all (F111).
+
+## Figures
+
+`figures/adapt_objective.png` and `.pdf`, from `scripts/figures/plot_adapt_objective.py`, which
+reads the `.npz` files directly and holds no measured value as a literal.
 
 ## Videos
 
-`video_hex_current`, `video_b1_commit3`, `video_heldout_fewshot`, `video_b1_from_hexgoal`. Rendered
+`video_hex_unseen`, `video_b1_selfgoal_commit3`, `video_hex_unseen_fewshot`, `video_b1_hexgoal_warmturn`. Rendered
 with `sim/render/render_closed_loop.py`, which shares `channel_for` with the scorer and takes
 `--goal_dir` to show the goal clip beside the robot.
 

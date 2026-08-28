@@ -92,12 +92,12 @@ three speed targets** (F101).
 
 **Cross-embodiment control** (2026-08-28) is the fourth scope and the narrowest, and it is a claim
 about the **adaptation objective**, not about the pretrained latent. The ladder, all arms at
-`--warm_start 0 --commit 3` against a 33% chance rate on the forward goal: frozen world model with
-only the projector fitted **5%**, adapted separately under MSE **32%**, adapted **jointly** under
-MSE **38%**, jointly with a contrastive term **71%**. **Only the loss term separates the last two**
--- same file, same 24 clips, same code path, and the MSE arm ran 25% more steps. On four clips per
-condition the two do not overlap: **32% +/- 7 against 74% +/- 3**, with MSE exactly on chance.
-Turning clears chance under neither (2% +/- 2 and 32% +/- 5). **A world model pretrained on the insect cannot drive the quadruped at
+`--warm_start 0 --commit 3`, four goal clips per arm, against a 33% chance rate on the forward
+goal: frozen world model with only the projector fitted **5% +/- 0**, adapted separately under MSE
+**28% +/- 5**, adapted **jointly** under MSE **32% +/- 7**, jointly with a contrastive term
+**74% +/- 3**. **Only the loss term separates the last two** -- same file, same 24 clips, same code
+path, and the MSE arm ran 25% more steps. The two do not overlap. **Turning clears chance in no
+arm**, the contrastive one included (32% +/- 5). **A world model pretrained on the insect cannot drive the quadruped at
 all, and MSE adaptation leaves it at chance** -- the contrastive term is what crosses the gap, which
 is F98's mechanism deciding a physics loop rather than a ranking on recorded clips (F112). Goal frames come
 from a **hexapod** clip, candidates stay B1 clips because only those are executable, and the B1

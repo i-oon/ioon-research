@@ -7182,7 +7182,7 @@ faster candidates for faster goals. Every goal draws the same mixture, mean `vx`
 at Froude 0.126, `vx0.38` at 0.160, `vx0.40` at 0.174, `vx0.50` at 0.206, against goals of
 0.129-0.222.
 
-**And the same loop does control speed when the goal is the same robot.** `hex_c3_rep5`: 50% of runs
+**And the same loop does control speed when the goal is the same robot.** `hex_unseen_commit3`: 50% of runs
 inside the 15% band, median error **14.8%**. The graded control is present within an embodiment and
 absent across one, on the dimensionless quantity built to make the comparison fair.
 
@@ -7207,43 +7207,42 @@ project's own scripts printed verdicts that were threshold comparisons of overla
 
 **Asked because the claim was worded to invite it.** "The model never saw the quadruped during
 pretraining" is true and reads as though a hexapod latent generalises to a four-legged robot. The
-ladder that tests it was already on disk: the same loop, the same goals, `--warm_start 0`,
-`--commit 3`, three checkpoints differing only in how much adaptation they received.
+arms that test it were already on disk: the same loop, the same goals, `--warm_start 0`,
+`--commit 3`, four checkpoints differing only in how much adaptation they received and under which
+loss.
 
-| | `ep1` forward | `ep1300` turn | `ep2301` sideways | upright |
-|---|---|---|---|---|
-| **rung 1** frozen world model, projector fitted only | **5%** | 5% | 38% | 3/3 |
-| **rung 2** ITM+FDM adapted separately, MSE | **32%** | 9% | 29% | 3/3 |
-| **rung 3a** projector+FDM **jointly**, MSE | **38%** | 0% | 25% | 3/3 |
-| **rung 3b** projector+FDM jointly, **+ InfoNCE** | **71%** | 37% | 0% | 3/3 |
-| *chance* | *33%* | *33%* | *17%* |
+**Four clips per condition, not four reruns.** The B1 loop is MuJoCo and repeats bit for bit
+(F105), so a rerun returns the identical number; the spread has to come from the recorded goal clip.
 
-**Rung 1 is not weak, it is below chance.** A world model trained on the insect alone, with a
+| adaptation | forward, `speed_c5.8` | turning, `turn_s0.56` |
+|---|---|---|
+| frozen world model, projector fitted only | **5% +/- 0** | 2% +/- 2 |
+| ITM+FDM adapted separately, MSE | **28% +/- 5** | 12% +/- 2 |
+| projector+FDM adapted **jointly**, MSE | **32% +/- 7** | 2% +/- 2 |
+| projector+FDM adapted jointly, **+ InfoNCE** | **74% +/- 3** | 32% +/- 5 |
+| *chance* | *33%* | *33%* |
+
+Every run stayed upright for all 65 steps in every arm.
+
+**The frozen arm is not weak, it is below chance.** A world model trained on the insect alone, with a
 two-layer projector fitted to map the quadruped's 12-D actions into it, selects forward candidates
 **5%** of the time against a 33% rate from guessing. **The pretrained latent does not transfer to
 this robot in any usable sense**, and every sentence implying otherwise has to go.
 
-**Rungs 2 and 3a are chance, and 3a is the control that makes the claim an ablation.** Adapting on
-24 B1 clips under MSE -- what the source method's three stages do throughout -- buys **32%**
-separately and **38%** jointly, against 33%. **Fine-tuning jointly is not what does it**, which was
-the obvious competing explanation and the first thing a reader would ask.
+**The two MSE arms are chance, and the joint one is the control that makes this an ablation.**
+Adapting on 24 B1 clips under MSE -- what the source method's three stages do throughout -- buys
+**28%** separately and **32%** jointly against 33%. **Fine-tuning jointly is not what does it**,
+which was the obvious competing explanation and the first thing a reader would ask.
 
-**Rung 3b is the result.** The same file, the same 24 clips, the same architecture, the same
-`adapt3.py` code path; **only `--lambda_nce` differs**, and forward selection goes **38% to 71%**.
-The same arm reaches 84% with a forward warm start (F109).
+**The contrastive arm is the result.** The same file, the same 24 clips, the same architecture, the same
+`adapt3.py` code path; **only `--lambda_nce` differs**, and forward selection goes
+**32% +/- 7 to 74% +/- 3**. The same arm reaches 84% with a forward warm start (F109).
 
-**With spread, on four recorded clips per condition** (MuJoCo repeats bit for bit, F105, so the
-variation has to come from the goal clip rather than from reruns):
-
-| | `speed_c5.8`, 4 clips | `turn_s0.56`, 4 clips |
-|---|---|---|
-| joint, MSE | **32% +/- 7** (25-38) | **2% +/- 2** (0-5) |
-| joint, **+ InfoNCE** | **74% +/- 3** (71-77) | 32% +/- 5 (28-37) |
-| *chance* | *33%* | *33%* |
-
-**Forward does not overlap**: the MSE arm's best run is 38% and the contrastive arm's worst is 71%.
-MSE sits exactly on chance. **Turning does not clear chance under either**, and MSE is far *below*
-it at 2% -- it avoids turn candidates systematically rather than failing to find them.
+**Forward does not overlap**: the joint-MSE arm's best run is 38% and the contrastive arm's worst is
+71%. **Turning clears chance in no arm at all** -- the contrastive arm's 32% +/- 5 sits on the 33%
+line, and the earlier single-run 37% that read as a result is the top of that band. Both MSE arms
+land *below* chance on turning, at 2% and 12%: they avoid turn candidates systematically rather than
+failing to find them.
 
 **Training budget runs the wrong way to explain it.** `stage3_b1_full` (MSE) ran **15,000** steps
 and `stage3_b1_nce` **12,000** -- the losing arm got 25% more optimisation.
@@ -7266,10 +7265,75 @@ quadruped forward.* Sideways fails at every rung, and **turning does not clear c
 clips are measured -- the 37% that looked like a result is the top of a 28-37 band around a 33%
 chance rate.
 
-> **Rung 1's 38% on sideways is not a result.** With forward at 5% the loop is defaulting onto
+> **The frozen arm's 38% on sideways is not a result.** With forward at 5% the loop is defaulting onto
 > `side_*` candidates, which is what a planner that cannot discriminate looks like when one family
-> happens to sit closest. F96 named this failure mode; the way to see it is that all four of rung
+> happens to sit closest. F96 named this failure mode; the way to see it is that all of
 > 1's columns are within the spread of "always pick the same thing".
+
+---
+
+### F113. The quadruped walks out of its own camera frame, and the insect never does
+
+**Found from a preview video, not from a table.** `results/wm/dataset/preview_beh12/` shows the B1
+partly outside the image in the sideways clips. Measured across all 96 clips -- robot mask taken as
+the difference from each clip's own median background, since the robot moves and the backdrop does
+not:
+
+| | smallest visible area, as a fraction of that clip's own maximum | frames whose silhouette touches an image edge |
+|---|---|---|
+| **B1** `side_R_lvl1` | **42%** | 100% |
+| **B1** `side_L_lvl0` / `lvl1` / `side_R_lvl0` | 87 / 85 / 90% | 100% |
+| **B1** forward and turning | 69-76% | 36-47% |
+| **hexapod**, all twelve conditions | 83-94% | **0%** |
+
+**The insect never touches an edge in any of its 48 clips; the B1 does in every sideways frame and
+in a third to a half of the rest.** And it is not confined to the recorded data -- inside the closed
+loop the B1 drops to **43-66%** visible on cross-embodiment goals and **47%** on its own sideways
+goal, while the hexapod loop stays at **89-93%**.
+
+**This is a data defect on one robot only, and it lands on the behaviour that fails everywhere.**
+Sideways is at or below chance in every arm of F112, on both robots in F104, and survived nine
+refuted explanations (F106) -- all nine of which were on the deployment side.
+
+**It is not established as the cause, and the reason is in the same table.** Forward clips clip
+almost as badly (69-76% visible, 36-47% of frames touching an edge) and forward is the one behaviour
+that works, at 74% +/- 3. **Framing is a real defect and a confound; calling it the explanation
+would repeat the mistake F106 already made twice.**
+
+**Fixing it is not a one-line change.** The camera would have to move back, which changes every B1
+frame, which means re-recording `data/beh12_b1_flat` and redoing the stage-3 adaptation that all of
+F112 rests on. The insect side needs nothing. **Until that is done, every B1 number in this project
+carries a framing asymmetry that the hexapod numbers do not.**
+
+**The floor was checked and is not the problem, which took two measurements to establish.** A
+bigger robot shows more ground, so the ground was the natural next suspect. Background sd on the
+pixels the robot never covers reads **5.53 for the B1 against 3.74 for the insect** -- but splitting
+that into a smoothed component and its residual shows where it lives:
+
+| | total sd | smooth (lighting falloff) | high-frequency (floor texture) |
+|---|---|---|---|
+| B1 | 5.53 | **5.30** | 0.99 |
+| hexapod | 3.74 | **3.37** | 1.02 |
+
+**Both floors are effectively untextured, and identically so** -- 0.99 against 1.02. Essentially all
+of the difference is a smooth lighting gradient, stronger in the B1's scene. **Three readings drawn
+from the raw sd are therefore withdrawn**: that the encoder could key on floor pattern for position,
+that the two scenes' floors let it separate the robots without looking at either, and that the
+texture had to be fixed before the camera. A smooth gradient carries far less of any of that than a
+pattern would.
+
+**What survives is the framing and the apparent size.** Moving the camera back still shows more of
+the lighting gradient, and flattening the lighting is still worth doing while the scene is open --
+but it is a tidy-up, not the reason to re-render.
+
+**Target for the fix, so it can be checked rather than eyeballed:** a B1
+bounding box near **118 px** of 256 -- the insect's -- against its present 157, with **0%** of
+frames touching an edge, which is what the insect already achieves in all 48 of its clips.
+
+> **Fourth defect this project found by looking rather than reading**, after the standing-start
+> jump, the camera that followed the robot, and the loop turning the wrong way. The dataset's own
+> `--separability` check passes on all of these clips, because it measures where the *body* went and
+> never asks whether the camera saw it.
 
 ---
 
@@ -7352,11 +7416,10 @@ chance rate.
   femur/tibia boundary, from recorded frames (F42)
 - `results/wm/dataset/ratio_gaits_ep6.mp4` -- the five bodies walking, ordered by ratio
 - `results/wm/README.md` -- per-run metrics
-- `results/wm/closed_loop/b1_from_hexgoal/` -- cross-embodiment control, turning warm start (F107)
-- `results/wm/closed_loop/b1_hexgoal_fwdwarm/` -- the same goals with a forward warm start (F109)
-- `results/wm/closed_loop/b1_hexgoal_nowarm/` -- the same goals with no warm start at all (F109)
-- `results/wm/closed_loop/hex_rep5_nowarm/` -- the F95 configuration with no warm start (F110)
-- `results/wm/closed_loop/hex_realturn_nowarm{,_c3}/` -- real turns with no warm start, `--commit` 1 and 3 (F110)
-- `results/wm/closed_loop/b1_hexgoal_speed/` -- seven hexapod forward goals spanning 1.72x in Froude (F111)
-- `results/wm/closed_loop/b1_hexgoal_rung{1,2,3mse}/` -- the adaptation ladder against `b1_hexgoal_nowarm` (F112)
-- `results/wm/closed_loop/spread_rung3{mse,nce}/` -- four clips per condition on the two contested arms (F112)
+- `results/wm/closed_loop/b1_hexgoal_warmturn/` -- cross-embodiment control, turning warm start (F107)
+- `results/wm/closed_loop/b1_hexgoal_warmforward/` -- the same goals with a forward warm start (F109)
+- `results/wm/closed_loop/b1_hexgoal_arm4_nce_joint/` -- the same goals with no warm start at all (F109)
+- `results/wm/closed_loop/hex_unseen_nowarm/` -- the F95 configuration with no warm start (F110)
+- `results/wm/closed_loop/hex_unseen_turn_nowarm{,_c3}/` -- real turns with no warm start, `--commit` 1 and 3 (F110)
+- `results/wm/closed_loop/b1_hexgoal_speedrange/` -- seven hexapod forward goals spanning 1.72x in Froude (F111)
+- `results/wm/closed_loop/b1_hexgoal_arm{1,2,3,4}_*/` -- the four adaptation arms, four goal clips per condition (F112)

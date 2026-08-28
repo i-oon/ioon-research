@@ -1,7 +1,9 @@
 """The adaptation objective decides cross-embodiment selection: MSE lands on chance, InfoNCE does not.
 
 Both arms are `wm/adapt3.py` on the same 24 B1 clips, the same architecture and the same code path;
-only `--lambda_nce` differs, and the MSE arm ran 15,000 steps against the contrastive arm's 12,000.
+only `--lambda_nce` separates the last two, and the MSE arm ran 15,000 steps against the
+contrastive arm's 12,000. The first two arms are earlier, weaker adaptations kept in the figure
+because they show the source method's objective failing at three different amounts of it.
 The goal frames come from a **hexapod** clip and the candidates are B1 clips, so only the goal
 crosses embodiments (F107).
 
@@ -33,7 +35,10 @@ PANELS = (
     ("turning", "turn_s0.56", "turn",
      ("hexapod_ep1300", "hexapod_ep1301", "hexapod_ep1302", "hexapod_ep1303")),
 )
-ARMS = (("MSE", "spread_rung3mse", SAND), ("+ InfoNCE", "spread_rung3nce", TEAL))
+ARMS = (("frozen\nworld model", "b1_hexgoal_arm1_frozen", GREY),
+        ("adapted\nseparately", "b1_hexgoal_arm2_mse_separate", SAND),
+        ("adapted\njointly", "b1_hexgoal_arm3_mse_joint", SAND),
+        ("adapted jointly\n+ InfoNCE", "b1_hexgoal_arm4_nce_joint", TEAL))
 CHANCE = 1 / 3
 
 
@@ -60,7 +65,7 @@ def main():
     ap.add_argument("--out", default="results/wm/closed_loop/figures/adapt_objective.png")
     args = ap.parse_args()
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.6), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(9.6, 4.0), sharey=True)
     rng = np.random.default_rng(0)          # jitter only, never touches a measured value
 
     for ax, (title, condition, want, goals) in zip(axes, PANELS):
@@ -80,7 +85,12 @@ def main():
                         textcoords="offset points", xytext=(0, 9), ha="center",
                         color=INK, fontsize=9.5, fontweight="semibold")
         ax.set_xlim(-.55, len(ARMS) - .45)
-        ax.set_xticks(range(len(ARMS)), [a[0] for a in ARMS])
+        ax.set_xticks(range(len(ARMS)), [a[0] for a in ARMS], fontsize=8.5)
+        # the first three arms are the source method's objective at three points; only the last differs
+        ax.plot([-.3, 2.3], [-.215, -.215], color=GREY, lw=1, clip_on=False,
+                transform=ax.get_xaxis_transform())
+        ax.text(1.0, -.26, "MSE, as the source method does at every stage", ha="center",
+                fontsize=8, color=GREY, transform=ax.get_xaxis_transform())
         ax.set_title(title, fontsize=10.5, color=INK, pad=14)
         ax.text(.5, 1.015, condition, transform=ax.transAxes, ha="center",
                 fontsize=8.5, color=GREY, family="monospace")
@@ -96,10 +106,10 @@ def main():
     axes[0].annotate("chance", (-.5, CHANCE), textcoords="offset points", xytext=(2, 4),
                      ha="left", color=GREY, fontsize=8.5)
     # the turning panel's conclusion is that nothing clears the line, which is easy to miss
-    axes[1].annotate("neither clears chance", (.5, .62), ha="center", color=GREY, fontsize=8.5)
+    axes[1].annotate("no arm clears chance", (1.5, .62), ha="center", color=GREY, fontsize=8.5)
     fig.suptitle("Adaptation objective, not adaptation itself, is what crosses embodiments",
                  fontsize=11, color=INK, y=1.0)
-    fig.text(.5, -.03, "hexapod goal frames, B1 candidates and body, MuJoCo physics; "
+    fig.text(.5, -.10, "hexapod goal frames, B1 candidates and body, MuJoCo physics; "
                        "one point per recorded goal clip, bars are $\\pm$1 s.d. (n=4)",
              ha="center", fontsize=8, color=GREY)
     fig.tight_layout()

@@ -58,6 +58,7 @@ exception, and says so in the file: the broken bodies are its subject.
 
 | | |
 |---|---|
+| `identity_linearity.py` | Is embodiment identity actually removed from `z`, or only hidden from a straight line? |
 | `z_content.py` | Is the latent still a behaviour representation, or was it hollowed out? |
 | `z_dynamics.py` | Does the latent carry the transition, or only the pose at time t? |
 | `z_body_share.py` | How much of the latent is "which body is this", on trained and on held-out bodies. |
@@ -71,7 +72,11 @@ exception, and says so in the file: the broken bodies are its subject.
 | | |
 |---|---|
 | `latent_rollout.py` | Closes the forward model on its own output and rolls it forward against two no-learning baselines. The only script that scores it on the task it is actually for. |
+| `cross_latent_rollout.py` | Drive one robot's forward model with the other robot's latent, and see if the prediction holds. LAC-WM section 5.2, adapted. |
+| `ftm_uses_z.py` | Does the forward model read the latent, or is the next frame guessable without it? |
 | `aug_noise.py` | How much of the reconstruction target is augmentation noise rather than motion. |
+| `target_window_sweep.py` | Does shortening the window turn the motion target from a state into a change? |
+| `loss_gradient_balance.py` | Which loss term is actually pulling on the latent, measured as a gradient rather than a loss. |
 
 **Whether the setting supports the claim**
 
@@ -83,6 +88,18 @@ exception, and says so in the file: the broken bodies are its subject.
 | `swap_embodiment.py` | Does a latent inferred from an unseen embodiment drive the decoder, or is that embodiment simply read as a training body? The cross-embodiment form of `swap_pathway.py`, definable only for the 4-leg, which shares expert episodes with the hexapod. |
 | `b1_horizon.py` | Is the B1's command as determined by a single frame as the insect's is? |
 | `occlusion_dynamics.py` | Does the second frame matter more when one frame cannot fix the gait phase? |
+| `pretrain_control.py` | Does insect pretraining transfer locomotion, or only familiarity with the feature space? |
+| `speed_variance_split.py` | Is body speed readable from one frame because of physics, or because we built the data badly? |
+| `pairing_taskspace.py` | Can a cross-embodiment pairing be built in task space, where the contact labels failed? |
+
+**The shared body target**
+
+| | |
+|---|---|
+| `screen_behaviour_channels.py` | Which body-motion channels carry shared meaning, now that both robots vary in them. **Supersedes `_archive/channel_screen.py`**, which predates the corrected data. Run it against the checkpoint you are actually claiming about: on `beh12_hexonly` nothing transfers, because that run has one robot in it (F110). |
+| `body_head_ablation.py` | Does the body-motion term constrain the latent, or does the head read the frame instead? |
+| `body_motion_probe.py` | Does a body-level motion readout transfer between the two robots, where a leg-level one does not? |
+| `show_body_motion_edges.py` | See the edge artefact in the `lambda_body` target, next to the video it was computed from. |
 
 **Cross-embodiment transfer**
 
@@ -97,6 +114,24 @@ exception, and says so in the file: the broken bodies are its subject.
 | | |
 |---|---|
 | `wm_gait_report.py` | Gait diagram and side-by-side video, predicted commands against IK ground truth, driven through the same physics. |
+
+**Planning and the closed loop** — everything below scores *selection*, not prediction. A model that
+predicts the next frame well and ranks candidates badly passes every other table on this page.
+
+| | |
+|---|---|
+| `plan_open_loop.py` | Run the planner over recorded frames, before any simulator is involved. Start here: if selection fails offline it will not appear in a loop. |
+| `plan_discriminates.py` | Can the forward model tell a good candidate action from a bad one? |
+| `does_rollout_matter.py` | Does rolling the forward model change which action the planner picks? Scores `rollout` against `direct` (no roll) and `blind` (no action) — deleting the rollout costs 24-30 points on the B1 (F100). |
+| `action_identifies_behaviour.py` | Does the action, on its own, say which behaviour is being performed? The control for "this robot's actions carry nothing plannable", which was asserted and then refuted (F97). |
+| `score_closed_loop.py` | Score a closed-loop run against the criteria fixed in advance. **Read its `channel_for` first**: grading a turn on forward speed is what it exists to prevent (F108). Survival is `n/a`, never 0%, on a loop that cannot fall. |
+| `does_score_see_speed.py` | Does the planner's score separate *how fast*, or only *which behaviour*? |
+| `why_speed_misses.py` | Is the candidate library too coarse to hit the commanded speed, or is the planner missing? |
+| `what_stitching_costs.py` | Does switching between recorded clips cost travel, or was that an artefact of a residual? |
+| `loop_frames_are_off_manifold.py` | Are the frames the loop drives itself into outside what the model was fitted on? |
+| `hexapod_replay_fidelity.py` | Does replaying a recorded hexapod clip reproduce its speed, as F93 implies it must? |
+| `b1_replay_stability.py` | Does a recorded B1 action sequence keep the robot upright when replayed open loop? Answers whether a fall is the planner's fault or the clip's. |
+| `z_crosses_bodies.py` | Is the latent organised by behaviour or by body? **Its verdict has been backwards about the loop twice** — it ranks turning first and forward last, and the loop does the opposite (F107, F112). A pooled linear readout is not what the planner computes. |
 
 ---
 
@@ -114,9 +149,36 @@ exception, and says so in the file: the broken bodies are its subject.
 
 ## figures/
 
-`make_track_figures.py`, `make_stage2_diagram.py`, `plot_morphology_evidence.py`,
-`plot_cross_loss_effect.py`,
-`plot_obs_format.py`, `plot_ik_intuition.py`.
+Every one of these reads its numbers from disk. **None of them holds a measured value as a
+literal**, so a figure cannot drift away from the run it describes.
+
+| | |
+|---|---|
+| `plot_adapt_objective.py` | The adaptation-objective result: MSE on chance, InfoNCE well above it, one point per recorded goal clip (F112). |
+| `plot_ftm_fewshot.py` | How many clips of a new robot adapt the forward model, and to what horizon. |
+| `plot_4leg_fewshot_and_ablation.py` | The 4-leg head fit against clip count, with the latent ablated. |
+| `plot_body_head_design.py`, `plot_cross_loss_effect.py` | What each added loss term buys and costs. |
+| `plot_morphology_evidence.py`, `plot_z_umap.py` | The encoder's morphology readout, and the latent's layout. |
+| `plot_obs_format.py`, `plot_ik_intuition.py` | Explanatory, not measurements. |
+| `make_track_figures.py`, `make_stage2_diagram.py` | Pipeline diagrams. |
+
+## dataset/, continued
+
+| | |
+|---|---|
+| `collect_beh12.py` | Collect the twelve matched behaviours for one body. `--separability` is not optional: it checks that `side_L` travels positive lateral and `side_R` negative, and that each level exceeds the one below **on its own channel**. Two conditions shipped reversed before that check existed (F106). |
+| `merge_behaviour_dirs.py`, `merge_speed_dirs.py` | Combine collected directories into one training set. |
+| `preview_clips.py`, `plot_gait_compare.py` | Look at a new body before training on it. Always do this. |
+
+## Traps this directory exists because of
+
+| | |
+|---|---|
+| **a verdict is not a measurement** | Several scripts used to print "reachable" / "not reachable" from a threshold comparison of two overlapping means. They were removed. Report the number and the chance rate; let the reader conclude. |
+| **`pgrep -f` matches the shell running it** | A wait-loop keyed on `pgrep -f "<script name>"` never exits, and the job it was guarding silently never starts. Check for output files, not for processes. |
+| **CoppeliaSim fails silently** | No error, no exit, ~0% CPU. It needs a GUI instance (`DISPLAY=:0`), exactly one, and headless exits on its own. |
+| **`--demo` is an intervention** | In the closed loop it supplies the starting state *and* the first `--warm_start` actions, which for a same-robot run are the goal clip's own. Hold it fixed and neutral, or vary it as a control (F109, F110). |
+| **MuJoCo repeats, CoppeliaSim does not** | Rerunning a B1 configuration returns the identical number and carries no information; a hexapod configuration spreads 37-71%. Get spread from different goal clips on the B1, from repeats on the insect (F105). |
 
 ## finished/
 
