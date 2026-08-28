@@ -7441,6 +7441,62 @@ frames from unpinned cameras**, including all of F112.
 
 ---
 
+### F114. One of the four turn levels does not turn, and it is the forward clip under another name
+
+**Spotted in a preview video.** `b1_turn_wz0.00` walks straight, because `wz = 0.00` is a commanded
+yaw rate of zero. Measured, it is not merely weak -- it is **the same behaviour as the forward
+clip**:
+
+| condition | forward Froude | yaw |
+|---|---|---|
+| `speed_vx0.30` | **+0.1259** | **+0.0008** |
+| `turn_wz0.00` | **+0.1259** | **+0.0008** |
+| `turn_wz0.08` | +0.1288 | +0.0146 |
+| `turn_wz0.19` | +0.1297 | +0.0359 |
+| `turn_wz0.40` | +0.1295 | +0.0760 |
+
+Identical to four decimals in both channels. **The twelve-condition set contains eleven behaviours.**
+
+**The insect's weakest turn is milder but not a duplicate.** `turn_s0.05` reaches yaw -0.0072
+against forward's +0.0026 to +0.0088 -- the same magnitude as straight walking's drift, though at
+least the opposite sign. F107 already flagged that clip as barely turning; this is the quadruped's
+version of the same problem, one step worse.
+
+**It biases the two families in opposite directions, which is worse than a constant offset.**
+Choosing `wz0.00` is *correct* behaviour for a forward goal and is scored as a miss; it is *wrong*
+behaviour for a turn goal and is scored as a hit. Recomputing F112's ladder with `wz0.00` counted as
+what it does rather than what it is called:
+
+| | forward goal, as labelled | by behaviour | turn goal, as labelled | by behaviour |
+|---|---|---|---|---|
+| frozen | 5% | 5% | 2% | 2% |
+| separate, MSE | 28% | **37%** | 12% | **5%** |
+| joint, MSE | 32% | 32% | 2% | 2% |
+| joint, **+ InfoNCE** | 74% | **83%** | 32% | **23%** |
+| *chance* | *33%* | ***42%*** | *33%* | ***25%*** |
+
+Chance moves too: forward holds five of twelve conditions and turning three.
+
+**Both conclusions survive and both numbers move.** Forward goes to **83% against 42%**, still twice
+chance; turning goes to **23% against 25%**, still not clearing it. **The contrastive result is not
+an artefact of this defect** -- it is the arm that gains most on forward and loses most on turning,
+which is what a planner that actually reads the goal should do.
+
+**The `--separability` check cannot see it, and the reason is general.** It verifies that each level
+exceeds the one below *on its own channel*, and 0.0146 > 0.0008 passes. **Nothing checks that a
+family's weakest level is distinguishable from a different family.** Adding that is one comparison:
+the lowest level of each family must differ from the forward clips by more than the forward clips
+differ among themselves.
+
+**The fix worth making is a new level, not a relabelling.** Renaming `wz0.00` to `speed` is free and
+leaves turning with three levels against everything else's four. Collecting `wz0.60` instead
+restores the balance **and extends the quadruped's turn range past the insect's**, which is
+presently the other way around -- the B1 tops out at yaw 0.076 where the insect reaches 0.088, so
+the two robots' strongest turns are not matched either. `rollout_b1_mujoco.py --wz` already does it,
+and the re-render is happening anyway.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
