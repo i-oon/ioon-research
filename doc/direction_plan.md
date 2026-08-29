@@ -90,8 +90,18 @@ A **quadruped** stands through every episode under the same planner after the wo
 adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
 three speed targets** (F101).
 
-**Cross-embodiment control** (2026-08-28) is the fourth scope and the narrowest, and it is a claim
-about the **adaptation objective**, not about the pretrained latent. The ladder, all arms at
+**Cross-embodiment control** (2026-08-28, refitted on the corrected B1 set 2026-08-29) is the
+fourth scope and the narrowest. **Forward and turning both cross; sideways does not.** With the two
+stage-3 arms differing only in `--lambda_nce`: forward **53%** under MSE and **54%** with the
+contrastive term against 33% chance, turning **22%** and **43%**, sideways 19% and 20% against 17%.
+Every run stayed upright and **every turning run turned the right way** -- the first time that could
+be measured, since the two robots turned opposite ways until F115.
+
+**The contrastive term's job is to make the forward model use its action, and that only matters for
+turning.** Its `/mean-z` goes 0.977 to 0.493; the collapsed arm still selects forward at 53%, so
+**forward can be chosen by a model that ignores the action entirely** and is not evidence the world
+model works. F112's 32%-against-74% on forward does not reproduce and was partly a label defect
+(F114, F116). The ladder, all arms at
 `--warm_start 0 --commit 3`, four goal clips per arm, against a 33% chance rate on the forward
 goal: frozen world model with only the projector fitted **5% +/- 0**, adapted separately under MSE
 **28% +/- 5**, adapted **jointly** under MSE **32% +/- 7**, jointly with a contrastive term

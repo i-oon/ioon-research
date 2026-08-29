@@ -7556,7 +7556,7 @@ is done.**
 
 ---
 
-### F116. On the corrected data the contrastive term buys turn selection and nothing on forward, and F112's headline does not reproduce
+### F116. Forward selection survives a forward model that ignores its action, and that is what the contrastive term is for
 
 **The whole pipeline was refitted on `data/beh12_b1_v2`** -- stage 1, stage 2, stage 3 -- because
 the set the original was fitted on turns the opposite way from the insect (F115), files the forward
@@ -7602,6 +7602,32 @@ accuracy rewards the second. **Neither reaches the commanded rate** -- 54% and 4
 **Turning crosses embodiments, weakly, and this is the first time the question could be asked.**
 Before the sign was fixed a hexapod goal turning one way was scored against a library that only
 turned the other, so every earlier turning number measured the dataset.
+
+**The `/mean-z` column resolves what looked like a contradiction, and it is the sharpest number
+here.** F98 built that ratio to catch a forward model that ignores its action input: 1.0 means the
+answer given the real action equals the answer given the mean one.
+
+| | `/mean-z` | forward in the loop | turning in the loop |
+|---|---|---|---|
+| MSE | **0.977** | 53% | 22% |
+| + InfoNCE | **0.493** | 54% | 43% |
+| *chance* | | *33%* | *33%* |
+
+**The MSE arm ignores the action channel and still selects forward at 53% against 33%.** That is the
+result to take seriously: **forward "cross-embodiment control" does not require the forward model to
+use the action at all** -- a 2% residual sensitivity is enough to rank the speed family above the
+others. Forward is separable in the frame, and picking it is not evidence that the world model is
+working.
+
+**So the contrastive term does help, and only where help is needed.** What it changes is whether the
+model uses the action -- 0.977 to 0.493 -- and that shows up exactly in the behaviour that cannot be
+chosen without it: turning, where the collapsed arm sits **below** chance at 22% and the contrastive
+arm clears it at 43%. On forward, where a nearly collapsed model already scores 1.6x chance, it buys
+nothing.
+
+**This also reframes F100.** Deleting the rollout there cost 30 points, but the arm measured was one
+that used its action channel. A model that has already stopped using it loses far less, because the
+selection it was making did not depend on the action in the first place.
 
 **Sideways is at chance under both** -- 19% and 20% against 17% -- which is now the fourth
 independent measurement of the same failure and the first on data with no known defect in it.
