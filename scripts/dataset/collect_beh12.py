@@ -64,10 +64,16 @@ SPEED = [("speed_c5.8", ["--cycles", "5.8"]),
          ("speed_c8.15", ["--cycles", "8.15"]),
          ("speed_c8.8", ["--cycles", "8.8"])]
 
-TURN = [("turn_s0.05", ["--spin", "0.05"]),
-        ("turn_s0.15", ["--spin", "0.15"]),
-        ("turn_s0.29", ["--spin", "0.29"]),
-        ("turn_s0.56", ["--spin", "0.56"])]
+TURN_LEVELS = (0.05, 0.15, 0.29, 0.56)
+
+
+def turn_conditions(sign=1.0):
+    """`--spin` per level, signed. The name keeps the magnitude; the sign is a collection choice."""
+    return [(f"turn_s{v:.2f}".rstrip("0").rstrip("."), ["--spin", f"{sign * v:g}"])
+            for v in TURN_LEVELS]
+
+
+TURN = turn_conditions()
 
 # F71's sideways gait: fore-aft amplitude zero, feet half a cycle out of phase, and a `--spin`
 # that cancels the yaw the strafe induces -- different per direction, which is why left and right
@@ -259,6 +265,12 @@ def main():
                          "this first**: two of the twelve recipes are reconstructed, and a wrong "
                          "one produces a dataset that differs from the original without saying so.")
     ap.add_argument("--verify_out", default="data/beh12_verify_raw")
+    ap.add_argument("--spin_sign", type=float, default=1.0,
+                    help="multiply every turn level's --spin by this. **The same positive spin "
+                         "rotates c10f10t10 one way and c08f09t09 the other** (F117), so a body "
+                         "whose turns must match a reference collects them with -1 here. Verify "
+                         "with --separability --turn_sign rather than assuming the flag flips "
+                         "the motion: the two bodies already disagree under an identical command.")
     ap.add_argument("--turn_sign", type=float, default=0.0,
                     help="the yaw sign this body's turns must have, to match the body the "
                          "goals come from. 0 disables the check. Two hexapod bodies running "
@@ -272,11 +284,16 @@ def main():
     ap.add_argument("--tolerance", type=float, default=0.15,
                     help="relative agreement required on the condition's dominant channel")
     args = ap.parse_args()
-    if args.lvl0_strafe != LVL0_STRAFE:
-        global CONDITIONS, SIDE
+    if args.lvl0_strafe != LVL0_STRAFE or args.spin_sign != 1.0:
+        global CONDITIONS, SIDE, TURN
         SIDE = side_conditions(args.lvl0_strafe)
+        TURN = turn_conditions(args.spin_sign)
         CONDITIONS = SPEED + TURN + SIDE
-        print(f"lvl0 strafe {args.lvl0_strafe} (default {LVL0_STRAFE})")
+        if args.lvl0_strafe != LVL0_STRAFE:
+            print(f"lvl0 strafe {args.lvl0_strafe} (default {LVL0_STRAFE})")
+        if args.spin_sign != 1.0:
+            print(f"spin sign {args.spin_sign:+g}: " +
+                  " ".join(f"{n}={c[1]}" for n, c in TURN))
 
     if args.separability:
         separability(os.path.join(ROOT, args.separability))

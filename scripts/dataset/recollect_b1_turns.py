@@ -55,10 +55,16 @@ SYM = "sim/assets/b1_policy/base_1.7hz_sym/model_600.pt"
 # Calibrated on the finished clips, not on the rollout: the sweep measures yaw at the rollout's
 # 50 Hz and the clips are stored at 20 Hz, and the median of the downsampled series is not the
 # median of the full one -- fitting on the wrong rate left the strongest level 27% short.
-LEVELS = (("turn_w0.008", 0, 1000, {"sym": -0.023, "gait3": -0.081}),
-          ("turn_w0.024", 1, 1100, {"sym": -0.115, "gait3": -0.169}),
-          ("turn_w0.037", 2, 1200, {"sym": -0.191, "gait3": -0.252}),
-          ("turn_w0.075", 3, 1300, {"sym": -0.587, "gait3": -0.664}))
+# **Positive, to match both insect bodies.** The first pass matched the goal body's negative turns;
+# F117 then found the *pretraining* body turning the other way, and the cheapest resolution is to
+# align everything to it -- pretraining is the expensive artefact, collection and fine-tuning are
+# not. The goal body was re-collected at `--spin_sign -1` and the commands here are negated with it.
+# The policy's response was linear in the sweep, so the magnitudes carry over; **that is an
+# assumption of symmetry and the verify step below is what checks it.**
+LEVELS = (("turn_w0.008", 0, 1000, {"sym": 0.023, "gait3": 0.081}),
+          ("turn_w0.024", 1, 1100, {"sym": 0.115, "gait3": 0.169}),
+          ("turn_w0.037", 2, 1200, {"sym": 0.191, "gait3": 0.252}),
+          ("turn_w0.075", 3, 1300, {"sym": 0.587, "gait3": 0.664}))
 # two clips per policy, in the order the existing set uses: sym first, then gait3 (F80)
 POLICIES = (("sym", SYM, 1.7), ("gait3", "", 2.0))
 CLIPS_PER_POLICY, FRAMES, FPS = 2, 66, 20.0
