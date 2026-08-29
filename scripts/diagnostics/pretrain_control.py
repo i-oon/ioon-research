@@ -151,7 +151,7 @@ def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save, min_gap=10
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="data/ik_walk_m3d_clean")
-    ap.add_argument("--arch_ckpt", default="wm/runs/stage1_m3d_cross/best.pt",
+    ap.add_argument("--arch_ckpt", default="wm/runs/s1_m3d_cross/best.pt",
                     help="only its Config is used, so both arms match the run they explain")
     ap.add_argument("--out_dir", default="wm/runs")
     ap.add_argument("--modes", nargs="+", default=["real", "shuffled"],

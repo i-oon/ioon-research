@@ -27,7 +27,7 @@ visits 9.8% and 5.7% of the time. Report the margin either way; a prediction is 
 backbone score negative R^2 -- neither produces a usable head -- so their ratio compares two
 failures and says nothing. At nine both are positive and the comparison means something.
 
-  .venv/bin/python3 scripts/diagnostics/fit_b1_head.py --ckpt wm/runs/stage1_m3d_cross/best.pt
+  .venv/bin/python3 scripts/diagnostics/fit_b1_head.py --ckpt wm/runs/s1_m3d_cross/best.pt
 """
 import argparse
 import glob
@@ -149,7 +149,7 @@ def condition_groups(paths):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", default="wm/runs/stage1_m3d_cross/best.pt")
+    ap.add_argument("--ckpt", default="wm/runs/s1_m3d_cross/best.pt")
     ap.add_argument("--data", default="data/b1_framed")
     ap.add_argument("--train_clips", type=int, default=5)
     ap.add_argument("--splits", type=int, default=3)
