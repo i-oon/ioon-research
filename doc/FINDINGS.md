@@ -7672,6 +7672,18 @@ and leaves the training body's cell **empty**, so the reversal was never display
 caught the sideways reversal on that body and reported it as a headline; turning reversed in exactly
 the same way and went unnoticed for a week, because one column was not filled in.
 
+**Confirmed by looking at the walked paths, after three angle measures disagreed with each other.**
+Asked to cross-check the sign, the obvious quick tests all failed: the endpoint difference of the
+body quaternion reads +12 deg and +10 deg for the two bodies -- the same sign -- and an unwrapped
+heading taken from consecutive head displacements gives a ladder that *decreases* with commanded
+spin. **Both are contaminated by the insect's body swinging side to side every step**, which is the
+same reason F72 rejected head orientation and Euler angles when the yaw channel was first defined.
+
+`results/wm/dataset/figures/turn_paths_three_sets.png` plots the head's path for all four turn
+levels of each set, smoothed over one stride. **The two insect bodies curve in visibly opposite
+directions and the B1 curves with the goal body**, which settles it and also validates
+`yaw_rate()`: its signs match the paths, where the naive checks did not.
+
 **It is most likely morphology rather than a defect.** Both bodies run the same CPG at the same
 `--spin` levels, and the leg-ratio change that reverses the weak sideways gait (F94) plausibly
 reverses the turning gait too. **But it means `turn_s0.56` does not denote the same behaviour across
