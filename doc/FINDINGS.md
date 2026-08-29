@@ -7690,6 +7690,21 @@ bodies**, in a dataset whose entire purpose is matched behaviour.
 negative, so selection is being asked a coherent question; the pretrained model's exposure to the
 opposite sign is a handicap both arms carry equally.
 
+**Closed in the collector rather than in a note.** `collect_beh12.py --separability` checked
+`side_L` and `side_R` for sign but turning only for **size** -- `abs(w) < 0.5 * abs(turn_s0.56)` --
+which is the same `|w_hat|` blindness F75 diagnosed between the two robots. It now fails a body
+whose turn levels disagree with each other, and takes `--turn_sign` to fail a body whose turns
+oppose the one the goals come from. Run over the three sets in use:
+
+| | turn signs | |
+|---|---|---|
+| `beh12_hex_flat`, pretrained on | **+** | consistent |
+| `beh12_c08f09t09_flat`, the goals | **-** | consistent |
+| `beh12_b1_v2`, the candidates | **-** | consistent |
+
+Each set is internally consistent, which is why nothing ever failed; the disagreement is only
+visible across sets, and no check compared sets until now.
+
 > **The lesson is the blank cell, not the sign.** A comparison table with an empty column reads as
 > "not applicable" and hides "not checked". Fill every cell or say why it is missing.
 

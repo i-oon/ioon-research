@@ -173,8 +173,21 @@ def separability(root):
             bad.append(f"{c}: lateral {l:+.3f}, should travel left (positive)")
         if c.startswith("side_R") and l >= 0:
             bad.append(f"{c}: lateral {l:+.3f}, should travel right (negative)")
-        if c.startswith("turn") and abs(w) < 0.5 * abs(mean.get("turn_s0.56", (0, 0, 1))[2]):
-            pass
+    # **Turning is checked for sign, not only for size, and that gap cost a week.** The four turn
+    # levels of one body must all rotate the same way, and they must rotate the way the reference
+    # body does -- `--turn_sign`. Checking `|yaw|` alone is what let `c10f10t10` turn one way and
+    # `c08f09t09` the other through four bodies and two robots (F75, F115, F117): the calibration
+    # tables all reported magnitudes and agreed to within 3%.
+    turns = {c: w for c, (f, l, w) in mean.items() if c.startswith("turn")}
+    if turns:
+        signs = {np.sign(w) for w in turns.values() if abs(w) > 1e-3}
+        if len(signs) > 1:
+            bad.append("turn levels disagree on direction: "
+                       + ", ".join(f"{c} {w:+.4f}" for c, w in sorted(turns.items())))
+        elif args.turn_sign and signs and args.turn_sign not in signs:
+            bad.append(f"turns rotate {'positive' if 1 in signs else 'negative'}, "
+                       f"--turn_sign asked for {'positive' if args.turn_sign > 0 else 'negative'}; "
+                       "a body whose turns oppose the reference is not collecting the same behaviour")
     for fam, ch in (("side_L", 1), ("side_R", 1), ("turn", 2), ("speed", 0)):
         levels = sorted((c for c in mean if c.startswith(fam)), key=str)
         for a, b in zip(levels, levels[1:]):
@@ -246,6 +259,11 @@ def main():
                          "this first**: two of the twelve recipes are reconstructed, and a wrong "
                          "one produces a dataset that differs from the original without saying so.")
     ap.add_argument("--verify_out", default="data/beh12_verify_raw")
+    ap.add_argument("--turn_sign", type=float, default=0.0,
+                    help="the yaw sign this body's turns must have, to match the body the "
+                         "goals come from. 0 disables the check. Two hexapod bodies running "
+                         "the same --spin turned opposite ways and nothing noticed for a "
+                         "week, because every table reported |yaw| (F117).")
     ap.add_argument("--separability", default="",
                     help="measure a collected directory instead of collecting: how far apart the "
                          "conditions sit in body-motion space, in units of their own spread. This "
