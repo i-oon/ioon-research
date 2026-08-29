@@ -23,7 +23,7 @@ Three gates, following F69:
     hides robot   AUC near 0.5 from the target alone; lateral speed failed this at 0.788
     transfers     a readout fitted on one robot, applied to the other
 
-  .venv/bin/python3 scripts/diagnostics/channel_screen.py --ckpt wm/runs/s2_hex7-b1_body0.5/last.pt
+  .venv/bin/python3 scripts/diagnostics/channel_screen.py --ckpt wm/runs/s2_fwd_hex7-b1_body0.5/last.pt
 """
 import argparse
 import glob
@@ -82,7 +82,7 @@ def cell(x_tr, y_tr, x_te, y_te):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", default="wm/runs/s2_hex7-b1_body0.5/last.pt")
+    ap.add_argument("--ckpt", default="wm/runs/s2_fwd_hex7-b1_body0.5/last.pt")
     ap.add_argument("--insect_dir", default="data/ik_walk_speed7")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()

@@ -14,7 +14,7 @@ UMAP is illustration only: it does not preserve distance, and it will happily dr
 is not there. The measurement stays the probe's numbers, printed under each row.
 
   .venv/bin/python3 scripts/figures/plot_z_umap.py \\
-      --ckpts wm/runs/s2_hex7-b1_ctrl/last.pt wm/runs/s2_hex7-b1_body0.5/last.pt \\
+      --ckpts wm/runs/s2_fwd_hex7-b1_ctrl/last.pt wm/runs/s2_fwd_hex7-b1_body0.5/last.pt \\
       --labels "control (no body term)" "with body head"
 """
 import argparse

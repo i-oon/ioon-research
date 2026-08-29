@@ -43,7 +43,7 @@ from diagnostics.body_motion_probe import gather, standardise
 R="/home/aria/ioon-research"
 from vjepa2_encoder import VJEPA2FrameEncoder
 enc=VJEPA2FrameEncoder(device="cuda", dtype=torch.float32)
-ck=torch.load(f"{R}/wm/runs/s2_hex7-b1_body0.5/last.pt", map_location="cpu", weights_only=False)
+ck=torch.load(f"{R}/wm/runs/s2_fwd_hex7-b1_body0.5/last.pt", map_location="cpu", weights_only=False)
 itm=InverseTransitionModel(from_checkpoint(ck["config"])); itm.load_state_dict(ck["itm"]); itm.eval()
 d=gather(enc, 2, "data/ik_walk_speed7", f"{R}/results/wm/cache/probe_ik_walk_speed7.pt", itm, ck)
 del enc
