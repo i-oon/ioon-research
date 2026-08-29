@@ -57,3 +57,41 @@ This was the most valuable thing that came out of the deeper digging — a clean
 ถ้าผ่าน → รันข้อ 2
 อัปเดตแถวสุดท้ายของตารางเป็นสองเวอร์ชันตามสถานะจริง พร้อม flag ว่าข้อ 3 (video+joint count) ยังไม่ปิดจนกว่าข้อทดลอง 1-2 จะเสร็จ
 เชื่อม claim นี้เข้ากับ Q17_ANS เวอร์ชันล่าสุด (objective-at-adapt-time) — สองอันนี้เป็นคนละแกนแต่ต้องไม่ขัดกัน ตัวที่เป็นแกนหลักคือ objective, ตัวนี้เป็น secondary claim ที่ยังอยู่ระหว่างพิสูจน์
+
+
+## Where "ours" stands vs. every alternative — full positioning summary
+
+**The one-line version:**
+
+> Every alternative either needs a human to define correct behavior on the target robot, needs a kinematic model to define correspondence, or (like LAC-WM) needs an existing policy to select from. Ours needs none of the three — it needs unlabelled interaction and the transferred latent action space.
+
+---
+
+### The full landscape, by what each approach requires
+
+| Approach | Requires on the new robot | Generates or selects? | Why it's not a real alternative |
+|---|---|---|---|
+| **Vanilla RL from scratch** | a hand-designed reward function | Generates | Reward engineering is the same cost as kinematic engineering, just relocated — throws away everything the video-trained latent space already knows |
+| **BC on curated B1 clips** | 24 human-picked "correct" demonstrations | Generates | Circular — a human decided what counts as correct walking/turning/strafing before training starts (Q16) |
+| **BC on bio (insect) video** | *not well-defined* — no `(obs, action)` pairing exists without... | — | ...either hand-labeling the correspondence, or a kinematic retargeting step (X-Morph's move), or a learned cross-embodiment map — which *is* the pipeline itself. Not a baseline; it's excluded, not beaten. |
+| **LAC-WM / STORM / World Action Planner** | a pretrained, competent VLA to propose candidates | **Selects**, doesn't generate | Presupposes the hard part (a working policy) already exists; only reranks its outputs |
+| **Li et al. 2020 (hexapod+quadruped)** | separate expert demonstrations per robot | Generates | No shared latent across bodies — same method applied twice, not one transferred representation |
+| **X-Morph** | a URDF / kinematic retargeting stage | Generates | Solves correspondence with a body model, exactly the cost this project avoids |
+| **QWM** | morphology parameters (scale-invariant descriptor) | Generates | Zero-shot only *within* the quadrupedal family — never crosses leg count |
+| **Ours (target state)** | unlabelled interaction on the target robot | Generates | No reward, no curated demo, no kinematic model, no pretrained policy to select from — the latent action space does the correspondence work |
+
+---
+
+### The three claims, and where each actually stands right now
+
+Since this was already flagged precisely: **"ours" is three separate claims bundled into one row, and they're not equally proven.**
+
+1. **"Across disjoint leg counts"** — ✅ done, measured (F82/F83 numbers).
+2. **"Generates"** — ⏳ well-defined, testable, not yet run (distillation experiment).
+3. **"From video + [unlabelled interaction], not curated demonstrations"** — ⏳ the one that's currently overclaimed as "video + joint count alone"; needs experiment 1 (babble-fit projector) to hold before it's honest.
+
+The correct sentence for the doc, combining everything from this conversation:
+
+> No method in the surveyed landscape generates a legged locomotion controller for an unseen robot from unlabelled interaction alone: reward-based RL needs a hand-designed reward, imitation needs curated or kinematically-retargeted demonstrations, and the closest cross-embodiment world models (LAC-WM and its family) only rerank an already-competent policy's proposals rather than generating one. This project's claim to occupy that gap is currently proven for cross-leg-count transfer and well-defined for the generation step, but not yet proven for the "no curated demonstration" step — that depends on the babble-fit projector experiment currently pending.
+
+That's the accurate, defensible version — strong where the evidence is strong, explicit about the one leg that's still standing on a plan rather than a result.

@@ -14,10 +14,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python3
-CLIPS=$($PY -c "
-import torch
-c=torch.load('wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt',map_location='cpu',weights_only=False)
-print(' '.join(sorted(c['stage3']['train_paths'])))")
+# the 24-clip budget the original stage 3 used, listed here so this sheet needs no checkpoint
+# to read it from -- it is 24 filenames, not a reason to copy 384 MB between machines
+CLIPS="
+  b1_ep1.npz b1_ep1001.npz b1_ep1002.npz b1_ep101.npz
+  b1_ep102.npz b1_ep1101.npz b1_ep1102.npz b1_ep1201.npz
+  b1_ep1202.npz b1_ep1301.npz b1_ep1302.npz b1_ep2.npz
+  b1_ep2001.npz b1_ep2002.npz b1_ep201.npz b1_ep202.npz
+  b1_ep2101.npz b1_ep2102.npz b1_ep2201.npz b1_ep2202.npz
+  b1_ep2301.npz b1_ep2302.npz b1_ep301.npz b1_ep302.npz
+"
 
 for SEED in 0 1 2; do
   for ARM in nce mse; do
