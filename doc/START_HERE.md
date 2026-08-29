@@ -75,11 +75,16 @@ transfers across legged robots with **different leg counts** from video alone. M
 kinematic tree stay inside one robot or one leg-count family; methods that span leg counts use
 explicit retargeting.
 
-**The honest scope of the contribution** is the adaptation objective, not the pretrained latent:
-MSE adaptation makes the forward model discard the action channel across morphology families, and a
-contrastive term restores it. CAPE reports the same failure mode in another setting, so what is new
-is that it appears across morphology families and is invisible in the loss curve -- **not** the
-technique. `Q17_ANS.md` works this positioning out in full; it is a draft the user owns.
+**The contribution is three things, and they are not equally proven.**
+
+| | what it is | status |
+|---|---|---|
+| **1. joint targets, no kinematics** | the action space is raw joint commands -- 18-D and 12-D, disjoint, nothing commensurable between them -- and the correspondence is *learned* by the action projector rather than defined by a URDF or a shared task-space coordinate. **This is the axis that separates the work from everything else in the table**: X-Morph retargets kinematically, LAC-WM unifies quantities that already mean the same thing on both bodies (a fingertip at `(x,y,z)`), and morphology-agnostic proprioceptive control has to be handed the kinematic graph. A camera is handed nothing | implemented and runs end to end; its cross-embodiment evidence is withdrawn with the rest of the B1 numbers |
+| **2. a joint target crosses robots only with a body term** | within one robot the joint decoder works unsupervised (0.35 error); across robots it is -28.9 / -43.1 without the term and +0.61 / +0.57 with it (F82, F83). **The conditional is the finding**, not "joint targets work" | the A/B contrast survives its data's defects, since both arms carry them; **the figures do not** -- forward walking only, and a frame-rate mismatch (F74) |
+| **3. the adaptation objective** | MSE adaptation makes the forward model discard the action channel across morphology families; a contrastive term restores it. CAPE reports the same failure mode elsewhere, so what is new is that it appears across morphology families and is invisible in the loss curve -- **not** the technique | the most fragile of the three: the ordering flipped between budgets on single runs, and three seeds per arm is outstanding |
+
+**Claim 1 is the one to lead with** and the one the literature table is built around. `Q17_ANS.md`
+works the positioning out in full; it is a draft the user owns.
 
 **Two things are still overclaimed there and are flagged in that file**: "a camera is the only thing
 it needs" is untrue while the candidate library is 24 curated clips, and the shared-body-target

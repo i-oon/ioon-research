@@ -112,6 +112,14 @@ quotable until the rebuild:
 | the contrastive advantage is not established | MSE at the original budget reaches 36% on turning against 43%, inside that arm's own spread, and the two had been compared at different budgets. Three seeds per arm is the outstanding measurement |
 | sideways fails everywhere | 19-20% against 17%, on four independent measurements |
 
+**And the axis that makes any of it interesting is the joint-space one.** The two robots' action
+spaces are 18-D and 12-D with nothing commensurable between them, and the correspondence is learned
+by the projector rather than defined by a kinematic model. LAC-WM unifies quantities that already
+mean the same thing on both bodies; X-Morph retargets through a URDF; proprioceptive
+morphology-agnostic control is handed the kinematic graph. **A joint-space target is what makes the
+problem hard and what makes solving it worth something** (F82), and F83's conditional is the
+measured answer: it works within a robot unsupervised and crosses robots only with the body term.
+
 **So the defensible sentence names the behaviour and the limit**: a quadruped walks forward from a
 stick insect's video, and turning is the only behaviour where a better world model measurably beats
 a collapsed one. Do not write "behaviours cross".
