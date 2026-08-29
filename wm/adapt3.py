@@ -41,8 +41,8 @@ the true next embedding, does the forward model rank the action that actually ca
 actions from other behaviours? A collapsed model scores at chance by construction, and a planner
 is exactly a discriminator, so this is the closed-loop result available without rendering.
 
-    .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1_v2.pt \\
-        --projector wm/runs/beh12_hexonly/projector_b1_adapted_v2.pt \\
+    .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1.pt \\
+        --projector wm/runs/beh12_hexonly/projector_b1_adapted.pt \\
         --data data/beh12_b1_flat --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
 """
 import argparse
@@ -189,7 +189,7 @@ def main():
                     help="batch order, negative sampling and any random init. **Without this "
                          "every run of one configuration is bit-identical**, so repeats say "
                          "nothing and a single run cannot be told apart from a lucky one -- "
-                         "which matters here, because the same arm moved 9% to 58% speed "
+                         "which matters here, because the same arm moved 9%% to 58%% speed "
                          "error between 12k and 15k steps (F116).")
     ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--batch", type=int, default=16)

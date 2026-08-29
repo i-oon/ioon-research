@@ -18,7 +18,7 @@ calls. The saved checkpoint carries the original decoder weights unchanged so th
 rebuilding a full model from it still work.
 
   .venv/bin/python3 -m wm.adapt --ckpt wm/runs/beh12_hexonly/best.pt \\
-      --data data/beh12_b1_flat --embodiment b1 --clips 9 --out wm/runs/beh12_hexonly/adapted_b1_v2.pt
+      --data data/beh12_b1_flat --embodiment b1 --clips 9 --out wm/runs/beh12_hexonly/adapted_b1.pt
 """
 import argparse
 import glob

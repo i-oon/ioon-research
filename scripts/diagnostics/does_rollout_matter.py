@@ -21,8 +21,8 @@ Three scoring rules, same candidates, same held-out clips, argmin of each:
 rate reachable without using the goal, and any rule that fails to beat it is not planning.
 
     .venv/bin/python3 scripts/diagnostics/does_rollout_matter.py \\
-        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt \\
-        --projector wm/runs/beh12_hexonly/projector_stage3_nce_v2.pt --data data/beh12_b1_flat
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt \\
+        --projector wm/runs/beh12_hexonly/projector_stage3_nce_s0.pt --data data/beh12_b1_flat
 """
 import argparse
 import os
