@@ -7717,6 +7717,26 @@ oppose the one the goals come from. Run over the three sets in use:
 Each set is internally consistent, which is why nothing ever failed; the disagreement is only
 visible across sets, and no check compared sets until now.
 
+**Resolved by flipping everything onto the pretraining body, and the choice was economic.**
+`c10f10t10` is the expensive artefact -- re-pretraining costs far more than re-collecting -- so the
+held-out body and the B1 were re-collected to match it rather than the other way round.
+`collect_beh12.py` gained `--spin_sign`, verified on one clip before committing to sixteen: the same
+level at `--spin -0.56` gives **+0.0814** where `+0.56` gave -0.0878, the same size with the sign
+reversed. All three sets now agree:
+
+| | level 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| `beh12_hex_flat`, pretraining | +0.0032 | +0.0141 | +0.0363 | +0.0775 |
+| `beh12_c08f09t09_flat`, held out | +0.0069 | +0.0215 | +0.0407 | +0.0863 |
+| `beh12_b1_v2`, the candidates | +0.0105 | +0.0268 | +0.0401 | +0.0807 |
+
+**And the direction can be stated in the image, which is the frame that matters.** Taking the
+principal axis of the robot's silhouette and following it through a clip, all three sets now rotate
+**anticlockwise on screen** -- +140 deg for the pretraining insect, +152 for the held-out one, +54
+for the B1. The two scenes ship identical cameras, so on-screen sense is a shared language; **being
+unable to name the direction from the picture would concede the project's own claim that vision
+carries shared meaning across bodies.**
+
 > **The lesson is the blank cell, not the sign.** A comparison table with an empty column reads as
 > "not applicable" and hides "not checked". Fill every cell or say why it is missing.
 
