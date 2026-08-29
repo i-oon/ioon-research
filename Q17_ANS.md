@@ -73,12 +73,15 @@ This was the most valuable thing that came out of the deeper digging — a clean
 |---|---|---|---|
 | **Vanilla RL from scratch** | a hand-designed reward function | Generates | Reward engineering is the same cost as kinematic engineering, just relocated — throws away everything the video-trained latent space already knows |
 | **BC on curated B1 clips** | 24 human-picked "correct" demonstrations | Generates | Circular — a human decided what counts as correct walking/turning/strafing before training starts (Q16) |
+| **this project, as currently built** | the same 24 curated clips | Selects | **The same circularity, deliberately, and it is the measuring instrument rather than the claim.** "Did the world model pick the right action" is only answerable against a set of actions whose correct answer is already known; a library with labels is what makes selection scorable at all. It bounds one claim and not the others: it is why "a camera is the only thing it needs" is listed below as unproven, and it does not touch whether the latent picks correctly, which is what the library exists to test |
 | **BC on bio (insect) video** | *not well-defined* — no `(obs, action)` pairing exists without... | — | ...either hand-labeling the correspondence, or a kinematic retargeting step (X-Morph's move), or a learned cross-embodiment map — which *is* the pipeline itself. Not a baseline; it's excluded, not beaten. |
 | **LAC-WM / STORM / World Action Planner** | a pretrained, competent VLA to propose candidates | **Selects**, doesn't generate | Presupposes the hard part (a working policy) already exists; only reranks its outputs |
 | **Li et al. 2020 (hexapod+quadruped)** | separate expert demonstrations per robot | Generates | No shared latent across bodies — same method applied twice, not one transferred representation |
 | **X-Morph** | a URDF / kinematic retargeting stage | Generates | Solves correspondence with a body model, exactly the cost this project avoids |
 | **QWM** | morphology parameters (scale-invariant descriptor) | Generates | Zero-shot only *within* the quadrupedal family — never crosses leg count |
-| **Ours (target state)** | unlabelled interaction on the target robot | Generates | No reward, no curated demo, no kinematic model, no pretrained policy to select from — the latent action space does the correspondence work |
+| **Dreamer-style RL in imagination** | a reward, and a world model accurate over the training horizon | Generates | Moves the cost to reward design and to long-horizon accuracy, this project's weakest measurement; QWM is this within one leg-count family |
+| **BC on the same 24 clips we use** | nothing we do not already need | Generates | **The comparison that has not been run and is the sharpest "so what".** If behaviour cloning on the identical clips matches the planner, the world model is buying nothing on this data |
+| **Ours (target state)** | unlabelled interaction on the target robot, plus a goal video from another robot | Generates | No hand-designed reward, no curated demo, no kinematic model, no pretrained policy to select from — the latent action space does the correspondence work. **The supervision is not nothing: it is a video of another robot doing the thing** |
 
 ---
 
@@ -86,7 +89,13 @@ This was the most valuable thing that came out of the deeper digging — a clean
 
 Since this was already flagged precisely: **"ours" is three separate claims bundled into one row, and they're not equally proven.**
 
-1. **"Across disjoint leg counts"** — ✅ done, measured (F82/F83 numbers).
+1. **"Across disjoint leg counts"** — ⏳ demonstrated in a controller, not yet stable. **Do not cite
+   F82 or F83 for it**: F82 is a positioning argument rather than a measurement, and F83's transfer
+   numbers come from the `stage2_*` checkpoints on pre-F74 data, while the checkpoint that closes
+   the loop has no cross-embodiment shared target at all (F110). The load-bearing evidence is the
+   control result -- a quadruped walks forward and turns the correct way from a stick insect's
+   video, above chance on both (F116) -- and its caveat is that each arm has been trained once, with
+   the ordering moving between budgets, which is what the three-seed run is for.
 2. **"Generates"** — ⏳ well-defined, testable, not yet run (distillation experiment).
 3. **"From video + [unlabelled interaction], not curated demonstrations"** — ⏳ the one that's currently overclaimed as "video + joint count alone"; needs experiment 1 (babble-fit projector) to hold before it's honest.
 
