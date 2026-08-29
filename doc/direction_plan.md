@@ -97,8 +97,12 @@ contrastive term against 33% chance, turning **22%** and **43%**, sideways 19% a
 Every run stayed upright and **every turning run turned the right way** -- the first time that could
 be measured, since the two robots turned opposite ways until F115.
 
-**The contrastive term's job is to make the forward model use its action, and that only matters for
-turning.** Its `/mean-z` goes 0.977 to 0.493; the collapsed arm still selects forward at 53%, so
+**Whether the contrastive term helps at all is open again.** Its `/mean-z` goes 0.977 to 0.493, so
+it does make the forward model use its action; but MSE given the *original* budget reaches 36% on
+turning against the contrastive arm's 43%, inside that arm's own spread, and the two were compared
+at different budgets. Both are being retrained matched (F116).
+
+**What the term does, mechanically:** Its `/mean-z` goes 0.977 to 0.493; the collapsed arm still selects forward at 53%, so
 **forward can be chosen by a model that ignores the action entirely** and is not evidence the world
 model works. F112's 32%-against-74% on forward does not reproduce and was partly a label defect
 (F114, F116). The ladder, all arms at

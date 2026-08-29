@@ -7629,6 +7629,26 @@ nothing.
 that used its action channel. A model that has already stopped using it loses far less, because the
 selection it was making did not depend on the action in the first place.
 
+**The old gap was the data, and that was tested rather than assumed.** Training MSE on the corrected
+set with the *original run's* configuration -- batch 16, 15,000 steps, the two things that differed
+from the new arms -- gives **58% forward and 36% turning**, against the original's 32% and 2% on the
+old data. Same objective, same optimiser settings, same clip count; **only the data differs, and it
+moves forward by 26 points and turning by 34.**
+
+| MSE arm | batch | steps | data | forward | turning |
+|---|---|---|---|---|---|
+| the original | 16 | 15,000 | old | 32% | 2% |
+| refit, original config | 16 | 15,000 | **v2** | **58%** | **36%** |
+| refit, matched to the contrastive arm | 8 | 12,000 | v2 | 53% | 22% |
+
+**And that exposes a flaw in the comparison above.** MSE at batch 16 and 15,000 steps reaches 36% on
+turning where the batch-8, 12,000-step arm reaches 22%, so **the configuration is worth 14 points to
+MSE and the "matched" ablation gave it the weaker one**. Against the stronger MSE the contrastive
+arm's turning advantage is 43% against 36%, seven points, inside its own +/-11 spread. **The claim
+that the contrastive term buys turn selection is not yet established** -- it rests on a comparison
+that varied the objective and the budget together, which is the same fault this project criticised
+in the original run. Both arms are being retrained at batch 8 and 15,000 steps to settle it.
+
 **Sideways is at chance under both** -- 19% and 20% against 17% -- which is now the fourth
 independent measurement of the same failure and the first on data with no known defect in it.
 
