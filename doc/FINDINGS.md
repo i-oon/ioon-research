@@ -7654,6 +7654,47 @@ independent measurement of the same failure and the first on data with no known 
 
 ---
 
+### F117. The two hexapod bodies turn opposite ways, and F94 left the cell that would have shown it blank
+
+**Found while auditing what data each checkpoint came from.** The world model is pretrained on
+`beh12_hex_flat` (`c10f10t10`) and every cross-embodiment goal comes from `beh12_c08f09t09_flat`.
+Their turn ladders have the same magnitudes and opposite signs, on **every one of the 32 clips**:
+
+| condition | `c10f10t10`, pretrained on | `c08f09t09`, the goal source |
+|---|---|---|
+| `turn_s0.05` | **+0.0029 +0.0047 +0.0043 +0.0006** | -0.0062 -0.0082 -0.0062 -0.0082 |
+| `turn_s0.15` | +0.0138 +0.0135 +0.0152 +0.0140 | -0.0221 -0.0270 -0.0274 -0.0199 |
+| `turn_s0.29` | +0.0357 +0.0370 +0.0358 +0.0368 | -0.0377 -0.0366 -0.0377 -0.0366 |
+| `turn_s0.56` | +0.0762 +0.0759 +0.0790 +0.0788 | -0.0857 -0.0899 -0.0857 -0.0899 |
+
+**F94 already had this in front of it.** Its comparison table prints the held-out body's yaw ladder
+and leaves the training body's cell **empty**, so the reversal was never displayed. The same finding
+caught the sideways reversal on that body and reported it as a headline; turning reversed in exactly
+the same way and went unnoticed for a week, because one column was not filled in.
+
+**It is most likely morphology rather than a defect.** Both bodies run the same CPG at the same
+`--spin` levels, and the leg-ratio change that reverses the weak sideways gait (F94) plausibly
+reverses the turning gait too. **But it means `turn_s0.56` does not denote the same behaviour across
+bodies**, in a dataset whose entire purpose is matched behaviour.
+
+**Three consequences, in order of how much they cost.**
+
+1. **The model is pretrained on turns of one sign and asked about goals of the other.** Nothing in
+   `beh12_hex_flat` ever showed the insect turning the way the goal clips turn.
+2. **The B1 was matched to the goal body** (F115), which is right for the loop -- goal and candidate
+   library agree -- but it makes the quadruped disagree with the pretraining insect.
+3. **Any hexapod-to-hexapod turning comparison across these two bodies is sign-inconsistent**,
+   including F95's held-out-body loop.
+
+**What it does not do is invalidate F116.** There the goal source and the candidate library are both
+negative, so selection is being asked a coherent question; the pretrained model's exposure to the
+opposite sign is a handicap both arms carry equally.
+
+> **The lesson is the blank cell, not the sign.** A comparison table with an empty column reads as
+> "not applicable" and hides "not checked". Fill every cell or say why it is missing.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
