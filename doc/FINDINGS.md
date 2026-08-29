@@ -8478,6 +8478,26 @@ the goal, 25-33% against the demonstration). That was measured on the B1 with a 
 B1 as a constant, which makes it a **lower bound** -- the rule conditioned on its target while its
 coordinate was returning noise.
 
+**Adaptation is a second, independent way the shared coordinate is lost, found while validating the
+tool.** The same head, the same B1 clips, two checkpoints:
+
+| ITM supplying the latent | correlation | compression |
+|---|---|---|
+| `beh12_hexonly/best.pt`, unadapted | **+0.76** | 2.2x |
+| `stage3_b1_nce_s0.pt`, after stages 1 and 3 | **+0.23** | 3.2x |
+
+**Adapting the forward model to the B1 makes the shared head read the B1 worse**, and `wm/adapt.py`
+states the mechanism in its own docstring -- "stage 2 ... against the *adapted* ITM, since stage 1
+moved what `z` means". The head was fitted against the pretrained latent space; stage 1 moves that
+space and nothing moves the head with it. **So the pass bar can be met on the pretrain and lost by
+the checkpoint the planner actually uses**, and both have to be measured. The run sheet now runs
+`body_head_calibration.py` before stage 1 and again after stage 3 for exactly this reason.
+
+**The tool agrees with the hand measurement**, which is what licenses the pass bar: on the same
+checkpoint it reads B1 at +0.23 / 3.2x against the manual +0.20 / 3.2x, and the hexapod at
++0.99 / 1.0x either way. The 0.03 is 240 samples against 288. **The earlier disagreement was two
+different checkpoints being compared, not two different readings.**
+
 **The run this calls for**, and it is the one to hand to com7:
 
     --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \

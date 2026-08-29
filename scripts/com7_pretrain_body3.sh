@@ -43,6 +43,16 @@ if [ -f "$RUN/best.pt" ]; then echo "skip $RUN/best.pt"; else
 fi
 
 echo
+echo "=== calibration A: straight off the pretrain, both robots  $(date '+%F %T')"
+# **Measured here and again after stage 1, because adaptation moves the latent the head reads.**
+# On the current hexapod-only pretrain the head reads the B1 at corr +0.76 / 2.2x before adaptation
+# and +0.23 / 3.2x after it -- `wm/adapt.py` says why in its own docstring, "stage 1 moved what `z`
+# means", and no stage adapts the head to follow. If that repeats here, the pass bar can be met at
+# A and lost at B, and only running both shows it.
+$PY scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/best.pt" \
+  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+
+echo
 echo "=== stage 1: adapt ITM and forward model to the B1  $(date '+%F %T')"
 [ -f "$RUN/adapted_b1.pt" ] || PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt \
   --ckpt "$RUN/best.pt" --data data/beh12_b1_flat --embodiment b1 \
@@ -62,6 +72,11 @@ echo "=== stage 3: contrastive, one seed to start  $(date '+%F %T')"
   --data data/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
   --steps 15000 --lambda_nce 1.0 --batch 8 --seed 0 \
   --cache results/wm/cache/b1.pt --out "$RUN/stage3_b1_nce_s0.pt"
+
+echo
+echo "=== calibration B: after stage 3, on the checkpoint the planner would use  $(date '+%F %T')"
+$PY scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/stage3_b1_nce_s0.pt" \
+  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
 
 echo
 echo "=== done  $(date '+%F %T')"
