@@ -7672,12 +7672,18 @@ and leaves the training body's cell **empty**, so the reversal was never display
 caught the sideways reversal on that body and reported it as a headline; turning reversed in exactly
 the same way and went unnoticed for a week, because one column was not filled in.
 
-**Confirmed by looking at the walked paths, after three angle measures disagreed with each other.**
-Asked to cross-check the sign, the obvious quick tests all failed: the endpoint difference of the
-body quaternion reads +12 deg and +10 deg for the two bodies -- the same sign -- and an unwrapped
-heading taken from consecutive head displacements gives a ladder that *decreases* with commanded
-spin. **Both are contaminated by the insect's body swinging side to side every step**, which is the
-same reason F72 rejected head orientation and Euler angles when the yaw channel was first defined.
+**Confirmed by looking at the walked paths, and the cross-checks that disagreed were my own error.**
+Two quick tests written on the spot both gave nonsense -- an endpoint quaternion difference reading
+the same sign for both bodies, and a net-rotation ladder that *decreased* with commanded spin. I
+attributed that to the insect's body swaying every step. **That explanation was wrong.** Both
+helpers assumed `(w, x, y, z)`, and `wm/data/embodiment.py` says in its own docstring that the
+hexapod's `body_quat` is **`(x, y, z, w)` off an abdomen whose z axis points aft**, while the B1's
+is MuJoCo's `(w, x, y, z)`. The canonical `yaw_rate()` handles both and was right throughout; a
+second reading of it reproduces the table above to the fourth decimal.
+
+**The failure was inventing a plausible cause instead of reading the code that documents the trap** --
+the same shape as trusting F75's "fixed" without re-measuring. Use `yaw_rate()`; do not hand-roll a
+quaternion helper for these two robots.
 
 `results/wm/dataset/figures/turn_paths_three_sets.png` plots the head's path for all four turn
 levels of each set, smoothed over one stride. **The two insect bodies curve in visibly opposite
