@@ -48,6 +48,7 @@ if [ -f "$PROJ" ]; then echo "skip $PROJ"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.fit_projector \
     --ckpt "$ADAPTED" \
     --hex_dir data/beh12_c10f10t10_flat --b1_dir data/beh12_b1_flat \
+    --exclude $HOLDOUT \
     --cache results/wm/cache/beh12_embeddings.pt \
     --out "$PROJ"
 fi

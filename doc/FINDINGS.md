@@ -7800,6 +7800,21 @@ clips stage 1 would take meant loading a 383 MB checkpoint and the encoder -- wh
 caught the contamination for the length of the original run. It is `wm.adapt.select_clips(paths,
 clips, test_clips, seed, stratify)`, callable on its own.
 
+**A third leak, found in the stage 2 log on 2026-08-29 and closed the same evening.**
+`fit_projector` fitted on **all 48 B1 clips**, the twelve candidates and twelve validation clips
+included. It is milder than the stage 1 one -- the projector is only stage 3's starting point and
+stage 3 retrains it for 15,000 steps at `lr_proj 1e-3` under a different objective, where stage 1's
+forward model is what stage 3 scores and is only nudged at `lr_ftm 1e-5` -- but **how much of the
+memorised `(a, z)` survives 15k steps was never measured**, so "mild" was an argument rather than a
+number. Both sheets now pass `--exclude $HOLDOUT`, the 24 non-training clips, listed in full with
+their `.npz` suffix: `fit_projector --exclude` matches by prefix, and `b1_ep100` is a prefix of
+`b1_ep1000` through `b1_ep1003`.
+
+The rebuild was 19 minutes into the six stage-3 seeds when this was found and was restarted rather
+than annotated. **None of the three leaks could change the MSE-against-contrastive ordering** -- all
+six runs share one stage 1 checkpoint and one projector -- but each would have sat as a caveat
+beside every absolute number the run produces.
+
 **So a turn-ladder number is only comparable to another one aggregated the same way.** Quote the
 table above, or say which reduction produced the number.
 
