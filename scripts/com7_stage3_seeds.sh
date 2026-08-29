@@ -36,7 +36,7 @@ for SEED in 0 1 2; do
       --projector wm/runs/beh12_hexonly/projector_b1_adapted.pt \
       --data data/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
       --steps 15000 --lambda_nce $LAM --batch 8 --seed $SEED \
-      --cache results/wm/cache/b1_v2.pt --out "$OUT"
+      --cache results/wm/cache/b1.pt --out "$OUT"
   done
 done
 echo "done -- six checkpoints; close the loop on each and report mean and spread, never one run"
