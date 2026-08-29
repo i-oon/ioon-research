@@ -64,7 +64,7 @@ def fit_mixture(target, sources):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pred", required=True, help="npz from wm.predict_actions")
-    ap.add_argument("--data_dir", default="data/ik_walk_8body")
+    ap.add_argument("--data_dir", default="data/fwd_hex8body")
     ap.add_argument("--train_morphs", nargs="+", default=None,
                     help="defaults to the train_morphs recorded in the prediction file")
     ap.add_argument("--out", default="")

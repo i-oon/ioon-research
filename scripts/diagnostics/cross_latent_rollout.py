@@ -56,7 +56,7 @@ def latents(itm, e, chunk=8):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--hex_dir", default="data/beh12_hex_flat")
+    ap.add_argument("--hex_dir", default="data/beh12_c10f10t10_flat")
     ap.add_argument("--b1_dir", default="data/beh12_b1_flat",
                     help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")

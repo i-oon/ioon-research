@@ -1,50 +1,45 @@
-# Datasets
+# data — what each set is
 
-Recorded clips. Each `.npz` holds `frames` (T, 256, 256, 3), the commands, foot forces and the
-body pose, plus scalar fields naming the body and the source expert episode.
+**Naming.** `<behaviours>_<body>_<variant>`, the same rule as `wm/runs/`.
 
-**Nothing here is regenerable without CoppeliaSim**, so treat it as evidence rather than cache.
-`results/wm/cache/` is the disposable one.
+| field | values |
+|---|---|
+| behaviours | `beh12` -- the twelve matched conditions, speed / turn / sideways; `fwd` -- forward walking only |
+| body | `c10f10t10`, `c08f09t09` for the two insect bodies by their segment ratios; `b1`; `hex8body`, `m3d`, `bracket` for multi-body Stage 1 sets |
+| variant | `flat` -- one clip per file with labels; `50hz` -- the rate it was rendered at, when that is the thing about it |
 
-## Which set to use
+**Bodies are named, never called "hexapod".** Two insect bodies with the same generic name cost a
+week: the pretraining body and the held-out body turned opposite ways and every table said
+"hexapod" (F117).
 
-| directory | what it is | used by |
+## The live sets
+
+| | clips | what it is |
 |---|---|---|
-| `ik_walk_8body` | the base hexapod set, one speed, 9 bodies | Stage 1 and the original Stage 2 |
-| `ik_walk_m3d_clean`, `ik_walk_cov_*`, `ik_walk_bracket` | **symlinks into `ik_walk_8body`**, selecting subsets | Stage 1 experiments |
-| `ik_walk_speed5` | 5 constant speeds, 67 clips | the first `lambda_body` pair |
-| **`ik_walk_speed7`** | **5 constant + 2 ramped, 91 clips** | **current Stage 2 work** |
-| `b1_framed` | the quadruped, 14 clips, 2 policies x 7 speeds | every cross-embodiment run |
-| `ik_4leg_c08f09t09_clean10` | 4-leg build cut from a **held-out** body | slide 15 |
-| `ik_4leg_middleloss_clean9` | 4-leg build cut from a **training** body | superseded, see F59 |
+| `beh12_c10f10t10_flat` | 48 | the body the world model is pretrained on |
+| `beh12_c08f09t09_flat` | 48 | a held-out body of the same embodiment |
+| `beh12_b1_flat` | 48 | the quadruped -- the only executable candidates |
+| `beh12_b1_flat_9clips` | 9 | symlinks into the above; the few-shot budget |
 
-**The symlink directories look empty at 4.0K and are not.** Deleting `ik_walk_8body` breaks five
-datasets at once, including everything Stage 1 in the deck reports.
+**All three turn the same way**, anticlockwise on screen, since 2026-08-29. They did not before, and
+nothing that predates that can be compared across them (F115, F117). `beh12_b1_flat/README.md`
+lists the four defects corrected on the quadruped side.
 
-## The speed sets, and why they exist
+## Stage 1 sets, forward walking only
 
-The expert is a real stick insect walking **one speed** -- 1.9 percent variation across 1,000
-episodes. That made every body-level question unanswerable: a readout fitted on the B1 learns
-commanded speed, one fitted on the insect learns how far the body rocks within a stride, and asking
-one to transfer to the other is not a question with an answer (F57).
+`fwd_hex8body`, `fwd_hex7speed`, `fwd_m3d`, `fwd_bracket`, `fwd_cov_wide`, `fwd_cov_narrow`,
+`fwd_decoupled` -- the multi-body insect sets Stage 1 was measured on, and `fwd_b1_50hz`, the
+quadruped set the `s2_*` runs used.
 
-`collect_ik.py --speed` resamples the shared foot path along time -- same path, fewer frames, so
-the robot covers the same ground faster. **Every leg is resampled by the same time map**, so the
-inter-leg phase relationships are untouched and the gait stays the animal's.
+**The `fwd` prefix is the point.** Everything known about the shared body target was measured on
+these, so it was measured on **one behaviour**. `fwd_b1_50hz` also names its own defect: it was
+rendered at 50 Hz against the insect's 20, which made every cross-embodiment number computed with it
+span mismatched durations (F74).
 
-`--speed_end` sweeps the speed *within* a clip. That exists because five constant speeds gave the
-shared decoding head 12 distinct values to memorise rather than a function to learn (F58). Ramping
-made the target continuous and moved `insect->b1` from unstable to positive (F60).
+Several are symlink farms into `fwd_hex8body` and `fwd_decoupled` -- cheap views, not copies.
 
-Episode numbers carry the condition as a block of a thousand -- `_ep2020` is block 2, source
-episode 20 -- so cross-body pairing only ever happens within one condition. A 92-frame clip and a
-60-frame clip must never both claim to be "episode 6".
+## `_archive/`
 
-## Two collection flags that are not optional
-
-`--cam_dx -0.6 --spawn 0 0` are the defaults now, and were not for a long time. Without them the
-robot starts outside the right image edge and **56-70 percent of frames are clipped**, unequally
-per body, so morphology decodability partly measures framing.
-
-`--morphs NAME=SCENE` must be passed for the `cXXfYYtZZ` bodies. The built-in `SCENES` list is
-still the old three-length set, so omitting it silently collects bodies nothing else uses.
+Speed and ramp sweeps, the 4-leg body sets, the B1 trajectory dumps, and raw pre-flatten
+directories. **Nothing in the current pipeline reads them and their results are written up in
+`doc/FINDINGS.md`.** Kept so that deleting them is a decision rather than an accident. ~700 MB.

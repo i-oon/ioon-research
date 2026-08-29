@@ -77,10 +77,10 @@ def gather(encoder, chunk, itm=None, checkpoint=None):
     out = {}
     for name in ("insect", "b1"):
         if name == "insect":
-            paths = [f"{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz"
+            paths = [f"{ROOT}/data/fwd_hex8body/{b}_ep{e}.npz"
                      for b in INSECT_BODIES for e in INSECT_EPS]
         else:
-            paths = sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))
+            paths = sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz"))
         feats, labels, clip_id = [], [], []
         for i, path in enumerate(paths):
             if not os.path.exists(path):

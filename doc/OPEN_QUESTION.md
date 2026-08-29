@@ -12,7 +12,7 @@ this file carries only what is still undecided.
 
 ## Q12. Which bodies belong in the dataset at all? (new, 2026-08-11 — blocking)
 
-Measured in **F42**: two of the nine bodies in `data/ik_walk_8body` do not walk — one moves 0.057 m
+Measured in **F42**: two of the nine bodies in `data/fwd_hex8body` do not walk — one moves 0.057 m
 in an episode, the other **walks backwards** — and two more crab sideways 2 to 6 times more than
 any sound body. Every Stage 2 run globs the whole directory, so about a fifth of the hexapod
 gradient went to a robot that does not locomote.

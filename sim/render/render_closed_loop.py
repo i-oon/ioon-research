@@ -2,7 +2,7 @@
 
 The scoring script says upright and on-speed. It cannot say whether the gait looks like walking,
 and this project's rule is to render before believing a body -- the two clips in
-`data/ik_walk_8body` that do not walk passed every summary statistic they were checked against.
+`data/fwd_hex8body` that do not walk passed every summary statistic they were checked against.
 
 **The frame carries its own numbers.** Every figure in this project does, because a picture of two
 insects is equally consistent with a working controller and a broken one. The header states which
@@ -87,7 +87,7 @@ def compose(ref, got, header, sub, pick, want, t, n, warm):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+")
-    ap.add_argument("--demo_dir", default="data/beh12_hex_flat")
+    ap.add_argument("--demo_dir", default="data/beh12_c10f10t10_flat")
     ap.add_argument("--goal_dir", default="data/beh12_c08f09t09_flat",
                     help="where to find the goal clip when it came from another robot")
     ap.add_argument("--out", default="results/wm/closed_loop/video")

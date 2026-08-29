@@ -60,9 +60,9 @@ def gather(encoder, itm, chunk, bodies, cache_path=CACHE):
     cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
     fresh = False
     E, Z, emb, stance = [], [], [], []
-    clips = [("hexapod", f"{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz")
+    clips = [("hexapod", f"{ROOT}/data/fwd_hex8body/{b}_ep{e}.npz")
              for b in bodies for e in INSECT_EPS]
-    clips += [("b1", p) for p in sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))]
+    clips += [("b1", p) for p in sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz"))]
     for name, path in clips:
         clip = np.load(path, allow_pickle=True)
         if path not in cache:

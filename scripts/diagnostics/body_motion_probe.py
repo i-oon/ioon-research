@@ -91,7 +91,7 @@ def gather(encoder, chunk, insect_dir, cache_path, itm=None, checkpoint=None):
         if name == "insect":
             paths = insect_paths(insect_dir)
         else:
-            paths = sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))
+            paths = sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz"))
         feats, labels, clip_id = [], [], []
         for i, path in enumerate(paths):
             if not os.path.exists(path):
@@ -218,7 +218,7 @@ def main():
     ap.add_argument("--raw", action="store_true", help="skip per-embodiment standardisation")
     ap.add_argument("--ckpt", default="",
                     help="score the learned latent from this checkpoint's ITM as well")
-    ap.add_argument("--insect_dir", default="data/ik_walk_8body",
+    ap.add_argument("--insect_dir", default="data/fwd_hex8body",
                     help="the hexapod clips. The default reproduces the original measurement; "
                          "point it at a speed-varied set to ask whether body motion is readable "
                          "when there is any body-motion variation to read")

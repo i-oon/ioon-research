@@ -22,7 +22,7 @@ Two things this settles about building a 4-leg dataset, both cheaper than the ro
     turns the 18-D command into a 12-D one.
 
 What is missing is the framing. This preview uses a head camera and the body leaves the frame
-around step 83 of 139. A dataset render has to match `data/ik_walk_8body` exactly or the model
+around step 83 of 139. A dataset render has to match `data/fwd_hex8body` exactly or the model
 sees a different scene, not a different body:
 
     --scale 0.5 --travel 0.8 --warmup 20 --cam_dx -0.6 --cam_dy 0.0 --spawn 0 0

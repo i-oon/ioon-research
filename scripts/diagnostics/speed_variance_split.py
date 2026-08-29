@@ -57,7 +57,7 @@ def fit(x, y, clip, seed):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--insect_dir", default="data/ik_walk_speed7")
+    ap.add_argument("--insect_dir", default="data/fwd_hex7speed")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--trim", type=int, default=0,
                     help="drop this many frames from each end before measuring. **Not cosmetic.** "
@@ -75,7 +75,7 @@ def main():
     cache = torch.load(cache_path, map_location="cpu")
 
     groups = {"insect": insect_paths(os.path.join(ROOT, args.insect_dir)),
-              "b1": sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))}
+              "b1": sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz"))}
 
     print("Forward Froude read from ONE frame, split into the part that varies between clips")
     print("and the part that varies inside a clip.\n")

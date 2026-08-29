@@ -50,7 +50,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--projector", default="")
-    ap.add_argument("--candidates_dir", default="data/beh12_hex_flat")
+    ap.add_argument("--candidates_dir", default="data/beh12_c10f10t10_flat")
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--horizon", type=int, default=5)
     ap.add_argument("--demos", type=int, default=12, help="demonstration clips to run")

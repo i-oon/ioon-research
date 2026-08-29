@@ -128,7 +128,7 @@ def condition_groups(paths):
     """Clips grouped by behaviour condition, so a split can cover every behaviour on both sides.
 
     Reads the `condition` field the matched collection writes into each npz. Falls back to the
-    `_vx` filename convention of `data/b1_framed`, which predates that field and carries commanded
+    `_vx` filename convention of `data/fwd_b1_50hz`, which predates that field and carries commanded
     speed in the name -- without the fallback this reads one group and silently stops stratifying.
     """
     groups = {}
@@ -150,7 +150,7 @@ def condition_groups(paths):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/s1_fwd_m3d_cross/best.pt")
-    ap.add_argument("--data", default="data/b1_framed")
+    ap.add_argument("--data", default="data/fwd_b1_50hz")
     ap.add_argument("--train_clips", type=int, default=5)
     ap.add_argument("--splits", type=int, default=3)
     ap.add_argument("--stratify", action="store_true",

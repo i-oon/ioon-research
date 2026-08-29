@@ -44,7 +44,7 @@ DT = {"hexapod": 0.05, "b1": 0.02}
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--insect_dir", default="data/ik_walk_speed7")
+    ap.add_argument("--insect_dir", default="data/fwd_hex7speed")
     ap.add_argument("--clips", type=int, default=4)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
@@ -68,7 +68,7 @@ def main():
     encoder = VJEPA2FrameEncoder(device=args.device, dtype=torch.float32)
     rows = {"real z": [], "zero z": [], "zero frame": []}
     for name, pattern, spec in (("hexapod", f"{args.insect_dir}/*.npz", "hexapod"),
-                                ("b1", "data/b1_framed/*.npz", "b1")):
+                                ("b1", "data/fwd_b1_50hz/*.npz", "b1")):
         paths = sorted(p for p in glob.glob(os.path.join(ROOT, pattern))
                        if "manifest" not in os.path.basename(p))[-args.clips:]
         for path in paths:

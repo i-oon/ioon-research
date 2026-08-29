@@ -64,7 +64,7 @@ def main():
     ap.add_argument("--out", default="results/wm/stage2/figures")
     args = ap.parse_args()
 
-    path = args.clip or sorted(glob.glob(f"{ROOT}/data/ik_walk_speed7/c10f10t10_ep*.npz"))[0]
+    path = args.clip or sorted(glob.glob(f"{ROOT}/data/fwd_hex7speed/c10f10t10_ep*.npz"))[0]
     with np.load(path, allow_pickle=True) as clip:
         frames, position = clip["frames"], clip["head"]
     height = float(np.median(position[:, 2]))

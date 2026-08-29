@@ -914,7 +914,7 @@ python3 sim/collect_ik.py --port 23000 --episodes <100 eps> --repeats 1 --scale 
     --travel 0.8 --cam_dx -0.6 --spawn 0 0 --out data/ik_walk_100_framed
 
 python3 sim/render_b1_replay.py --scene sim/env/b1_flat.ttt --traj data/b1_traj/fwd_vx0.4.npz \
-    --spawn 0 0 --cam_dx -0.6 --travel 0.8 --out data/b1_framed
+    --spawn 0 0 --cam_dx -0.6 --travel 0.8 --out data/fwd_b1_50hz
 ```
 
 ### 16.10 สถานะ / ต้องทำต่อ
@@ -991,7 +991,7 @@ fold 2 (`fold_short`, กัน `short` ไว้) ยืนยันซ้ำ: 
 
 แก้ให้รับ `--coxa --femur --tibia` แยกกัน และ `sim/collect_ik.py` รับ `--morphs NAME=SCENE` เก็บหุ่นกี่ตัวก็ได้
 
-สร้าง 9 หุ่น เก็บ `data/ik_walk_8body` 30 clips ต่อหุ่น หุ่นทดสอบ `c08f09t09` (0.8, 0.9, 0.9) ตรวจด้วย
+สร้าง 9 หุ่น เก็บ `data/fwd_hex8body` 30 clips ต่อหุ่น หุ่นทดสอบ `c08f09t09` (0.8, 0.9, 0.9) ตรวจด้วย
 linear programming ว่าอยู่ใน convex hull ของหุ่นเทรน และห่างจากเส้นตรงระหว่างคู่หุ่นทุกคู่ 0.082
 จึงเป็นการทดสอบ **composition** ไม่ใช่ interpolation
 
@@ -1073,8 +1073,8 @@ Smoke test บนชุดจิ๋ว 975 pairs เทียบกับ contro
 `adv_warmup_epochs = 5` และ `heldout/motion_zero_x` เพื่อวัดว่า decoder หันไปพึ่งภาพจริงไหม
 
 ### 18.8 สถานะ / ต้องทำต่อ
-- ☑ `data/ik_walk_8body` 7 หุ่นสะอาด
-- ☑ `data/b1_framed` render-locked (แก้ FOV กล้อง 24° → 15°, พื้นหลังต่าง 5.03 → 0.52/255)
+- ☑ `data/fwd_hex8body` 7 หุ่นสะอาด
+- ☑ `data/fwd_b1_50hz` render-locked (แก้ FOV กล้อง 24° → 15°, พื้นหลังต่าง 5.03 → 0.52/255)
 - ☑ B1 trajectory 2 policy × 7 ความเร็ว ครอบคลุมช่วงความเร็วตั๊กแตน
 - ☐ `m3d_adv01` — ผลตัดสินว่าปิดทางลัดแล้ว decoder หันไปอ่านภาพไหม
 - ☐ Stage 2 — รอผล `m3d` ตัดสินว่าจับคู่ B1 กับตั๊กแตนกี่ตัว

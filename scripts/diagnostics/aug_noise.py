@@ -13,7 +13,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder
 from wm.data.dataset import load_clip
 from wm.data.augment import AugmentParams, apply, sample_params
 
-frames = load_clip(f'{ROOT}/data/ik_walk_8body/c10f10t10_ep6.npz')['frames'][:32]
+frames = load_clip(f'{ROOT}/data/fwd_hex8body/c10f10t10_ep6.npz')['frames'][:32]
 H, W = frames.shape[1:3]
 rng = np.random.default_rng(0)
 

@@ -54,7 +54,7 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--projector", default="")
     ap.add_argument("--demo", required=True, help="clip whose behaviour the planner must reproduce")
-    ap.add_argument("--candidates_dir", default="data/beh12_hex_flat")
+    ap.add_argument("--candidates_dir", default="data/beh12_c10f10t10_flat")
     ap.add_argument("--scene", default="medauroidea_stick_insect.ttt")
     ap.add_argument("--morph", default="",
                     help="body label written into the output, and the name collect_ik registers "

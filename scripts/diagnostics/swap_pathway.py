@@ -39,7 +39,7 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--bodies", nargs=2, required=True, metavar=("A", "B"))
     ap.add_argument("--episodes", type=int, nargs="+", default=[101, 113, 124])
-    ap.add_argument("--data_dir", default="data/ik_walk_8body")
+    ap.add_argument("--data_dir", default="data/fwd_hex8body")
     ap.add_argument("--chunk", type=int, default=4)
     ap.add_argument("--encode_device", default="")
     ap.add_argument("--embodiment", default="hexapod",

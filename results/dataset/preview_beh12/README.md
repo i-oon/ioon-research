@@ -6,7 +6,7 @@ the wrong things.
 
 | prefix | set | role |
 |---|---|---|
-| `hex_c10f10t10__` | `data/beh12_hex_flat` | the body the world model is pretrained on |
+| `hex_c10f10t10__` | `data/beh12_c10f10t10_flat` | the body the world model is pretrained on |
 | `hex_c08f09t09__` | `data/beh12_c08f09t09_flat` | a held-out body of the same embodiment |
 | `b1__` | `data/beh12_b1_flat` | the quadruped, the only executable candidates |
 

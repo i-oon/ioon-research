@@ -176,8 +176,8 @@ def intent_ratio(label, actions, groups, rng, draws):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--hexapod_dir", default="data/ik_walk_m3d_clean")
-    ap.add_argument("--b1_dir", default="data/b1_framed")
+    ap.add_argument("--hexapod_dir", default="data/fwd_m3d")
+    ap.add_argument("--b1_dir", default="data/fwd_b1_50hz")
     ap.add_argument("--phase_bins", type=int, default=8)
     ap.add_argument("--froude_bins", type=int, default=3)
     ap.add_argument("--draws", type=int, default=4000)

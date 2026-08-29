@@ -61,7 +61,7 @@ def speed_over(position, dt, window):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cuda")
-    ap.add_argument("--insect_dir", default="data/ik_walk_speed7")
+    ap.add_argument("--insect_dir", default="data/fwd_hex7speed")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--ckpt", default="",
                     help="also read each target out of this checkpoint's `z`. Both halves of the "
@@ -78,7 +78,7 @@ def main():
 
     import glob
     groups = {"insect": insect_paths(os.path.join(ROOT, args.insect_dir)),
-              "b1": sorted(glob.glob(f"{ROOT}/data/b1_framed/*.npz"))}
+              "b1": sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz"))}
 
     print("Forward speed averaged over W steps, read from a SINGLE frame's frozen embedding.")
     print("R^2 near 0 means one frame cannot supply it -- the property that makes a target safe")

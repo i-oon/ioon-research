@@ -39,7 +39,7 @@ E = {}
 for b in TRAIN + HELD:
     clips = []
     for e in EPS:
-        path = f'{ROOT}/data/ik_walk_8body/{b}_ep{e}.npz'
+        path = f'{ROOT}/data/fwd_hex8body/{b}_ep{e}.npz'
         if path not in cache:
             if enc is None:
                 enc = VJEPA2FrameEncoder(device='cpu', dtype=torch.float32)

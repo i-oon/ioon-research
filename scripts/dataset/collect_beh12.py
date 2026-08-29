@@ -1,6 +1,6 @@
 """Collect the twelve matched behaviour conditions for one body, from a recipe kept in code.
 
-**The existing `data/beh12_hex_flat` was collected by hand, one command per condition, and the
+**The existing `data/beh12_c10f10t10_flat` was collected by hand, one command per condition, and the
 commands were never written down.** Ten of the twelve are recoverable from the condition names --
 `speed_c7.1` is `--cycles 7.1`, `turn_s0.29` is `--spin 0.29` -- and the two sideways levels per
 direction are recoverable from nothing at all. The base sideways recipe survives in FINDINGS F71,
@@ -53,7 +53,7 @@ COMMON = ["--gait", "cpg", "--scale", "0.65", "--cam_dx", "-0.6", "--behavior", 
 # **`--episodes` is an index into the expert recording, 0-999, and it is not the episode number
 # the clips carry.** `merge_behaviour_dirs` overwrites `expert_episode` with its own
 # `axis*1000 + level*100 + clip`, so the value actually used at collection time is not recoverable
-# from `data/beh12_hex_flat` -- reading 1000 and 2300 back as expert indices is out of range and
+# from `data/beh12_c10f10t10_flat` -- reading 1000 and 2300 back as expert indices is out of range and
 # is what made the first verification run die on the fifth condition.
 #
 # One expert episode for all twelve. In `--gait cpg` the behaviour comes from the oscillator flags;
@@ -99,7 +99,7 @@ SIDE = side_conditions()
 
 CONDITIONS = SPEED + TURN + SIDE
 
-# What `data/beh12_hex_flat` achieved, measured from the clips. `--verify` reproduces these.
+# What `data/beh12_c10f10t10_flat` achieved, measured from the clips. `--verify` reproduces these.
 REFERENCE = {"speed_c5.8": (0.126, 0.007, 0.002), "speed_c7.1": (0.151, -0.025, -0.003),
              "speed_c8.15": (0.174, 0.010, 0.003), "speed_c8.8": (0.205, -0.047, 0.001),
              "turn_s0.05": (0.137, -0.003, 0.003), "turn_s0.15": (0.135, 0.001, 0.014),
@@ -141,7 +141,7 @@ def separability(root):
     """Are the conditions further apart than their own spread? Prints the closest pairs.
 
     A planner cannot resolve two conditions the *robot* does not resolve, so this bounds what any
-    representation could do. Measured on `data/beh12_hex_flat` it also explains nothing about
+    representation could do. Measured on `data/beh12_c10f10t10_flat` it also explains nothing about
     F91's failure -- there the turn levels are 2.7x to 6.8x apart and the speed levels 1.7x, and
     the planner resolves speed 9/9 and turn 2/9. It succeeds on the closest axis.
     """
@@ -261,7 +261,7 @@ def main():
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--dry_run", action="store_true", help="print the commands and collect nothing")
     ap.add_argument("--verify", action="store_true",
-                    help="re-collect on c10f10t10 and compare against data/beh12_hex_flat. **Run "
+                    help="re-collect on c10f10t10 and compare against data/beh12_c10f10t10_flat. **Run "
                          "this first**: two of the twelve recipes are reconstructed, and a wrong "
                          "one produces a dataset that differs from the original without saying so.")
     ap.add_argument("--verify_out", default="data/beh12_verify_raw")

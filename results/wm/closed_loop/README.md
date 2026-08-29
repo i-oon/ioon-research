@@ -8,7 +8,7 @@ candidate's score, and the body trace. Score them with
 ```
 
 **The `--demo_dir` matters and is not guessable from the run.** `full` is the trained body and takes
-`data/beh12_hex_flat`; every other hexapod run is the held-out body and takes
+`data/beh12_c10f10t10_flat`; every other hexapod run is the held-out body and takes
 `data/beh12_c08f09t09_flat`; B1 runs take `data/beh12_b1_flat`.
 
 **Read `S.R. speed` and the median error together.** The rate is a 15% threshold and hides whether a

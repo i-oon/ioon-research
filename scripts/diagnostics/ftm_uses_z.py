@@ -73,7 +73,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--dirs", nargs="+",
-                    default=["hexapod=data/beh12_hex_flat", "b1=data/beh12_b1_flat"])
+                    default=["hexapod=data/beh12_c10f10t10_flat", "b1=data/beh12_b1_flat"])
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--horizon", type=int, default=8)
     ap.add_argument("--seed", type=int, default=0)
