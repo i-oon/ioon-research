@@ -1236,7 +1236,7 @@ frame fixes the phase. The error never rises above 5.33 against a signal of 11.3
 tested.
 
 > **Superseded in its numbers by F53, not in its conclusion.** Re-measured on
-> `ik_walk_m3d_clean` the same way, the errors are uniformly lower — 3.00 / 3.40 / 2.86 for
+> `fwd_m3d` the same way, the errors are uniformly lower — 3.00 / 3.40 / 2.86 for
 > `a_t` / `a_{t+8}` / `a_{t+32}` — because this fitted 18 clips rather than 4, and 4 clips is
 > 264 samples against 1,408 features. The measured cycle is **19 frames, not 22**, identical
 > across all five bodies, and 32 is not a multiple of it, so "a distant offset wraps back to a
@@ -2905,7 +2905,7 @@ requires; batching the *optimiser* is not. See `scripts/README.md`.
 
 ### F53. F31 re-measured on the clean dataset: same conclusion, lower errors, and the cycle is 19
 
-F31 was fitted on **four clips** -- 264 samples against 1,408 encoder features. `ik_walk_m3d_clean`
+F31 was fitted on **four clips** -- 264 samples against 1,408 encoder features. `fwd_m3d`
 has 26 clips of `c10f10t10`, so the same ridge now sees 18. Nothing here uses a trained
 checkpoint, so this was never stale from the Stage 1 retrain; it was stale from the dataset.
 
@@ -2939,7 +2939,7 @@ F52 measured that insect-pretrained ITM+FTM adapt to the B1 from ~7x fewer clips
     the model learned the shape of V-JEPA2's feature manifold, nothing about motion
 
 Two arms, identical in every respect except **what the ITM is given as its second frame**. Same
-100 clips of `ik_walk_m3d_clean`, same architecture, 15,000 minibatch steps, same seed. ITM+FTM
+100 clips of `fwd_m3d`, same architecture, 15,000 minibatch steps, same seed. ITM+FTM
 only -- no decoder, no cross term -- since that is all `finetune_ftm.py` loads.
 
 | arm | second frame |
@@ -2977,7 +2977,7 @@ At nine clips the three-split ranges lie on top of each other -- 1.29-1.34 again
 trained on, which is the internal consistency check this rests on.
 
 **Both arms are competent in-domain, which is what licenses reading the B1 numbers at all.** The
-same frozen checkpoints, on 40 `ik_walk_m3d_clean` clips the pretraining never saw:
+same frozen checkpoints, on 40 `fwd_m3d` clips the pretraining never saw:
 
 | arm, frozen on held-out insect clips | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|
@@ -3151,7 +3151,7 @@ path along time: the same Cartesian path through fewer samples covers the same g
 real animal's coordination at a different tempo, which is what the animal itself does, rather than
 authoring a tripod and discarding the recording.
 
-`data/ik_walk_speed5`: five speeds, 0.72 to 1.10, 67 clips from 75 after `walk_check`.
+`data/_archive/ik_walk_speed5`: five speeds, 0.72 to 1.10, 67 clips from 75 after `walk_check`.
 
 | | insect, five speeds | B1 |
 |---|---|---|
@@ -3200,7 +3200,7 @@ identical weight sharing without that pressure, produces visibly disjoint per-da
 number from `z` through **one head shared by every embodiment**. A per-embodiment head here would
 reintroduce exactly the freedom the term exists to remove.
 
-Matched pair on `data/ik_walk_speed5` + `data/fwd_b1_50hz`, one flag apart, 60 epochs, one seed.
+Matched pair on `data/_archive/ik_walk_speed5` + `data/fwd_b1_50hz`, one flag apart, 60 epochs, one seed.
 
 | | insect->insect | b1->b1 | **insect->b1** | **b1->insect** |
 |---|---|---|---|---|
@@ -3376,15 +3376,15 @@ body B's latent, on `c10f10t10` and `c10f06t06`, whose commands differ by 21.1 d
 
 | trained on | reads body identity from | strength |
 |---|---|---|
-| `ik_walk_8body`, one speed | **the latent** | 3.1x / 3.8x |
-| `ik_walk_speed5`, five speeds, **no term** | **the frame** | 2.9x / 3.9x |
-| `ik_walk_speed7`, seven conditions, **no term** | **the frame** | 5.0x / 3.7x |
-| `ik_walk_speed7` + `L_body` | the frame | 4.8x / 4.5x |
+| `fwd_hex8body`, one speed | **the latent** | 3.1x / 3.8x |
+| `_archive/ik_walk_speed5`, five speeds, **no term** | **the frame** | 2.9x / 3.9x |
+| `fwd_hex7speed`, seven conditions, **no term** | **the frame** | 5.0x / 3.7x |
+| `fwd_hex7speed` + `L_body` | the frame | 4.8x / 4.5x |
 
 Almost a mirror image, and **the controls did it** -- `lambda_body 0.0`, and the checkpoint confirms
 no shared head was ever built. `L_body` adds nothing here (4.8/4.5 against 5.0/3.7, within noise).
 
-**The confounds were checked.** Both runs trained on the same four bodies (`ik_walk_8body`'s nine
+**The confounds were checked.** Both runs trained on the same four bodies (`fwd_hex8body`'s nine
 minus the non-walkers leaves five; `stage2_clean` held out three and `speed5` held out one, landing
 on the same four), the same 5 clips per body, the same 60 epochs, the same architecture. And
 scoring `stage2_clean` on the *speed-varied clips* still gives the latent at 3.1x/3.8x, so it is
@@ -3393,16 +3393,16 @@ the training data that matters and not the evaluation data.
 This is what `lambda_cross` does in Stage 1 and what the adversary never managed (F59). **It was
 achieved by making the insect walk more than one speed.**
 
-**Isolated 2026-08-18.** `ik_walk_8body` and `ik_walk_speed7` are separate collection runs, so
-"speed variation" needed separating from "the newer dataset". `stage2_8body_matched` retrains on
+**Isolated 2026-08-18.** `fwd_hex8body` and `fwd_hex7speed` are separate collection runs, so
+"speed variation" needed separating from "the newer dataset". `s2_fwd_hex8-b1_ctrl` retrains on
 the **old** data with the **new** split -- `heldout_bodies c08f09t09` alone, 5 clips per body, 60
 epochs, same architecture and seed.
 
 | trained on | reads body identity from |
 |---|---|
-| `ik_walk_8body`, 3 bodies held out (`stage2_clean`) | **latent**, 3.1x / 3.9x |
-| `ik_walk_8body`, **1 body held out** (matched) | **latent**, 3.2x / 4.3x |
-| `ik_walk_speed7`, 1 body held out | **frame**, 2.9-5.0x |
+| `fwd_hex8body`, 3 bodies held out (`stage2_clean`) | **latent**, 3.1x / 3.9x |
+| `fwd_hex8body`, **1 body held out** (matched) | **latent**, 3.2x / 4.3x |
+| `fwd_hex7speed`, 1 body held out | **frame**, 2.9-5.0x |
 
 **Changing the split does nothing.** The old data still produces the switch. Ruled out alongside
 it: clips per body (5 in both) and frame clipping -- both datasets measure **0% of frames touching
@@ -3426,7 +3426,7 @@ hind scores 0.931 and the mean is 0.586, so the other three average **0.471 -- b
 the `L_body` run the same leg scores 0.404 while the other three average 0.580: **a different leg
 carries it.**
 
-**And the matched run settles it.** `stage2_8body_matched` and `stage2_clean` train on *identical
+**And the matched run settles it.** `s2_fwd_hex8-b1_ctrl` and `stage2_clean` train on *identical
 data* and differ only in the split. The leg probe reads **0.377 and 0.562** -- a 0.19 swing -- while
 the swap test on those same two runs reads 3.1x/3.9x against 3.2x/4.3x and the forward model differs
 by **0.014**. A metric that moves 0.19 on a change the representation does not register is not
@@ -3507,7 +3507,7 @@ Giving the insect five speeds instead of one moves it by the same order, and doe
 comparison available.
 
 **Design, because the obvious version of this test cannot work.** `stage2_clean` trained on
-`ik_walk_8body` and `stage2speed7ctrl` on `ik_walk_speed7`, so scoring on either set puts one model
+`fwd_hex8body` and `s2_fwd_hex7-b1_ctrl` on `fwd_hex7speed`, so scoring on either set puts one model
 in-distribution and the other out. Scoring on **both** separates the two explanations: if each wins
 at home it is distribution match, if one wins everywhere it is a better forward model. Rolled on
 its own output against holding the frame still, four clips per cell, **both checkpoints at epoch
@@ -3515,13 +3515,13 @@ its own output against holding the frame still, four clips per cell, **both chec
 
 | body | scored on | | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|---|---|
-| `c10f10t10` | `ik_walk_8body` | `stage2_clean` | 1.38x | 1.57x | 1.50x | 1.29x |
+| `c10f10t10` | `fwd_hex8body` | `stage2_clean` | 1.38x | 1.57x | 1.50x | 1.29x |
 | | | **`speed7` ctrl** | **1.43x** | **1.66x** | **1.60x** | **1.37x** |
-| | `ik_walk_speed7` | `stage2_clean` | 1.35x | 1.47x | 1.43x | 1.23x |
+| | `fwd_hex7speed` | `stage2_clean` | 1.35x | 1.47x | 1.43x | 1.23x |
 | | | **`speed7` ctrl** | **1.41x** | **1.58x** | **1.56x** | **1.35x** |
-| `c10f06t06` | `ik_walk_8body` | `stage2_clean` | 1.32x | 1.44x | 1.40x | 1.22x |
+| `c10f06t06` | `fwd_hex8body` | `stage2_clean` | 1.32x | 1.44x | 1.40x | 1.22x |
 | | | **`speed7` ctrl** | **1.39x** | **1.54x** | **1.50x** | **1.30x** |
-| | `ik_walk_speed7` | `stage2_clean` | 1.27x | 1.40x | 1.38x | 1.19x |
+| | `fwd_hex7speed` | `stage2_clean` | 1.27x | 1.40x | 1.38x | 1.19x |
 | | | **`speed7` ctrl** | **1.34x** | **1.52x** | **1.50x** | **1.29x** |
 
 **24 of 24 comparisons**, two bodies at opposite ends of the leg-length range (0.77 m and 0.47 m),
@@ -3530,7 +3530,7 @@ both evaluation sets, six horizons each. Mean gain **+7.0 percent**; **+5.6 at s
 whose only job is to be rolled.
 
 **Distribution match is ruled out by the cell that should have gone the other way.** On
-`ik_walk_8body` clips -- which `stage2_clean` trained on and `speed7` never saw -- `speed7` still
+`fwd_hex8body` clips -- which `stage2_clean` trained on and `speed7` never saw -- `speed7` still
 wins at every horizon on both bodies. A model predicts the other model's training data better than
 its owner does.
 
@@ -3544,15 +3544,15 @@ plainly:
 | the forward model's rollout | **data**, +7% (this) |
 | `z` carries body speed across the two robots | **the loss term** (F58, F60) -- every control stays at -7.1 |
 
-**Isolated 2026-08-18, same run as F61.** `stage2_8body_matched` -- old data, new split -- rolled on
+**Isolated 2026-08-18, same run as F61.** `s2_fwd_hex8-b1_ctrl` -- old data, new split -- rolled on
 the same two evaluation sets:
 
 | scored on | | h=1 | h=3 | h=5 | h=10 |
 |---|---|---|---|---|---|
-| `ik_walk_8body` | `stage2_clean` | 1.38x | 1.57x | 1.50x | 1.29x |
+| `fwd_hex8body` | `stage2_clean` | 1.38x | 1.57x | 1.50x | 1.29x |
 | | **matched, old data** | 1.38x | 1.57x | 1.49x | 1.26x |
 | | `speed7` control | **1.43x** | **1.66x** | **1.60x** | **1.37x** |
-| `ik_walk_speed7` | `stage2_clean` | 1.35x | 1.47x | 1.43x | 1.23x |
+| `fwd_hex7speed` | `stage2_clean` | 1.35x | 1.47x | 1.43x | 1.23x |
 | | **matched, old data** | 1.35x | 1.46x | 1.41x | 1.19x |
 | | `speed7` control | **1.41x** | **1.58x** | **1.56x** | **1.35x** |
 
@@ -3578,7 +3578,7 @@ Two objections to it, both fair. It sits badly with a thesis whose claim is that
 information. And "the frame would let it take a shortcut" was asserted, never measured.
 
 **So it was rebuilt properly**: one head on `MotionDecoder`'s shared `features(x_t, z)`, no
-embodiment key, gradient reaching the trunk. `stage2_speed7_bodyframe`, same data, same weight,
+embodiment key, gradient reaching the trunk. `s2_fwd_hex7-b1_bodyframe0.5`, same data, same weight,
 same control, both at epoch 60.
 
 | | insect->insect | b1->b1 | **insect->b1** | **b1->insect** |
@@ -3642,7 +3642,7 @@ F58 and F60 reported `lambda_body 0.5` costing **+55 percent on validation motio
 the trade the mechanism demands. It was not. 0.5 was copied from `lambda_cross`, where it works in
 Stage 1, with no argument that it should transfer to a different loss on a different target.
 
-Swept at `lambda_body 0.1`, everything else identical, same control (`stage2speed7ctrl`, epoch 60):
+Swept at `lambda_body 0.1`, everything else identical, same control (`s2_fwd_hex7-b1_ctrl`, epoch 60):
 
 | | val recon | val motion | cost | body loss, train | held out |
 |---|---|---|---|---|---|
@@ -3806,7 +3806,7 @@ given.
 
 And its Figure 2 is our control experiment: "IDM trained **without** the motion decoder (MD), where
 Agibot and Egodex cluster together but separate from Droid." **No auxiliary head, disjoint space.**
-That is `stage2speed7ctrl` at r = -0.048, arrived at independently.
+That is `s2_fwd_hex7-b1_ctrl` at r = -0.048, arrived at independently.
 
 **Wrong 2, then wrong again in the other direction.** The first version of this entry said their MD
 never emits different-dimensional output and concluded our per-embodiment heads were the whole
@@ -3915,7 +3915,7 @@ The frame sits at the start of the window instead of its middle, so it stops bei
 **Both halves of the condition, and a forward horizon passes both.** F64 requires the target to be
 unrecoverable from the head's other inputs; it equally requires the target to be recoverable from
 `z`, or the auxiliary loss adds noise rather than a constraint. Reading the same targets out of a
-trained `z` (`--ckpt stage2speed7body`):
+trained `z` (`--ckpt s2_fwd_hex7-b1_body0.5`):
 
 | R^2 | | W=1 | W=2 | **W=5** | W=10 | **W=20** |
 |---|---|---|---|---|---|---|
@@ -4214,7 +4214,7 @@ yaw, so left and right have to be measured separately rather than assumed symmet
 
 **Speed: widen the foot path, do not run the oscillator faster.** `--scale`, the shared foot-path
 scale about each body's hip, defaults to **0.5** -- feet pulled halfway in, so that the shortest
-legs in `ik_walk_8body` could still reach a shared absolute coordinate. Once the collection is one
+legs in `fwd_hex8body` could still reach a shared absolute coordinate. Once the collection is one
 long-legged body (F15: the hexapod morphology space is two-dimensional and a held-out body is
 reconstructed from a 2-D basis to 0.203 deg, so extra bodies add almost nothing), that constraint
 has no purpose -- **and it reaches the oscillator too**, because `--gait cpg` centres itself on the
@@ -4594,7 +4594,7 @@ balanced 4/4/4, 48 clips a side. This is the re-test.
 
 `screen_behaviour_channels.py` scores four channels (F70's three plus **yaw**, which the old screen
 had no rotational channel for) at two timescales against F69's three gates, on the frozen encoder --
-`stage2speed7body` predates both F71's wider foot path and F74's frame rate and has never seen
+`s2_fwd_hex7-b1_body0.5` predates both F71's wider foot path and F74's frame rate and has never seen
 either robot's current data, so its `z` says nothing here.
 
 **A held-out clip is not a held-out behaviour, and the difference reverses the result.** Within a
@@ -4652,7 +4652,7 @@ copies, as the 2-10% within-condition figure shows.
 ### F77. The screen measured the untrained baseline, and a length scale cannot move it
 
 F76 reported that supplying matched behaviour left no new channel shareable. **That conclusion was
-drawn from the frozen encoder**, because `stage2speed7body` predates both F71's wider foot path and
+drawn from the frozen encoder**, because `s2_fwd_hex7-b1_body0.5` predates both F71's wider foot path and
 F74's frame rate and has never seen either robot's current data. The frozen encoder is the *before*
 condition, and this project's own measurement of what training does to that condition is F66:
 
@@ -5030,7 +5030,7 @@ match and is the worst of the three:
 |---|---|---|
 | all twelve conditions | 0.066 | 48 |
 | speed conditions only | **0.040** | **16** |
-| old `ik_walk_speed7` | 0.045 | 91 |
+| old `fwd_hex7speed` | 0.045 | 91 |
 
 **R^2 is variance explained.** The speed-only subset has *less* forward variance than the old data
 and a third of the clips, so after a 70/30 split it tests on about five clips over a narrower range.
@@ -6660,7 +6660,7 @@ Median lateral speed per condition:
 
 | | `side_L_lvl0` | `side_L_lvl1` | `side_R_lvl0` | `side_R_lvl1` |
 |---|---|---|---|---|
-| `beh12_hex_flat` | +0.071 | +0.185 | -0.118 | -0.186 |
+| `beh12_c10f10t10_flat` | +0.071 | +0.185 | -0.118 | -0.186 |
 | `beh12_b1_flat` | +0.066 | +0.152 | -0.119 | -0.169 |
 | **`beh12_c08f09t09_flat`** | **-0.045** | +0.148 | **+0.017** | -0.131 |
 
@@ -7129,12 +7129,12 @@ checkpoint is stage 1. Both are right about different models, and F83's +0.761/+
 quoted about the model that closes the loop.
 
 **The gap: no checkpoint is both correct and cross-embodiment.** `stage2_*` trains on two robots but
-on `ik_walk_*` + `b1_framed`, from before F74's frame-rate fix; `beh12_hexonly` is on the corrected
+on `ik_walk_*` + `fwd_b1_50hz`, from before F74's frame-rate fix; `beh12_hexonly` is on the corrected
 data but has one robot. **So every closed-loop cross-embodiment number was produced without ever
 using the mechanism this project measured as the thing that creates transfer** -- and forward still
 crosses at 67-84%.
 
-**That makes the next run obvious rather than speculative**: stage 2 on `beh12_hex_flat` +
+**That makes the next run obvious rather than speculative**: stage 2 on `beh12_c10f10t10_flat` +
 `beh12_b1_flat`, `lambda_body 0.5` against an `0.0` control, then stage 3 and the loop on both. It
 is the first experiment that would carry the body-head result all the way to a controller, and
 widening `body_channels` becomes testable on top of it rather than instead of it. Heavy; it belongs
@@ -7657,7 +7657,7 @@ independent measurement of the same failure and the first on data with no known 
 ### F117. The two hexapod bodies turn opposite ways, and F94 left the cell that would have shown it blank
 
 **Found while auditing what data each checkpoint came from.** The world model is pretrained on
-`beh12_hex_flat` (`c10f10t10`) and every cross-embodiment goal comes from `beh12_c08f09t09_flat`.
+`beh12_c10f10t10_flat` (`c10f10t10`) and every cross-embodiment goal comes from `beh12_c08f09t09_flat`.
 Their turn ladders have the same magnitudes and opposite signs, on **every one of the 32 clips**:
 
 | condition | `c10f10t10`, pretrained on | `c08f09t09`, the goal source |
@@ -7692,7 +7692,7 @@ bodies**, in a dataset whose entire purpose is matched behaviour.
 **Three consequences, in order of how much they cost.**
 
 1. **The model is pretrained on turns of one sign and asked about goals of the other.** Nothing in
-   `beh12_hex_flat` ever showed the insect turning the way the goal clips turn.
+   `beh12_c10f10t10_flat` ever showed the insect turning the way the goal clips turn.
 2. **The B1 was matched to the goal body** (F115), which is right for the loop -- goal and candidate
    library agree -- but it makes the quadruped disagree with the pretraining insect.
 3. **Any hexapod-to-hexapod turning comparison across these two bodies is sign-inconsistent**,
@@ -7710,7 +7710,7 @@ oppose the one the goals come from. Run over the three sets in use:
 
 | | turn signs | |
 |---|---|---|
-| `beh12_hex_flat`, pretrained on | **+** | consistent |
+| `beh12_c10f10t10_flat`, pretrained on | **+** | consistent |
 | `beh12_c08f09t09_flat`, the goals | **-** | consistent |
 | `beh12_b1_flat`, the candidates | **-** | consistent |
 
@@ -7726,7 +7726,7 @@ reversed. All three sets now agree:
 
 | | level 1 | 2 | 3 | 4 |
 |---|---|---|---|---|
-| `beh12_hex_flat`, pretraining | +0.0032 | +0.0141 | +0.0363 | +0.0775 |
+| `beh12_c10f10t10_flat`, pretraining | +0.0032 | +0.0141 | +0.0363 | +0.0775 |
 | `beh12_c08f09t09_flat`, held out | +0.0069 | +0.0215 | +0.0407 | +0.0863 |
 | `beh12_b1_flat`, the candidates | +0.0105 | +0.0268 | +0.0401 | +0.0807 |
 
@@ -7773,7 +7773,7 @@ carries shared meaning across bodies.**
   is continuous rather than one value per clip (F60)
 - `data/README.md` -- which dataset to use for what, and the two collection flags that are not
   optional
-- `data/ik_walk_speed5` -- five retimed speeds matched to the B1's Froude band (F57). Episode
+- `data/_archive/ik_walk_speed5` -- five retimed speeds matched to the B1's Froude band (F57). Episode
   numbers carry the speed as a block of a thousand, so cross-body pairing stays inside one speed
 - `sim/collect/collect_ik.py --speed` -- time-retime the shared foot path; every leg by the same
   map, so inter-leg phase is untouched (F57)

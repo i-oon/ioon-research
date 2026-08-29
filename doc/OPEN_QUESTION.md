@@ -527,7 +527,7 @@ the wrong claim to put in front of a committee.
 | sideways is at or below chance | nine hypotheses: library coarseness, score blindness, amplitude, switch rate, gait phase, lock-in, camera angle, condition labels, joint replay | **all nine are on the deployment side.** Lateral has never been in the training target either |
 | the candidate library is recorded clips, so "a camera is the only thing it needs" is not earned | -- | **`rollout_b1_mujoco.py` takes `--vx --vy --wz`**, so a B1 library can be sampled without P'Jo's CPG -- but see below: this changes the prior rather than removing it |
 
-**The first two collapse into one run**: stage 2 on `beh12_hex_flat` + `beh12_b1_flat` with
+**The first two collapse into one run**: stage 2 on `beh12_c10f10t10_flat` + `beh12_b1_flat` with
 `body_channels ['0','1','2']` against a `lambda_body 0.0` control, then stage 3 and the loop on
 both. It is the run that would carry F83's mechanism into a controller for the first time, and it
 answers turning and sideways together. Heavy -- fibo7.

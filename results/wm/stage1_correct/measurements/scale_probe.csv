@@ -1,4 +1,0 @@
-split,train_bodies,heldout,mixture_gap,probe_error,pred_coxa,pred_femur,pred_tibia,true_coxa,true_femur,true_tibia,model_deg,r2,outcome
-m3d,4,c08f09t09,0.000,0.021,0.836,0.914,0.914,0.80,0.90,0.90,3.44,0.81,beats copy-nearest
-cov_narrow,4,c10f10t08,0.141,0.082,0.955,0.819,0.819,1.00,1.00,0.80,12.67,-0.78,loses
-cov_wide,6,c10f10t08,0.063,0.034,0.973,0.954,0.772,1.00,1.00,0.80,3.27,0.89,beats every baseline

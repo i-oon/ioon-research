@@ -90,53 +90,31 @@ A **quadruped** stands through every episode under the same planner after the wo
 adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
 three speed targets** (F101).
 
-**Cross-embodiment control** (2026-08-28, refitted on the corrected B1 set 2026-08-29) is the
-fourth scope and the narrowest. **Forward and turning both cross; sideways does not.** With the two
-stage-3 arms differing only in `--lambda_nce`: forward **53%** under MSE and **54%** with the
-contrastive term against 33% chance, turning **22%** and **43%**, sideways 19% and 20% against 17%.
-Every run stayed upright and **every turning run turned the right way** -- the first time that could
-be measured, since the two robots turned opposite ways until F115.
+**Cross-embodiment control** is the fourth scope and the narrowest. Goal frames come from a
+hexapod clip, candidates stay B1 clips because only those are executable, and the driven robot is
+the quadruped -- so only the goal crosses embodiments, which is the form this demonstration can take
+without a motion decoder that generalises across bodies.
 
-**Whether the contrastive term helps at all is open again.** Its `/mean-z` goes 0.977 to 0.493, so
-it does make the forward model use its action; but MSE given the *original* budget reaches 36% on
-turning against the contrastive arm's 43%, inside that arm's own spread, and the two were compared
-at different budgets. Both are being retrained matched (F116).
+**Every B1 number was withdrawn on 2026-08-29 and nothing has replaced it yet.** The set those
+numbers were measured on had four defects -- the robot clipped by the image edge in 61% of frames,
+an unpinned camera giving every clip its own background, a forward clip filed as the weakest turn
+level, and turns that ran opposite to the insect's (F113-F115, F117). The data is corrected and all
+three sets now turn the same way; **the checkpoints were deleted and stages 1-3 have to be rebuilt.**
 
-**What the term does, mechanically:** Its `/mean-z` goes 0.977 to 0.493; the collapsed arm still selects forward at 53%, so
-**forward can be chosen by a model that ignores the action entirely** and is not evidence the world
-model works. F112's 32%-against-74% on forward does not reproduce and was partly a label defect
-(F114, F116). The ladder, all arms at
-`--warm_start 0 --commit 3`, four goal clips per arm, against a 33% chance rate on the forward
-goal: frozen world model with only the projector fitted **5% +/- 0**, adapted separately under MSE
-**28% +/- 5**, adapted **jointly** under MSE **32% +/- 7**, jointly with a contrastive term
-**74% +/- 3**. **Only the loss term separates the last two** -- same file, same 24 clips, same code
-path, and the MSE arm ran 25% more steps. The two do not overlap. **Turning clears chance in no
-arm**, the contrastive one included (32% +/- 5). **A world model pretrained on the insect cannot drive the quadruped at
-all, and MSE adaptation leaves it at chance** -- the contrastive term is what crosses the gap, which
-is F98's mechanism deciding a physics loop rather than a ranking on recorded clips (F112). Goal frames come
-from a **hexapod** clip, candidates stay B1 clips because only those are executable, and the B1
-walks: **67% / 84% / 71% of planned steps on forward candidates against 33% chance** under three
-warm-start settings (a turning clip, a forward clip, and none at all), upright for every step of
-every run. **Only forward travel crosses.** Sideways is at or below chance in all three, and turning
-straddles chance in all three -- it was reported as crossing and then withdrawn. Over thirteen
-cross-embodiment runs the goal's yaw and the robot's yaw correlate at **-0.33 with 46% sign
-agreement**: the loop controls *forward or not forward* and does not control direction (F107, F109).
-The defensible sentence is **"a quadruped walks forward from an insect's video"**, not "behaviours
-cross" -- and narrower still: **the loop transfers the kind of motion, not the amount.** Seven goals
-spanning a 1.72x range of commanded Froude produce achieved speeds correlating at **+0.074**, and
-the planner does not select faster candidates for faster goals (-0.167) although the library covers
-the range. The same loop tracks speed to a median 14.8% when the goal is the same robot (F111).
+**What the withdrawn runs showed, kept because it shapes what to measure next**, and none of it is
+quotable until the rebuild:
 
-> **The checkpoint that closes the loop has no shared body target.** `beh12_hexonly` trains on
-> `hexapod=data/beh12_c10f10t10_flat` alone, so `lambda_body` supervises forward *within the insect*; stage 3
-> trains only the projector and the forward model. A channel screen on that checkpoint transfers
-> **nothing**, forward included (-0.112 hex->b1), while forward crosses in the loop at 67-84%.
-> **The cross-embodiment result comes from V-JEPA2's features plus stage-3 adaptation, not from
-> `lambda_body`.** F83 is not contradicted -- it measured `stage2_*` checkpoints trained on two
-> robots, and those sit on pre-F74 data. **No checkpoint is both correct and cross-embodiment**, so
-> the loop has never used the mechanism this project identified as what creates transfer. The next
-> run is stage 2 on `beh12_hex_flat` + `beh12_b1_flat` against a `lambda_body 0.0` control, then
-> stage 3 and the loop on both (F110). Heavy -- fibo7.
+| | |
+|---|---|
+| forward crosses | 53-58% of planned steps against 33% chance, under every objective tried |
+| **forward does not need the world model** | an arm whose `/mean-z` is 0.977 -- it answers the same given the real action or the mean one -- still selects forward at 53%. A 2% residual sensitivity is enough, so forward selection is not evidence the forward model works |
+| turning is where the objectives differ | the collapsed arm sits *below* chance at 22%, the contrastive arm clears it at 43%, and `/mean-z` goes 0.977 to 0.493 |
+| the contrastive advantage is not established | MSE at the original budget reaches 36% on turning against 43%, inside that arm's own spread, and the two had been compared at different budgets. Three seeds per arm is the outstanding measurement |
+| sideways fails everywhere | 19-20% against 17%, on four independent measurements |
+
+**So the defensible sentence names the behaviour and the limit**: a quadruped walks forward from a
+stick insect's video, and turning is the only behaviour where a better world model measurably beats
+a collapsed one. Do not write "behaviours cross".
 
 **The adaptation objective is a claim in its own right.** LAC-WM's three stages are MSE throughout.
 Applied across families that fails in a specific way: the forward model improves its predictions
