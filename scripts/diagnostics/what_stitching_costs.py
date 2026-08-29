@@ -13,7 +13,7 @@ seeding, same episode length. **The difference is what the switching itself cost
 selection quality and replay fidelity held out of it, because both sequences are replays.
 
     .venv/bin/python3 scripts/diagnostics/what_stitching_costs.py \\
-        results/wm/closed_loop/b1_physics3/*.npz --data data/beh12_b1_v2
+        results/wm/closed_loop/b1_physics3/*.npz --data data/beh12_b1_flat
 """
 import argparse
 import collections

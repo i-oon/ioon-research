@@ -43,7 +43,7 @@ is exactly a discriminator, so this is the closed-loop result available without 
 
     .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1_v2.pt \\
         --projector wm/runs/beh12_hexonly/projector_b1_adapted_v2.pt \\
-        --data data/beh12_b1_v2 --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
+        --data data/beh12_b1_flat --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
 """
 import argparse
 import glob

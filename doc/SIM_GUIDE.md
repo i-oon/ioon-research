@@ -154,13 +154,13 @@ physics is replayed from the file and only the camera changes.
 
 ```bash
 # speed and sideways: re-render the stored states
-cd $REPO && .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/beh12_b1_v2
+cd $REPO && .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/beh12_b1_flat
 
 # turning: re-roll, because the commands themselves change
 cd $REPO && .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/beh12_b1_turns
 ```
 
-The current set is **`data/beh12_b1_v2`**; `data/beh12_b1_flat` is the superseded one and the two
+The current set is **`data/beh12_b1_flat`**; `data/beh12_b1_flat` is the superseded one and the two
 must not be mixed. Its README lists what changed.
 
 #### The configuration that has to stay fixed

@@ -90,8 +90,8 @@ def run(clips, label, w, epochs=300, seed=0):
 
 def main():
     sets = [("hexapod, joint targets", "data/beh12_hex_flat", "actions"),
-            ("B1, policy actions", "data/beh12_b1_v2", "action"),
-            ("B1, joint positions", "data/beh12_b1_v2", "joint_pos")]
+            ("B1, policy actions", "data/beh12_b1_flat", "action"),
+            ("B1, joint positions", "data/beh12_b1_flat", "joint_pos")]
     print(f"  {'source':<26}{'win':>3}{'cond':>10}{'chance':>9}{'family':>11}{'chance':>9}")
     out = {}
     for label, d, key in sets:

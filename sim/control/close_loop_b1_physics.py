@@ -25,7 +25,7 @@ steps at 50 Hz, six seconds; this loop is three.
     .venv/bin/python3 sim/control/close_loop_b1_physics.py \\
         --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_v2.pt \\
         --projector wm/runs/beh12_hexonly/projector_stage3_nce_v2.pt \\
-        --demo data/beh12_b1_v2/b1_ep2.npz --out results/wm/closed_loop/b1_physics
+        --demo data/beh12_b1_flat/b1_ep2.npz --out results/wm/closed_loop/b1_physics
 """
 import argparse
 import os
@@ -64,8 +64,8 @@ def main():
                          "to take. Defaults to `--demo`, i.e. same-robot goals")
     ap.add_argument("--goal_embodiment", default="",
                     help="embodiment of `--goal`, for the centring offset. Defaults to --embodiment")
-    ap.add_argument("--candidates_dir", default="data/beh12_b1_v2",
-                    help="**`beh12_b1_v2`, not `beh12_b1_flat`.** The original set clips the robot "
+    ap.add_argument("--candidates_dir", default="data/beh12_b1_flat",
+                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The original set clips the robot "
                          "in 61% of frames, never pins its camera, files the forward clip under "
                          "`turn_wz0.00`, and turns the opposite way from the insect -- so its "
                          "turning conditions cannot be reached from an insect goal at all "

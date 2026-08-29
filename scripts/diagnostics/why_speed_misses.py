@@ -19,7 +19,7 @@ predicted: these are clips of the robot performing that behaviour, so their achi
 measured fact.
 
     .venv/bin/python3 scripts/diagnostics/why_speed_misses.py \\
-        results/wm/closed_loop/b1_physics3/*.npz --demo_dir data/beh12_b1_v2
+        results/wm/closed_loop/b1_physics3/*.npz --demo_dir data/beh12_b1_flat
 """
 import argparse
 import glob

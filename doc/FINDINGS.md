@@ -7274,7 +7274,7 @@ chance rate.
 
 ### F113. The quadruped walks out of its own camera frame, and the insect never does
 
-**Found from a preview video, not from a table.** `results/wm/dataset/preview_beh12/` shows the B1
+**Found from a preview video, not from a table.** `results/dataset/preview_beh12/` shows the B1
 partly outside the image in the sideways clips. Measured across all 96 clips -- robot mask taken as
 the difference from each clip's own median background, since the robot moves and the backdrop does
 not:
@@ -7558,7 +7558,7 @@ is done.**
 
 ### F116. Forward selection survives a forward model that ignores its action, and that is what the contrastive term is for
 
-**The whole pipeline was refitted on `data/beh12_b1_v2`** -- stage 1, stage 2, stage 3 -- because
+**The whole pipeline was refitted on `data/beh12_b1_flat`** -- stage 1, stage 2, stage 3 -- because
 the set the original was fitted on turns the opposite way from the insect (F115), files the forward
 clip under `turn_wz0.00` (F114) and clips the robot in 61% of frames (F113). **The two stage-3 arms
 now differ in `--lambda_nce` and in nothing else**: same 24 clips, 12,000 steps each, batch 8. The
@@ -7712,7 +7712,7 @@ oppose the one the goals come from. Run over the three sets in use:
 |---|---|---|
 | `beh12_hex_flat`, pretrained on | **+** | consistent |
 | `beh12_c08f09t09_flat`, the goals | **-** | consistent |
-| `beh12_b1_v2`, the candidates | **-** | consistent |
+| `beh12_b1_flat`, the candidates | **-** | consistent |
 
 Each set is internally consistent, which is why nothing ever failed; the disagreement is only
 visible across sets, and no check compared sets until now.
@@ -7728,7 +7728,7 @@ reversed. All three sets now agree:
 |---|---|---|---|---|
 | `beh12_hex_flat`, pretraining | +0.0032 | +0.0141 | +0.0363 | +0.0775 |
 | `beh12_c08f09t09_flat`, held out | +0.0069 | +0.0215 | +0.0407 | +0.0863 |
-| `beh12_b1_v2`, the candidates | +0.0105 | +0.0268 | +0.0401 | +0.0807 |
+| `beh12_b1_flat`, the candidates | +0.0105 | +0.0268 | +0.0401 | +0.0807 |
 
 **And the direction can be stated in the image, which is the frame that matters.** Taking the
 principal axis of the robot's silhouette and following it through a clip, all three sets now rotate

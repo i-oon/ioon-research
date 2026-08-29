@@ -13,7 +13,7 @@ proprioception come from the MuJoCo rollout (where the policy actually walks).
 # the scene's own way, the B1 touches an image edge in 61% of frames against the insect's 0%, every
 # clip carries its own background because the camera is never pinned, and a 24-degree view reaches
 # the far edge of the 15 m floor. `--cam_fov 24 --spawn 0 0 --floor_scale 3` is what
-# `data/beh12_b1_v2` was built with, and anything rendered differently cannot be mixed with it
+# `data/beh12_b1_flat` was built with, and anything rendered differently cannot be mixed with it
 # (F113). Pass `--cam_fov 15 --floor_scale 0` to reproduce the old, defective framing.
 import argparse
 import os

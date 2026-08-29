@@ -34,7 +34,7 @@ for SEED in 0 1 2; do
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt3 \
       --ckpt wm/runs/beh12_hexonly/adapted_b1_v2.pt \
       --projector wm/runs/beh12_hexonly/projector_b1_adapted_v2.pt \
-      --data data/beh12_b1_v2 --embodiment b1 --train_clips $CLIPS \
+      --data data/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
       --steps 15000 --lambda_nce $LAM --batch 8 --seed $SEED \
       --cache results/wm/cache/b1_v2.pt --out "$OUT"
   done

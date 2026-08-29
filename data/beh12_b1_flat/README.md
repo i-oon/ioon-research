@@ -1,9 +1,9 @@
-# beh12_b1_v2 — the corrected B1 set
+# beh12_b1_flat — the corrected B1 set
 
 Replaces `beh12_b1_flat`, which four separate defects made unusable for the turning half of the
 matched behaviour set. **Do not mix the two.**
 
-| | `beh12_b1_flat` | `beh12_b1_v2` | hexapod |
+| | `beh12_b1_flat` | `beh12_b1_flat` | hexapod |
 |---|---|---|---|
 | frames touching an image edge | 61% (100% on every sideways clip) | **0%** | 0% |
 | background spread between clips | 2.79 grey levels | **0.26** | 0.14 |

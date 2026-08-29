@@ -93,7 +93,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--hex_dir", default="data/beh12_hex_flat")
-    ap.add_argument("--b1_dir", default="data/beh12_b1_v2",
+    ap.add_argument("--b1_dir", default="data/beh12_b1_flat",
                     help="empty string fits the hexapod alone, for a checkpoint that never saw a "
                          "quadruped")
     ap.add_argument("--exclude", nargs="*", default=[],
