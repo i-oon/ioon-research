@@ -7820,6 +7820,50 @@ table above, or say which reduction produced the number.
 
 ---
 
+### F119. Three seeds settle it: the contrastive term is what makes the quadruped selectable, and MSE is below chance
+
+**The measurement F116 asked for, on the corrected data and with the three leaks of F118 closed.**
+Six stage-3 runs, three seeds per arm, everything else identical -- same stage 1 checkpoint, same
+stage 2 projector, same 24 clips, 15,000 steps, batch 8. Averaged over the last 21 evaluations
+(step 10,000 onward), a window fixed before the runs and applied to both arms:
+
+| arm | family | cond | `/mean-z` | `/hold` |
+|---|---|---|---|---|
+| **contrastive** (`--lambda_nce 1`) | **54.8% +/- 1.1** | 28.6% | **0.490** | 0.891 |
+| **MSE** (`--lambda_nce 0`) | **21.6% +/- 0.3** | 7.8% | **0.985** | **0.802** |
+| *chance* | 28% | 8% | -- | -- |
+
+Per seed, the two arms do not come within 30 points of each other: contrastive 53.7 / 55.0 / 55.9,
+MSE 21.3 / 21.7 / 21.8. **F116's ambiguity is gone** -- there, MSE at one budget reached 36%
+against contrastive's 43%, inside that arm's own spread, and the two had been compared at different
+budgets.
+
+**MSE is not merely worse at selecting, it is below chance.** 21.6% against 28%, and `cond` at 7.8%
+against 8% is the rate of guessing. `/mean-z` 0.985 says why: the forward model returns the same
+answer for the real action as for the mean one, so there is nothing for a planner to rank and the
+sub-chance score is what ranking noise looks like.
+
+**And the arm that selects is the arm that predicts worse.** MSE ends with the lower training loss
+(0.69 against 1.12) and the better held-out prediction (`/hold` 0.802 against 0.891). **The two
+capabilities dissociate cleanly, and the objective decides which one you get** -- which is the
+claim, stated at three seeds rather than one.
+
+**Reproduces F98 on data that no longer carries the four B1 defects**, and slightly better on both
+arms: F98 read `/mean-z` 0.62, cond 29%, family 50% for contrastive and 0.993 / 6% / 19% for MSE.
+
+**What this is not.** It is offline discrimination over recorded clips, not a closed loop: the
+model ranks twelve candidate actions against a known next embedding. Whether the ordering survives
+into physics is the next measurement, and F100's warning applies -- forward selection has cleared
+chance before under a model whose `/mean-z` was 0.977.
+
+`scripts/diagnostics/summarise_stage3_seeds.py` produces the table; `adapt3` stores only the final
+step in its checkpoint, and the final step is not the run -- `family` wanders about four points
+between evaluations, so nce seed 0 ends on 57% against a 53.7% mean. Log kept at
+`results/wm/stage3_b1_seeds_2026-08-29.txt`.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
