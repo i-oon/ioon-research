@@ -185,6 +185,12 @@ def main():
                     help="clip basenames to fit on. Default: whatever stage 1 recorded in the "
                          "checkpoint, so the few-shot budget is the same one and not quietly "
                          "widened by running this file.")
+    ap.add_argument("--seed", type=int, default=0,
+                    help="batch order, negative sampling and any random init. **Without this "
+                         "every run of one configuration is bit-identical**, so repeats say "
+                         "nothing and a single run cannot be told apart from a lucky one -- "
+                         "which matters here, because the same arm moved 9% to 58% speed "
+                         "error between 12k and 15k steps (F116).")
     ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--lr_proj", type=float, default=1e-3)
@@ -211,6 +217,7 @@ def main():
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
+    torch.manual_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     cfg = from_checkpoint(checkpoint["config"])
@@ -287,7 +294,7 @@ def main():
           f"{top1:>7.0%}{fam:>8.0%}   <- before stage 3")
     chance = 1.0 / max(ncond, 1)
 
-    g = torch.Generator().manual_seed(0)
+    g = torch.Generator().manual_seed(args.seed)
     step, run = 0, 0.0
     while step < args.steps:
         for pairs in batches(clips, train, args.batch, g):
