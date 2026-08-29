@@ -42,7 +42,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
-from wm.models.action_projector import ActionProjector  # noqa: E402
+from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
@@ -124,7 +124,7 @@ def main():
     if "val_paths" not in saved:
         raise SystemExit(f"{os.path.relpath(proj_path, ROOT)} predates held-out clip recording. "
                          "Refit with `.venv/bin/python3 -m wm.fit_projector --ckpt <ckpt>`.")
-    proj = ActionProjector(cfg, saved["action_dims"]).to(device).eval()
+    proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
     proj.load_state_dict(saved["projector"])
 
     name = args.embodiment

@@ -7021,6 +7021,17 @@ below it. **F107's turn dose-response was measuring the clip I chose to start th
 
 **What crosses embodiments in an actual control loop is forward travel, and only that.**
 
+> **Corrected by F126 and then reframed by F127 (2026-08-30). Read all three or none.**
+> "Forward is the robust behaviour and turning the broken one" is not a fact about the behaviours.
+> F126 measured the ordering **inverting** on same-robot goals -- turning 53% at one step rising to
+> 89% at ten, forward weakest at 30-46%. **F127 then showed why neither ordering answers the
+> question asked here**: under a mismatched goal the planner still scores 56-70% against the
+> *demonstration* and 18-23% against the goal it was shown, below chance. The loop is not
+> conditioning on its target, so **"which behaviour transfers" is not measurable from these runs at
+> all** -- what the numbers rank is how identifiable each behaviour is from its own dynamics.
+> Turning is the most classifiable family; forward the least. **Do not carry "forward crosses,
+> turning does not" into a write-up.**
+
 **Cutting the warm start entirely does not rescue the turn, and the B1 walks fine without it.**
 `--warm_start 0` seeds the state from the demonstration's first frame and hands the planner a
 standing robot from step 0. All four goals survive **65 of 65 steps** at 0.054-0.119 m/s, so the ten
@@ -7172,6 +7183,12 @@ Seven hexapod forward goals spanning Froude **0.129 to 0.222**, a 1.72x range, d
 | `ep201` `speed_c8.15` | 0.1996 | 0.362 | 0.1290 |
 | `ep300` `speed_c8.8` | 0.2067 | 0.354 | 0.0692 |
 | `ep301` `speed_c8.8` | 0.2216 | 0.373 | 0.0771 |
+
+> **Read with F127.** The failure of forward *amount* to transfer, measured here, is real and
+> stands. The implied contrast with turning does not: F127 shows the planner does not condition on
+> its goal in either embodiment, so a behaviour ranking taken from these loops measures how
+> classifiable each behaviour is, not what transfers. F126 read the same gap as a
+> cross-embodiment-metric failure and **that reading is withdrawn.**
 
 **corr(goal, achieved) = +0.074.** The B1 walks at an unrelated speed, and it is not the body
 failing to deliver: **corr(goal, mean `vx` selected) = -0.167**, so the planner does not even choose
@@ -7860,6 +7877,617 @@ chance before under a model whose `/mean-z` was 0.977.
 step in its checkpoint, and the final step is not the run -- `family` wanders about four points
 between evaluations, so nce seed 0 ends on 57% against a 53.7% mean. Log kept at
 `results/wm/stage3_b1_seeds_2026-08-29.txt`.
+
+---
+
+
+### F120. The objective's 33-point offline lead is 6 points in physics, and neither arm turns
+
+**The closed loop, run on the checkpoints of F119.** Twelve episodes: two stage-3 arms against six
+goal clips -- two per behaviour family, both sideways signs -- with MuJoCo carrying the weight and
+CoppeliaSim supplying the camera. Goals are the `...3` validation clips, in no candidate library and
+in no training set. Nothing differs between the arms but `--ckpt`.
+
+**Selection, measured over the planner's own 330 picks per arm** rather than over what it achieved:
+
+| | offline (F119) | in the loop |
+|---|---|---|
+| contrastive | 54.8% | **41%** |
+| MSE | 21.6% | **35%** |
+| chance | 28% | 28% |
+
+**The gap collapses from 33 points to 6**, and MSE moves from *below* chance to *above* it. Whatever
+the offline discrimination measures, most of it does not survive being asked the same question on
+frames the loop drove itself into.
+
+**What the robot actually did**, median over the planned steps, dimensionless:
+
+| goal | target | contrastive | MSE |
+|---|---|---|---|
+| forward, `speed_vx0.30` | 0.122 | **0.096** | 0.077 |
+| forward, `speed_vx0.50` | 0.197 | 0.049 | 0.058 |
+| turn, `turn_w0.037` | yaw 0.052 | 0.026 | 0.006 |
+| turn, `turn_w0.075` | yaw 0.063 | 0.006 | 0.010 |
+| sideways left | lateral +0.173 | +0.009 | +0.025 |
+| sideways right | lateral -0.178 | **+0.012** | -0.017 |
+
+**Survival is 12 of 12 and the speed criterion is 0 of 6 in both arms.** The signs are mostly right
+and the magnitudes are 5-20% of target: the quadruped **barely turns and barely strafes**, rather
+than turning the wrong way. The one reversed run is the contrastive arm on sideways right.
+
+**So the defensible sentence about the objective is offline-only.** F119's contrast is real and
+three-seeded; F120 says it does not carry into control on this robot, which is what F100 warned
+about from the other direction -- selection scores and loop behaviour have come apart before.
+
+> **`S.R. behaviour` cannot be quoted from these runs.** `score_closed_loop.py` decides the class by
+> the largest channel, and forward speed exceeds yaw in every turn condition on both robots (F108),
+> so a turning goal and a walking outcome are both "forward" and the check passes for free. It
+> reads 67% against 50% here and neither number means what it appears to. The speed column was
+> fixed to use `channel_for`; `ok_class` was not. **Fix it, and re-report every `S.R. behaviour`
+> that has been quoted.**
+
+Runs in `results/wm/closed_loop/b1_{nce,mse}_s0_b1_ep*/`.
+
+---
+
+
+### F121. With the turn signs finally agreeing, cross-embodiment control is still at chance and the quadruped does not turn
+
+**The first cross-embodiment loop run on data where all three sets turn the same way** (F118).
+Goal frames come from the held-out insect `c08f09t09`, candidates stay B1 clips because only those
+are executable, and `--demo` is held fixed at one forward B1 validation clip so that only the goal
+varies (F109, F110). Twelve episodes, two stage-3 arms, six goals.
+
+**Selection, over 330 picks per arm:**
+
+| | contrastive | MSE | chance |
+|---|---|---|---|
+| same-robot goals (F120) | 41% | 35% | 28% |
+| **insect goals** | **32%** | **33%** | 28% |
+
+**Both arms are at chance and the two are indistinguishable.** The objective that separates by 33
+points offline and by 6 points on same-robot goals separates by **-1** here.
+
+**What the quadruped did**, median over the planned steps:
+
+| goal | target | contrastive | MSE |
+|---|---|---|---|
+| `speed_c5.8` | 0.131 | 0.070 | **0.101** |
+| `speed_c8.8` | 0.222 | 0.069 | **0.105** |
+| `turn_s0.29` | yaw 0.041 | 0.004 | -0.005 |
+| `turn_s0.56` | yaw 0.088 | -0.002 | 0.009 |
+| `side_L_lvl1` | lateral +0.160 | +0.013 | +0.002 |
+| `side_R_lvl1` | lateral -0.140 | +0.016 | -0.004 |
+
+**The robot walks forward whatever it is shown.** Yaw is 2-10% of target and twice carries the
+wrong sign; lateral is 1-11% of target. Survival is 12 of 12 and the speed criterion is 0 of 6 in
+both arms. On forward the **MSE arm is the better of the two**, at 23% and 53% error against 47%
+and 69%.
+
+**So the sign correction was necessary and is not sufficient.** Before F117 the turning question was
+unaskable -- an insect turning one way against B1 candidates turning the other. It is now askable
+and the answer is that nothing crosses: what the loop does with an insect goal is what it does with
+no useful goal at all.
+
+**Two things this does not settle.** The fixed forward demonstration starts the robot walking
+forward and supplies ten warm-start commands, so "walks forward regardless" is the null the design
+makes easiest to fall into; a neutral or standing demonstration is the control that has not been
+run. And this is one seed per arm -- F119's three seeds cover the offline claim only.
+
+Runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_*/`.
+
+**`score_closed_loop.py` could not grade these until today.** It read the reference from `--demo`,
+which in a cross-embodiment run is the neutral B1 clip rather than the goal, so every such run was
+being scored against a forward walk it was never asked for. It now prefers the recorded `goal` when
+that differs from the demonstration, takes `--goal_dir`, and picks the scored channel from the
+*reference's* condition. Same-robot numbers are unchanged -- `b1_nce_s0_b1_ep3` reads 20.9% before
+and after.
+
+---
+
+
+### F122. Committing three steps buys the turn back and it is still not the goal's turn
+
+**Thirty-six cross-embodiment episodes**, two stage-3 arms against six insect goals at three loop
+settings: `commit 1 / warm 10` (F121), `commit 3 / warm 10`, and `commit 3 / warm 0`. Survival is
+36 of 36.
+
+**Committing changes execution, exactly as F102 and F103 predict.** The quadruped's achieved yaw
+range widens from -0.005..+0.021 at commit 1 to +0.004..+0.046 at commit 3, and the contrastive
+arm's `turn_s0.29` lands within **0.9%** of its goal -- the first `S` on any cross-embodiment run.
+
+**It is not a turning result, and the control is inside the same batch.** A *forward* goal produces
+as much yaw as a turning one:
+
+| setting, contrastive arm | turn goals | forward goals |
+|---|---|---|
+| commit 3, warm 10 | +0.041, +0.046 | +0.023, **+0.037** |
+| commit 3, warm 0 | +0.060, +0.035 | **+0.054**, +0.009 |
+
+The 0.9% match is a robot yawing 0.02-0.05 whatever it is shown, meeting a goal that happens to ask
+for 0.041.
+
+**Goal yaw against achieved yaw, six cells of six runs**: r = -0.30, +0.76, +0.33 for contrastive
+across the three settings and -0.18, -0.07, -0.66 for MSE. **The sign of the effect flips between
+settings within one arm**, which at n = 6 is what no relationship looks like. F109 measured -0.33
+and 46% sign agreement on the old data; that survives the correction.
+
+**Selection stays at chance under every setting:**
+
+| | contrastive | MSE | chance |
+|---|---|---|---|
+| commit 1, warm 10 | 32% | 33% | 28% |
+| commit 3, warm 10 | 34% | 35% | 28% |
+| commit 3, warm 0 | 36% | 29% | 28% |
+
+**So the sign defect was real, was fixed, and was not what stood between this pipeline and a
+cross-embodiment turn.** Before F117 the question was unaskable; asked properly, on data where all
+three sets turn the same way, the answer is that **forward travel crosses and turning does not** --
+F109's sentence, now without the confound that could have explained it away.
+
+**And the warm start is no longer load-bearing either.** At `warm 0` the robot starts standing and
+still survives 65 of 65 in all twelve runs, so the ten steps were never holding the loop up. What
+they were doing is what F109 said: setting the yaw the robot then keeps.
+
+Runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_c{1,3w10,3w0}_*/`. The `--commit` and
+`--warm_start` settings are in the directory names because two settings cannot be compared without
+naming them.
+
+---
+
+
+### F123. The cross-embodiment goal metric was the fault, and a mean shift recovers it
+
+**The planner scores a raw MSE between a predicted B1 embedding and the goal embedding**, and in a
+cross-embodiment run that goal is a *hexapod* frame. Embodiment is strongly decodable from these
+embeddings (F43, F46), so the distance is dominated by which robot is in the picture. No correction
+was applied: the checkpoints carry no `embedding_offsets` and `center_embeddings` is false.
+
+**Tested offline, no simulator, one checkpoint (`stage3_b1_nce_s0`), 8 demonstrations, 95
+decisions.** `plan_open_loop.py` gained `--goal_dir` / `--goal_embodiment` so the goal can come from
+another robot, and `--center`, which translates the goal clip into the driven robot's mean
+appearance -- **only the goal moves**, since `e_t` is also the forward model's input and shifting it
+would trade one confound for another.
+
+| goal | exact condition | right behaviour |
+|---|---|---|
+| the B1's own clips | 19.4% | 47.2% |
+| **insect, raw MSE** | **4.2%** | **34.7%** |
+| **insect, goal mean-shifted** | **23.2%** | **55.8%** |
+| *chance* | 8.3% | 25.0% |
+
+> **The reading below is withdrawn by F125.** The control it names as unrun was run the same
+> evening: with the goal swapped for a *different behaviour*, the corrected score is **55.8%
+> again, unchanged to the decimal**, and the score against the clip the planner was actually
+> shown is 22.1% against a 25% chance rate. **The planner is not reading the goal.** The
+> measurements in this entry are correct; the sentence "the mean shift recovers cross-embodiment
+> selection" is not.
+
+**Uncorrected, exact-condition selection is *below* chance and the behaviour family is barely above
+it. Corrected, both clear the same-robot baseline.** The mean shift is one subtraction: no
+retraining, no architecture change, nothing learned.
+
+**This locates the failure of F120-F122.** Every cross-embodiment loop in this project scored its
+candidates against an insect goal in raw embedding space, so the planner was ranking on a distance
+whose leading term is "this is the wrong robot" -- a term identical for every candidate in its
+constant part and dominated by appearance in the part that varies. The loop's 32-36% is what that
+metric supports.
+
+**What it does not establish.** This is open loop: frames come from recorded clips, not from states
+the robot drove itself into, and the closed loop has to survive both. It is one checkpoint and one
+seed. And a mean shift is a first-order correction only -- if the two embodiments also differ in
+variance structure, per-dimension standardisation or a learned alignment may be needed, and the
+recovery above being *complete* rather than partial is the evidence that a mean is enough here.
+
+**Next**: apply the shift in `wm/policy/planner.py` and rerun the twelve cross-embodiment episodes,
+which is the same test in physics. Also worth re-reading F107's retrieval proxy, which asked a
+related question and was wrong in the direction that cancelled the experiment.
+
+---
+
+
+### F124. The goal shift that fixes selection offline does not fix it in the loop
+
+**F123's correction, applied in physics.** `close_loop_b1_physics.py` gained `--center_goal`, which
+translates the insect goal clip into the driven robot's mean appearance -- the B1 reference taken
+from its own demonstration clip, since live frames cannot supply it at step 0, and only the goal
+moves. Twelve episodes, both arms, otherwise identical to F122's `commit 3, warm 0` cell.
+
+| | offline (F123) | in the loop |
+|---|---|---|
+| raw MSE, behaviour | 34.7% (chance 25%) | 36% / 29% (chance 28%) |
+| goal shifted, behaviour | **55.8%** | **36% / 34%** |
+
+**Offline the shift is worth 21 points; in the loop it is worth nothing.** Survival stays 12 of 12,
+the speed criterion stays 0 of 6, and achieved forward speed still covers a fraction of the goal
+range (0.072-0.093 against goals of 0.017-0.218 for the contrastive arm -- *narrower* than without
+the shift).
+
+**It does move which behaviour is confused for which**, which is why the overall figure hides it:
+
+| | sideways | forward | turning |
+|---|---|---|---|
+| contrastive, raw | 16% | **52%** | 40% |
+| contrastive, shifted | 18% | **32%** | **58%** |
+| MSE, raw | 16% | 43% | 29% |
+| MSE, shifted | **32%** | 33% | 36% |
+
+Turning rises 40% to 58% and forward falls 52% to 32% in the contrastive arm. The shift redistributes
+selection across families rather than improving it: chance is 33% per family, so the shifted
+contrastive arm is at chance on forward and above it on turning, having been the reverse.
+
+**Yaw still does not track the goal.** r = -0.14 (contrastive) and +0.13 (MSE) with 83% sign
+agreement in both -- and the sign agreement is uninformative because every goal in the corrected data
+turns positive and the robot's own drift is positive (F109).
+
+**So hypothesis (a) is confirmed as a real defect and refuted as the explanation.** The metric was
+wrong, correcting it recovers offline selection completely, and the loop does not benefit -- which
+leaves (b), the five-step rollout on frames the robot drove itself into, as the remaining candidate.
+That is the next test: `does_rollout_matter.py` and `loop_frames_are_off_manifold.py` on these
+checkpoints, and a one-step loop against the five-step one.
+
+**A control that has not been run and should be, before any of this is written up.** The shift uses
+the B1's own demonstration clip as the appearance reference, so the goal the planner sees is
+"insect movement content, B1 appearance". Whether the offline gain came from the insect's content or
+merely from the goal landing on the B1's manifold is answered by shuffling which insect behaviour is
+paired with which demonstration: if the score holds up under a mismatched goal, it was never reading
+the content.
+
+Runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_c3w0ctr_*/`.
+
+**Cosmetic defect in the new code**: the line printing the shift norm computes it after the shift is
+applied, so it always reports 0.00. The shift itself is correct; the diagnostic print is not.
+
+---
+
+
+### F125. The planner does not read the goal at all, and every offline selection number in this project shares the confound
+
+**The control F124 called for, run immediately.** `plan_open_loop.py` gained `--mismatch`, which
+pairs each B1 demonstration with an insect goal from a **different behaviour family** and reports
+two numbers: the picks scored against the demonstration, and against the clip the planner was
+actually shown. With a matched goal these are the same number by construction, which is why nothing
+before now could tell them apart.
+
+Contrastive checkpoint, 8 demonstrations, 95 decisions, goal mean-shifted as in F123:
+
+| goal shown | scored against the demonstration | scored against the goal |
+|---|---|---|
+| matched (F123) | 55.8% | 55.8% *(identical by construction)* |
+| **a different behaviour** | **55.8%** | **22.1%** |
+| *chance* | 25% | 25% |
+
+**Showing the planner a goal from a different behaviour family does not move its picks by a single
+point.** It scores 55.8% against the demonstration either way, and below chance against what it was
+shown. **The 55.8% is a readout of `e_t` -- the quadruped's own current frame -- not goal-following.**
+
+**So what the mean shift actually did.** It did not make insect content readable. It made the goal
+term nearly constant across candidates, and the ranking fell back on the part driven by `e_t`, which
+correlates with the demonstration's condition at 55.8%. That is why the correction was worth 21
+points offline (F123) and nothing in the loop (F124): in the loop, `e_t` is a frame the robot drove
+itself into and its condition is whatever the robot is currently doing, so a readout of it is not a
+controller.
+
+**The confound is not confined to this experiment.** Any offline selection score measured with a
+goal drawn from the demonstration's own future -- which is every one this project has reported,
+including the same-robot 47.2% baseline above and F100's 62% -- cannot separate "picked the
+candidate that reaches the goal" from "named the behaviour already visible in the current frame".
+**The mismatch control is cheap and should be attached to every such number before any of them is
+quoted again.**
+
+**What this does and does not say about the world model.** It does not say the forward model is
+useless: F119's discrimination gives it the true next embedding and it ranks at 54.8% against 28%,
+which is a different question and still stands. It says the *planning objective as implemented* --
+minimise the distance from a rolled-out prediction to a goal embedding -- is not being solved by the
+goal in a cross-embodiment setting, in either the raw or the corrected metric.
+
+**Where this leaves the hypothesis table.** (a) is a real defect that explains the offline gap and
+nothing else; the correction's apparent success was the confound. (b), the five-step rollout, is
+still untested and is now joined by a sharper question: **does the goal term influence the argmin at
+all, under any metric?** `does_rollout_matter.py`'s `blind` arm answers a version of that and should
+be run first, before `loop_frames_are_off_manifold.py` -- if the goal does not move the choice, the
+manifold question is downstream of a more basic failure.
+
+**The full control matrix, and the raw metric is the best of the three.** Two further cells were
+run: the raw metric under a mismatched goal, and a dataset-level mean -- averaged over 12 clips of
+each robot rather than over the single goal clip -- on the hypothesis that a clip's mean carries its
+behaviour and subtracting it removes both.
+
+| metric | scored against the demonstration | **scored against the goal shown** |
+|---|---|---|
+| raw MSE | 33.7% | **38.9%** |
+| goal shifted by the clip mean | 55.8% | 22.1% |
+| goal shifted by a dataset mean | 49.5% | 25.3% |
+| *chance* | 25% | 25% |
+
+**The raw metric does follow the goal, weakly**: 38.9% against a 25% chance rate, and above its own
+demonstration-tracking. **Every centring tried destroys that** and replaces it with an `e_t` readout,
+the dataset mean no better than the clip mean -- so the "behaviour lives in the clip mean" reasoning
+is refuted too. Adding the driven robot's appearance to the goal, however it is estimated, makes the
+ranking answer "which prediction looks most like a typical B1", which correlates with the current
+state and not with the goal.
+
+**So the honest number for cross-embodiment goal-following is 38.9% against 25%, uncorrected**, and
+hypothesis (a) closes with the metric already at its best. `--center` is kept in the script because
+the negative result is worth being able to reproduce, and defaults to off.
+
+Logs: `/tmp/ol_mismatch.log`, `/tmp/ol_mismatch_raw.log`, `/tmp/ol_dsmean_mismatch.log`; the pairing
+is a deterministic family rotation at matched level.
+
+**Two silent pairing failures were hit building this control**, both from the two robots naming the
+same thing differently. Matching demonstration to goal by condition string kept only the sideways
+clips, since `speed_vx0.30` and `speed_c5.8` share no prefix; and a rotation written over
+`side_L`/`side_R` matched almost nothing, because the recorded `behaviour` field holds three values
+-- `speed`, `turn`, `side`. The first reported 0.0% from 12 decisions and the second reported a
+clean-looking 66.7% from 2 demonstrations of 8. **Both failed by skipping, not by raising.** The
+script now refuses to start if any demonstration is left unpaired.
+
+---
+
+
+### F126. The forward model works, the rollout earns its cost, and the whole failure is the cross-embodiment goal
+
+**Hypothesis (b) tested and closed.** `does_rollout_matter.py` on the contrastive stage-3
+checkpoint, 48 clips, 12 candidates, scored on 2,340 transitions from clips no candidate came from,
+**same-robot goals**:
+
+| horizon | rollout | direct | blind | per family (rollout) |
+|---|---|---|---|---|
+| 1 | **61%** | 31% | 34% | side_L 100%, side_R 100%, speed 30%, turn 53% |
+| 3 | **71%** | 32% | 38% | side 98/100%, speed 46%, turn 67% |
+| 5 | **73%** | 35% | 36% | side 96/100%, speed 39%, **turn 82%** |
+| 10 | **72%** | 34% | 35% | side 86/100%, speed 31%, **turn 89%** |
+| *chance* | 28% | 28% | 28% | |
+
+> **The goal-following reading of this table is withdrawn by F127.** The mismatch control was run
+> the same night: with the goal frame taken from a **different behaviour of the same robot**, the
+> rollout still scores 56-70% against the *demonstration* and only **18-23% against the goal it was
+> shown**, below the 28% chance rate. The rollout is doing real work and it is not the work of
+> reaching a goal. Read every number below as "names the behaviour the robot is already in", not as
+> selection.
+
+**Rolling the forward model is worth 27-37 points over ignoring the goal, and deleting it costs
+almost all of that** -- `direct` sits within a few points of `blind` at every horizon. The world
+model is a predictor here, not a similarity function, and the sixty forward-model calls per control
+step buy exactly what they are supposed to. **The horizon that plans best is 5, and 10 is no worse**,
+which is the opposite of the fragility that was assumed.
+
+**And turning is the behaviour the rollout helps most** -- 53% at one step rising to 89% at ten,
+the only family that improves monotonically with horizon. Sideways, which fails everywhere else in
+this project, is at 86-100%. Forward is the *weakest* family here at 30-46%.
+
+> **This inverts a claim the project has repeated, and the inversion is the point.** F109 and F111
+> report forward as the behaviour that transfers and turning as the one that does not, and the
+> "forward crosses, turning does not" framing was built on them. Both are **cross-embodiment**
+> measurements, and F126 localises the cross-embodiment goal comparison as the one broken component
+> -- so that ranking was a property of the broken metric, not of the behaviours. With the metric
+> sound, turning is the strongest family and improves with horizon, which is mechanically sensible:
+> a turn is a sustained low-frequency signal a longer rollout accumulates. **Correction notes have
+> been added to F109 and F111 so the two cannot be read as jointly true.**
+
+> **And the localisation below is withdrawn too.** F127 measures the planner failing to condition
+> on its goal *within one robot*, where no cross-embodiment metric is involved, so "everything works
+> except the cross-embodiment comparison" is false. F125's metric defect is real and sits on top of
+> a planner that was not using its target in either setting.
+
+**Put beside F125 this locates the failure precisely.** Same checkpoint, same candidates, same
+projector, same rollout:
+
+| goal comes from | selection | baseline |
+|---|---|---|
+| **the B1 itself** | **73%** | 36% (blind) |
+| **the insect** | **38.9%** | 25% (chance) |
+
+**Everything in the pipeline works except the comparison between a predicted quadruped embedding and
+an insect goal embedding.** Not the objective (F119), not the projector, not the rollout, not the
+horizon. And F125 measured that the obvious repair -- removing each robot's appearance offset -- makes
+it worse under every estimator tried.
+
+**What follows, and it is a design change rather than a fix.** A raw embedding distance was never a
+shared coordinate; it was hoped to become one because both robots pass through one frozen encoder.
+The project already owns a quantity that *is* shared by construction: the **body-motion head** that
+`lambda_body` supervises, in dimensionless units both robots are measured in (F58, F65, F66).
+Scoring a candidate by the body motion its rollout predicts, against the body motion the goal clip
+shows, asks for the same comparison in a space where the two robots are commensurable -- rather than
+hoping appearance cancels. That is the next experiment.
+
+**Caveat on the numbers above**: same-robot goals here come from clips the candidates did not come
+from, but the goal is still the demonstration's own future, so F125's confound applies to this table
+too -- part of the 73% may be a readout of `e_t` rather than goal-following. The mismatch control
+has not been run in this script. **It should be, before 73% is quoted anywhere.**
+
+---
+
+
+### F127. Even within one robot the planner does not follow its goal; the rollout is a state classifier
+
+**The control F126 called for, run before its 73% was quoted anywhere.** `does_rollout_matter.py`
+gained `--mismatch`, which takes each demonstration's goal frame from a clip of a **different
+behaviour family of the same robot** and adds a column scoring the rollout's pick against the family
+the goal actually came from.
+
+| horizon | rollout vs demonstration | direct | blind | **rollout vs the goal shown** |
+|---|---|---|---|---|
+| 1 | 56% *(61% matched)* | 36% | 34% | **18%** |
+| 3 | 64% *(71%)* | 26% | 38% | **18%** |
+| 5 | 68% *(73%)* | 30% | 36% | **23%** |
+| 10 | 70% *(72%)* | 24% | 35% | **21%** |
+| *chance* | 28% | 28% | 28% | 28% |
+
+**Showing the planner a goal from a different behaviour costs it 3-7 points of agreement with the
+demonstration and leaves it below chance on the goal.** The 73% was never selection. It is the
+same confound as F123, now measured **within one embodiment**, where no appearance mismatch and no
+cross-robot metric can be blamed.
+
+**This is the deepest correction of the session and it reframes the whole diagnosis.** F126 read the
+gap between same-robot 73% and cross-embodiment 38.9% as "everything works except the
+cross-embodiment comparison". It is not: **the goal drives the argmin in neither setting.** The
+cross-embodiment metric is a real defect (F125) sitting on top of a planner that was not using its
+goal to begin with.
+
+**What the rollout is actually doing, and it is not nothing.** It beats `blind` by 22-35 points
+under mismatch, so the forward model contributes real information -- but the information is *which
+behaviour this robot is currently in and how it continues*, not *which action reaches a target*.
+`direct` sits at or below `blind` throughout, so that information arrives specifically through
+rolling the dynamics. **A good predictor, wired as a state classifier.**
+
+**The turning result survives this and is worth keeping.** Turning still rises 39% to 88% with
+horizon under mismatch, and sideways stays at 85-100%: the ordering F126 reports is a property of
+how well the rollout identifies a behaviour from its dynamics, which is a real and useful capability
+-- it is just not planning. F109 and F111's "forward crosses, turning does not" remains corrected.
+
+**Consequence for what to do next.** The criterion for any proposed fix is now **the `roll/goal`
+column, not the score against the demonstration**, which is passable without reading the goal at
+all. That applies to the body-motion-head scoring proposed in F126: **predicted body motion against
+the goal clip's body motion must clear 28% on a mismatched goal**, or it has changed the coordinate
+without changing what the planner uses.
+
+**And it puts a number on the teacher-student argument (Q16).** Candidate scoring here is not
+failing to pick the best candidate -- it is not conditioning on the request. Emitting a policy makes
+the request part of training rather than something a run-time argmin has to honour.
+
+Log: `/tmp/rollout_mismatch.log`.
+
+---
+
+
+### F128. Scoring in the shared coordinate restores goal-conditioning, and the shared coordinate is too narrow to use
+
+**The falsification F127 demanded, run with its control in the same pass so no number could stand
+alone.** `scripts/diagnostics/score_by_body_motion.py` scores a candidate by the body motion it
+produces rather than by embedding distance:
+
+    score(a) = | body_head(proj(a)) - forward speed of the goal clip |
+
+The goal enters as a dimensionless physical quantity, so nothing has to cancel and no embedding
+distance is involved. Matched and mismatched goals are computed in the same run.
+
+**Same-robot goals, and this is the first rule in the project that conditions on its goal:**
+
+| horizon | matched | mismatched vs demonstration | **mismatched vs the goal shown** |
+|---|---|---|---|
+| 1 | 49% | 33% | **49%** |
+| 3 | 47% | 31% | **49%** |
+| 5 | 45% | 28% | **49%** |
+| 10 | 47% | 25% | **51%** |
+| *chance* | 28% | 28% | 28% |
+
+Against the embedding rule under the identical control -- 18-23% against the goal, 56-70% against
+the demonstration (F127) -- **the ordering inverts.** The picks follow the target and stop following
+the current frame. **The coordinate was the thing standing between this planner and goal-conditioned
+selection**, and it is not the world model: this rule uses no rollout, no `e_t`, and no forward
+model at all.
+
+**Cross-embodiment, the same rule does not separate**, and the reason is measurable rather than
+mysterious:
+
+| horizon | matched | mismatched vs demonstration | mismatched vs goal |
+|---|---|---|---|
+| 1 | 48% | 48% | 44% |
+| 5 | 48% | 47% | 47% |
+| 10 | 50% | 49% | 49% |
+
+**The two columns agreeing is the signature of a near-constant pick**, not of goal-following.
+
+**Why, and it is the head rather than the data.** The two datasets are calibrated to each other --
+B1 `speed_vx0.30` walks at 0.126 against the insect's `speed_c5.8` at 0.129, `speed_vx0.50` at 0.206
+against 0.215, and every condition pairs within a few percent. What fails is the head's reading of
+the candidates:
+
+| candidate | true forward speed | `body_head(proj(a))` |
+|---|---|---|
+| `side_L_lvl0` | **-0.008** | **0.079** |
+| `side_R_lvl1` | 0.013 | 0.119 |
+| `speed_vx0.30` | 0.132 | 0.129 |
+| `speed_vx0.50` | **0.215** | **0.126** |
+| `turn_w0.075` | 0.127 | 0.102 |
+
+**True spread 0.223, predicted spread 0.059 -- a 3.8x compression, correlation +0.60** -- and the
+four speed levels are read as identical to three decimals. The head can say "sideways or not" and
+nothing finer, so the argmin saturates: any target above the achievable band selects the same
+candidate, which is why matched and mismatched agree.
+
+**So the same-robot 49% is two-way discrimination on a compressed signal**, not speed tracking, and
+the cross-embodiment 44-49% is one candidate chosen almost regardless of the request. Both numbers
+are honest and neither is a planner.
+
+**What this changes about the pivot argument.** F127 said the loop's argmin was never conditioned on
+the command, which read as an argument that run-time search cannot be made to honour a goal. That is
+too strong: **it can, and this is the demonstration** -- put the score in a coordinate the two bodies
+share and goal-conditioning appears immediately. The limit that remains is the *width* of the shared
+coordinate: `body_dim 1`, forward speed alone, compressed 3.8x. Turning and sideways are not in the
+shared space at all, which is exactly the channel-competition problem F83 measured and did not solve.
+
+> **The "too narrow" diagnosis is corrected by F129.** The head is not compressed and the coordinate
+> is not narrow: on the hexapod, the body it was trained on, it reads forward speed at correlation
+> **+0.99 and compression 1.0x**, matching every family to three decimals. The 3.8x compression
+> measured here is what that head does on a **B1**, which it has never seen -- `beh12_hexonly` is a
+> hexapod-only pretrain and neither `wm/adapt.py` nor `wm/adapt3.py` touches the motion decoder. The
+> tables above are correct; the conclusion drawn from them is not.
+
+**The concrete next experiment is therefore a pretraining change, not a planner change**: widen the
+body head to yaw and lateral (`body_channels 0,1,2`) and check its calibration against measured
+speed before scoring anything with it. F83 says the channels compete; F128 says a one-channel head
+is not enough to plan with. Those are the same question and it is now the blocking one.
+
+Log: the tables above are reproducible with `--goal_dir data/beh12_c08f09t09_flat`.
+
+---
+
+
+### F129. The shared head is exact on the robot it trained on and constant on the one it never saw
+
+**Measured before spending ten hours widening a head that might not have been the problem.** The
+body head is a two-layer MLP on `z`; it can be evaluated on either robot with the weights already on
+disk. Fed the ITM's latent from real frames:
+
+| robot | correlation | true spread | predicted spread | compression |
+|---|---|---|---|---|
+| **hexapod**, the body it trained on | **+0.99** | 0.194 | 0.194 | **1.0x** |
+| **B1**, never seen by this head | +0.20 | 0.197 | 0.061 | 3.2x |
+
+Per behaviour family, dimensionless forward speed, true against predicted:
+
+| | hexapod | B1 |
+|---|---|---|
+| sideways | 0.022 -> **0.018** | 0.003 -> 0.106 |
+| forward | 0.160 -> **0.161** | 0.159 -> 0.112 |
+| turning | 0.129 -> **0.128** | 0.122 -> 0.115 |
+
+**On the hexapod the shared coordinate is exact.** It separates a standing-still sideways gait from
+a fast walk from a turn, to three decimals, from the latent alone. **On the B1 it returns the
+dataset mean for everything** -- 0.106, 0.112, 0.115 against a `body_stats` mean of 0.109 -- which is
+the correct behaviour of a model asked outside its domain, not a defect in the head.
+
+**The cause is structural and is written in the code.** `beh12_hexonly` is pretrained on
+`sources hexapod=...` alone, and both adaptation stages say so explicitly: `wm/adapt.py` --
+"the motion decoder is not adapted at all"; `wm/adapt3.py` fine-tunes projector and forward model.
+**The shared head has never seen a B1 latent at any point in the three stages.** F128 scored
+candidates with it anyway and read the resulting flatness as the coordinate being too narrow.
+
+**So the instruction to widen the head to `body_channels 0,1,2` is right and would have been
+uninterpretable as issued.** Widening it on a hexapod-only pretrain produces a three-channel head
+that has still never seen the target robot; a negative result would say nothing about channel
+competition. **The pretrain has to contain both embodiments**, which is the condition F83 measured
+channel competition under -- and F83's run is forward-walking only and carries the frame-rate defect
+(F74), so it has to be redone on `beh12_*` regardless.
+
+**What this does not rescue.** F128's same-robot result stands unchanged: scoring in the shared
+coordinate is the only rule in this project that has ever conditioned on its goal (49-51% against
+the goal, 25-33% against the demonstration). That was measured on the B1 with a head that reads the
+B1 as a constant, which makes it a **lower bound** -- the rule conditioned on its target while its
+coordinate was returning noise.
+
+**The run this calls for**, and it is the one to hand to com7:
+
+    --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \
+        --lambda_body 0.5 --body_dim 3 --body_channels 0 1 2
+
+then stages 1-3 on top, then per-channel calibration on **both** robots before anything is scored
+with it. **The pass bar, set in advance**: all three channels within ~1.5x compression on both
+robots, and `roll/goal` above 28% on mismatched cross-embodiment goals. If forward calibrates and
+yaw does not, that is F83's channel competition reproduced on corrected data and the bottleneck is
+the pretraining objective rather than head width -- **stop there and report it, rather than tuning.**
 
 ---
 

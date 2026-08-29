@@ -64,6 +64,17 @@ def main():
                          "to take. Defaults to `--demo`, i.e. same-robot goals")
     ap.add_argument("--goal_embodiment", default="",
                     help="embodiment of `--goal`, for the centring offset. Defaults to --embodiment")
+    ap.add_argument("--center_goal", action="store_true",
+                    help="translate the goal clip into the **driven** robot's mean appearance "
+                         "before planning against it. The score is a raw MSE between a predicted "
+                         "B1 embedding and the goal embedding, and embodiment is strongly "
+                         "decodable from these embeddings (F43, F46), so across robots that "
+                         "distance is led by which robot is in the picture. Offline this is the "
+                         "difference between selecting *below* chance and clearing the same-robot "
+                         "baseline -- exact condition 4.2% to 23.2%, behaviour 34.7% to 55.8% "
+                         "(F123). Only the goal moves: `e_t` is the forward model's input and "
+                         "shifting that would trade one confound for another. No effect when the "
+                         "goal is the demonstration.")
     ap.add_argument("--candidates_dir", default="data/beh12_b1_flat",
                     help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The original set clips the robot "
                          "in 61% of frames, never pins its camera, files the forward clip under "
@@ -117,6 +128,18 @@ def main():
     goal_off = offset_for(checkpoint, goal_emb)
     if goal_off is not None:
         demo_e = demo_e - goal_off
+    if args.center_goal and goal_path != demo_path:
+        # The driven robot's appearance is taken from its own demonstration clip, which is a B1
+        # recording and is already on disk; the live frames cannot supply it at step 0.
+        driven_e = encode_clip(encoder, demo["frames"], 2).float()
+        if offset is not None:
+            driven_e = driven_e - offset
+        shift = driven_e.mean(0, keepdim=True) - demo_e.mean(0, keepdim=True)
+        demo_e = demo_e + shift
+        # measured before the shift is applied; computing it afterwards reports 0.00 by
+        # construction, which is what the first version of this line did
+        print(f"goal translated into {args.embodiment}'s mean appearance "
+              f"(shift norm {float(shift.norm()):.2f})")
     demo_e = demo_e.to(device)
     if goal_path != demo_path:
         with np.load(goal_path, allow_pickle=True) as raw:

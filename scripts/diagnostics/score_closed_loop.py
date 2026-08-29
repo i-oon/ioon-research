@@ -62,6 +62,7 @@ def summarise(path, window=None):
         demo = str(d["demo"]) if "demo" in d.files else ""
         chosen = d["chosen"] if "chosen" in d.files else None
         want = str(d["condition"]) if "condition" in d.files else ""
+        goal = str(d["goal"]) if "goal" in d.files else ""
         kinematic = bool(d["kinematic"]) if "kinematic" in d.files else False
         fell_at = int(d["fell_at"]) if "fell_at" in d.files else -1
     c = channels(head, quat, dt, embodiment)
@@ -80,7 +81,8 @@ def summarise(path, window=None):
     if len(c) < 3:
         raise SystemExit(f"{os.path.basename(path)}: only {len(c)} steps to score")
     half = len(head_p) // 2
-    return {"path": path, "demo": demo, "condition": want, "dt": dt, "embodiment": embodiment,
+    return {"path": path, "demo": demo, "goal": goal, "condition": want, "dt": dt,
+            "embodiment": embodiment,
             "forward": float(np.median(c[:, 0])), "lateral": float(np.median(c[:, 1])),
             "yaw": float(np.median(c[:, 2])),
             "fell_at": fell_at, "planned_steps": len(c),
@@ -121,6 +123,14 @@ def main():
     ap.add_argument("runs", nargs="+", help="closed-loop npz files")
     ap.add_argument("--demo_dir", default="data/beh12_c10f10t10_flat",
                     help="where the demonstration clips live, for the reference Froude")
+    ap.add_argument("--goal_dir", default="",
+                    help="where the **goal** clips live, when the goal is a different robot from "
+                         "the one driven. **The goal is what a run has to be scored against, not "
+                         "the demonstration**: in a cross-embodiment run `--demo` supplies only "
+                         "the start state and the warm-start commands and is held fixed and "
+                         "neutral while the goal varies (F109, F110), so grading against it reads "
+                         "a forward B1 walk for a run whose goal was an insect turning. Defaults "
+                         "to `--demo_dir`, which is right when goal and demonstration coincide.")
     args = ap.parse_args()
 
     print(f"{'run':<30}{'steps':>11}{'channel':>9}{'demo':>9}{'got':>9}{'err':>8}{'class':>11}"
@@ -130,10 +140,14 @@ def main():
     graded = []
     for path in args.runs:
         row = summarise(path)
-        demo_path = os.path.join(ROOT, args.demo_dir, row["demo"])
+        # The run records both, and they are the same file unless `--goal` was given.
+        crosses = bool(row["goal"]) and row["goal"] != row["demo"]
+        ref_name = row["goal"] if crosses else row["demo"]
+        ref_dir = (args.goal_dir or args.demo_dir) if crosses else args.demo_dir
+        demo_path = os.path.join(ROOT, ref_dir, ref_name)
         if not os.path.exists(demo_path):
-            raise SystemExit(f"demonstration {row['demo']} not found under {args.demo_dir}; "
-                             "pass --demo_dir")
+            raise SystemExit(f"reference {ref_name} not found under {ref_dir}; pass --demo_dir "
+                             "(or --goal_dir when the goal is another robot)")
         # **The reference has to cover the same steps.** Both clips start from a standstill and
         # spend their first second accelerating; scoring our 10 planned steps against the
         # demonstration's whole 66 compares a start-up transient against a settled walk, and made
@@ -146,7 +160,10 @@ def main():
         # figures: the first run of `side_R_lvl0` read 34.2% while tracking its lateral speed to
         # within a fifth of that. The channel is chosen from the demonstration, never from the run,
         # or a run that drifted into a different behaviour would be graded on the one it drifted to.
-        key = channel_for(row["condition"], ref)
+        # **The condition of the *reference*, not of the run.** They differ only in a
+        # cross-embodiment run, where the run inherits its demonstration's condition -- and taking
+        # that one grades an insect's turn on the B1 demonstration's forward channel.
+        key = channel_for(ref["condition"] or row["condition"], ref)
         err = abs(row[key] - ref[key]) / max(abs(ref[key]), 1e-6)
         ok_speed = err < SPEED_TOLERANCE
         ok_class = dominant(row) == dominant(ref)

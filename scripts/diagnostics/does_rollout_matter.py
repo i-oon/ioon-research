@@ -38,18 +38,27 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.adapt3 import FAMILY, gather  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
-from wm.models.action_projector import ActionProjector  # noqa: E402
+from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
 @torch.no_grad()
-def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=0):
+def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=0,
+             mismatch=None):
+    """`mismatch`, when given, maps a family to the clip index its goal frame is taken from.
+
+    **The control F125 forced.** With the goal drawn from the demonstration's own future, a rule
+    that reads the current frame and names the behaviour already visible scores exactly as well as
+    one that follows the goal -- that is how F123's 55.8% survived until it was swapped. Taking the
+    goal from a *different behaviour* separates them: a goal-follower tracks the goal's family and a
+    frame-reader tracks the demonstration's.
+    """
     conds = sorted(cand)
     g = torch.Generator().manual_seed(seed)
     picks = val if len(val) <= limit else [val[i] for i in
                                            torch.randperm(len(val), generator=g)[:limit].tolist()]
-    hit = {k: 0 for k in ("rollout", "direct", "blind")}
+    hit = {k: 0 for k in ("rollout", "direct", "blind", "rollout_goal")}
     per = {}
     n = 0
     z_bar = None
@@ -65,7 +74,12 @@ def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=
         if len(keep) < 2:
             continue
         e_t = clips[c]["e"][t].float().to(device).unsqueeze(0)
-        e_goal = clips[c]["e"][t + h].float().to(device).unsqueeze(0)
+        goal_clip = c
+        if mismatch is not None:
+            goal_clip = mismatch.get(FAMILY(clips[c]["cond"]), c)
+            if t + h >= clips[goal_clip]["n"]:
+                continue
+        e_goal = clips[goal_clip]["e"][t + h].float().to(device).unsqueeze(0)
         a = torch.stack(acts).to(device)                       # C x h x action_dim
         C = len(keep)
         z = proj(a.reshape(C * h, -1), name).reshape(C, h, -1)
@@ -85,8 +99,11 @@ def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=
         err_blind = ((z[:, 0] - z_bar) ** 2).mean(1)
 
         truth = FAMILY(clips[c]["cond"])
+        goal_truth = FAMILY(clips[goal_clip]["cond"])
         for key, err in (("rollout", err_roll), ("direct", err_direct), ("blind", err_blind)):
             hit[key] += FAMILY(keep[int(err.argmin())]) == truth
+        hit["rollout_goal"] = hit.get("rollout_goal", 0) + (
+            FAMILY(keep[int(err_roll.argmin())]) == goal_truth)
         # **Split by the demonstration's own family.** An aggregate hides which behaviours the
         # ranking resolves; the loop fails on sideways and succeeds on turning, and the question
         # is whether that ordering is already present before any robot moves.
@@ -106,6 +123,13 @@ def main():
     ap.add_argument("--horizons", type=int, nargs="*", default=[1, 3, 5, 10])
     ap.add_argument("--cache", default="results/wm/cache/b1_all.pt")
     ap.add_argument("--chunk", type=int, default=2)
+    ap.add_argument("--mismatch", action="store_true",
+                    help="take each demonstration's goal frame from a clip of a **different "
+                         "behaviour family**. Without it, goal-following and reading the current "
+                         "frame produce the same score and cannot be told apart -- the confound "
+                         "that made F123's 55.8% look like selection. The extra column "
+                         "`roll/goal` scores the rollout's pick against the family the goal was "
+                         "actually taken from.")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -127,7 +151,7 @@ def main():
     itm = InverseTransitionModel(cfg).to(device).eval(); itm.load_state_dict(ck["itm"])
     ftm = ForwardTransitionModel(cfg).to(device).eval(); ftm.load_state_dict(ck["ftm"])
     saved = torch.load(os.path.join(ROOT, args.projector), map_location="cpu", weights_only=False)
-    proj = ActionProjector(cfg, saved["action_dims"]).to(device).eval()
+    proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
     proj.load_state_dict(saved["projector"])
 
     cand, seen = {}, set()
@@ -140,11 +164,27 @@ def main():
                           for i, _t in val[::37]])
     print(f"{len(clips)} clips | {len(cand)} candidates | scored on {len(val)} transitions "
           f"from clips no candidate came from\n")
-    print(f"  {'horizon':>8}{'rollout':>10}{'direct':>9}{'blind':>8}{'n':>7}")
+    mismatch = None
+    if args.mismatch:
+        # a deterministic family rotation, resolved to one clip per family that is not a candidate
+        order, by_family = ["speed", "turn", "side_L", "side_R"], {}
+        for i, c in enumerate(clips):
+            if i not in cand.values():
+                by_family.setdefault(FAMILY(c["cond"]), i)
+        order = [f for f in order if f in by_family] or sorted(by_family)
+        mismatch = {f: by_family[order[(order.index(f) + 1) % len(order)]] for f in order}
+        print("  goal taken from another behaviour: "
+              + ", ".join(f"{f}->{FAMILY(clips[i]['cond'])}" for f, i in sorted(mismatch.items()))
+              + "\n")
+    print(f"  {'horizon':>8}{'rollout':>10}{'direct':>9}{'blind':>8}"
+          + (f"{'roll/goal':>11}" if args.mismatch else "") + f"{'n':>7}")
     for h in args.horizons:
-        r, n, per = evaluate(clips, val, cand, proj, itm, ftm, name, h, device)
-        print(f"  {h:>8}{r['rollout']:>10.0%}{r['direct']:>9.0%}{r['blind']:>8.0%}{n:>7}"
-              + "   " + "  ".join(f"{k} {v[0]/max(v[1],1):.0%}" for k, v in sorted(per.items())))
+        r, n, per = evaluate(clips, val, cand, proj, itm, ftm, name, h, device, mismatch=mismatch)
+        line = f"  {h:>8}{r['rollout']:>10.0%}{r['direct']:>9.0%}{r['blind']:>8.0%}"
+        if args.mismatch:
+            line += f"{r['rollout_goal']:>11.0%}"
+        print(line + f"{n:>7}   "
+              + "  ".join(f"{k} {v[0]/max(v[1],1):.0%}" for k, v in sorted(per.items())))
     print(f"\n  chance for the family score is {fam_chance:.0%}.\n")
     print("`rollout` is the planner as built. `direct` deletes the forward model and matches the")
     print("projected action against the inverse model's reading of (now, goal). `blind` ignores the")

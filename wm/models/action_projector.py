@@ -30,6 +30,27 @@ import torch
 import torch.nn as nn
 
 
+def action_dims_from(saved):
+    """`{embodiment: action_dim}` for a saved projector, whether or not the file records it.
+
+    **`wm/fit_projector` writes `action_dims`; `wm/adapt3` did not until 2026-08-30**, so every
+    stage-3 checkpoint produced before then -- including the six the objective comparison rests on
+    -- carries a projector that cannot be rebuilt from the key alone. The per-embodiment `mean_*`
+    buffer is the action's width by construction, so the dimensions are always recoverable.
+
+    Defined here rather than in each caller because three scripts and the planner each did it
+    separately, and the planner's copy was fixed while the other three kept failing with a
+    `KeyError` that reads like a corrupt checkpoint.
+    """
+    state = saved.get("projector", saved) if isinstance(saved, dict) else saved
+    dims = saved.get("action_dims") if isinstance(saved, dict) else None
+    dims = dims or {k[len("mean_"):]: v.numel() for k, v in state.items()
+                    if k.startswith("mean_")}
+    if not dims:
+        raise KeyError("projector carries neither action_dims nor mean_* buffers")
+    return dims
+
+
 class ActionProjector(nn.Module):
     """`{embodiment: action_dim}` -> a shared `z_dim` latent."""
 

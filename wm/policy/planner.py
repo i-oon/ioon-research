@@ -41,7 +41,7 @@ import torch
 
 from ..config import from_checkpoint
 from ..data.embodiment import REGISTRY, load
-from ..models.action_projector import ActionProjector
+from ..models.action_projector import ActionProjector, action_dims_from
 from ..models.ftm import ForwardTransitionModel
 
 
@@ -102,7 +102,7 @@ class LatentPlanner:
 
         projector_path = projector_path or os.path.join(os.path.dirname(ckpt_path), "projector.pt")
         saved = torch.load(projector_path, map_location="cpu", weights_only=False)
-        proj = ActionProjector(cfg, saved["action_dims"]).to(device).eval()
+        proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
         proj.load_state_dict(saved["projector"])
         for p in proj.parameters():
             p.requires_grad_(False)

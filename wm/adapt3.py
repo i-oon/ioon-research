@@ -355,6 +355,9 @@ def main():
         os.makedirs(os.path.dirname(out), exist_ok=True)
         torch.save({"config": checkpoint["config"], "itm": checkpoint["itm"], "ftm": ftm.state_dict(),
                     "md": checkpoint["md"], "projector": proj.state_dict(),
+                    # what `wm/policy/planner.py` needs to rebuild the projector; stage 2 records
+                    # it and this file did not, so the loop could not load its own output
+                    "action_dims": {name: int(clips[0]["a"].shape[1])},
                     "action_stats": checkpoint.get("action_stats"),
                     "body_stats": checkpoint.get("body_stats"),
                     "adapted": checkpoint.get("adapted"),
