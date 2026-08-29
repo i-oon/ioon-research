@@ -40,6 +40,49 @@ from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
+def select_clips(paths, clips, test_clips, seed, stratify):
+    """Which clips stage 1 adapts on, and which it reports the rollout ratio over.
+
+    Split out of `main` so the choice can be checked without loading a 383 MB checkpoint or
+    the encoder -- the previous selection put two of stage 3's candidate clips inside the
+    adaptation set and nothing could see that without running the whole file.
+    """
+    rng = np.random.default_rng(seed)
+    order = rng.permutation(len(paths))
+    if stratify:
+        # Condition and family are read off the clip, never parsed from its filename: `ep1302` says
+        # nothing, and a body list written into a script is the trap `wm/bodies.py` exists for.
+        by_family = {}
+        for i in order:
+            with np.load(paths[i], allow_pickle=True) as d:
+                condition = str(d["condition"])
+            by_family.setdefault(condition.split("_")[0], {}).setdefault(condition, []).append(i)
+        families = sorted(by_family)
+        picked, used = [], set()
+        while len(picked) < clips:
+            before_round = len(picked)
+            for family in families:
+                if len(picked) >= clips:
+                    break
+                fresh = [c for c in sorted(by_family[family]) if c not in used]
+                # every condition of this family is already represented: take a second clip of one
+                pool = fresh or sorted(by_family[family])
+                condition = pool[0]
+                used.add(condition)
+                clip = by_family[family][condition].pop(0)
+                by_family[family][condition].append(clip)
+                picked.append(clip)
+            if len(picked) == before_round:
+                raise SystemExit("--stratify ran out of clips before reaching --clips")
+        train = [paths[i] for i in picked]
+        rest = [i for i in order if i not in set(picked)]
+        test = [paths[i] for i in rest[-test_clips:]]
+    else:
+        train = [paths[i] for i in order[:clips]]
+        test = [paths[i] for i in order[-test_clips:]]
+    return train, test
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
@@ -51,6 +94,24 @@ def main():
                          "clearing break-even where starting cold never does.")
     ap.add_argument("--test_clips", type=int, default=10,
                     help="held out of adaptation, used only to report the rollout ratio")
+    ap.add_argument("--train_clips", nargs="*", default=[],
+                    help="clip basenames stage 1 is allowed to draw from; `--clips` still says "
+                         "how many of them it adapts on, and the rollout test comes from the "
+                         "rest of the *same* pool. **Pass stage 3's training list here.** "
+                         "Without it stage 1 permutes the whole directory, and on "
+                         "`data/beh12_b1_flat` at seed 0 that puts two of stage 3's twelve "
+                         "candidate clips and three of its twelve validation clips inside the "
+                         "forward model's adaptation set -- the candidate library is what the "
+                         "planner picks from, so contaminating it flatters the number stage 3 "
+                         "is scored on.")
+    ap.add_argument("--stratify", action="store_true",
+                    help="draw the adaptation clips across behaviours instead of uniformly. "
+                         "**A plain permutation loses whole families**: nine clips from the 48-clip "
+                         "directory at seed 0 cover six of the twelve conditions, with the "
+                         "strongest turn three times and one sideways clip in total; nine from "
+                         "stage 3's 24 cover eight. This walks the families in turn -- speed, "
+                         "turn, sideways -- taking an unused condition from each, so nine clips "
+                         "are nine distinct conditions, three per family.")
     ap.add_argument("--steps", type=int, default=1000, help="optimiser updates, not epochs")
     ap.add_argument("--lr", type=float, default=1e-4)
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 3, 5, 10])
@@ -66,13 +127,18 @@ def main():
     cfg = from_checkpoint(checkpoint["config"])
 
     paths = sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz")))
+    if args.train_clips:
+        pool = {os.path.basename(p): p for p in paths}
+        missing = [c for c in args.train_clips if c not in pool]
+        if missing:
+            raise SystemExit(f"not in {args.data}: {' '.join(missing)}")
+        paths = [pool[c] for c in sorted(args.train_clips)]
     if args.clips + args.test_clips > len(paths):
         raise SystemExit(f"{args.clips} adapt + {args.test_clips} test exceeds {len(paths)} clips; "
                          "the two sets would overlap and the rollout ratio would be measured "
                          "partly on clips the model was fitted on")
-    order = np.random.default_rng(args.seed).permutation(len(paths))
-    train = [paths[i] for i in order[:args.clips]]
-    test = [paths[i] for i in order[-args.test_clips:]]
+    train, test = select_clips(paths, args.clips, args.test_clips, args.seed,
+                               args.stratify)
 
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     train_e = embeddings_for(encoder, train, args.chunk)

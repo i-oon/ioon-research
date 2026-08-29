@@ -7748,6 +7748,63 @@ carries shared meaning across bodies.**
 
 ---
 
+### F118. The corrected turn ladders reproduce independently, and the aggregation is part of the number
+
+**Re-measured on 2026-08-29 from a fresh session, before spending GPU on the rebuild**, because
+F117 records the fix and F115 records a fix that had not happened. All three sets turn the
+same way and the four levels are matched:
+
+| | level 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| `beh12_c10f10t10_flat`, pretraining | +0.0032 | +0.0141 | +0.0363 | +0.0775 |
+| `beh12_c08f09t09_flat`, held out | +0.0069 | +0.0215 | +0.0407 | +0.0863 |
+| `beh12_b1_flat`, the candidates | +0.0105 | +0.0268 | +0.0401 | +0.0807 |
+
+Identical to F117's table to four decimals, from a separate reading of the clips. **F117's fix is
+confirmed, not merely recorded.**
+
+**Reproducing it requires the project's aggregation, and the first attempt did not use it.** Taking
+the **mean** of `yaw_rate()` over a clip's frames gives +0.0029 / +0.0148 / +0.0353 / +0.0736 on the
+pretraining set -- same signs, same ordering, wrong in the third decimal, and 5% low at the top
+level. The convention is **median over the frames of a clip, then mean over the clips of a
+condition**, which is what `achieved()` and `_channels()` in `scripts/dataset/collect_beh12.py` do,
+at a hard-coded `dt` of 0.05. The cause is the smoothing: `yaw_rate` convolves over a one-second
+window in `same` mode, so the first and last half-windows are averaged against zero padding and pull
+a mean down; a median ignores them. Trimming those frames instead overshoots to +0.0813.
+
+**Made clean before the rebuild ran, not recorded as a caveat.** `wm/adapt.py` permuted the whole
+48-clip directory, so at seed 0 its nine adaptation clips included `b1_ep100` and `b1_ep1300` --
+two of the twelve clips `adapt3` uses as the **candidate library**, the set the planner picks from
+-- and three of its twelve validation clips. It now takes `--train_clips`, both sheets source the
+same 24-clip list from `scripts/b1_stage3_clips.sh`, and stage 1 draws its nine from those 24:
+`b1_ep1002, 102, 1102, 1302, 2, 2201, 2302, 301, 302`, overlapping the candidates and the
+validation clips in nothing. Whether the deleted `adapted_b1_v2.pt` had the same contamination is
+**not in the logs** -- it recorded its `train_paths` inside the checkpoint, and the checkpoint was
+deleted.
+
+**Two things the fix does not do, recorded so neither is discovered later as a surprise.**
+
+1. **The pool changed, so stage 1's own numbers are no longer comparable to F52 or F97.** It was
+   nine clips drawn from 48 and is now nine drawn from 24. The rollout ratios `wm/adapt.py` prints
+   are against a different held-out set; quote them only against runs under the new rule.
+2. **The draw was not stratified, and now is.** Nine clips can cover at most nine of the twelve
+   conditions, and a plain permutation covers fewer: the old pool gave **6/12** with `turn_w0.075`
+   appearing three times and one sideways clip in total, the new pool gave **8/12** with
+   `speed_vx0.50` twice -- better by accident, not by construction. `--stratify` walks the families
+   in turn and takes an unused condition from each, giving **9/12 conditions, three per family**,
+   and the rebuild sheet passes it. The clips are `b1_ep1002, 102, 1102, 1202, 2, 2001, 201, 2101,
+   2201`. Condition and family are read off each clip, never parsed from its filename.
+
+**And the selection is now checkable without a GPU.** It lived inside `main()`, so seeing which
+clips stage 1 would take meant loading a 383 MB checkpoint and the encoder -- which is why nothing
+caught the contamination for the length of the original run. It is `wm.adapt.select_clips(paths,
+clips, test_clips, seed, stratify)`, callable on its own.
+
+**So a turn-ladder number is only comparable to another one aggregated the same way.** Quote the
+table above, or say which reduction produced the number.
+
+---
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

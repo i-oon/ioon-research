@@ -23,6 +23,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PY=.venv/bin/python3
+. scripts/b1_stage3_clips.sh
 RUN=wm/runs/beh12_hexonly
 ADAPTED=$RUN/adapted_b1.pt
 PROJ=$RUN/projector_b1_adapted.pt
@@ -36,7 +37,7 @@ echo "=== stage 1: adapt the ITM and forward model to the B1  $(date '+%F %T')"
 if [ -f "$ADAPTED" ]; then echo "skip $ADAPTED"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt \
     --ckpt $RUN/best.pt \
-    --data data/beh12_b1_flat --embodiment b1 --clips 9 \
+    --data data/beh12_b1_flat --embodiment b1 --clips 9 --stratify --train_clips $CLIPS \
     --out "$ADAPTED"
 fi
 
