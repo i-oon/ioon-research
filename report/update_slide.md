@@ -3,9 +3,14 @@
 Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaSim.
 
 **Slides 1-12 are Stage 1**: one 18-DOF topology, several leg geometries, unchanged from the
-previous update. **Slides 13-18 are Stage 2**: what crosses between two robots with no shared
-action space, what the world model can and cannot do about it, and the named failure that blocks
-the rest.
+previous update. **Slides 13-19 are Stage 2**: what crosses between two robots with no shared
+action space, what the world model can and cannot do about it, the named failure that blocks the
+rest, and what is being built next.
+
+**Notation.** `e_t` is a V-JEPA2 observation embedding, `z` a latent action, `a` a joint command.
+Where this deck describes a phenomenon ActSWM also reports — action-sensitivity, Context Collapse,
+the real-against-null rollout contrast — it uses their terminology and **our** symbols; ActSWM's
+`z` denotes an observation embedding and adopting it would collide with ours.
 
 Slides 1 to 3 are background already covered previously. Stage 1's update starts at slide 4;
 Stage 2 is new since the last deck and starts at slide 13.
@@ -534,10 +539,13 @@ set a numeric threshold.
 
 ---
 
-## Slide 11 — One frame nearly determines the command
+## Slide 11 — At one speed, one frame nearly determines the command
 
-A structural fact about the task, not about the model, and it bounds what any latent could be
-worth here. Two measurements say it independently.
+**Scope, and it decides how far this claim reaches.** Everything below is measured on **forward
+walking at a single speed**, where the gait is periodic and one frame fixes the phase. It is a
+structural fact about *that* task, not about the model, and **it does not extend to locomotion with
+varying speed** — slide 15 shows the action mattering as soon as the magnitude varies. Two
+measurements say it independently.
 
 ### The transition is worth about a third
 
@@ -581,12 +589,15 @@ Measured on `c10f10t10` in `ik_walk_m3d_clean`, ridge from mean-pooled frozen en
 signal — 26, 30 and 25 percent — against a spread widened to 15.0 deg by the between-body
 variance, so the claim does not depend on that choice.
 
-**Why this bounds the whole design.** The joint command cannot be where the latent earns its keep,
-because the frame nearly determines it on its own. That is a property of forward walking at one
-speed, not a fault in the model — and it is the reason the next slide scores the forward model on
+**Why this bounds the design, and exactly how far.** At one speed the joint command cannot be where
+the latent earns its keep, because the frame nearly determines it alone. That is a property of the
+task, not a fault in the model, and it is the reason the next slide scores the forward model on
 rolling the world forward instead.
 
-**This bounds the action-decoding path only.** The forward model itself is measured next.
+**It bounds the action-decoding path at a fixed magnitude, and nothing wider.** Let the speed vary
+and the same measurement reverses: the prediction responds to actions of a different magnitude
+(`/mean-z` 0.485 against 0.951 within one speed, slide 15). **Read this slide as "at one speed",
+never as "the action does not matter in locomotion".**
 
 ---
 
@@ -696,9 +707,9 @@ measured; the dynamics model that would act on it does not yet, and we know why.
                                                                           │
     B1 candidate action ──► projector ──► shared head ──►  predicted: (fwd, lat, yaw)
 
-**Nothing but pixels enters on either side.** No recorded trajectory value, no joint correspondence,
-no kinematic model. The two robots meet in a physical quantity that is measurable from outside and
-means the same thing on a six-legged insect and a quadruped.
+**Nothing but pixels enters on either side** — no trajectory value, no joint correspondence, no
+kinematic model. The two robots meet in a quantity measurable from outside that means the same thing
+on both.
 
 **The control that decides whether any of this is real:**
 
@@ -724,58 +735,89 @@ shaped a plan.
 Tracking the demonstration instead falls to **18-21%, below chance** — the picks follow the request
 and stop following the robot's current state.
 
+### ▶ `f136_strafe_reframe.mp4` — the clearest single result
+
+    GOAL: insect strafing LEFT  │  one-channel score picks  │  three-channel score picks
+                                │  side_R_lvl1              │  side_L_lvl1
+                                │  strafes the OPPOSITE way │  correct side
+
+**A forward-speed-only score cannot tell left from right, because both have the same forward
+speed.** Add the lateral channel and the sign separates them immediately. **Invisible, not hard**,
+in one picture.
+
+### ▶ `f136_selection.mp4` — the same rule across all three families
+
+Three rows, each *insect goal* beside *the quadruped behaviour the score picked*. **These are two
+recorded clips: the behaviour it selected, not the robot it drove.** F136 measures selection; the
+cross-embodiment physics loops this project has run are the chance-level ones, and using their
+frames here would be the overclaim the mismatch control exists to prevent.
+
+| goal | picked | reading |
+|---|---|---|
+| `speed_c7.1` | `speed_vx0.38` | exact match, but on only **3 of 10** steps — forward is a weak family |
+| `turn_s0.29` | `turn_w0.075` | **responds but ranks poorly: right family (10/10), wrong level** |
+| `side_L_lvl1` | `side_L_lvl1` | exact match, 5 of 10 |
+
+**The middle row is the open problem made visible** — unanimous about *what* the insect is doing and
+wrong about *how much*. That is slide 15's third level, in a picture.
+
 **Two claims this deck made that the three-channel run overturns.**
 
-**Sideways was never a hard behaviour. It was an invisible one.** Every report since the
-behaviour-family work said strafing fails on every measurement. It reads 13-25% on a
-forward-speed-only score, at or below its own 17% chance rate, and **86-100%** once lateral speed
-enters the score. We were measuring a channel the metric could not see.
+**Sideways was never a hard behaviour. It was an invisible one.** 13-25% on a forward-only score,
+at or below its 17% chance rate; **86-100%** once lateral speed enters it. Every report since the
+behaviour-family work said strafing fails everywhere — we were measuring a channel the metric could
+not see.
 
 **There is no channel competition.** The earlier result — adding yaw costing forward 68% — was
 measured on forward-walking-only data carrying a frame-rate defect. On corrected data with both
 robots in the pretraining, all three channels calibrate at once: correlation +0.97 to +0.99 and
 range compression 1.0-1.2x, on **both** bodies.
 
-**What is shared is not the latent.** The latent is fitted per robot; a hexapod's 18-D command and
-a quadruped's 12-D command reach it by different routes. What is shared is the **target quantity**.
-That is the sentence the thesis rests on, and it is the one the control leaves standing.
+**What is shared is not the latent** — that is fitted per robot, and an 18-D and a 12-D command
+reach it by different routes. What is shared is the **target quantity**, and that is the sentence
+the control leaves standing.
 
 ---
 
 ## Slide 15 — What the world model can do, and the wall it hits
 
-**Coarse yes, fine no.** The line is in the same place in every measurement that has looked for it.
+**Where the model does and does not separate actions.** `/mean-z` is our **action-sensitivity
+ratio**: the rolled prediction's error on the real `z` over its error on a substitute `z`. Lower
+means the action matters more. At one step:
 
-    which BEHAVIOUR?         walk / turn / strafe        ████████████  works
-    ───────────────────────────────────────────────────────────────────────────
-    which VERSION of it?     fast walk / slow walk       ░░░░░░░░░░░░  chance
-                            this turn / that turn
+| the action is compared against | B1 | insect | reading |
+|---|---|---|---|
+| the average of **this clip** — one magnitude | 0.951 | 0.697 | **ambiguous**: the gait is periodic at one speed, so the action may be genuinely redundant |
+| the average of **this behaviour, other magnitudes** | **0.485** | 0.597 | the model **does** separate speeds |
+| the average of **all behaviours** | 0.476 | 0.534 | it separates behaviours |
 
-Everything that was tried on the top row worked. Everything that needed the bottom row failed, and
-five separate measurements put the boundary in the same place.
+**The middle row settles what the first row could not** — hold the magnitude fixed and the action
+changes the B1's prediction by 5%; let it vary and it changes it by more than half. **The model is
+not blind inside a behaviour; it is blind where there is nothing to see.**
 
-| measurement | coarse | fine |
-|---|---|---|
-| ranking recorded behaviours against the true next frame | **95%** family accuracy | — |
-| ranking behaviours against a *goal* | **55%** against 33% chance | — |
-| the speed a cross-embodiment loop achieves against the speed asked for | — | correlation **+0.074** |
-| the same action's small perturbations, judged in physics | — | **33%**, where a coin is 50% |
-| predicting the next state given the real action versus the clip's average action | 0.476 across behaviours | **0.951** within one |
+**But reacting is not ranking, and the distinction has three levels:**
 
-**The model tells walking from turning from strafing. It cannot tell one walk from a slightly
-different walk.** Every attempt to build on the second column has failed, and the failures were
-informative:
+    within one magnitude    does the action matter?     no -- and correctly so.
+                                                        THIS IS ALL SLIDE 11 CLAIMS,
+                                                        and it is a task property no fix targets
+    across magnitudes       does it REACT?              yes, 0.485 -- not collapsed
+    across magnitudes       does it RANK correctly?     not well, and OPEN
 
-**The planner was never conditioned on its goal.** Swapping the goal for a different behaviour left
-its picks unchanged and it scored *below* chance against what it was actually shown. What looked
-like planning was a readout of the current frame. The fix was the coordinate, not the planner — and
-the coordinate needs no rollout at all: deleting the forward model from the scoring rule costs
-nothing.
+Turning and forward are the **weakest** families in cross-embodiment selection — 39-64% and 41-62%
+against a 33% chance rate, where sideways reaches 65-100%. **The prediction moves when the magnitude
+changes and still orders magnitudes poorly.** Across embodiments the speed a loop achieves and the
+speed it was asked for correlate at **+0.074**.
 
-**Run-time action search cannot find a gait.** With no library of recorded behaviours, sampled
-joint commands never produce locomotion at any noise scale — the quadruped travels backwards while
-rotating, at every setting including one that is essentially a static mean pose. Locomotion needs
-periodic joint trajectories and a smoothed random walk is not in that family.
+**So the wall is narrower than it looked, and it is not one wall.** Separating behaviours works.
+Reacting to magnitude works. *Ordering* magnitudes is weak and open. Ordering perturbations of one
+action at one magnitude is not a wall at all — the physics barely separates them either. Three
+attempts to build past this failed, and the failures were informative:
+
+**The planner was never conditioned on its goal.** Swap the goal and its picks do not move. **The
+fix was the coordinate, and the coordinate needs no rollout.**
+
+**Run-time action search cannot find a gait** — with no recorded library, sampled joint commands
+never produce locomotion at any noise scale.
 
 **Teacher-student failed a bar fixed before it ran**, on the easiest possible case — same robot on
 both sides, a forward model good to three steps, real clips to bootstrap from:
@@ -787,18 +829,34 @@ both sides, a forward model good to three steps, real clips to bootstrap from:
 
 Both stayed upright for the whole three seconds. Neither travelled. **The teacher made it worse.**
 
-**The cause was measured, not guessed.** The teacher ranks behaviour families at 55% against 33%
-chance, and ranks small perturbations of one action at **33% against a coin's 50%**, judged by
-executing both in physics rather than by asking the model. Its labels were indistinguishable from
-the student's own output — 0.1304 against 0.1299 mean distance to the goal. **DAgger trained the
-student on noise around itself**, which is exactly the small degradation the bar measured.
+### ▶ `f144_labelled.mp4` — recorded walk, cloning, and cloning plus the teacher
 
-**This is not a tuning failure.** More rounds, more candidates or a different horizon cannot sharpen
-an ordering that is not there.
+**The distances are burned into the frames**, because all three look like walking and only the
+ground covered separates them — motion without travel. A clip of the taught policy alone would read
+as success and contradict its own number, so it is not kept.
+
+**The cause was measured, and it is not only the teacher.** It ranks behaviour families at **55%**
+against 33% chance and perturbations of one action at **33%** against a coin — but **the physics
+barely separated those candidates either**, 0.1304 against 0.1299 mean distance to the goal.
+
+**So it is not a tuning failure and not only a model failure.** More rounds cannot sharpen an
+ordering the world does not provide. **A teacher can be built on the choice between behaviours,
+never on the refinement of one gait.**
 
 ---
 
 ## Slide 16 — The root cause has a name in the literature
+
+**Two earlier slides narrowed what the latent's job could be. This one names what breaks it.**
+
+    Slide 11   NOT decoding the joint command -- at ONE SPEED one frame supplies two thirds
+               of it. A property of the TASK, not a failure, and true only at fixed magnitude
+    Slide 12   NOT raw forward prediction -- the forward model was scored on the wrong thing
+    ────────────────────────────────────────────────────────────────────────────────────
+    so         action-CONDITIONED prediction is what is left --
+               reacted to (0.485 across magnitudes) but not yet well ranked
+               (39-64% turning, 41-62% forward), and Context Collapse is
+               what breaks it over the horizon
 
 **Context Collapse** — the predictor extrapolates the next state from the context it already has and
 stops responding to the action it is conditioned on. Named in **ActSWM (arXiv 2607.26712, 2026)**.
@@ -811,16 +869,16 @@ stops responding to the action it is conditioned on. Named in **ActSWM (arXiv 26
       ▲
       the action decides where it goes     the state decides; the action is decoration
 
-**The diagnostic is the same one we had already been running.** ActSWM compares a rollout driven by
-the recorded actions against one driven by zero actions. Our `/mean-z` compares the real action
-against the average action. Same question, arrived at independently.
+**The diagnostic is the one we were already running.** ActSWM contrasts a real-action rollout with
+a **null-action** one; our `/mean-z` contrasts the real `z` against a substitute `z`. Same question,
+reached independently.
 
 **We arrived at the same diagnostic independently.** Our `/mean-z` compares a rollout on the real
 action against one on the average action. On a body the model never trained on:
 
 | | |
 |---|---|
-| rolled state error against holding the frame still, one step | **0.732** |
+| **rollout prediction error** — the rolled state's error over a frozen frame's, one step | **0.732** |
 | the same at ten steps | **0.978** — indistinguishable from predicting no motion |
 | effect of perturbing the action by a full standard deviation | **1%** |
 | effect of substituting a real action from another state | 6% |
@@ -839,21 +897,19 @@ action against one on the average action. On a body the model never trained on:
     same model, robot B                                    0.757 ──► 1.052  worse than
                                                                             a frozen frame
 
-**The repair is local to the body it was made on.** That is the trap slide 17's second term
-exists to close.
+**The repair is local to the body it was made on** — the trap slide 17's second term closes.
 
-**Two more results in the literature name the two halves of our wall.**
+**Two more results name the two halves of our wall.** **CD-LAM (2607.09185)** reports latent-action
+predictors *fragile under small perturbations* — slide 15's fine-ranking failure elsewhere.
+**Dueling World Models (2608.06706)** reports the loss improving while actions become
+indistinguishable — the shape of our stage-3 arm with the lowest loss and the worst sensitivity.
 
-**CD-LAM (arXiv 2607.09185)** reports latent-action predictors that are *fragile under small
-perturbations* — the fine-ranking failure of slide 15, in someone else's system.
+**So the failure is neither ours alone nor mysterious**, and it has a published fix.
 
-**Dueling World Models (arXiv 2608.06706)** reports the loss improving while actions become
-mutually indistinguishable — the exact shape of our stage-3 arm that reaches the lowest training
-loss and the worst action-sensitivity.
-
-**So the failure is neither ours alone nor mysterious.** It is a known pathology of
-action-conditioned world models, we measured it with the field's own diagnostic before knowing its
-name, and it has a published fix.
+**Why there is no side-by-side video of this**, where ActSWM has one: their world model predicts
+pixels, so a real-action rollout and a zero-action rollout can be shown as two near-identical
+videos. **Ours predicts V-JEPA2 embeddings and has no decoder back to images**, so the collapse is
+visible only as numbers. That is a property of the architecture, not a missing figure.
 
 *References supplied by the advisor; arXiv identifiers were not verified from this machine.*
 
@@ -866,22 +922,28 @@ name, and it has a published fix.
                     ┌─────────────────────────────────────────────┐
     e_t, z real ───►│                                             │──► rollout A
                     │              forward model                  │
-    e_t, z zero ───►│                                             │──► rollout B
+    e_t, z null ───►│                                             │──► rollout B
                     └─────────────────────────────────────────────┘
                           │                        │
-                    prediction loss          hinge: push A and B apart
-                    (keep accuracy)          over K steps, not one
+                    prediction loss          ROLLOUT SEPARATION:
+                    (keep accuracy)          push A and B apart over K steps,
+                                             not at one
                                                     │
-                                             through a FROZEN random readout
-                                             so the signal cannot relocate to
-                                             wherever it is being measured
+                                             scored through a fixed,
+                                             randomly-initialised action-readout
+                                             that is never trained
 
-**1. The hinge is rollout-level.** Our sensitivity dies past three steps; a one-step penalty cannot
-see that, and the horizon is what a distilled policy consumes.
+**1. The separation term is rollout-level.** Our sensitivity dies past three steps; a one-step
+penalty cannot see that, and the horizon is what a distilled policy consumes.
 
-**2. The readout is frozen.** This closes a trap we measured, not a hypothetical one: the
-contrastive term produced sensitivity that lived only in the projector's region and only on the body
-it was adapted to.
+**2. The readout is frozen — randomly initialised and never trained.** That is what stops it
+cheating: a reader that learns cannot relocate the boundary to wherever the loss is looking. It
+closes a trap we measured rather than a hypothetical one — the contrastive repair produced
+sensitivity that lived only in the projector's region and only on the body it was adapted to.
+
+*Our null is not ActSWM's zero action.* Their contrast is a zero-action rollout; ours is a **null
+action**, the robot's standing stance, because these action spaces are joint targets rather than
+torques and the literal zero vector collapses both robots (F148).
 
 **3. The prediction loss stays.** The trade is **tunable, not structural** — measured: 0.710 fidelity
 with 0.476 sensitivity together, against MSE's 0.585 and 0.969. A fifth of the accuracy buys all of
@@ -898,8 +960,8 @@ shows it is open.
 
 | | expectation |
 |---|---|
-| usable imagination horizon | extends past three steps |
-| fine and magnitude ranking | improves **partially**, not fully — ActSWM's own precision results are moderate |
+| usable imagination horizon | **the primary target** — past three steps, where the rollout prediction error crosses 0.8. This is the clean, confirmed Context Collapse |
+| magnitude **ranking** | **open, declared neither way.** The prediction already reacts to magnitude; ordering it is weak. A null here refutes nothing |
 | action-sensitivity across embodiments | **the open question**; the naive fix fails it today |
 
 **Deferred and named, not quietly dropped**: where a target robot's first motion comes from, if not
@@ -939,8 +1001,8 @@ ambiguity until the control was run.
 intervention while turning rose eighteen points and forward fell twenty. The aggregate was
 actively misleading.
 
-**Feed a model the latent it is actually shown.** State fidelity measured on the inverse model's
-latents read 1.370 for a checkpoint that reads 0.710 on the projector's — the path a policy would
+**Feed a model the latent it is actually shown.** The rollout prediction error measured on the
+inverse model's latents read 1.370 for a checkpoint that reads 0.710 on the projector's — the path a policy would
 drive. One number said the objective was structurally broken; the other said the trade is a knob.
 
 **What each of the three numbers on slide 14 rests on.** 70% is one checkpoint and one seed,
@@ -951,3 +1013,37 @@ fixed in advance, with its cause measured in physics rather than inferred.
 Speaker note: the discipline is the result as much as the numbers are — five conclusions were
 withdrawn during this work, every one of them because a control had not been run, and every one of
 them had already shaped a plan before it was checked.
+
+---
+
+## Slide 19 — What we do next
+
+**The diagnosed failure.** Our forward model predicts the next embedding and stops responding to
+the action that produced it. From `e_t`, a rollout on the real `z` and a rollout on a null `z`
+converge: by ten steps the prediction is no better than a frozen frame, and a full-standard-
+deviation change to `z` moves the answer by **1%**. This is **Context Collapse** (ActSWM, arXiv
+2607.26712), and it comes from a pretraining objective that asks for reconstruction and readouts
+and never asks the prediction to depend on `z`.
+
+**The fix: three terms in pretraining.**
+
+    (a) rollout separation      roll twice from the same e_t -- real z and null z -- and force the
+                                two futures apart across the horizon, not at one step
+
+    (b) frozen action-readout   the separation is scored through a fixed, randomly-initialised,
+                                untrainable reader, so the model must separate the transitions
+                                instead of relocating the signal to wherever it is measured.
+                                This closes F139/F143's trap: our contrastive repair lived only
+                                in the projector's region, on one body
+
+    (c) cross-augmentation      kept, unchanged. It fixes a different leak -- `z` copying the
+                                future frame -- and nothing here replaces it
+
+**The null action** (F148) is each body's **standing stance**: 18-D and 12-D, different vectors,
+identically defined. Not the zero command and not the dataset-mean pose — both make a robot fall,
+and a null meaning *still* on one body and *falling* on the other would corrupt the
+cross-embodiment test before it starts.
+
+**Pre-registered** (F146). Primary: does action-sensitivity survive past `h = 3`. **The
+contribution**: does it survive hexapod ↔ quadruped, where our naive fix did not (F143). Magnitude
+ranking is open — a null result there refutes nothing.

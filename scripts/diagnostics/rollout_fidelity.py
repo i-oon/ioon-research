@@ -66,6 +66,14 @@ def main():
                          "instead asks whether the action matters *inside* one behaviour, and on "
                          "the same checkpoint that reads 0.95. **The second is the stricter "
                          "question and the one control depends on**; both are printed.")
+    ap.add_argument("--family_mean", action="store_true",
+                    help="add a third `/mean-z` baseline: the mean latent of the **same behaviour "
+                         "family at other magnitudes**. **This is what separates a task property "
+                         "from a model failure.** Within one clip the gait is periodic at one "
+                         "speed, so a frame fixes the phase and the action is genuinely near "
+                         "redundant -- a high `/mean-z` there says nothing about the model. Across "
+                         "the family the magnitude varies and the action is *not* redundant, so a "
+                         "high `/mean-z` there is the model discarding information that exists.")
     ap.add_argument("--noise", type=float, default=1.0,
                     help="off-manifold perturbation, in units of the latent's own sd")
     args = ap.parse_args()
@@ -110,9 +118,22 @@ def main():
                          torch.cat([itm(e[t:t + 1], e[t + 1:t + 2])
                                     for t in range(len(e) - 1)])).mean(0, keepdim=True))
         z_global = torch.cat(pool).mean(0, keepdim=True)
+        # the family mean: same behaviour, the other magnitudes, excluding the clip itself
+        fam_mean = {}
+        if args.family_mean:
+            import collections
+            fam_of = lambda cond: ("side" if cond.startswith("side") else cond.split("_")[0])
+            by = collections.defaultdict(list)
+            for c_, m_ in zip(clips, pool):
+                by[fam_of(c_["cond"])].append((c_["cond"], m_))
+            for c_ in clips:
+                f_ = fam_of(c_["cond"])
+                others = [m_ for cond_, m_ in by[f_] if cond_ != c_["cond"]]
+                if others:
+                    fam_mean[c_["cond"]] = torch.cat(others).mean(0, keepdim=True)
         for h in args.horizons:
             tot = {"model": 0.0, "hold": 0.0, "moved": 0.0, "truth": 0.0, "off": 0.0,
-                   "shuf": 0.0, "meanz": 0.0, "meanz_all": 0.0}
+                   "shuf": 0.0, "meanz": 0.0, "meanz_all": 0.0, "meanz_fam": 0.0}
             n = 0
             for c in clips:
                 e = c["e"].float().to(device)
@@ -134,6 +155,7 @@ def main():
                     shuf = e[t:t + 1]
                     mz = e[t:t + 1]
                     mz_all = e[t:t + 1]
+                    mz_fam = e[t:t + 1]
                     z_bar = zs.mean(0, keepdim=True)
                     noise = args.noise * z_sd * torch.randn(
                         seq.shape, generator=torch.Generator(device=device).manual_seed(t),
@@ -144,6 +166,7 @@ def main():
                         shuf = ftm(shuf, zs[order[(t + i) % len(zs)]].unsqueeze(0))
                         mz = ftm(mz, z_bar)
                         mz_all = ftm(mz_all, z_global)
+                        mz_fam = ftm(mz_fam, fam_mean.get(c["cond"], z_global))
                     tot["model"] += float(((pred[0] - truth) ** 2).mean())
                     tot["hold"] += float(((e[t] - truth) ** 2).mean())
                     tot["moved"] += float(((pred[0] - e[t]) ** 2).mean())
@@ -152,6 +175,7 @@ def main():
                     tot["shuf"] += float(((shuf[0] - truth) ** 2).mean())
                     tot["meanz"] += float(((mz[0] - truth) ** 2).mean())
                     tot["meanz_all"] += float(((mz_all[0] - truth) ** 2).mean())
+                    tot["meanz_fam"] += float(((mz_fam[0] - truth) ** 2).mean())
                     n += 1
             r = {k: v / max(n, 1) for k, v in tot.items()}
             rows[h] = r
@@ -161,7 +185,9 @@ def main():
                   f"{r['off'] / max(r['hold'], 1e-9):>14.3f}"
                   f"{r['shuf'] / max(r['hold'], 1e-9):>12.3f}{n:>7}"
                   + (f"   /mean-z within-clip {r['model'] / max(r['meanz'], 1e-9):.3f}"
-                     f"  across-clips {r['model'] / max(r['meanz_all'], 1e-9):.3f}"
+                     + (f"  within-family {r['model'] / max(r['meanz_fam'], 1e-9):.3f}"
+                        if args.family_mean else "")
+                     + f"  across-all {r['model'] / max(r['meanz_all'], 1e-9):.3f}"
                      if args.mean_z else ""))
 
     h0 = min(rows)

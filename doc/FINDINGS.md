@@ -9154,6 +9154,13 @@ reported a 1-6% effect; both are right and they average different things:
 | the mean across the whole dataset -- `wm/adapt3`'s, and F119's | **0.476** |
 | the mean within the clip being predicted | 0.951 |
 
+> **F147 corrects what the within-clip number means.** It is measured at a **fixed magnitude**,
+> where the gait is periodic and a frame fixes the phase, so the action is redundant by
+> construction (Slide 11). Let the magnitude vary inside the same behaviour family and the same
+> checkpoint reads **0.485**, against 0.476 across all behaviours. **The model is not blind within a
+> behaviour; it is blind where there is nothing to see.** Quote 0.951 as a property of the task,
+> never as the model discarding information.
+
 **Across behaviours the action matters; within one behaviour it barely does.** That is the same
 shape as F111 -- the kind of motion transfers and the amount does not -- now visible in the forward
 model's own predictions, and it is a real limit on fine control rather than a measurement artefact.
@@ -9486,6 +9493,10 @@ each produced was compared with the goal:
 | mean distance to the goal, student | **0.1299** |
 | mean distance to the goal, teacher | **0.1304** |
 
+> **Read with F147.** The candidates here are perturbations of one action at one magnitude, and the
+> physics barely separated them -- 0.1304 against 0.1299. **A ranker cannot order what the outcome
+> does not distinguish**, so this is partly a property of the task and not only of the teacher.
+
 **The teacher's ranking of local perturbations is worse than a coin and its labels are
 indistinguishable from the student's own output** -- 0.1304 against 0.1299 over twelve states. It
 changed the action every single time and gained nothing by it. **That is the mechanism of F144**:
@@ -9535,7 +9546,12 @@ this machine.*
 **Three terms, together, replacing the current pretraining objective.**
 
 **1. A rollout-level action-sensitivity hinge.** Penalise similarity between a rollout driven by the
-real actions and one driven by zero actions, accumulated over K steps rather than one. **A one-step
+real actions and one driven by the **null** action, accumulated over K steps rather than one.
+**The null is each embodiment's standing stance** -- per-embodiment vectors, identically defined as
+"the pose that body stands still in" (F148). Not the zero vector, which collapses both robots, and
+**not the dataset-mean pose**, which collapses the B1 and drifts the insect: a null that means
+*still* on one robot and *falling* on the other would make a cross-embodiment sensitivity comparison
+measure the nulls instead of the models. **A one-step
 penalty cannot see our failure**: F138 measures 0.732 at one step decaying to 0.978 by ten, and the
 horizon is what a policy consumes.
 
@@ -9555,8 +9571,8 @@ something no checkpoint has shown.
 
 | | expectation |
 |---|---|
-| usable imagination horizon | past **h = 3**, where the state ratio currently crosses 0.8 |
-| fine and magnitude ranking | improves **partially** -- ActSWM's own precision results are moderate, so a full repair is not the prediction |
+| usable imagination horizon | **the primary target**: past **h = 3**, where the state ratio crosses 0.8. This is the clean, confirmed Context Collapse -- 0.732 at one step to 0.978 at ten on the pretrain (F138) |
+| magnitude **ranking** | **open, and pre-declared neither way** (F147). The prediction already *reacts* to magnitude -- `/mean-z` 0.485 across sizes -- and ranks it poorly: turning 39-64%, forward 41-62%, against 33% chance (F136). **Reacting and ranking are different and only the first is established**, so this run is not a test of whether the fix repairs ranking, and a null there refutes nothing |
 | **action-sensitivity across disjoint embodiments** | **the open question, and the contribution** |
 
 **The third row is ours and not ActSWM's.** They test within one body. **F143 is the measurement
@@ -9572,6 +9588,143 @@ not need a rollout at all.
 
 **Status: plan. Nothing here is measured.** The three-channel pretraining run it builds on is
 complete and evaluated (F134, F136).
+
+---
+
+
+### F147. The within-behaviour blindness is the task, not the model -- and that re-labels two earlier findings
+
+**F146 is the ActSWM plan; this is the prerequisite that was almost skipped.** Slide 11 measured a
+property of the *task*: at one speed the gait is periodic, a single frame fixes the phase, and the
+command follows -- removing the transition entirely costs 28-34%, a second frame is worth 1.11x, and
+predicting 32 frames ahead is as accurate as predicting the present. **That is real redundancy and
+no objective should remove it.** F138/F140/F145 measured a *model* failure. The two were being read
+as one fact, and the number that conflated them -- `/mean-z` 0.951 within a clip -- was measured at
+**fixed magnitude**, where the task is redundant by construction.
+
+**The measurement that separates them: a third baseline.** The mean latent of the *same behaviour
+family at other magnitudes*, where the action genuinely is not redundant.
+
+| `/mean-z`, h = 1, projector path | within one clip | **within the family** | across all behaviours |
+|---|---|---|---|
+| **B1**, contrastive stage 3 | **0.951** | **0.485** | 0.476 |
+| **insect**, contrastive stage 3 | 0.697 | 0.597 | 0.534 |
+
+**On the B1 the answer is unambiguous.** Holding the speed fixed, the action changes the prediction
+by 5%. Letting the speed vary, it changes it by more than half -- and 0.485 is indistinguishable
+from the across-everything 0.476. **The model is not blind within a behaviour. It is blind within a
+behaviour at one magnitude, which is the regime where there is nothing to see.**
+
+**So two earlier readings have to be corrected.**
+
+**F140's within-clip 0.951 is not evidence of collapse.** It is Slide 11's task property, measured
+on the forward model instead of the decoder. It should be quoted as "the action is near-redundant at
+fixed magnitude", never as "the model ignores the action within a behaviour".
+
+**F145's local-ranking failure is at least partly the same thing.** The teacher ranked
+perturbations of one action at 33% against a coin's 50% -- and the physics agreed with it: executing
+the teacher's pick and the student's own gave mean distances to the goal of **0.1304 and 0.1299**.
+**The world itself barely distinguished those actions.** A ranker cannot order what the outcome does
+not separate. The teacher's labels were uninformative because the candidates were, not only because
+the model was.
+
+**What survives unchanged, and it is what F146 is for.** Context Collapse is still measured and
+still a model failure: on the **pretrain**, held-out insect clips, the rolled state goes 0.732 at
+one step to **0.978** at ten, and a full-standard-deviation perturbation of the action changes the
+answer by **1%** (F138). That is at every magnitude, not one, and it is horizon decay rather than
+task redundancy. **The ActSWM rebuild is aimed at that, and this finding does not weaken it** -- it
+removes a piece of evidence that was never valid for it.
+
+**What it does change about expectations, and the distinction has three levels rather than two.**
+`/mean-z` 0.485 says the prediction **reacts** to actions of a different magnitude. It does **not**
+say the model **orders** them correctly, and F136 measures that it does not do so well: at three
+channels, turning and forward are the *weakest* families in cross-embodiment selection -- turning
+39-64% and forward 41-62% against a 33% chance rate, where sideways reaches 65-100%.
+
+| | status |
+|---|---|
+| within one magnitude: does the action matter at all | **no, and correctly so** -- Slide 11's task property, not a target |
+| across magnitudes: does the prediction **react** | **yes**, 0.485 -- not collapsed |
+| across magnitudes: does it **rank** them correctly | **not well, and open** -- F136's weakest families |
+
+**So F146 should be judged primarily on horizon** -- 0.732 at one step to 0.978 at ten is the clean,
+confirmed Context Collapse and the thing the hinge targets. **Whether it also improves magnitude
+*ranking* is open and must not be pre-declared either way**, solved or unfixable.
+
+**And the still-open question**: whether a model could ever rank actions *within* a behaviour at a
+fixed magnitude, or whether the outcome genuinely does not depend on them. The 0.1304 against 0.1299
+says the second, on twelve states of one robot. **That is a limit on control precision that no
+objective fixes**, and it should be written as a property of the task.
+
+Logs `/tmp/f147_{hex,b1}.log`; `rollout_fidelity.py --family_mean`.
+
+---
+
+
+### F148. The null action: holding the settled pose, on both robots. The zero vector falls.
+
+**A prerequisite for F146, not a detail.** The action-sensitivity hinge contrasts a rollout on the
+real actions against one on a **null** action. If the null makes the robot collapse, the hinge is
+trained to separate *walking* from *falling* -- trivial, and it teaches nothing about the action
+channel. Three candidates, each held constant for three seconds, on both bodies:
+
+| B1, MuJoCo | travel | jitter | forward | lateral | yaw | min height | verdict |
+|---|---|---|---|---|---|---|---|
+| hold the settled pose | 0.008 m | 0.61 mm | +0.000 | -0.000 | -0.000 | 0.462 | **still** |
+| **the standing stance the clips start in** | 0.008 m | **0.17 mm** | +0.001 | -0.000 | -0.000 | 0.502 | **still** |
+| the dataset-**mean** pose | **0.628 m** | 0.36 mm | -0.001 | +0.001 | -0.001 | **0.126** | **FALLS** |
+| **the zero vector** | **1.077 m** | 16.9 mm | -0.001 | **-0.104** | -0.037 | **0.088** | **FALLS** |
+
+| hexapod `c10f10t10`, CoppeliaSim | travel | jitter | forward | lateral | yaw | min height | verdict |
+|---|---|---|---|---|---|---|---|
+| hold the settled pose | 0.0002 m | 0.03 mm | -0.000 | +0.000 | +0.000 | 0.151 | **still** |
+| **the standing stance the clips start in** | 0.0002 m | 0.04 mm | -0.000 | +0.000 | +0.000 | 0.151 | **still** |
+| the dataset-**mean** pose | 0.063 m | 0.04 mm | +0.000 | -0.000 | -0.000 | 0.150 | drifts |
+| **the zero vector** | 0.034 m | 0.04 mm | -0.000 | -0.001 | +0.000 | **0.019** | **FALLS** |
+
+**The literal zero vector is the wrong null on both robots and for the same reason.** These action
+spaces are **joint targets**, not torques, so zero commands every joint to angle zero -- a specific
+and unsupportable posture. The B1 collapses and slides **1.08 m** doing it, at a lateral speed of
+-0.104, which is faster sideways than any recorded strafing clip. The insect folds to a fifth of its
+standing height. **A hinge built on that would be scoring "did the robot fall", and the answer would
+be yes every time.**
+
+**Holding a pose works on both, and the two variants are equivalent here.** Commanding the settled
+pose back to itself and commanding the dataset's neutral stance both give body motion of zero to
+three decimals in every channel, no fall, and sub-millimetre jitter. On the insect they coincide by
+construction: the warm-up holds the clip's first command, so the pose it settles into *is* the
+neutral stance.
+
+**A fourth candidate was proposed and it fails: the dataset-**mean** pose.**
+
+| | B1 travel | B1 verdict | hexapod travel | hexapod verdict |
+|---|---|---|---|---|
+| the standing stance | 0.008 m | still | 0.0002 m | still |
+| **the dataset-mean pose** | **0.628 m** | **FALLS**, height 0.126 against 0.50 | 0.063 m | drifts, 150x the stance |
+
+**A mean over a gait cycle averages swing against stance and produces a posture that exists in no
+frame and holds nothing up.** F137 measured the same thing from the other side: sampling around the
+mean pose at 0.1 sd sent the quadruped backwards while rotating. **"The dataset-mean pose" is not
+the null.**
+
+**The choice for F146, stated so it cannot be misread: the standing stance of each embodiment** --
+the pose that robot's clips start in and settle into. It is **per-embodiment by necessity** (18-D
+and 12-D, different vectors) and **identically defined on both** (the pose that body stands still
+in), which is the property the cross-embodiment test depends on.
+
+**That last point is the one that matters for the contribution.** If the null meant *still* on one
+robot and *collapsing* on the other, a cross-embodiment sensitivity comparison would be measuring
+the difference between the two nulls rather than between the two models. **The stance is the only
+candidate that reads 0.000 in every channel on both bodies**; the mean falls on one, and the zero
+vector falls on both.
+
+**One property worth stating before the rebuild.** This null is *a pose*, not an absence of
+actuation. The robot is being actively held, so the contrast is "commanded to hold still" against
+"commanded to move", not "actuated" against "unactuated". **That is the right contrast for a
+joint-target action space** and it should be written that way in the objective, because "zero
+action" in a torque-controlled system would mean something else entirely.
+
+`scripts/diagnostics/null_action.py`; log `/tmp/f148.log`.
 
 ---
 
