@@ -1030,11 +1030,14 @@ and never asks the prediction to depend on `z`.
     (a) rollout separation      roll twice from the same e_t -- real z and null z -- and force the
                                 two futures apart across the horizon, not at one step
 
-    (b) frozen action-readout   the separation is scored through a fixed, randomly-initialised,
-                                untrainable reader, so the model must separate the transitions
-                                instead of relocating the signal to wherever it is measured.
-                                This closes F139/F143's trap: our contrastive repair lived only
-                                in the projector's region, on one body
+    (b) frozen action-readout   a NEW module -- randomly initialised, never trained -- that scores
+                                the separation. The model must separate the transitions instead of
+                                relocating the signal to wherever it is measured. Closes F139/F143's
+                                trap: our contrastive repair lived only in the projector's region,
+                                on one body.
+                                **Not the ITM.** The ITM makes the z the projector imitates;
+                                freezing it at random weights would make z arbitrary and break
+                                every control-time path. The new readout feeds nothing downstream
 
     (c) cross-augmentation      kept, unchanged. It fixes a different leak -- `z` copying the
                                 future frame -- and nothing here replaces it

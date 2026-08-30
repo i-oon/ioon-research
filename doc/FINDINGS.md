@@ -9555,8 +9555,17 @@ measure the nulls instead of the models. **A one-step
 penalty cannot see our failure**: F138 measures 0.732 at one step decaying to 0.978 by ten, and the
 horizon is what a policy consumes.
 
-**2. A frozen random action-readout.** The sensitivity loss backpropagates through the latent inputs
-only, never through the readout that scores it. **This targets a trap we measured rather than a
+**2. A frozen action-readout, and it is a NEW module -- not the ITM.** A small head, **randomly
+initialised and never trained**, that scores the separation between the two rollouts. The sensitivity
+loss backpropagates through the latent inputs only, never through the readout itself.
+
+> **Design decision, locked: do not freeze the ITM.** The ITM produces the `z` that the action
+> projector is fitted to imitate (`wm/fit_projector`), so freezing it at random weights makes `z`
+> arbitrary and breaks the projector -- and with it every control-time path, since the projector is
+> how the model is driven when the future frame is unavailable. **The new readout consumes nothing
+> downstream**: its only job is to force gradient into the forward model and the latent so that
+> transitions are genuinely separated. Nothing reads its output but the loss. **The ITM keeps
+> training exactly as it does now.** **This targets a trap we measured rather than a
 hypothetical one**: F139 and F143 found the contrastive term producing sensitivity that lives only
 in the projector's region and only on the body it was adapted to -- `/mean-z` 0.534 on `c10f10t10`
 and state fidelity 1.052 on `c08f09t09`. A learnable readout can relocate the signal to wherever it
@@ -9725,6 +9734,345 @@ joint-target action space** and it should be written that way in the objective, 
 action" in a torque-controlled system would mean something else entirely.
 
 `scripts/diagnostics/null_action.py`; log `/tmp/f148.log`.
+
+---
+
+
+### F149. Gradient balance on the three-channel pretrain: reconstruction is 96-99% of the loss and 22-41% of the gradient
+
+**The pre-rebuild baseline.** F87 measured this on `beh12_body_fwd`, a one-channel checkpoint, and
+its first reading over-standardised the body target on an insect-only batch. `loss_gradient_balance`
+now takes the statistics from the checkpoint -- pooled across both embodiments, which is why
+`train.py` stores them -- so the correction is applied by construction. Re-measured on
+`beh12_hex-b1_body3/best.pt`, `body_dim 3`, 24 transitions, each term's gradient taken with respect
+to the **same** `z`:
+
+| hexapod | lambda | loss | share of loss | \|dL/dz\| raw | x lambda | **share of gradient** |
+|---|---|---|---|---|---|---|
+| recon | 1.00 | 1.5266 | **98.8%** | 0.0029 | 0.0029 | **40.6%** |
+| motion | 1.00 | 0.0046 | 0.3% | 0.0016 | 0.0016 | 22.8% |
+| body | 0.50 | 0.0266 | 0.9% | **0.0052** | 0.0026 | **36.6%** |
+
+| B1 | lambda | loss | share of loss | \|dL/dz\| raw | x lambda | **share of gradient** |
+|---|---|---|---|---|---|---|
+| recon | 1.00 | 1.3131 | **95.6%** | 0.0028 | 0.0028 | **22.3%** |
+| motion | 1.00 | 0.0304 | 2.2% | 0.0058 | 0.0058 | **46.3%** |
+| body | 0.50 | 0.0589 | 2.1% | **0.0079** | 0.0039 | 31.4% |
+
+**Reconstruction is 96-99% of the loss and 22-41% of the gradient into the latent.** The gap between
+the two columns is the whole point: **the loss values were never the right thing to read**, and F23's
+"99 percent of the gradient goes to reconstruction" was an inference from loss magnitudes, not a
+measurement of gradients. It should not be quoted.
+
+**The body term has the largest raw `|dL/dz|` on both robots** -- 0.0052 and 0.0079 against
+reconstruction's 0.0029 and 0.0028 -- and is then halved by `lambda_body 0.5`. **The smallest term
+by weight pulls hardest on the latent.**
+
+**Compared with F87's one-channel run** (recon 5.1%, motion 12.3%, body 82.5% before rescaling,
+about 13/37/50 after), the three-channel pretrain is **more balanced**: reconstruction's share rises
+from about 13% to 22-41% and the body term's falls from about 50% to 31-37%. Widening the shared
+target from one channel to three spread the gradient rather than concentrating it.
+
+**What this is for.** It is the number the ActSWM rebuild (F146) will be measured against. The
+rebuild adds a rollout-separation term scored through a frozen readout, and **the claim it has to
+support is that gradient into the latent increases and does so through the new term**, not that the
+loss curve moves. Re-measuring this table after the rebuild is the check.
+
+**And it rules out the same intervention F87 ruled out**, on a different checkpoint: lowering
+`lambda_recon` removes gradient without rebalancing anything, because reconstruction was not
+dominating it to begin with.
+
+`scripts/diagnostics/loss_gradient_balance.py`; logs `/tmp/f149_{hex,b1}.log`. Batch 24, one robot at
+a time -- two concurrent runs OOM an 11 GB card.
+
+---
+
+
+### F150. Three wiring checks before the rebuild. All pass, and the third sets the bar
+
+**Nothing here trains anything.** Each check is cheap now and expensive after five hours of
+pretraining on a mis-wired objective. `scripts/diagnostics/check_actswm_wiring.py`.
+
+## 1. The null-action contrast is wired to the stance, and the two rollouts do differ
+
+Rolled from the same `e_t`, once on the real action's latent and once on the **standing stance's**
+(F148). The stance is a real posture -- `|a|` up to 2.545 on the insect and 3.364 on the B1 -- and
+not the zero vector, which would be a fall.
+
+| body | h=1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| hexapod, real-vs-null over real-vs-`e_t` | 0.078 | 0.135 | 0.180 | 0.211 | **0.236** |
+| B1 | 0.089 | 0.117 | 0.124 | 0.135 | **0.146** |
+
+**The separation exists and is small**: after five steps the two rollouts differ by 24% of how far
+the real one has travelled from its starting frame on the insect, and 15% on the B1. **That is the
+quantity the separation term has to grow**, and it is non-zero, so the term has something to push
+on. Had it been ~0 the hinge would have had nothing to work with; had the null been the zero vector
+it would have been large and meaningless.
+
+## 2. The frozen readout takes no gradient and passes gradient through
+
+A new module, `[e_t, e_t+1] -> action`, 725,778 parameters, randomly initialised with
+`requires_grad = False` throughout. One backward pass through it into a trainable forward model:
+
+| | |
+|---|---|
+| gradient reaching the readout's own parameters | **0 tensors** -- correct |
+| gradient reaching the forward model | **312 tensors, total norm 27.56** -- flows, correct |
+| the ITM | **not instantiated for training, untouched** |
+
+**The mechanism is confirmed**: the readout cannot move, so the only way to lower a loss measured
+through it is to make the transitions themselves separable. That is precisely what a *learnable*
+readout would avoid doing, and what F139 and F143 measured our contrastive repair avoiding -- the
+sensitivity lived in the projector's region and on one body only.
+
+## 3. The starting sensitivity, against the same null
+
+`/mean-z` here is the rolled error on the real action over the rolled error on the null action.
+**1.0 means the action changed nothing.**
+
+| body | h=1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| hexapod | **0.956** | 0.923 | 0.894 | 0.871 | 0.863 |
+| B1 | **0.936** | 0.921 | 0.937 | 0.922 | 0.925 |
+
+**This is the number the rebuild must move, and it is worse than the earlier ones suggest.** F140's
+0.476 and F149's more balanced gradient both come from *adapted* checkpoints or from a mean-latent
+baseline. Measured on the **pretrain** against the **stance null** -- the exact contrast the hinge
+will use -- the action buys 4-14% at every horizon on both robots.
+
+**And the horizon direction differs between the bodies.** On the insect sensitivity improves with
+horizon, 0.956 to 0.863: a longer rollout accumulates the difference. On the B1 it is flat at
+0.92-0.94. **A rollout-level term is the right shape for the insect's curve and an open question for
+the B1's**, and that difference is worth watching in the rebuilt run rather than pooling the two.
+
+**Verdict: all three pass. The wiring is correct and the pre-rebuild baselines are recorded**
+(F149 for gradient share, this entry for sensitivity). What remains before the run is the lambda
+values, and the full pretrain has not been started.
+
+Log `/tmp/f150.log`.
+
+---
+
+
+### F151. The short run says stop: the null cannot be an action at pretraining, and 400 steps made prediction worse
+
+**A 400-step continuation of the three-channel checkpoint under the ActSWM objective**, ActSWM's
+Table 3 values where they are not physics-dependent -- `alpha_pred` 1.0, `lambda_hinge` 0.5, margin
+0.3, `lambda_readout` 1.0, readout hidden 512, frozen. `wm/actswm_short.py`. **This is not a
+pretrain and does not stand in for one.**
+
+## The two settings that were not copied, and why
+
+**K = 5, not their 12.** F140 and F150 measure the rolled prediction crossing "worse than a frozen
+frame" by five steps on this checkpoint. **Hinging separation at horizons where the prediction is
+already broken trains on noise.** Ready to drop to 3.
+
+**H stays at 1, not their 32.** Checked in the code rather than assumed: `wm/train.py:140` drives
+the forward model as `FTM(e_t, z)` -- **a single frame, 256 tokens, no temporal stack.** 32 is not a
+hyperparameter here, it is a different architecture, and nothing in F138 or F150 implicates context
+length.
+
+**`lambda_sig = 0.09` was not applied.** Which term it scales is not identifiable from the number
+alone, and guessing would put a value in the log under a name that may not mean what the paper
+means.
+
+## The blocker the check was run to find
+
+**The null cannot be an *action* at pretraining time.** F148 defined it as each body's standing
+stance, which is an action -- and **pretraining has no action projector**. `wm/train.py` drives the
+forward model with the ITM's `z`; the projector is fitted *afterwards*, against a frozen ITM
+(`wm/fit_projector`), and the pretrain checkpoint has no `projector` key at all. A hinge built on
+`proj(stance)` therefore has **no path back to `z`**, and that is exactly what the first run
+measured:
+
+| first attempt, null = `proj(stance)` | \|dL/dz\| hinge | \|dL/dz\| readout |
+|---|---|---|
+| hexapod | **0.00000** | **0.00000** |
+| B1 | **0.00000** | **0.00000** |
+
+**The pretraining-compatible null is `ITM(e_t, e_t)`** -- the latent of *nothing happened*. It needs
+no projector, carries the same meaning as the stance, and restores the gradient path. **F148's
+stance null remains correct for anything measured through the projector**, which is every
+adaptation-stage and control-time measurement; the two nulls are for two different stages and both
+belong in the write-up.
+
+## What 400 steps did, with the corrected null
+
+| | \|dL/dz\| pred | hinge | readout | `/mean-z` | prediction / frozen frame |
+|---|---|---|---|---|---|
+| hexapod, before | 0.00778 | 0.00108 | 0.00224 | 1.046 | **0.658** |
+| hexapod, after | 0.00393 | **0.00006** | 0.00217 | 1.096 | **0.798** |
+| B1, before | 0.00443 | 0.00044 | 0.00367 | 1.010 | **0.714** |
+| B1, after | 0.01856 | 0.00390 | 0.00582 | 1.033 | **0.904** |
+
+**Gradient does enter the latent from both new terms** -- that half of the wiring works.
+
+**Prediction degrades on both bodies**: 0.658 to 0.798 on the insect and 0.714 to **0.904** on the
+B1, which is nearly the frozen-frame baseline. **`/mean-z` moves the wrong way**, 1.046 to 1.096 and
+1.010 to 1.033.
+
+**And the separation term is unstable.** Across the run it read 0.019, 0.137, **0.496**, then
+**0.008** -- it overshoots the 0.3 margin, the hinge switches off, and it collapses back. The
+hexapod's hinge gradient falls to 0.00006 by the end, which is a term that has stopped acting.
+
+## Reading, and what to change before five hours are spent
+
+**Do not start the full pretrain.** Three things point the same way:
+
+1. **The margin is too aggressive for our scale.** 0.3 in cosine distance is a large ask when the
+   real and null rollouts start 0.078-0.089 apart (F150). The term either saturates or overshoots,
+   and both were observed inside 400 steps.
+2. **K = 5 is still too long.** Prediction degraded most on the B1, whose sensitivity is flat with
+   horizon (F150) -- the body with least to gain from a long rollout lost the most accuracy.
+3. **`/mean-z` against the latent null starts at ~1.0**, not the 0.86-0.96 F150 read against the
+   stance null. **The two nulls are not interchangeable as a baseline**, and the rebuild's
+   improvement must be quoted against whichever null it trains on.
+
+**Proposed next step, one short run each, not the pretrain**: margin 0.1 with K = 3, and a
+prediction-anchored variant that raises `alpha_pred`. **The check did its job** -- a five-hour run
+under these settings would have produced a worse forward model and a hinge that had switched itself
+off.
+
+Logs `/tmp/f151.log` (the zero-gradient first attempt) and `/tmp/f151b.log`.
+
+---
+
+
+### F152. The margin was the problem: at 0.1 the hinge stops oscillating and stays alive. Prediction still slips.
+
+**Two 400-step runs, `K = 3` and margin `0.1`, everything else as F151.** The diagnosis there was
+that a 0.3 cosine margin is 3-4x the separation the model starts with, so the hinge bought
+separation by breaking prediction, overshot, switched itself off, and collapsed --
+0.019, 0.137, **0.496**, 0.008, with its gradient dying to 0.00006.
+
+**A** = margin 0.1, K 3, `alpha_pred` 1.0.
+**B** = the same with `alpha_pred` **3.0**, to anchor prediction while separation grows. *(The
+instruction called this the "readout predicted-transition weight"; it is applied here to the
+prediction term, which is what anchors accuracy. Flagged rather than silently reinterpreted.)*
+
+## The oscillation is gone
+
+Separation over training, eight points across the run, margin 0.1:
+
+| | | | | | | | | |
+|---|---|---|---|---|---|---|---|---|
+| **A**, hexapod | 0.005 | 0.007 | 0.006 | 0.012 | 0.018 | 0.020 | 0.013 | **0.022** |
+| **A**, B1 | 0.005 | 0.004 | 0.007 | 0.005 | 0.009 | 0.010 | 0.007 | **0.011** |
+| **B**, hexapod | 0.006 | 0.007 | 0.005 | 0.009 | 0.013 | 0.007 | 0.011 | **0.012** |
+| **B**, B1 | 0.004 | 0.004 | 0.005 | 0.005 | 0.010 | 0.007 | 0.006 | **0.008** |
+
+**Rising and holding, on both bodies, in both runs.** Nothing approaches the margin, so the hinge
+never switches off, and there is no 0.496-then-0.008 collapse anywhere. **The margin was the cause,
+and 0.1 fixes it.**
+
+## The hinge stays alive
+
+| \|dL/dz\| hinge | before | after |
+|---|---|---|
+| F151, margin 0.3, hexapod | 0.00108 | **0.00006** -- dead |
+| **A**, hexapod | 0.00089 | **0.00130** |
+| **A**, B1 | 0.00038 | **0.00058** |
+| B, hexapod | 0.00089 | 0.00061 |
+| B, B1 | 0.00038 | **0.00016** |
+
+**A keeps the hinge acting on both bodies and B weakens it**, which is what tripling the prediction
+weight should do: the hinge is now a smaller share of a larger loss.
+
+## Prediction still slips, and B slips less
+
+| prediction error / frozen frame | before | after |
+|---|---|---|
+| F151, margin 0.3, hexapod | 0.658 | 0.798 |
+| F151, margin 0.3, B1 | 0.714 | **0.904** |
+| **A**, hexapod | 0.642 | 0.779 |
+| **A**, B1 | 0.686 | 0.807 |
+| **B**, hexapod | 0.642 | **0.721** |
+| **B**, B1 | 0.686 | **0.760** |
+
+**B halves the damage** -- the B1 goes to 0.760 where margin 0.3 sent it to 0.904 -- **and neither
+run holds prediction where it started.** `/mean-z` does not move usefully in either: A reads
+1.026 / 1.051, B reads 1.020 / 0.984, from 1.100 / 0.994.
+
+## Verdict against the acceptance criteria
+
+| | A | B |
+|---|---|---|
+| hinge gradient alive | **yes** | weakened on the B1 |
+| separation stable, not oscillating | **yes** | **yes** |
+| prediction not degrading | **no**, 0.642 to 0.779 | **closest**, 0.642 to 0.721 |
+
+**Two of three pass and the third does not, in either run. Still no full pretrain.**
+
+**What the numbers say to try next, in order of what they support.** Separation rises steadily and
+stays an order of magnitude below the margin, so **the hinge is not saturating -- it is being
+outpaced**: 400 steps is short, and a longer run at margin 0.1 with `alpha_pred` 3 is the setting
+the evidence points at rather than another margin change. **And the prediction slip may be an
+artefact of continuing from a converged checkpoint** at a learning rate meant for pretraining --
+which a from-scratch run would not have, and which this test cannot distinguish. That limit is worth
+stating before anyone reads 0.721 as a property of the objective.
+
+**Locked, and not re-litigated here.** `H = 1` is architectural (`wm/train.py:140`), `lambda_sig` is
+LeWM-specific and stays out, and the two nulls belong to two stages -- `ITM(e_t, e_t)` in
+pretraining, `proj(stance)` at projector evaluation. **Never compare `/mean-z` across them**: the
+same checkpoint reads ~1.0 against one and 0.86-0.96 against the other.
+
+Logs `/tmp/f152_{A,B}.log`.
+
+---
+
+
+### F153. The ActSWM rebuild: settings, pre-registration, and how criterion 3 becomes measurable (run pending)
+
+**The objective is implemented and the run is handed to com7.** `wm/train.py` gained the two terms
+behind `lambda_hinge` and `lambda_readout`, both zero by default so every run before 2026-08-31
+reproduces unchanged. Smoke-tested end to end: one epoch on both embodiments starts, the config
+records every new field, nothing crashes. `scripts/com7_pretrain_actswm.sh`.
+
+## The settings, each with the measurement behind it
+
+| | value | why not ActSWM's |
+|---|---|---|
+| margin | **0.1** | at 0.3 the term overshoots, switches off and collapses -- 0.019, 0.137, 0.496, 0.008, gradient to 0.00006 (F151). At 0.1 separation rises and holds on both bodies (F152) |
+| `K` | **3** | the rolled prediction crosses "worse than a frozen frame" by five steps (F140, F150); hinging past that trains on noise |
+| `H` | **1** | `wm/train.py` conditions the forward model on one frame. 32 is a different architecture |
+| `lambda_recon` | **3.0** | tripling the prediction weight halved the accuracy loss in the short run (F152, B) |
+| `lambda_hinge` / `lambda_readout` | 0.5 / 1.0 | adopted |
+| `lambda_sig` | **not used** | SigReg is LeWM-specific; this is V-JEPA2 and the term is not guessed in |
+| null | **`ITM(e_t, e_t)`** | the stance is an *action* and pretraining has no projector; a hinge on `proj(stance)` puts zero gradient into `z` (F151) |
+
+## Why criterion 3 is only now measurable
+
+**The short runs could not answer it and no number of them could.** They fine-tune a converged
+checkpoint at a pretraining learning rate, so prediction can move for reasons that have nothing to
+do with the hinge, and "the hinge breaks prediction" cannot be separated from "continuing to train
+this checkpoint moves it". **The confound is structural to fine-tuning and disappears only when the
+hinge is present from step 0**, which is this run.
+
+## Pre-registered, before the run
+
+| outcome | reading |
+|---|---|
+| prediction healthy **and** `/mean-z` down **and** separation holding | **the rebuild works** -- Context Collapse addressed |
+| prediction degrades toward the frozen frame, hinge present from step 0 | **now real, not an artefact**: the term is trading accuracy for separation. **Stop**, lower `lambda_hinge` or the margin |
+| separation oscillates again | the margin is still too high for a from-scratch run; lower it or schedule it |
+
+**Two rules on how the numbers are read, both from findings that were misread once already.**
+
+**Per body, never pooled.** The insect's sensitivity improves with horizon and the B1's is flat
+(F150), and the B1 lost accuracy fastest in every short run. **The contribution -- does
+action-sensitivity survive across disjoint embodiments -- is a claim about both bodies separately**,
+and pooling would hide the case that fails.
+
+**`/mean-z` only against the null it was trained on.** The pretraining null is `ITM(e_t, e_t)` and
+the baseline against it is about **1.0** (F151). The projector-stage null is the stance and its
+baseline is **0.86-0.96** (F150). **The same checkpoint reads both, and cross-comparing them would
+manufacture an improvement or hide one.**
+
+**Baselines this run is measured against**: gradient share F149, sensitivity F150 and F151,
+calibration F134, selection F136.
+
+**Status: not run.** Five hours on com7.
 
 ---
 

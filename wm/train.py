@@ -14,6 +14,7 @@ from dataclasses import asdict
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -159,6 +160,33 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         body_pred = models["md"].body(views["view1_t"], z)
         body_target = batch["body_motion"].to(device)
 
+    # --- ActSWM terms (F146, F151, F152). Off unless `lambda_hinge` or `lambda_readout` is set,
+    # so every earlier run reproduces byte for byte.
+    hinge = readout_loss = None
+    if cfg.lambda_hinge > 0 or cfg.lambda_readout > 0:
+        # **The null is `ITM(e_t, e_t)` -- the latent of "nothing happened".** F148's standing
+        # stance is an *action*, and pretraining has no action projector to map it into `z`; a
+        # hinge built on `proj(stance)` puts exactly zero gradient into `z`, measured on both
+        # bodies (F151). The stance null remains the right one for anything measured through the
+        # projector, which is a different stage. **Never compare the two stages' `/mean-z`.**
+        z_null = models["itm"](views["view1_t"], views["view1_t"])
+        real, null, seps = views["view2_t"], views["view2_t"], []
+        for _ in range(max(1, cfg.hinge_K)):
+            real = models["ftm"](real, z, embodiment)
+            null = models["ftm"](null, z_null, embodiment)
+            seps.append(1 - F.cosine_similarity(real.flatten(1), null.flatten(1), dim=1).mean())
+        if cfg.lambda_hinge > 0:
+            # margin 0.1, not ActSWM's 0.3: at 0.3 the term overshoots, switches itself off and
+            # collapses -- 0.019, 0.137, 0.496, 0.008 with its gradient dying to 0.00006 (F151).
+            # At 0.1 separation rises and holds on both bodies (F152).
+            hinge = F.relu(cfg.hinge_margin - torch.stack(seps)).mean()
+        if cfg.lambda_readout > 0 and "readout" in models:
+            # the readout is frozen and randomly initialised: it cannot relocate the boundary it
+            # scores, so the only way to lower this is to make the transitions separable (F150)
+            readout_loss = F.mse_loss(models["readout"][embodiment](views["view2_t"], real),
+                                      action.reshape(len(action), -1)[:, :models["readout"][
+                                          embodiment].out_dim])
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -166,9 +194,17 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
             adv_logits = models["adv"](z, scale)
         if "probe" in models:
             probe_logits = models["probe"](z)
-    return compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
-                          adv_logits, morph_id, probe_logits, cross_pred, cross_target,
-                          body_pred, body_target)
+    loss, parts = compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
+                                 adv_logits, morph_id, probe_logits, cross_pred, cross_target,
+                                 body_pred, body_target)
+    if hinge is not None:
+        loss = loss + cfg.lambda_hinge * hinge
+        parts["hinge"] = float(hinge)
+        parts["separation"] = float(seps[-1])
+    if readout_loss is not None:
+        loss = loss + cfg.lambda_readout * readout_loss
+        parts["readout"] = float(readout_loss)
+    return loss, parts
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0,
@@ -273,6 +309,21 @@ def build_models(cfg, device, heads=None, n_bodies=0):
             models["adv"] = MorphAdversary(cfg.z_dim, n_bodies, cfg.adv_hidden).to(device)
     elif cfg.lambda_adv > 0:
         raise ValueError("lambda_adv needs at least two training bodies to discriminate")
+    if cfg.lambda_readout > 0:
+        # **A new module, never the ITM.** The ITM produces the `z` the action projector is later
+        # fitted to imitate; freezing it at random weights would make that `z` arbitrary and break
+        # every control-time path. This readout feeds nothing downstream -- its only job is to
+        # route gradient into the forward model so transitions are genuinely separated.
+        from scripts.diagnostics.check_actswm_wiring import FrozenActionReadout
+        # a ModuleDict, not a plain dict: `run_epoch` calls `.train()` and `.parameters()` on
+        # every entry of `models`, and a bare dict has neither
+        import torch.nn as nn
+        heads_spec = dict(heads or {})
+        models["readout"] = nn.ModuleDict(
+            {name: FrozenActionReadout(cfg.token_dim, int(dim), hidden=cfg.readout_hidden)
+             for name, dim in heads_spec.items()}).to(device)
+        for head in models["readout"].values():
+            head.out_dim = head.net[-1].out_features
     return models
 
 

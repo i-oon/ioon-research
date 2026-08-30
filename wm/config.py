@@ -41,6 +41,11 @@ LEGACY_DEFAULTS = {
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
     "lambda_body": 0.0,
+    "lambda_hinge": 0.0,
+    "lambda_readout": 0.0,
+    "hinge_margin": 0.1,
+    "hinge_K": 3,
+    "readout_hidden": 512,
     "body_channels": (0,),
     "body_dim": 1,
     "body_sees_frame": False,
@@ -234,6 +239,12 @@ class Config:
     # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
     # (F55). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
+    # --- ActSWM (F146). Zero by default: every run before 2026-08-31 reproduces unchanged.
+    lambda_hinge: float = 0.0     # separation between the real-action and null-action rollouts
+    lambda_readout: float = 0.0   # the frozen readout must recover the action from the prediction
+    hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F151)
+    hinge_K: int = 3              # **3, not their 12** -- our rollout is reliable to about here
+    readout_hidden: int = 512
     body_dim: int = 1            # must equal len(body_channels)
     # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
     # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise
