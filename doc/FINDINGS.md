@@ -9361,6 +9361,221 @@ Logs `/tmp/f142_*.log`; runs in `results/wm/closed_loop/f142_*`.
 ---
 
 
+### F143. The insect teacher passes its gate on the body it will teach, and fails it on a body it will not
+
+**F142's teacher could not label** -- the insect-side pretrain rolled well and ignored the action,
+`/mean-z` 0.966 across clips. `scripts/com7_stage3_hexapod.sh` applied F119's contrastive term on the
+insect, 15,000 steps, 24 of the 48 `c10f10t10` clips, with the other 24 -- including
+`hexapod_ep100`, the clip F142 takes its goal and `D_real` from -- held out. **The gate was written
+into the sheet before the run.**
+
+**On the body it was adapted to and that F142 uses:**
+
+| | before stage 3 | after |
+|---|---|---|
+| state fidelity, h=1 | 0.705 | **0.739** *(adapt3's own held-out split)* |
+| `/mean-z` across clips | 0.955 | **0.583** |
+| exact condition picked | 53% | **85-90%** |
+| behaviour family | 84% | **95%** *(chance 28%)* |
+
+Re-measured with `rollout_fidelity.py` over all 48 clips -- optimistic, since 24 were trained on,
+and reported as such: **0.592 at one step, 0.715 at two, 0.796 at three**, `/mean-z` across clips
+**0.534 / 0.578 / 0.621**, and a wrong-but-real latent now costs **64%** at one step where before it
+cost three.
+
+**Gate passed.** Sensitivity arrives, fidelity stays inside the 0.8 bar out to three steps, and the
+horizon cap F141 fixed at `h <= 3` is exactly where the ratio crosses 0.8. **F142's teacher stage
+can be built.** The trade is the same shape and size as the B1's (F140: 0.585 to 0.710 buying 0.969
+to 0.476) -- **F140's refutation of F139 holds on a second robot.**
+
+**And on a body it was not adapted to, the gate fails**, which is a new limit and not a
+contradiction:
+
+| held-out **body** `c08f09t09` | before | after |
+|---|---|---|
+| state fidelity, h=1 | **0.757** | **1.052** -- worse than a frozen frame |
+| `/mean-z` across clips | 0.966 | 0.774 |
+| a wrong latent costs | 3% | **19%** |
+
+**The contrastive term buys action-sensitivity everywhere and pays for it in cross-*body*
+prediction.** Within the body it is adapted to, the payment is 5% of fidelity; across bodies it is
+the whole margin. That is a real constraint on where a teacher trained this way can be used, and it
+is a *cross-morphology* statement -- Stage 1's territory -- rather than a cross-embodiment one.
+
+**What it means for the direction.** F142 teaches on `c10f10t10` and is graded on `c10f10t10`, so it
+is inside the region where the teacher is sound. **A teacher expected to generalise to an unseen
+body would need something this adaptation does not provide**, and nothing measured says the term can
+be tuned to give both -- that is the lambda sweep's question
+(`scripts/com7_lambda_sweep.sh`), now with a reason to run it that F140 had removed.
+
+Log in `results/wm/`; the com7 run is `beh12_hex-b1_body3/stage3_hex_nce_s0.pt`, commit 3923cfa.
+
+---
+
+
+### F144. The engine test fails: teacher-student on the easy case walks less far than cloning alone
+
+**Judged against the bar locked in F142 before the teacher existed**, on `c10f10t10`, the body F143
+validated the teacher for. Goal and reference from `hexapod_ep100`, held out of the teacher's stage-3
+training and of the cloning split.
+
+| | distance | of `D_real` = 0.6566 m | upright the full 3 s | verdict |
+|---|---|---|---|---|
+| **cloning only**, the control | 0.2349 m | **36%** | yes | **FAIL** |
+| **teacher-student**, 10 DAgger rounds | 0.2042 m | **31%** | yes | **FAIL** |
+| *the bar* | 0.3283 m | 50% | required | |
+
+**The clone reproduced its earlier number exactly (36%, 0.2349 m) in the same simulator session**,
+so the comparison is not a session artefact.
+
+**The pre-registered reading for 31% is the third bracket: the teacher adds nothing.** It made the
+policy slightly worse. **The engine test on the easy case fails.**
+
+**What the run looked like.** Ten episodes, 66 teacher labels each, 32 candidates per step ranked by
+rolling the forward model three steps and reading the body motion the rolled transition implies,
+cloning pairs kept in the buffer throughout. Distance during training wandered between 0.09 and
+0.35 m with no trend, and the fitting loss fell from 0.067 to 0.055 -- **the student was fitting its
+labels; the labels were not worth fitting.**
+
+**Neither policy falls.** Both stay upright for the whole window and cover a third of the ground.
+The failure is a gait that does not travel, not a collapse, in both arms.
+
+Video `results/wm/closed_loop/f142_video/f144_real_clone_taught.mp4` -- recorded walk, clone, taught,
+side by side. **Diagnosis only; it does not overturn the numbers above.**
+
+**The most likely mechanism, stated as a hypothesis and not measured.** Candidates are Gaussian
+perturbations of the student's own action at 0.5 of each joint's standard deviation. If the
+teacher's ranking of those perturbations is close to arbitrary, DAgger trains the student on noise
+around itself, which is exactly the small degradation observed. **The measurement that would settle
+it is label quality**: execute the labelled action and the student's own from the same state and
+compare the body motion each produces. That was not run, and F143's `/mean-z` 0.534 is *not* that
+measurement -- it says the model separates a real action from an average one, not that it orders
+small perturbations of one action correctly.
+
+**Scope of the teacher, from F143 and repeated here because it bounds any reuse**: this teacher is
+validated on `c10f10t10` only. On `c08f09t09` its state fidelity is 1.052, worse than a frozen
+frame. **Do not use it off `c10f10t10`.**
+
+**What this does to the direction.** The pre-registration says stop, and the honest report is that
+teacher-student, in the form specified in F141 and built here, does not train a walking policy on
+the case designed to be easiest for it. **It does not say distillation from world models cannot
+work**; it says this teacher, ranking local perturbations at this horizon, produced no usable
+signal. The distinction matters for what gets written and neither half should be dropped.
+
+Runs `results/wm/closed_loop/f144_*`; logs `/tmp/f144_*.log`; students in `wm/runs/students/`.
+
+---
+
+
+### F145. The teacher ranks behaviours and cannot rank perturbations of one -- the mechanism of F144
+
+**Characterisation of a failed test, not an appeal against it.** F144's bar was pre-registered and
+failed; this asks only why, at two scales, with the same teacher and the same scoring rule the
+labeller used.
+
+**Local -- the perturbations the F144 teacher actually ranked, judged in the simulator.** At twelve
+branch points along a held-out clip, the student's own action and the teacher's pick out of 32
+Gaussian perturbations were each executed from the same state for three steps, and the body motion
+each produced was compared with the goal:
+
+| | |
+|---|---|
+| teacher's pick closer to the goal | **4 of 12 = 33%** |
+| a coin | 50% |
+| the teacher kept the student's own action | **0 of 12** |
+| mean distance to the goal, student | **0.1299** |
+| mean distance to the goal, teacher | **0.1304** |
+
+**The teacher's ranking of local perturbations is worse than a coin and its labels are
+indistinguishable from the student's own output** -- 0.1304 against 0.1299 over twelve states. It
+changed the action every single time and gained nothing by it. **That is the mechanism of F144**:
+DAgger trained the student on noise around itself, which is exactly the small degradation the bar
+measured, 36% to 31%.
+
+**Coarse -- the twelve recorded conditions as candidates, same rule, same states:**
+
+| | |
+|---|---|
+| pick shares the goal's behaviour family | **55% of 120 states** |
+| chance | 33% |
+
+**Above chance and far below F143's 95%, and the two are not in conflict** -- they ask different
+questions. F143's number comes from `adapt3`, which is handed the *true next embedding* and asked to
+rank actions against it. This is handed only a **goal body motion** and has to reach it, which is
+the harder and more deployment-like task. **55% against 33% is a real but coarse ability.**
+
+**So the answer is "coarse, not fine", and it is the one that decides what may be tried next.** The
+teacher can tell walking from turning from strafing well enough to beat chance; it cannot tell a
+good version of walking from a slightly different one. That is the same wall as F111's speed
+correlation of 0.074 and F140's within-clip `/mean-z` of 0.951, now measured on the labelling path
+and judged by physics rather than by the model.
+
+**What this rules in and out for any future distillation.** A scheme whose teacher must **choose
+among behaviours** has a signal to work with -- 55% against 33%. A scheme whose teacher must
+**refine within a behaviour**, which is what improving a gait requires and what F141's design asked
+for, does not. **F144 is not a tuning failure and no amount of DAgger rounds, candidate count or
+horizon fixes it**, because the ordering the labels depend on is not there to be sharpened.
+
+**F144's bar stands and this does not reopen it.** Runs and logs `/tmp/f145_*.log`;
+`scripts/diagnostics/teacher_label_quality.py`.
+
+---
+
+
+### F146. The next pretraining objective, pre-registered (plan, not run)
+
+**F138 traced the action-insensitivity to pretraining and F145 measured what it costs**: the
+forward model orders behaviours and not perturbations, so anything that needs the second -- planning
+within a behaviour, distillation, magnitude control -- has no signal to use. **ActSWM (arXiv
+2607.26712, 2026) names the pathology Context Collapse and publishes a fix**; CD-LAM (2607.09185)
+reports the fragility-under-small-perturbations half and Dueling World Models (2608.06706) the
+loss-improves-while-actions-merge half. *References supplied by the advisor and not verified from
+this machine.*
+
+**Three terms, together, replacing the current pretraining objective.**
+
+**1. A rollout-level action-sensitivity hinge.** Penalise similarity between a rollout driven by the
+real actions and one driven by zero actions, accumulated over K steps rather than one. **A one-step
+penalty cannot see our failure**: F138 measures 0.732 at one step decaying to 0.978 by ten, and the
+horizon is what a policy consumes.
+
+**2. A frozen random action-readout.** The sensitivity loss backpropagates through the latent inputs
+only, never through the readout that scores it. **This targets a trap we measured rather than a
+hypothetical one**: F139 and F143 found the contrastive term producing sensitivity that lives only
+in the projector's region and only on the body it was adapted to -- `/mean-z` 0.534 on `c10f10t10`
+and state fidelity 1.052 on `c08f09t09`. A learnable readout can relocate the signal to wherever it
+is measured instead of separating the transitions.
+
+**3. Keep the prediction loss.** Prediction plus hinge plus frozen readout. F140 established the
+trade is a knob rather than a wall -- 0.585/0.969 for MSE against 0.710/0.476 for contrastive, a
+fifth of the fidelity buying the whole sensitivity -- so asking for both at once is not asking for
+something no checkpoint has shown.
+
+**Pre-registered expectations, fixed before the run.**
+
+| | expectation |
+|---|---|
+| usable imagination horizon | past **h = 3**, where the state ratio currently crosses 0.8 |
+| fine and magnitude ranking | improves **partially** -- ActSWM's own precision results are moderate, so a full repair is not the prediction |
+| **action-sensitivity across disjoint embodiments** | **the open question, and the contribution** |
+
+**The third row is ours and not ActSWM's.** They test within one body. **F143 is the measurement
+that makes the cross-embodiment version a real question**: the naive contrastive repair holds on the
+robot it was adapted to and collapses on another one, so "does this fix survive a change of body"
+has a documented negative answer for the obvious approach.
+
+**Two things this plan does not address, named so they are not quietly folded in.** Where a target
+robot's first motion comes from without a recorded library and without reinforcement learning
+(F137, F141) -- distillation needs a policy that already moves, and removing the library is the
+point. And whether a repaired forward model would rescue candidate scoring, which F135 showed does
+not need a rollout at all.
+
+**Status: plan. Nothing here is measured.** The three-channel pretraining run it builds on is
+complete and evaluated (F134, F136).
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

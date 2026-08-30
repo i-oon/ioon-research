@@ -235,6 +235,132 @@ def evaluate(args, device):
     print(f"-> {args.out}")
 
 
+def improve(args, device):
+    """DAgger with the world model as the teacher: run the student, label what it saw, refit.
+
+    **The candidate a step is labelled with is a constant command held for `h` steps**, which is
+    what `--commit` does in the planner and keeps the sample space small enough to search at 20 Hz.
+    Sampling a different action per step would search `h` times the dimensions for a horizon the
+    forward model is only trustworthy over as a whole.
+
+    **The cloning data stays in the buffer.** A teacher that only ever sees states the student
+    reaches will happily walk it off the distribution its own labels were fitted on; keeping the
+    recorded pairs is the standard guard and it is also what makes the comparison against the clone
+    fair -- the teacher run has no data the clone did not.
+    """
+    ck, cfg, itm, ftm, md, proj = load_teacher(args.teacher, device)
+    channels = [int(c) for c in cfg.body_channels]
+    st = torch.load(os.path.join(ROOT, args.student), map_location="cpu", weights_only=False)
+    student = Student(st["token_dim"], st["goal_dim"], st["action_dim"]).to(device)
+    student.load_state_dict(st["student"])
+    mean_s = torch.tensor(np.asarray(ck["body_stats"][0]).ravel()[:len(channels)],
+                          dtype=torch.float32, device=device)
+    std_s = torch.tensor(np.asarray(ck["body_stats"][1]).ravel()[:len(channels)],
+                         dtype=torch.float32, device=device)
+
+    # goals come from the clips stage 3 trained on; the evaluation goal is held out from both
+    train_names = set(os.popen(". scripts/hex_stage3_clips.sh; echo $HEX_CLIPS").read().split())
+    goals = []
+    for p_ in sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz"))):
+        if os.path.basename(p_) not in train_names:
+            continue
+        with np.load(p_, allow_pickle=True) as z:
+            if str(z["behaviour"]) != "speed":
+                continue
+        goals.append((p_, body_goal(p_, "hexapod", channels)))
+    print(f"{len(goals)} forward goals from the stage-3 training clips; evaluation goal is not "
+          f"among them")
+
+    # the cloning pairs, kept in the buffer
+    base = torch.load(os.path.join(ROOT, args.student), map_location="cpu", weights_only=False)
+    encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+    cache_path = os.path.join(ROOT, args.cache)
+    cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
+    BX, BG, BY = [], [], []
+    for p_, g in goals:
+        clip = load(p_, REGISTRY["hexapod"])
+        if p_ not in cache:
+            cache[p_] = encode_clip(encoder, clip["frames"], 2).cpu().half()
+        e = pooled(cache[p_].float())
+        a = torch.tensor(np.asarray(clip["actions"]), dtype=torch.float32)
+        n = min(len(e), len(a))
+        BX.append(e[:n]); BY.append(a[:n])
+        BG.append(torch.tensor(g, dtype=torch.float32).expand(n, -1))
+    BX = torch.cat(BX).to(device); BG = torch.cat(BG).to(device); BY = torch.cat(BY).to(device)
+    print(f"cloning buffer {len(BX)} pairs")
+
+    seed = load(os.path.join(ROOT, args.goal_clip), REGISTRY["hexapod"])["actions"].astype(np.float32)
+    sigma = (args.sigma * student.std).to(device)
+    TX, TG, TY = [], [], []
+    opt = torch.optim.Adam(student.parameters(), lr=args.lr)
+    rng = np.random.default_rng(args.seed)
+
+    for it in range(args.iters):
+        gp, g = goals[int(rng.integers(len(goals)))]
+        g_t = torch.tensor(g, dtype=torch.float32, device=device).unsqueeze(0)
+        labelled = {"n": 0}
+
+        def policy(observation, t):
+            with torch.no_grad():
+                e = pooled(encode_clip(encoder, np.asarray(observation)[None], 1).float().to(device))
+                base_a = student.act(e, g_t)                       # 1 x action_dim
+                cand = base_a + sigma * torch.randn(args.samples, base_a.shape[-1], device=device)
+                cand = torch.cat([base_a, cand])                   # keep the student's own choice
+                z = proj(cand, "hexapod")
+                roll = e_full.expand(len(cand), -1, -1)
+                for _ in range(args.horizon):
+                    roll = ftm(roll, z)
+                motion = md.body(None, itm(e_full.expand(len(cand), -1, -1), roll))
+                if motion.dim() == 1:
+                    motion = motion.unsqueeze(-1)
+                k = min(motion.shape[-1], len(channels))
+                err = (motion[:, :k] - ((g_t[:, :k] - mean_s[:k]) / std_s[:k])).pow(2).mean(-1)
+                best = cand[int(err.argmin())]
+                TX.append(e[0].cpu()); TG.append(g_t[0].cpu()); TY.append(best.cpu())
+                labelled["n"] += 1
+                return base_a[0].cpu().numpy()
+
+        # the full token grid is needed by the ITM and the FDM; the pooled vector by the student
+        e_full = None
+
+        def policy_wrapper(observation, t):
+            nonlocal e_full
+            with torch.no_grad():
+                e_full = encode_clip(encoder, np.asarray(observation)[None], 1).float().to(device)
+            return policy(observation, t)
+
+        frames, actions, forces, heads, oris = run_in_sim_raw(student, g_t, device, args.port,
+                                                              args.steps, seed, policy_wrapper)
+        d = float(np.linalg.norm(np.asarray(heads)[-1, :2] - np.asarray(heads)[0, :2]))
+        X = torch.cat([BX, torch.stack(TX).to(device)])
+        G = torch.cat([BG, torch.stack(TG).to(device)])
+        Y = torch.cat([BY, torch.stack(TY).to(device)])
+        target = (Y - student.mean) / student.std
+        for _ in range(args.refit):
+            student.train(); opt.zero_grad()
+            loss = nn.functional.mse_loss(student(X, G), target)
+            loss.backward(); opt.step()
+        student.eval()
+        print(f"  iter {it + 1:2d}/{args.iters}  goal {os.path.basename(gp)}  "
+              f"travelled {d:.4f} m  labelled {labelled['n']}  buffer {len(TX)}  "
+              f"loss {loss.item():.4f}", flush=True)
+
+    out = os.path.join(ROOT, args.out)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    torch.save({**base, "student": student.state_dict(),
+                "teacher": args.teacher, "iters": args.iters, "horizon": args.horizon,
+                "samples": args.samples, "sigma": args.sigma}, out)
+    print(f"-> {args.out}")
+
+
+def run_in_sim_raw(student, goal, device, port, steps, seed_cmds, policy):
+    from coppeliasim_zmqremoteapi_client import RemoteAPIClient
+    from collect_ik import drive_and_record
+    sim = RemoteAPIClient("localhost", port=port).getObject("sim")
+    return drive_and_record(sim, SCENE, seed_cmds[:steps], 0.0, 20,
+                            cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", choices=("bc", "improve", "eval"))
@@ -253,6 +379,13 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--iters", type=int, default=10, help="simulator episodes of teacher labels")
+    ap.add_argument("--samples", type=int, default=32, help="candidates the teacher ranks per step")
+    ap.add_argument("--sigma", type=float, default=0.5, help="candidate spread, in action sd")
+    ap.add_argument("--horizon", type=int, default=3,
+                    help="**never past 3.** F143 measures the teacher's state ratio crossing 0.8 "
+                         "exactly there on this body")
+    ap.add_argument("--refit", type=int, default=300, help="gradient steps after each episode")
     ap.add_argument("--out", default="wm/runs/students/insect_bc.pt")
     args = ap.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -262,8 +395,7 @@ def main():
     elif args.stage == "eval":
         evaluate(args, device)
     else:
-        raise SystemExit("`improve` needs the insect stage-3 teacher; it is not built until the "
-                         "checkpoint exists and clears its gate (scripts/com7_stage3_hexapod.sh)")
+        improve(args, device)
 
 
 if __name__ == "__main__":
