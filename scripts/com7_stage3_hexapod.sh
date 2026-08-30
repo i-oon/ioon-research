@@ -21,6 +21,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python3
+. scripts/hex_stage3_clips.sh
 RUN=wm/runs/beh12_hex-b1_body3
 OUT=$RUN/stage3_hex_nce_s0.pt
 
@@ -29,7 +30,7 @@ echo "=== stage 3 on the hexapod, contrastive  $(date '+%F %T')"
 if [ -f "$OUT" ]; then echo "skip $OUT"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt3 \
     --ckpt $RUN/best.pt --projector $RUN/projector_b1_adapted.pt \
-    --data data/beh12_c10f10t10_flat --embodiment hexapod \
+    --data data/beh12_c10f10t10_flat --embodiment hexapod --train_clips $HEX_CLIPS \
     --steps 15000 --lambda_nce 1.0 --batch 8 --seed 0 \
     --cache results/wm/cache/hex_c10.pt --out "$OUT"
 fi
