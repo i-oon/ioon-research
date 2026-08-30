@@ -50,6 +50,13 @@ def main():
     ap.add_argument("--cache_dir", default="results/wm/cache")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=10, help="frames between samples within a clip")
+    ap.add_argument("--only", nargs="*", default=[],
+                    help="clip basenames to score, ignoring the rest. **Use the held-out list when "
+                         "the head has been fitted** (`wm/fit_body_head`), or the number is read "
+                         "off clips the head was trained on and means nothing.")
+    ap.add_argument("--held_out", action="store_true",
+                    help="score only the clips a `wm/fit_body_head` run held out, read from the "
+                         "checkpoint's own record so the split cannot drift")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -71,6 +78,17 @@ def main():
         before = len(cache)
         clips = gather(os.path.join(ROOT, directory), name, encoder, ck, cache,
                        args.chunk, max(1, cfg.action_lag), device)
+        keep = set(args.only)
+        if args.held_out:
+            fit = ck.get("body_head_fit") or {}
+            if fit.get("embodiment") == name:
+                keep |= set(fit.get("val_paths", []))
+                print(f"  {name}: scoring the {len(fit.get('val_paths', []))} clips the head fit "
+                      f"held out")
+            else:
+                print(f"  {name}: not the fitted embodiment, scoring every clip")
+        if keep:
+            clips = [c for c in clips if c["path"] in keep] or clips
         if len(cache) > before:
             os.makedirs(os.path.dirname(cache_path), exist_ok=True)
             torch.save(cache, cache_path)

@@ -82,3 +82,35 @@ echo
 echo "=== done  $(date '+%F %T')"
 echo "send back $RUN/{best.pt,config.yaml,adapted_b1.pt,projector_b1_adapted.pt,stage3_b1_nce_s0.pt}"
 echo "then here:  calibration on both robots first, scoring only after it passes"
+
+# ---------------------------------------------------------------------------------------
+# ADDENDUM 2026-08-30, after F131.
+#
+# The single-channel coordinate now works: fitted on the latents the planner actually supplies,
+# selection follows the goal at 86% same-robot (7% on the demonstration, below chance) and clears
+# chance cross-embodiment at 35-38% against 28%. **So this run is buying the extra channels, not
+# the basic capability**, and its result should be read against those numbers rather than against
+# the broken ones F128 reported.
+#
+# After the stages finish, fit the head on the latents it will be shown and score with the control:
+#
+#   .venv/bin/python3 -m wm.fit_body_head --ckpt $RUN/stage3_b1_nce_s0.pt \
+#       --data data/beh12_b1_flat --latent projector \
+#       --also hexapod=data/beh12_c10f10t10_flat \
+#       --out $RUN/stage3_b1_nce_s0_bodyfit_proj.pt
+#
+#   .venv/bin/python3 scripts/diagnostics/score_by_body_motion.py \
+#       --ckpt $RUN/stage3_b1_nce_s0_bodyfit_proj.pt --projector $RUN/stage3_b1_nce_s0.pt \
+#       --data data/beh12_b1_flat --goal_dir data/beh12_c08f09t09_flat --goal_embodiment hexapod
+#
+# **Only the mismatched-versus-goal column decides, and the bar is now 42%, not 38%** (F132). That
+# is what forward speed alone reaches in the honest condition -- frames and rollout on both sides,
+# nothing from a recorded trajectory -- at horizon 10, rising from 35% at horizon 3.
+#
+# **The realistic outcome, written down before the run so it cannot be reinterpreted afterwards.**
+# F83 measured the channels competing: adding yaw cost forward 68% and bought yaw at +0.37 +/- 0.27.
+# If that repeats, forward stays near 42% and yaw comes in low. **That is still a result worth
+# having** -- "the shared coordinate extends to forward speed robustly, and yaw and lateral need a
+# pretraining objective that does not trade channels against each other" is bounded, measured, and
+# names its own next problem. It is stronger than an unbounded claim, and it is not a failure of
+# this run.

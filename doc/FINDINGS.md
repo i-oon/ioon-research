@@ -8512,6 +8512,855 @@ the pretraining objective rather than head width -- **stop there and report it, 
 ---
 
 
+### F130. One head does serve both robots; it had simply never been fitted on the second one
+
+**F129 said the shared head reads the B1 as a constant because nothing ever adapts it. This fits it
+and asks what happens.** `wm/fit_body_head.py` freezes everything and trains the body head alone --
+about 8k parameters, `z_dim -> body_hidden -> body_dim` -- on latents the checkpoint's own ITM reads
+off real consecutive frames, so the question is what is *in* `z` rather than what the projector can
+reach. Split by clip, 20% of the B1 held out, evaluated on held-out clips only.
+
+**The premise that kept the decoder out of adaptation has expired.** `wm/adapt.py` excludes it
+because it "plays no part at control time, so adapting it would cost time for a module the planner
+never calls" -- correct until F128 put `body_head(proj(a))` on the control path.
+
+| head | B1 held-out clips | hexapod |
+|---|---|---|
+| **as shipped**, never fitted on a B1 | +0.23, compression 3.2x | **+0.99, 1.0x** |
+| fitted on the **B1 alone** | **+0.81, 1.5x** | +0.74, 0.5x |
+| fitted on **both robots at once** | **+0.81, 1.7x** | **+0.97, 1.0x** |
+
+Held-out MSE against predicting the target's mean, on the B1: **0.967 before, 0.514 after** -- the
+latent carried the signal all along and nothing was reading it.
+
+**Outcome (1) of the three named in advance: the shared coordinate is real and the head was simply
+unadapted.** Fitted on both, one head holds the hexapod at +0.97 and the B1 at +0.81 with no
+trade -- per family, hexapod sideways 0.020 -> 0.017, forward 0.160 -> 0.155, turning 0.131 -> 0.130.
+
+**But fitting on the B1 alone reproduces outcome (2), and that is worth keeping.** It costs the
+hexapod its correlation (0.99 -> 0.74) and **flips the sign of its sideways prediction** -- true
++0.020 read as -0.067 -- because the two robots' sideways gaits genuinely differ: the B1 strafes at
+about zero forward speed (-0.008) while the insect still travels +0.020 while strafing. A head shown
+only the quadruped learns "sideways means no forward motion" and carries that onto a body where it
+is false. **The shared coordinate holds only if the fit sees both robots**, which is exactly what
+the two-embodiment pretrain in `scripts/com7_pretrain_body3.sh` provides.
+
+**What this changes about the plan.** The 3-channel pretrain is still needed -- yaw and lateral are
+absent from the shared coordinate entirely, and one channel cannot separate turning from strafing
+(F128). But **a pretraining run is no longer the only route to a calibrated head**: fitting it after
+the fact takes minutes and recovers most of the gap, so the pretrain is buying the extra channels
+rather than the calibration.
+
+**Two things this does not yet show.** The B1's compression is 1.7x against a 1.5x bar, so the head
+tracks the ordering better than the range. And nothing here has been scored: whether a calibrated
+head raises `roll/goal` on mismatched cross-embodiment goals is the next measurement and the one
+that matters.
+
+> **Scored, and it made selection worse -- see F131 for why and for the fix.** Fitting against the
+> ITM's latent lifts the ITM path from +0.20 to +0.79 and leaves the *projector* path, which is the
+> one the planner feeds it, at +0.44 with its range 2.5x too wide. Same-robot goal-following fell
+> from 49-51% to 19-34%. **A head has to be fitted on the latent it will actually be shown.**
+
+Checkpoints: `stage3_b1_nce_s0_bodyfit.pt` (B1 only), `stage3_b1_nce_s0_bodyfit_both.pt` (both).
+Logs `/tmp/bodyfit*.log`, `/tmp/bodycal_{fit,both}.log`.
+
+**A defect in the first version of the fit script, caught by the calibration tool refusing to load
+its output**: it built the motion decoder with a placeholder action width and then saved the whole
+decoder, overwriting the checkpoint's real 12-D B1 output head with a 1-D one. It now updates the
+`body_head.*` keys inside the checkpoint's own decoder state and leaves every other head untouched.
+**A saved checkpoint that no longer loads is the lucky version of this mistake**; the same edit that
+silently kept a wrong head would not have announced itself.
+
+---
+
+
+### F131. Fitted on the latent it is actually shown, the shared coordinate follows the goal -- and it crosses embodiments
+
+**F130 fitted the body head against the ITM's latent and selection got worse.** The reason is the
+one `wm/fit_projector` already documents for its own target: fit against what will be consumed.
+`body_head(proj(a))` is what the planner evaluates, and `a -> z` is one-to-many (F97), so the
+projector's latents occupy a different region from the ITM's.
+
+| head, on B1 | ITM latent | projector latent |
+|---|---|---|
+| as shipped | +0.20, 3.2x | +0.44, 2.8x |
+| fitted on ITM latents | **+0.79**, 1.5x | +0.44, **0.4x** *(range 2.5x too wide)* |
+
+`wm/fit_body_head --latent projector` fits the same 8k parameters against the latents the planner
+supplies. Held-out MSE over predicting the mean: **0.854 before, 0.132 after.**
+
+**Scored with the mismatch control in the same pass, so no number stands without it:**
+
+| | horizon 1 | 3 | 5 | 10 | chance |
+|---|---|---|---|---|---|
+| **same robot**, vs the goal shown | **76%** | **79%** | **82%** | **86%** | 28% |
+| same robot, vs the demonstration | 18% | 16% | 14% | **7%** | 28% |
+| **insect goals**, vs the goal shown | **36%** | **37%** | **35%** | **38%** | 28% |
+| insect goals, vs the demonstration | 26% | 26% | 26% | 25% | 28% |
+
+**Same-robot selection follows the goal at 86% while tracking the demonstration at 7%, below
+chance.** No reading of that is compatible with the frame-reading confound that killed F123, F126
+and F128's cross-embodiment column: the rule now ignores what the robot is doing and answers what it
+was asked for.
+
+**And insect goals clear chance at every horizon** -- 35-38% against 28% -- with demonstration
+tracking at exactly chance. **This is the first cross-embodiment selection number in this project
+that survives its own control.** It is modest, and modest is what one channel buys.
+
+**What is actually shared here, stated precisely.** Not the latent: the head is fitted per robot on
+that robot's own projector latents. What is shared is the **target quantity** -- dimensionless body
+motion, measurable from outside with no kinematic model, and identical in meaning on a 6-legged
+insect and a 12-DOF quadruped. The planner compares a prediction in that quantity against a goal
+expressed in it. **That is the claim the project has been trying to make, and it is the first form
+of it that a control has not destroyed.**
+
+**Limits, all of them.** One channel -- forward speed only, so 36% is what remains after turning and
+sideways are invisible to the score. One checkpoint, one seed, offline, no simulator. The head is
+fitted on the target robot's actions, which is the same cost the action projector already pays and
+is honest about (F52's few-shot budget), but it is not zero. **And the 3-channel pretrain is now
+clearly worth running**: the coordinate works and it is one-dimensional.
+
+Checkpoint `stage3_b1_nce_s0_bodyfit_proj.pt`; logs `/tmp/bodyfit_proj.log`,
+`/tmp/score_proj_{same,cross}.log`.
+
+---
+
+
+### F132. Frames and rollout only: the quadruped's selection follows an insect's video above chance
+
+**F131's result was real and was not the claim.** Its scoring rule reads
+`body_head(proj(a))` against the goal clip's *measured* forward speed -- **no frame is consumed at
+scoring time, the forward model is never called, and the target comes off a recorded trajectory
+rather than out of a video.** It is action-to-speed regression matched against a number. Three
+conditions were run to separate what each component contributes, cross-embodiment goals,
+mismatch control in every one:
+
+| | what the candidate side uses | where the target comes from |
+|---|---|---|
+| **A** | `body_head(proj(a))`, no frames, no rollout | the goal clip's measured trajectory |
+| **B** | roll the FDM h steps from `e_t`, read the transition with the ITM | the goal clip's measured trajectory |
+| **C** | the same rollout | **the goal robot's own frames**, `body_head(ITM(g_t, g_t+h))` |
+
+**Selection against the goal actually shown, mismatched pairing, chance 28%:**
+
+| horizon | A | B | **C** |
+|---|---|---|---|
+| 1 | 36% | 34% | 28% |
+| 3 | 37% | 32% | **35%** |
+| 5 | 35% | **45%** | **39%** |
+| 10 | 38% | 39% | **42%** |
+| *tracking the demonstration instead, C* | -- | -- | 25-27% |
+
+**C is the condition the project's claim needs and it clears chance from three steps on**, rising
+with horizon to 42% while its demonstration-tracking stays at chance. In C **nothing but pixels and
+the world model is involved**: the candidate's future is predicted by rolling the forward model, the
+insect's request is read out of the insect's frames by the same shared head, and no recorded
+trajectory value enters either side.
+
+**And the world model earns its place.** B and C both roll the FDM, and both improve with horizon --
+B peaks at 45% at five steps, C at 42% at ten -- where A, which never calls it, is flat at 35-38%
+across every horizon. **A rule that ignores the rollout cannot get better with more of it**, and the
+horizon dependence is the signature that the prediction is contributing.
+
+> **This paragraph is withdrawn by F135.** The comparison it makes is between conditions that differ
+> in *two* things -- A is also handed a measured trajectory value where C has to read its target out
+> of frames -- so the horizon signature cannot be assigned to the rollout. **Mode D**, which takes
+> C's vision-only target and deletes the rollout, reaches **41% at horizon 3** against C's best of
+> 42%. The two overlap. **The rollout's contribution is not established**, and the argument above
+> that "a rule that ignores the rollout cannot get better with more of it" is wrong: D's target
+> window widens with the horizon too, so D varies with it as well. Everything else in this entry
+> stands.
+
+**What C's failure at one step says.** A single-step transition of a hexapod carries very little
+body motion to read, so the target is mostly noise there; three steps is enough. That is a property
+of the readout window, not of the coordinate.
+
+**Stated at its true strength.** This is offline selection among twelve recorded B1 behaviours,
+one checkpoint, one seed, forward speed only, on held-out clips. It is **not** a closed loop and not
+a controller. What it does establish, with the control that killed every previous version of this
+claim: **a quadruped, shown a stick insect's video and nothing else, picks its own behaviour to
+match what the insect is doing, above chance, using a world model to predict what each of its
+options would do.**
+
+Logs `/tmp/f132_{A,B,C}.log`; `scripts/diagnostics/score_by_body_motion.py --mode {A,B,C}`.
+
+---
+
+
+### F133. The contrastive objective is what makes the rollout usable, and mode A never needed it
+
+**A replication attempt on an independent stage-3 checkpoint turned into the control that explains
+F132.** The MSE-arm checkpoint differs from the contrastive one in a single flag; both were fitted
+the same way and scored the same way, cross-embodiment goals, mismatch control throughout.
+
+| | mode A -- no rollout, no frames | mode C -- rollout and frames |
+|---|---|---|
+| **contrastive** | 36 / 37 / 35 / 38% | 28 / **35 / 39 / 42%** |
+| **MSE** | 36 / 38 / 36 / 37% | 28 / **24 / 22 / 26%** |
+| *chance* | 28% | 28% |
+
+**Mode A is identical under both objectives**, which is what it should be: it never calls the
+forward model, so a model that ignores its action input is no handicap. `body_head(proj(a))` against
+a measured speed is action-to-speed regression and the objective cannot touch it.
+
+**Mode C works only for the contrastive arm.** The MSE arm sits at or below chance at every horizon
+and gets *worse* with more rollout. F119 measured why on the same checkpoints: MSE adaptation leaves
+`/mean-z` at 0.985 -- the forward model returns the same answer for the real action as for the mean
+one -- so rolling it accumulates nothing about the candidate.
+
+**This is the link between the two halves of the project, and it was missing until now.** F119 is a
+statement about a training objective; F132 is a statement about cross-embodiment selection. **They
+are the same statement**: the contrastive term is what makes the forward model's rollout carry
+action-specific information, and mode C is the only rule that consumes that information. Remove the
+term and the rule collapses while its rollout-free sibling is untouched.
+
+**What it does and does not do for F132's robustness.** It is not the seed replicate that is still
+outstanding -- `stage3_b1_nce_s{1,2}` are on com7 and have not been transferred. **But a checkpoint
+that differs in one flag and fails exactly where that flag predicts is stronger evidence than a
+second seed of the same configuration would have been**, because it rules out "any stage-3
+checkpoint scores 42% under mode C".
+
+Logs `/tmp/f133_{A,C}_mse.log`, `/tmp/f132_{A,C}.log`.
+
+---
+
+
+### F134. Three shared channels calibrate on both robots at once, and F83's channel competition does not reproduce
+
+**The com7 run F129 asked for**, `beh12_hex-b1_body3`: pretrained on **both** embodiments with
+`body_channels 0 1 2` -- forward, lateral and yaw, dimensionless, observed from outside. Five hours,
+then stages 1-3, with `body_head_calibration.py` run before adaptation and again after.
+
+**Straight off the pretrain, every channel on every robot:**
+
+| | forward | lateral | yaw |
+|---|---|---|---|
+| **hexapod** | **+0.99, 1.0x** | **+0.98, 1.2x** | **+0.98, 1.0x** |
+| **B1** | **+0.99, 1.0x** | **+0.97, 1.2x** | **+0.97, 1.0x** |
+
+**Every cell clears the 1.5x bar set in advance.** Per family the head reproduces the physics:
+hexapod `side_L` lateral 0.116 -> 0.111 against `side_R` -0.151 -> -0.119, both signs correct;
+B1 turning yaw 0.038 -> 0.038; forward speed to three decimals on both bodies.
+
+**F83 does not reproduce, and that finding should be treated as superseded.** It measured adding yaw
+costing forward 68% and buying yaw at +0.37 +/- 0.27 -- the result that made channel competition the
+expected outcome and was written into this run's pass bar as the likely failure. **On corrected data
+with both embodiments in the pretrain, there is no trade**: forward is +0.99 with yaw present, the
+same as it was alone (F129). What F83 measured was a two-embodiment pretrain on forward-walking-only
+data carrying the frame-rate defect (F74), and one channel of variation to learn from.
+
+**Adaptation degrades it, exactly as F129 predicted, on a pretrain F129 never saw:**
+
+| after stages 1 and 3 | forward | lateral | yaw |
+|---|---|---|---|
+| hexapod | +0.88, 1.5x | +0.81, **2.7x** | +0.83, 1.1x |
+| B1 | +0.82, **1.7x** | +0.60, **3.8x** | +0.80, 1.4x |
+
+Correlations fall from +0.97-0.99 to +0.60-0.88 and three of six cells fail the bar. **This is the
+second, independent confirmation that stage 1 moves the latent and nothing moves the head with it**
+-- and F131 already has the repair: refit the head on the latents the planner supplies, which took
+minutes and lifted held-out MSE from 0.854 to 0.132 on the one-channel model.
+
+**So the run bought what it was meant to buy.** The shared coordinate is three-dimensional and
+calibrated on both bodies; turning and strafing are now *in* it, where F128 could only separate
+"sideways or not". **What has not been measured is whether they help**: the 42% bar (F132) is
+forward speed alone, and the three-channel version has to beat it under mode C with the mismatch
+control. That needs the checkpoints, which are still on com7.
+
+Log: `paste_from_com7.txt`, run `beh12_hex-b1_body3`, commit ba12c71.
+
+---
+
+
+### F135. Deleting the rollout costs nothing: the result is the coordinate, not the world model
+
+**The control that prices the world model, and the reason it was needed.** F132 compared mode A
+(action-to-speed regression against a measured trajectory value, no frames, no rollout) with mode C
+(rollout on the candidate side, target read from the goal robot's frames) and read the difference as
+the world model contributing. **Those two conditions differ in two things at once.** Mode D fixes
+that: C's vision-only target, A's rollout-free candidate score.
+
+    A   body_head(proj(a))            vs  measured speed of the goal clip
+    C   body_head(ITM(e_t, rolled))   vs  body_head(ITM(g_t, g_t+h))
+    D   body_head(proj(a))            vs  body_head(ITM(g_t, g_t+h))     <- C's target, no rollout
+
+Cross-embodiment goals, mismatch control, selection against the goal actually shown, chance 28%:
+
+| horizon | A | C | **D** |
+|---|---|---|---|
+| 1 | 36% | 28% | **33%** |
+| 3 | 37% | 35% | **41%** |
+| 5 | 35% | 39% | **39%** |
+| 10 | 38% | 42% | **33%** |
+
+**D matches C.** Its best is 41% against C's 42%, they are equal at horizon 5, and D is *better* at
+one and three steps. **Rolling the forward model buys nothing measurable here**, and F132's
+horizon-signature argument does not survive: D's target window widens with the horizon as well, so
+varying with horizon is not evidence about the rollout.
+
+**What still stands, and it is the substantive half.** Cross-embodiment selection clears chance with
+**vision on both sides and no recorded trajectory value anywhere** -- 33-41% against 28%, with
+demonstration-tracking at chance. The insect's request is read out of the insect's frames by the
+shared body head, the quadruped's options are scored in the same physical coordinate, and the
+mismatch control that killed F123, F126 and F128 does not kill this. **The result is the shared
+coordinate. It is not the world model.**
+
+**Which sharpens what the project can claim and what it cannot.** "A quadruped selects its behaviour
+from an insect's video" is measured. "A world model plans the selection" is not: the best rule
+measured so far reads a target out of the goal video, maps each candidate action to the same
+quantity, and takes the nearest -- no prediction of the future required. **F127 said the planner was
+not conditioning on its goal; the fix turned out to be the coordinate, and the coordinate does not
+need a rollout to work.**
+
+**Two things that follow.** The forward model remains a strong dynamics predictor (F126: rollout
+beats blind by 22-35 points at classifying behaviour) -- it is simply not what makes this selection
+work, which is the same dissociation F133 found from the other direction. And mode D should be run
+on the MSE arm: if D works there too, the objective's role is confined to the rollout-based rules
+and F133's link between F119 and selection narrows accordingly.
+
+**Mode D on the MSE arm is at chance too** -- 33 / 24 / 26 / 28% -- which is not what the F133 story
+predicts on its own. **A and D share the entire candidate side**, `body_head(proj(a))`, and differ
+only in where the target comes from; A works on the MSE arm and D does not. The ITM is identical
+across the two arms (stage 3 trains the projector and forward model, not the inverse model), so what
+differs is the **head**, refitted per arm on that arm's projector latents. *Hypothesis, untested*:
+the contrastive stage 3 leaves the projector's latents in the region the ITM occupies, so a head
+fitted on one reads the other, and MSE's does not.
+
+**The per-family split of the one-channel mode D, which is the baseline the 3-channel run has to
+beat** (per-family chance: speed 33%, turn 33%, side_L 17%, side_R 17%):
+
+| horizon | pooled | side_L | side_R | speed | turn |
+|---|---|---|---|---|---|
+| 1 | 33% | 13% | 31% | 23% | **62%** |
+| 3 | **41%** | 20% | 39% | 52% | **62%** |
+| 5 | 39% | 25% | 38% | 45% | **54%** |
+| 10 | 33% | 17% | 33% | 18% | **57%** |
+
+**Turning is the best-identified family on a forward-speed-only coordinate**, at 54-62% against 33%,
+because turn clips occupy a narrow band of forward speed (0.119-0.141) that separates them from fast
+walks and from strafing. `side_L` sits at chance throughout: it is the family one channel cannot see.
+
+**A defect worth recording**: the first mode-D run reported 0% on every column with a healthy sample
+count, because the goal-encoding block still tested `mode == "C"` and every sample hit a `continue`
+past the counters. **An empty loop that prints a table looks exactly like a measurement.** It now
+raises instead of skipping.
+
+Log `/tmp/f135_D.log`.
+
+---
+
+
+### F136. Three shared channels: cross-embodiment selection reaches 70%, and strafing goes from invisible to near-perfect
+
+**The 3-channel pretrain (F134), carried through the repair F129 and F131 established.** Stage 1
+and 3 degrade the head -- forward +0.82/1.7x, lateral +0.60/**3.8x**, yaw +0.80/1.4x on the B1 --
+so the head was refitted on the latents it is actually shown: `proj(a)` and the ITM's, on the B1,
+plus the hexapod's ITM latents, everything else frozen, 20% of the B1 held out.
+
+**Calibration after the refit, on held-out clips** (F134's pretrain numbers are untouched and remain
+the record of what the pretrain itself produced):
+
+| | forward | lateral | yaw |
+|---|---|---|---|
+| **B1**, held out | **+0.95, 1.1x** | **+0.83, 1.3x** | +0.91, 1.6x |
+| **hexapod** | **+0.97, 1.1x** | **+0.96, 1.2x** | **+0.95, 1.1x** |
+
+Five of six cells clear the 1.5x bar; the B1's yaw misses by 0.1.
+
+**Selection, cross-embodiment, mismatch control, per behaviour family. Chance is 28% pooled and,
+per family, 33% for speed and turn and 17% for each sideways direction.**
+
+**Mode D** -- target read from the insect's frames, no rollout:
+
+| horizon | pooled | side_L | side_R | speed | turn |
+|---|---|---|---|---|---|
+| 1 | **70%** | 86% | 79% | 50% | 54% |
+| 3 | 68% | 92% | 65% | 62% | 45% |
+| 5 | **70%** | 87% | 69% | 41% | 64% |
+| 10 | **70%** | **100%** | 84% | 43% | 39% |
+| *tracking the demonstration* | 18-21% | | | | |
+
+**Mode C** -- the same target, with the forward model rolled on the candidate side:
+
+| horizon | pooled | side_L | side_R | speed | turn |
+|---|---|---|---|---|---|
+| 1 | 33% | 21% | 62% | 43% | 24% |
+| 3 | 43% | 42% | 57% | 55% | 30% |
+| 5 | 44% | 43% | 64% | 55% | 28% |
+| 10 | 37% | 32% | 40% | **86%** | 21% |
+
+**Three results, in order of size.**
+
+**1. The pass bar is met and then some.** Both sideways directions and turning clear their chance
+rates under mode D at every horizon: side_L 86-100% against 17%, side_R 65-84% against 17%, turning
+39-64% against 33%. **The channels transfer.**
+
+**2. Widening the coordinate is worth far more than the world model was.** Pooled mode D goes
+**33-41% on one channel to 68-70% on three** -- a doubling -- while demonstration-tracking falls to
+18-21%, below chance. The single largest change measured in this line of work, and it came from the
+target quantity rather than from anything in the planner.
+
+**3. Strafing was never a hard behaviour; it was an invisible one.** `side_L` reads 13-25% on the
+forward-only coordinate, at or below its 17% chance rate, and **86-100%** once lateral speed is in
+the score. Every earlier finding that sideways "fails on every measurement" was measuring a channel
+the score could not see. **That is a correction to a claim this project has repeated since F102.**
+
+**And mode C is worse than mode D again, more clearly than before.** 33-44% against D's 68-70%,
+with turning at 21-30% -- below its chance rate. Rolling the forward model does not merely fail to
+help here; on three channels it **destroys** the turning signal, and the one place it wins is
+forward speed at horizon 10 (86%). F135's reading stands and hardens: **the result is the shared
+coordinate, and the rollout is currently subtracting from it.**
+
+**Limits.** One checkpoint, one seed, offline selection among twelve recorded behaviours, held-out
+clips. The B1 head is fitted on the B1's own actions and latents, which is the same cost the action
+projector pays. Nothing here is a closed loop.
+
+Checkpoint `wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0_bodyfit_proj.pt`; logs
+`/tmp/f136_{fit,cal,C,D}.log`.
+
+---
+
+
+### F137. Without a library there is nothing to select: naive action search never finds locomotion
+
+**The test the deployment claim needs, and F135/F136 never ran.** Those measured the world model as
+a selector over twelve recorded B1 clips and found the shared coordinate does the selecting better
+alone. **But the clips supply the "how"** -- the coordinate says "produce this body motion" and a
+recorded clip already knows which joint sequence does. Remove the library and that gap is what a
+world model is for. `sim/control/plan_without_library.py` puts the goal in the shared coordinate,
+read from an insect's frames, and replaces the library with **sampled** action sequences:
+
+    condition 1   body_head(ITM(e_t, FDM rolled h steps))  vs the goal   -- planning over unrecorded futures
+    condition 2   body_head(proj(a))                       vs the goal   -- the same goal, no prediction
+    random        a uniform pick from the same bank                      -- the floor
+
+Both conditions see the identical bank; the winner of each is **executed in MuJoCo** and the body
+motion it actually produced is measured, so nothing is scored on a model's own prediction.
+
+| | distance to the goal | forward | lateral | yaw |
+|---|---|---|---|---|
+| world model | 0.331 | 0.186 | 0.082 | 0.248 |
+| no rollout | 0.313 | 0.193 | 0.091 | 0.214 |
+| **random** | **0.347** | 0.187 | 0.075 | 0.273 |
+
+**All three are the same, and the reason is not that the world model failed.** Every sample produces
+roughly the same motion, so no scoring rule can separate them. **The bank contains no solutions.**
+
+**Measured directly, and it does not depend on the noise scale**, 24 samples per setting executed in
+physics:
+
+| noise, in units of each joint's own sd | upright | forward achieved | yaw achieved |
+|---|---|---|---|
+| 0.10 | 24/24 | -0.092 .. -0.085 | -0.246 .. -0.229 |
+| 0.25 | 24/24 | -0.096 .. -0.079 | -0.254 .. -0.224 |
+| 0.50 | 24/24 | -0.100 .. -0.079 | -0.292 .. -0.181 |
+| 1.00 | 24/24 | -0.108 .. -0.025 | -0.304 .. -0.097 |
+| *the recorded clips* | | **-0.003 .. 0.206** | **0.010 .. 0.076** |
+
+**The robot stays upright and travels backwards while rotating, at every scale including 0.1 sd** --
+which is essentially the dataset's mean pose held constant. A static average posture is not a gait,
+and smoothed noise around it never becomes one: **locomotion needs periodic joint trajectories, and
+a low-passed random walk is not in that family.** The reachable set of this sampler does not
+intersect the goals.
+
+**So the result is about the search space, not the scoring rule.** `wm/policy/planner.py` already
+says this in its own docstring -- "sampling 18 continuous dimensions produces postures that do not
+walk and that the forward model has never seen" -- and it is now measured on the quadruped: **raw
+action-space search does not recover the "how" on a body with no demonstrations, and a world model
+cannot rank its way out of a bank with no answers in it.**
+
+**What this does to the three options.** Hand-authored periodic parameters (a CPG) would put gaits
+in the bank and are exactly the per-robot knowledge this project claims not to need. **Optimising
+the action sequence through the world model** -- CEM or gradients rather than uniform sampling -- is
+the honest remaining version of "give the world model its actual shot", and is F138. **And learning
+a policy** (Q16, teacher-student) is the option this result argues for most directly: if the "how"
+cannot be found by run-time search, it has to be learned once and stored in weights.
+
+**The comparison F135 drew stands unchanged.** With a library, the coordinate beats the rollout.
+Without one, neither rule has anything to choose between. **Nothing here shows the world model
+earning its place, and nothing here shows it failing at its job** -- the experiment could not put the
+question.
+
+Log `/tmp/f137.log`; results in `results/wm/closed_loop/plan_without_library/`.
+
+---
+
+
+### F138. The forward model's imagined state barely depends on the action, so teacher-student cannot proceed as it stands
+
+**The prerequisite check for distillation, on the tightest bar yet.** F126 asked whether a rollout
+ranks behaviours; a policy trained on imagined states needs the imagined *state* to be right.
+`scripts/diagnostics/rollout_fidelity.py`, the three-channel two-embodiment pretrain
+`beh12_hex-b1_body3/best.pt`, rolled on **48 held-out insect clips it never trained on**, actions
+teacher-forced from the ITM so the forward model is measured alone:
+
+| horizon | error / holding still | predicted over actual displacement | latent perturbed 1 sd | a real latent from another state |
+|---|---|---|---|---|
+| 1 | **0.732** | 0.41 | 0.741 | 0.775 |
+| 3 | 0.702 | 0.63 | 0.708 | 0.767 |
+| 5 | 0.764 | 0.76 | 0.768 | 0.826 |
+| 10 | **0.978** | 1.02 | 0.984 | 1.013 |
+
+**One-step ratio 0.732, growth +0.027 per step, and by ten steps 0.978 -- indistinguishable from
+predicting no motion at all.**
+
+**1. Fidelity.** The rolled state beats holding still by 27% at one step and by nothing at ten. The
+usable imagination horizon is about five steps, a quarter of a second, and that is an upper bound
+measured with the *true* actions supplied.
+
+**2. Cause: both, and the objective is the larger half.** A 0.732 one-step ratio is not a
+compounding failure -- nothing has compounded yet. The model is mediocre at the very first step,
+which is a statement about what the pretraining objective asked for: reconstruction and the
+auxiliary readouts, never rollout fidelity. The slope adds the rest.
+
+**3. And the sharper finding, which neither of those captures: the state prediction hardly uses the
+action.** Perturbing the latent by a full standard deviation moves the error from 0.732 to **0.741**
+-- one percent. Substituting a real latent from a state the model never followed costs **six**
+percent. **The forward model is predicting where this robot goes next mostly from where it is**,
+which is why "on-manifold versus off-manifold" does not separate here: there is no action-manifold
+dependence to leave.
+
+**This is the `/mean-z` pathology of F98 and F119 in the pretrain itself**, on a held-out body, not
+merely in MSE adaptation. F119 measured the contrastive term repairing it *during adaptation*
+(`/mean-z` 0.985 to 0.49); nothing repairs it during pretraining, where the same objective is used.
+
+**Verdict on teacher-student, which is what this was run to decide.** **It does not proceed as it
+stands.** Distillation trains a policy against futures the world model imagines; if those futures
+move by 1-6% when the action changes, the policy receives almost no signal about its own actions and
+will learn whatever the state alone predicts. **A capped horizon does not fix this** -- the defect is
+already present at one step, where there is nothing to cap.
+
+**What it points at instead, in order.** A pretraining objective with a rollout-fidelity term and an
+action-conditioning term -- the contrastive term already exists and is measured to restore action
+sensitivity in adaptation (F119); applying it in pretraining is the smallest change that addresses
+the measured cause. **That is a pretraining finding, and it is the first time in this project the
+pretraining objective has been implicated by a direct measurement rather than by elimination.**
+
+**Scope.** One pretrain, one seed, hexapod held-out clips, teacher-forced actions. The same
+measurement on the B1 and on the contrastive-adapted checkpoints has not been run and would say
+whether adaptation's contrastive term also repairs *state* fidelity or only ranking.
+
+Log `/tmp/f138_hex.log`.
+
+---
+
+
+### F139. Contrastive adaptation buys action-conditioning and spends state fidelity; MSE does the reverse
+
+> **The verdict of this entry is withdrawn by F140, and the cause is in its own last line.** Every
+> number below rolls the forward model on the **ITM's** latents. F139 itself measured that the
+> forward model is action-sensitive only in the **projector's** region -- and then drew its
+> conclusion from the path it had just shown to be the wrong one. Re-measured on the projector path,
+> the contrastive arm reads **state fidelity 0.710, not 1.370**, with `/mean-z` 0.476. **It has both
+> properties at once**, and "no cheap fix exists because no checkpoint has both" is false. The
+> tables below are correct as measurements of the ITM path; the conclusion drawn from them is not.
+
+**Run before any re-pretrain, to decide cheap fix against expensive retrain.** The same state-rollout
+diagnostic as F138, on B1 clips, across three checkpoints that differ only in what was done after
+pretraining. Actions teacher-forced from the ITM.
+
+| checkpoint | h=1 | 3 | 5 | 10 |
+|---|---|---|---|---|
+| pretrain, unadapted | 1.573 | 1.712 | 1.750 | 1.781 |
+| **contrastive**, stage 3 `--lambda_nce 1` | **1.370** | 1.848 | 2.071 | 2.221 |
+| **MSE**, stage 3 `--lambda_nce 0` | **0.592** | 0.862 | 1.008 | -- |
+
+*ratio of the rolled state's error to the error of holding `e_t` still; below 1.0 beats predicting
+no motion.*
+
+**The unadapted pretrain is worse than holding still at every horizon**, which is F51 restated at
+the state level: a hexapod-only forward model does not predict a quadruped. Both adaptations improve
+on it; only MSE's crosses below 1.0.
+
+**The MSE arm predicts the state far better than the contrastive one** -- 0.592 against 1.370 at one
+step, and it is still at break-even by five steps where the contrastive arm is at 2.07 and rising.
+That is the same trade F119 recorded from the loss side (`/hold` 0.802 against 0.891) and it is much
+larger at the state level than that number suggested.
+
+**The reconciliation, which was necessary before anything could be concluded.** F119 reports
+`/mean-z` 0.49 on the contrastive arm -- the real action halving the error against the average one --
+while F138 measured a 1-6% effect from perturbing the latent. **Both are correct and they feed
+different latents:**
+
+| action sensitivity, contrastive arm, h=1 | |
+|---|---|
+| `/mean-z` with the **projector's** latents (F119) | **0.49** |
+| `/mean-z` with the **ITM's** latents (measured here) | **0.965** |
+| 1 sd perturbation of the ITM's latent | 1.370 -> 1.366 |
+| a real ITM latent from another state | 1.370 -> 1.425 |
+
+**The forward model is action-sensitive only inside the region the projector produces.** Stage 3
+trains it jointly with the projector on `proj(a)` inputs and on nothing else, so that is the only
+subspace where its output responds to the action. The ITM's latents -- which is what F138 fed -- are
+outside it.
+
+**This changes F138's verdict in one direction and confirms it in the other.**
+
+**Better than F138 concluded**: a distilled policy would emit actions, and actions reach the forward
+model *through the projector*, which is the sensitive path. **Action-conditioning is not the
+blocker** -- `/mean-z` 0.49 is a real dependence, and contrastive adaptation is what produces it.
+
+**Worse than F138 concluded**: the arm that has the action-conditioning has **state fidelity of 1.370
+at one step and 2.221 at ten** -- its imagined states are further from the truth than assuming the
+robot froze. Teacher-student would train a policy against futures that are wrong in the ordinary
+sense, not merely action-insensitive. And the arm with usable state fidelity is the one F119 measured
+at `/mean-z` 0.985, which has no action-conditioning at all.
+
+**So the answer to the question this was run to settle: neither, and that is the finding.** There is
+no cheap fix, because no existing checkpoint has both properties; and a re-pretrain with the
+contrastive term alone would reproduce the contrastive arm's trade rather than escape it. **The
+objective needs a rollout-fidelity term *and* an action-conditioning term together, and the evidence
+that they are in tension is now direct**: every checkpoint measured pays for one with the other.
+
+**Do not start a re-pretrain on the strength of "apply contrastive properly".** F119's contrastive
+term is measured here degrading exactly the quantity distillation depends on.
+
+**Scope.** One seed per arm, B1 clips, teacher-forced ITM actions, one-channel checkpoints for the
+adapted arms. The projector-latent `/mean-z` is quoted from F119 rather than re-measured at every
+horizon.
+
+Logs `/tmp/f139_*.log`.
+
+---
+
+
+### F140. Measured on the path a policy would drive, the contrastive arm already has both properties
+
+**F139 asked whether the fix was cheap or expensive and answered from the wrong latent path.** The
+forward model is action-sensitive only inside the region the projector produces -- F139 measured
+that itself -- and then rolled on the ITM's latents to judge state fidelity. `rollout_fidelity.py`
+gained `--latent projector`, the path a distilled policy would actually drive, and the picture
+changes:
+
+| B1 clips, one step | state fidelity | `/mean-z` across clips | `/mean-z` within a clip |
+|---|---|---|---|
+| **MSE**, `--lambda_nce 0` | **0.585** | 0.969 | 0.975 |
+| **contrastive**, `--lambda_nce 1` | **0.710** | **0.476** | 0.951 |
+
+*(the same contrastive checkpoint on the ITM path reads 1.370 and 0.965 -- F139's numbers)*
+
+**The contrastive arm predicts the state better than holding still and reads the action**, at the
+same time, on the path that matters. **The trade is mild**: full action-sensitivity costs 0.585 to
+0.710, about a fifth of the state fidelity, and buys 0.969 to 0.476.
+
+**And that already clears the bar the sweep was written to look for** -- state under about 0.8 with
+meaningful action-sensitivity -- **at lambda 1, with no sweep and no re-pretrain.**
+
+**The `/mean-z` reconciliation, which had to be settled first.** F119 reports 0.49 and F138/F139
+reported a 1-6% effect; both are right and they average different things:
+
+| what the baseline latent is | contrastive arm |
+|---|---|
+| the mean across the whole dataset -- `wm/adapt3`'s, and F119's | **0.476** |
+| the mean within the clip being predicted | 0.951 |
+
+**Across behaviours the action matters; within one behaviour it barely does.** That is the same
+shape as F111 -- the kind of motion transfers and the amount does not -- now visible in the forward
+model's own predictions, and it is a real limit on fine control rather than a measurement artefact.
+The tool prints both.
+
+**Consequences.**
+
+**Teacher-student is not blocked by the objective.** F139's verdict was the strongest argument
+against it and it does not survive. What remains true from F138 is the horizon: the contrastive arm
+degrades from 0.710 at one step to worse than hold-still by five, so imagined rollouts stay short.
+
+**The lambda sweep is no longer a decision and becomes a refinement.** Its question was whether any
+lambda gives both; lambda 1 does. Running it would map whether an intermediate value keeps 0.476
+while recovering state toward 0.585, which is worth hours but decides nothing. The sheet is written
+(`scripts/com7_lambda_sweep.sh`) and does not need to run before anything else.
+
+**The lesson is the one this session keeps paying for.** F139 had the fact that decided its own
+verdict -- action sensitivity lives in the projector's region -- inside the same entry, and did not
+apply it. **Read a diagnostic's own finding back onto the diagnostic before drawing from it.**
+
+Logs `/tmp/f140_*.log`.
+
+---
+
+
+### F141. Teacher-student, designed against what the measurements actually allow (design only, not run)
+
+**Written before anything is executed, because the two surviving constraints decide the shape of the
+experiment and one of them decides what counts as success.** Q16 committed to teacher-student on
+2026-08-28 for a reason no measurement has touched: **scoring candidates needs a target-robot policy
+that already performs the behaviours, and learning one needs only the ability to actuate.** F140
+removed the objection that grew after that decision -- the objective does not trade state fidelity
+against action-sensitivity once both are measured on the projector path.
+
+## What the measurements permit
+
+| constraint | measured | consequence for the design |
+|---|---|---|
+| **horizon** | contrastive arm 0.710 at one step, worse than frozen by five (F138, F140) | imagine **h <= 3**, never 5. The teacher's signal is short-horizon or it is noise |
+| **magnitude** | `/mean-z` **0.476** across behaviours, **0.951** within one (F140) | the model reads **which** movement, not **how much**. A policy distilled from it can be asked for a behaviour and not for a rate |
+| **coordinate** | three channels calibrate on both robots, selection 70% cross-embodiment (F134, F136) | the goal is a body-motion vector, not a frame and not a joint target |
+| **search** | sampled joint commands never produce locomotion (F137) | the policy cannot be found by run-time search; it has to be fitted, which is what this is |
+
+## The design
+
+    goal g      a body-motion vector -- forward, lateral, yaw, dimensionless -- read from a video
+                by the shared head. Cross-embodiment by construction (F136)
+
+    teacher     from state e_t, for each candidate action, roll the FDM h <= 3 steps on proj(a) and
+                read body_head(ITM(e_t, rolled)). The label is the action whose imagined motion is
+                nearest g
+
+    student     pi(e_t, g) -> joint targets, trained on those labels, on states the student itself
+                reaches. One forward pass at run time, no library, no rollout, no camera if the
+                state is proprioceptive
+
+**On the insect**, where the forward model is worth rolling. The B1 is where it is deployed, not
+where it is learned, and that ordering is Q16's and unchanged.
+
+**The candidate set at training time is not a library.** It is whatever the student currently emits
+plus exploration around it; the teacher ranks those with the world model. Nothing has to already
+walk -- which is the whole point of the change, and the reason F137's negative result does not
+block this: F137 searched **once, blind, at run time**; this searches **repeatedly, locally, around
+a policy that is improving**.
+
+## The success criterion, fixed now
+
+**Primary, and it is what the magnitude limit permits**: on a held-out goal, the student produces
+the **right behaviour family** -- forward, turning, strafing, and the sign of the turn and the strafe
+-- above the chance rate, on a body with no candidate library, with the goal read from another
+robot's video. Direction is reported separately from family (F109).
+
+**Secondary, and expected to fail**: the achieved *magnitude* within a family tracks the goal's.
+F111 measured 0.074 correlation for speed across embodiments and F140 explains it -- within a
+behaviour the forward model barely distinguishes actions, so a teacher built on it cannot label
+"faster" reliably. **Report the correlation and expect it near zero.**
+
+**Is behaviour-type control a full result or a partial one? Partial, and it should be written as
+partial.** A controller that can be told *walk / turn left / strafe right* but not *how fast* is not
+a locomotion controller in the sense a robotics reader expects, and calling it one would be the
+overclaim this project has corrected five times in one session. **What it would be is the first
+demonstration that a body-motion goal read from one robot's video produces a working controller on
+a robot with no demonstrations of its own** -- which is the deliverable Q16 named and which LAC-WM
+does not produce, since it stops at selecting among what its VLA proposed.
+
+**The honest sentence, drafted now so it cannot drift later**: *a quadruped with no recorded
+behaviours is driven to the behaviour a stick insect's video specifies, in kind but not in
+magnitude, by a policy distilled from a world model that was never shown a quadruped.* Every clause
+in that is measurable and three of them are already measured.
+
+## What would make it a full result, and is out of scope here
+
+Magnitude control needs a forward model that distinguishes actions **within** a behaviour --
+`/mean-z` within-clip is 0.951 and would have to fall. Nothing measured suggests the contrastive
+term does that; it is a within-behaviour discrimination problem and the term's negatives are drawn
+from other behaviours. **That is a separate experiment and naming it here keeps the partial result
+from being sold as the whole one.**
+
+## The hole in the design above, found before building it
+
+**At initialisation the student is random, so the teacher ranks random joint targets -- which is
+F137 exactly.** F137 measured that sampled joint commands on a quadruped never produce locomotion at
+any noise scale, and nothing about the insect changes the argument: an 18-D joint target drawn near
+a mean pose is a posture, not a gait, and the teacher would be choosing the least-bad of a bank with
+no answers in it. **"Search locally around a policy that is improving" only escapes F137 if the
+policy starts somewhere that moves.**
+
+**So the design needs a bootstrap, and where it comes from decides whether the claim survives.**
+
+| bootstrap | what it costs the claim |
+|---|---|
+| recorded clips of the **target** robot | the library returns; the claim collapses to candidate scoring with extra steps |
+| recorded clips of the **source** robot (the insect) | **acceptable**: the insect is the robot we are transferring *from*, and having data for it is the premise, not a concession |
+| random exploration with a survival/motion reward | honest but it is reinforcement learning, and the project's own AMP branch was abandoned for producing gaits too poor to trust (`PROGRESS.md` §13) |
+
+**The second is the only one that keeps the claim and it changes the pipeline's shape**: clone the
+student on the *insect's* recorded actions to get something that moves, then improve it on the
+*target* robot with the world-model teacher and goals in the shared coordinate. The target robot
+still needs no recorded behaviours, which is the property Q16 was protecting.
+
+**But it introduces a transfer the design did not have**, since an insect-cloned policy emits 18-D
+insect joint targets and the quadruped takes 12. The action spaces are disjoint -- that is this
+project's whole premise -- so the clone cannot be copied across. **What can cross is the goal, which
+is the shared coordinate, and that is already measured (F136).** The student would therefore have to
+be per-robot and bootstrapped per-robot, which means the target robot needs *some* way to move
+before the teacher is useful.
+
+**That is the real open question this design surfaces, and it should be settled before any code:**
+**where does the target robot's first motion come from, if not from a library and not from
+reinforcement learning?** Until that has an answer, teacher-student on the B1 inherits F137's
+result. **On the insect it is buildable today** -- clips exist, replay is exact (F102, 1.06) -- so
+the honest first experiment is teacher-student **within** the insect, which tests the mechanism
+without claiming the transfer.
+
+## Before it runs
+
+The student trains on states it reaches, so it needs a simulator in the loop on the insect
+(CoppeliaSim, one instance, GUI -- F98). Budget is the same order as a stage-3 adaptation per
+iteration, and the horizon cap makes each teacher call cheap. **Nothing here is measured yet; this
+entry is a design and should be cited as one.**
+
+---
+
+
+### F142. Teacher-student on the insect: the reference, the bar, and the cloning control (teacher stage pending)
+
+**An engine test on the easy case: same robot on both sides, no transfer claimed or measurable.**
+The question is only whether short imagined rollouts can train a policy that walks. If they cannot
+here -- one robot, a trustworthy short-horizon forward model, legitimate replayable clips -- no
+cross-embodiment result rescues the direction.
+
+## Step 1, fixed before anything was trained
+
+`hexapod_ep100` (`speed_c7.1`) replayed through the insect's own physics, 66 steps, three seconds:
+
+| | |
+|---|---|
+| the clip's recorded head displacement | 0.6454 m |
+| **replayed** | **D_real = 0.6566 m** |
+| replay ratio | 1.017 *(F102 measured 1.06 on this robot)* |
+| **the bar, 50% of D_real** | **0.3283 m** |
+
+## Step 2, the pre-registered criterion
+
+**Both, over the whole three-second window, or it fails:** upright throughout -- head height never
+below 0.6 of its settled value -- **and** at least 0.3283 m travelled. A statue passes the first and
+fails the second; a lurch does the reverse. **The render is diagnosis only and cannot promote a
+numeric failure.**
+
+## The cloning control, which is also the bootstrap
+
+F137 measured that a policy starting from noise never walks, so the student is bootstrapped by
+cloning the insect's own forward-walking clips -- honest on this robot, which is the body the
+project has data for. **Cloning alone is therefore also the control: if it clears the bar, the
+teacher has added nothing.** Held-out cloning error 0.065 after 2,000 epochs.
+
+| cloned student, run in the insect's physics | |
+|---|---|
+| travelled | **0.2349 m = 36% of D_real** |
+| upright the whole window | **yes**, minimum head height 0.1400 against 0.1501 settled |
+| **verdict** | **FAIL**, on distance |
+
+**It walks and it under-travels.** The failure mode is not collapse -- the robot stays up for the
+full three seconds -- it is a gait that covers a third of the ground the recorded one does. That is
+the informative failure: **the control does not pass, so anything the teacher stage adds will be
+attributable.**
+
+Video at `results/wm/closed_loop/f142_video/f142_bc_vs_real.mp4`, recorded walk on the left and the
+cloned student on the right, and `f142_bc_student.mp4` alone.
+
+## What is not measured yet, and why
+
+**The teacher stage is not built**, because the insect-side forward model cannot yet label. Measured
+on the projector path, held-out insect clips: state fidelity **0.757** at one step and **0.727** at
+two -- inside the bar -- with `/mean-z` across clips at **0.966**. **The rollout is good and deaf**:
+a teacher whose prediction moves three percent when the action changes ranks noise. The quadruped
+side does not have this problem because it has had a contrastive stage 3 (0.476, F140), and
+`scripts/com7_stage3_hexapod.sh` applies the same term on the insect with the gate written into it.
+
+**This entry stops here deliberately.** The bar, the reference and the control are recorded before
+the teacher exists, so the teacher's number cannot be graded against a bar chosen after seeing it.
+
+Logs `/tmp/f142_*.log`; runs in `results/wm/closed_loop/f142_*`.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
