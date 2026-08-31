@@ -63,6 +63,36 @@ reference point. Blockquotes are reserved for caveats.
 
 ## 1. Claim
 
+### Positioning against Yeom et al. (2606.07687)
+
+**Their result:** V-JEPA carries action-relevant structure that is inverse-dynamics recoverable --
+R2 0.40 frozen, 0.85 with an ID head -- and they observe that static-environment benchmarks such as
+CALVIN let per-frame appearance stand in for temporal context.
+
+**The contribution statement, as owned by the user:**
+
+> งานก่อนหน้า (Yeom et al. 2606.07687) แสดงว่า V-JEPA เก็บ action-relevant structure ที่
+> inverse-dynamics recoverable ได้ดี และตั้งข้อสังเกตว่า static-environment benchmarks (CALVIN)
+> ทำให้ per-frame appearance แทน temporal context ได้ เราแสดงว่าใน legged locomotion กรณีนี้รุนแรงกว่าและเป็นเชิงโครงสร้าง:
+> gait periodicity ทำให้ joint action อ่านได้เกือบสมบูรณ์จาก single-frame pose ดังนั้นแม้ inverse-dynamics R2
+> จะสูง (0.78) action ก็แทบไม่ช่วย forward prediction (residual เหนือ frame-alone <1%) เราแสดงว่าสิ่งนี้ทำให้
+> rollout-level action-sensitivity objectives (ActSWM-style) ล้มเหลวโดยหลักการ -- วัดข้ามสองร่าง ทุก horizon
+> และผ่าน residual-recoverability -- เพราะไม่มี action-dependent signal ใน forward transition ให้ amplify
+> แม้ signal นั้นจะ inverse-recoverable
+
+**Four things it does:** acknowledges their result without reclaiming it; extends the exception they
+left open, periodicity being the severe form of CALVIN's static tabletop; adds the distinction
+**inverse-recoverable is not forward-necessary**; and ties that distinction to a measured objective
+failure.
+
+**One sentence in it must be narrowed, and F159 is why.** "อ่านได้เกือบสมบูรณ์จาก single-frame pose"
+holds on the **insect**, where a single frame reads the command at R2 0.779 against a pair's 0.887.
+**It does not hold on the B1**, where a single frame reads 0.161 against a pair's 0.342. The
+dissociation itself is unharmed and is in fact sharpest on the insect -- R2 0.887 recoverable, under
+3% of forward prediction error -- but **the sentence has to say "on the insect" or it is an
+overclaim on the quadruped.** See F159 for the per-family numbers.
+
+
 Learn a **morphology-agnostic latent action z_t** from simulation video that separates *what
 movement is happening* from *which body is doing it*, given no morphology label and no kinematics.
 

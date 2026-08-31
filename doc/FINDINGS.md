@@ -10348,7 +10348,274 @@ say the decoder has stopped working. After one epoch it means nothing; **if it i
 epoch 10 the run has hit F88's failure and its `null/real` cannot be read**, because a decoder that
 has stopped working says nothing about whether the action was available.
 
-**Outcome not yet recorded.** Nothing about lag 3 is decided until com7 reports.
+## Outcome: negative, and it removes the frameskip route entirely
+
+Ten epochs, com7, commit 9fecfb3. **Training converged and the decoder lived.** Validation motion
+sat at F88's dead-decoder level for five epochs -- 1.1346, 1.1072, 1.0244, 0.9989, 0.9727 -- then
+broke through to **0.5360** by epoch 10. Probe 0.974, body 0.1436. The reading is valid.
+
+**`null/real` at lag 3, measured on a model actually trained at lag 3: 1.032.** F156's
+off-distribution lower bound was 1.078. **It went down, not up.**
+
+| | measured at lag 3 | real beats null |
+|---|---|---|
+| lag-1 model, off-distribution (F156) | 1.078 | 94.6% |
+| **lag-3 model, on-distribution** | **1.032** | **82.9%** |
+
+## The comparison that settles it: each model at its own training lag
+
+| model | its lag | null/real | real beats null | real/hold |
+|---|---|---|---|---|
+| `beh12_hex-b1_body3` | 1 | 1.028 | 70.2% | 0.737 |
+| `beh12_lag3_nohinge` | 3 | **1.032** | 82.9% | 0.706 |
+
+**Tripling the spacing bought four tenths of a percentage point.** The action is worth 2.8% at lag 1
+and 3.2% at lag 3, and each model cuts about 30% of the motion error at its own spacing. **The
+structure is identical; only the units changed.**
+
+## F156's lag sweep was measuring model mismatch, not task structure
+
+This is the finding to carry forward. **The apparent climb from 1.028 to 1.078 was the
+off-distribution penalty, not the action becoming necessary.** Forcing a lag-1 model to predict
+three frames ahead degrades it, and it degrades the *null* rollout slightly more than the real one,
+which widens the ratio. Train the model where it is measured and the gap collapses back to 1.03.
+
+The same artefact appears in this run with the sign reversed: the lag-3 model reads **1.005 at lag
+1** with real beating null on 54.4% of samples -- worse than chance-adjacent, because lag 1 is now
+*its* off-distribution -- and climbs to 1.047 at lag 5, which is off-distribution in the other
+direction. **Every lag sweep on a fixed checkpoint measures how far the checkpoint is from home. It
+is not a read on the task, and F156's recommendation of lag 3 rested on exactly that mistake.**
+
+## The pre-registered branch, taken
+
+**`null/real` did not rise clearly above 1.078; it fell to 1.032.** By the decision fixed before the
+run: **the limit is the representation, not the objective. No frameskip reaches it. The next move is
+the encoder or the prediction target itself, and not another objective term.**
+
+**No hinge, no full pretrain, no `lambda` tuning.** F153 spent six hours proving a weight cannot
+create a signal that is not there; F156 proposed frameskip as the way to create it; this run shows
+frameskip does not create it either. **Three findings now point at the same place: V-JEPA2
+embeddings of this scene are dominated by what does not move, at every spacing tested.**
+
+## The one alternative explanation, stated so it is not hidden
+
+**This run had 10 epochs; the lag-1 model it is compared against had 50.** Action-sensitivity could
+in principle still be growing. Two things weigh against it: the run's own losses had largely
+flattened by epoch 10 (val 2.7527 to 2.7373), and **F153's 50-epoch run did not produce
+action-sensitivity either**. It is a real limit on the comparison and not, on this evidence, a
+reason to spend another six hours.
+
+## What survived, again
+
+**Probe 0.974 and body 0.1436 at ten epochs.** The shared body coordinate forms under a tripled
+stride, a rewired command window and a fresh initialisation. **It has now survived every
+intervention that broke the prediction path**, which is worth stating in the deck: it does not
+depend on the world model working.
+
+---
+
+
+### F158. What the action-blind prediction misses is mostly not the action
+
+**Before any representation-level rebuild, what are the three percent?** F157 closed the
+objective-level path; this asks whether the residual left by an action-blind prediction is
+structured signal worth predicting directly, or noise.
+
+    r  =  e_t+k  -  FTM(e_t, ITM(e_t, e_t))
+
+`scripts/diagnostics/residual_structure.py`, checkpoint `beh12_hex-b1_body3` at its own lag of 1,
+ridge solved in the dual so the full 360,448-dimensional embedding is used exactly, **split by clip**.
+
+| | action R2, insect | action R2, B1 |
+|---|---|---|
+| **`r`**, the null residual | **0.786** | **0.274** |
+| **`e_t` alone**, the control | 0.777 | 0.161 |
+| `e_t+k - e_t`, raw difference | 0.641 | 0.063 |
+
+**On the insect the residual carries nine thousandths more action than the bare frame does.** The
+frame shows the pose, the pose is the command, and `r` adds essentially nothing to it. Per family it
+is worse than the frame on two of three -- speed 0.774 against 0.805, turning 0.859 against 0.931 --
+and better only on sideways, 0.730 against 0.610.
+
+**On the B1 there is something, and it is small.** `r` reads 0.274 against the frame's 0.161, and
+turning goes from **-0.166** -- the frame is worse than predicting the mean -- to 0.114. So a little
+action information does live in the residual on the quadruped that the frame does not hold. **An R2
+of 0.27 is not a signal to build a research direction on.**
+
+## The pair test says `r` is not determined by the action
+
+Taking each held-out transition and its nearest neighbour in action space:
+
+| | matched-action pairs | random pairs | ratio |
+|---|---|---|---|
+| insect | 794,469 | 1,123,699 | **0.707** |
+| B1 | 909,641 | 971,224 | **0.937** |
+
+**Two states issued the same command leave almost as different a residual as two unrelated ones.**
+If `r` were a function of the action this ratio would go to zero; on the B1 it is 0.94.
+
+## Two things about the method that must be said
+
+**The family-accuracy column is uninformative and I am not reporting it as evidence.** `r` separates
+the families at 1.000 on the insect and 0.869 on the B1 -- but `e_t` alone reads 1.000 and 0.893.
+The frame identifies the behaviour by itself, so the test cannot distinguish a structured residual
+from a residual that merely remembers which clip it came from.
+
+**`r` contains `e_t` implicitly**, since `FTM(e_t, z_null)` is a function of `e_t`. A probe on `r`
+therefore has access to the frame whether or not the residual carries anything, which is exactly why
+the control row is the measurement and the `r` row alone is not.
+
+**And the pair test is loose**: nearest-neighbour in a continuous command space is not an identical
+action, which biases the ratio toward 1. It is conservative in the direction of calling `r` noise,
+so the insect's 0.707 should not be read as precise.
+
+## The branch this takes
+
+**`r` is not action-recoverable beyond what the frame already gives, so predicting `r` directly is
+not a viable next direction.** Fitting a target that is 94% not-determined by the action on the B1,
+and that adds one percent over the raw frame on the insect, reproduces the problem in a new place.
+
+**The remaining path is the representation itself -- the encoder, or what it is asked to predict.**
+That is the question to bring to the advisor. Four findings now converge: a weight cannot create the
+signal (F153), a wider spacing does not create it (F157), and what the action-blind model misses is
+not mostly the action (F158). **V-JEPA2 embeddings of this scene are dominated by what does not
+move, and no term added on top of them reaches around that.**
+
+**Measured on the lag-1 checkpoint only.** `beh12_lag3_nohinge` is on com7; the same script with
+`--lag 3` would confirm there, and F156's lesson applies -- measure a checkpoint at its own stride.
+
+---
+
+
+### F159. A single frame reads the insect's command almost as well as a pair, and does not on the B1
+
+**The paper measurement, in Yeom et al.'s metric.** They report V-JEPA inverse-dynamics R2 of 0.40
+frozen and 0.85 with an ID head, and note that CALVIN's static tabletop lets per-frame appearance
+substitute for temporal context. This asks how far that goes in legged locomotion, where a gait
+makes the pose a near-complete statement of the command. Ridge in the dual on the full
+360,448-dimensional embedding, **split by clip**, `beh12_c08f09t09_flat` held out for the insect.
+
+| features | insect | vs single | B1 | vs single |
+|---|---|---|---|---|
+| **`e_t`, one frame** | **0.779** | -- | **0.161** | -- |
+| `[e_t, e_t+1]`, the pair, their setup | 0.867 | +0.088 | **0.342** | +0.182 |
+| `[e_t, e_t+3]`, a wider pair | **0.887** | +0.108 | 0.328 | +0.167 |
+
+**On the insect one frame recovers 88% of what a pair recovers. On the B1 it recovers 47%.**
+
+| family | insect, single | insect, pair | B1, single | B1, pair |
+|---|---|---|---|---|
+| sideways | 0.609 | 0.846 | 0.317 | 0.456 |
+| speed | 0.814 | 0.861 | 0.263 | 0.482 |
+| **turning** | **0.931** | 0.957 | **-0.166** | 0.120 |
+
+**Insect turning is where the pose is nearly the whole command**: 0.931 from one frame, and the
+transition adds 0.026. **B1 turning is the opposite extreme**: one frame is *worse than predicting
+the mean* at -0.166, and even a pair only reaches 0.120.
+
+## What this does and does not license
+
+**The dissociation is real and it is sharpest exactly where it matters.** On the insect the command
+is recoverable at R2 0.887 and still contributes under 3% of one-step forward prediction error
+(F155). **Inverse-recoverable does not imply forward-necessary**, and that is now quantitative on
+the body where recoverability is highest -- which is the strong form of the claim, not the weak one.
+
+**But "the action is read almost completely from a single frame" is an insect statement.** The
+quadruped reads 0.161 from a frame and 0.342 from a pair, so on the B1 the transition roughly
+doubles what is recoverable and the total stays low. **The contribution statement in
+`direction_plan.md` has been annotated to scope that sentence to the insect**; written unscoped it
+is an overclaim a reviewer with our own table would catch.
+
+**And the two failures are different failures.** The insect fails as "the pose already says it"; the
+B1 fails as "not much is recoverable at all". F158 found the same asymmetry from the other side --
+`e_t` predicting the action at 0.777 on the insect and 0.161 on the B1. Both break an ActSWM-style
+objective, and only the first is the periodicity story.
+
+## The cross-paper number is not a like-for-like comparison
+
+Our single-frame 0.779 on the insect exceeds their frozen 0.40, and it is tempting to say
+periodicity makes the problem twice as easy. **Different data, different action space, different
+head, different split.** The comparison is worth one sentence of framing and must not be presented
+as a controlled contrast.
+
+## Scope
+
+**This measurement is nearly checkpoint-independent** -- the features are frozen encoder embeddings
+and only the action normalisation comes from the loaded config, which is a strength: it is a
+property of V-JEPA2 on this data, not of anything we trained. Confirming on `beh12_lag3_nohinge` at
+its own stride changes the *target* (a 3-step command window, 54 and 36 wide) rather than the
+features, and is the F156-lesson check to run on com7:
+
+    .venv/bin/python3 scripts/diagnostics/inverse_dynamics_r2.py \
+        --ckpt wm/runs/beh12_lag3_nohinge/best.pt --data data/beh12_c08f09t09_flat \
+        --embodiment hexapod --pair_lags 3
+
+---
+
+
+### F160. The `lambda_body = 0` control: pre-registered, measurement path pinned
+
+**The question a reviewer will ask that we cannot currently answer with a measurement**: did our own
+coordinate objective cause the action-insensitivity? Every `null/real` number in the chain, back to
+F87, comes from a checkpoint with the body term active at 0.5, taking 31-37% of the gradient (F149).
+
+**What this control is not.** It is **not** a test of whether the body term explains the lead
+finding. F159 measures action recoverability from **frozen V-JEPA2 embeddings**, which `lambda_body`
+never touches, so the single-frame pose-is-the-command result is encoder-level and stands whatever
+this run reports. **The narrower question, which is real and unmeasured**: does the body term
+*additionally* starve `z` of joint-level detail by shaping it into three coarse body-motion numbers,
+compounding the encoder limit?
+
+`scripts/com7_lambda_body0_control.sh`, run `wm/runs/beh12_lag3_nobody`, about ninety minutes.
+
+## Held identical to `beh12_lag3_nohinge`, one variable changed
+
+| | value | |
+|---|---|---|
+| `frame_stride` / `action_chunk` | 3 / 0 | same as baseline |
+| `lambda_hinge` / `lambda_readout` | 0 / 0 | same |
+| `lambda_recon` | 1.0 | same |
+| `epochs` | 10 | same |
+| `body_dim` / `body_channels` | 3 / `0 1 2` | **kept** |
+| **`lambda_body`** | **0.0** | **the single variable** |
+
+**Keeping `body_dim` and zeroing only the weight is deliberate.** The modules, the latent width and
+the saved buffers stay identical, so the only difference between the two checkpoints is the
+gradient. Dropping `body_dim` instead would change the architecture and make the comparison a
+different experiment.
+
+## The measurement path, pinned before the run
+
+F140 was withdrawn for comparing across two latent paths, so this is stated in advance and checked
+against the code rather than asserted. **`action_necessity.py` constructs the ITM and the FTM and
+nothing else** -- grepping it for `body_head`, `MotionDecoder` or `md` returns no lines -- and
+`gather` reads only `embedding_offsets` from the checkpoint, which `offset_for` supplies regardless
+of the body term. So on a `lambda_body = 0` checkpoint the path is byte-identical to the baseline's:
+
+| | |
+|---|---|
+| null | `ITM(e_t, e_t)`, the same definition as F151, F155 and F157 |
+| lag | **3**, this checkpoint's own stride, as F156 requires |
+| data | the same held-out body for the insect, the same clips for the B1 |
+
+**The script re-runs the baseline at lag 3 in the same log**, so the two tables cannot be mismatched
+by transcription.
+
+## The reading, fixed in advance
+
+| `null/real` | what it means |
+|---|---|
+| **stays near 1.03** | the body term is innocent; the insensitivity is purely encoder-level. **This strengthens the paper** -- our own objective is not the cause, V-JEPA2 is |
+| **rises** | the body term was stripping action detail from `z`. F159 still stands, but our pipeline **compounded** the encoder limit, and what we claim about `z` specifically has to change |
+
+## One gap to close before the comparison can be read
+
+**The B1 baseline number does not exist in any log I hold.** The `beh12_lag3_nohinge` run printed
+`action_necessity` for the insect (1.032 at lag 3, real beating null on 82.9%) and then for the B1,
+but only the insect table was transcribed back. **The insect comparison can be made today; the B1
+comparison needs either the rest of that log or the re-run this script performs.**
+
+**Outcome not yet recorded.**
 
 ---
 
