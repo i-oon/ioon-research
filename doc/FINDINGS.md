@@ -10615,7 +10615,211 @@ by transcription.
 but only the insect table was transcribed back. **The insect comparison can be made today; the B1
 comparison needs either the rest of that log or the re-run this script performs.**
 
-**Outcome not yet recorded.**
+## Outcome: the body term is innocent, and it was mildly helping
+
+Ten epochs, com7, commit 3d86ebc, `wm/runs/beh12_lag3_nobody`. Both tables in one log, both at lag 3,
+the same measurement path.
+
+| at lag 3 | insect `null/real` | real beats null | B1 `null/real` | real beats null |
+|---|---|---|---|---|
+| baseline, `lambda_body` 0.5 | **1.032** | 82.9% | **1.009** | 86.1% |
+| control, `lambda_body` 0 | **1.015** | 74.4% | **1.008** | 83.2% |
+
+**Removing the body term made the action matter less, not more.** On the insect `null/real` fell from
+1.032 to 1.015 and the sign became less reliable, 82.9% to 74.4%. On the B1 nothing moved, 1.009 to
+1.008.
+
+**The pre-registered reading was "stays near 1.03 means the body term is innocent".** It did not
+rise; it fell. **The coordinate objective was not stripping action detail from `z` -- it was a small
+positive contributor to what little action-sensitivity exists.**
+
+**This strengthens the paper on the exact question a reviewer will ask.** "Did your coordinate
+objective cause the action-insensitivity?" is now answerable with a controlled measurement, and the
+answer is no: with the term removed entirely, the insensitivity is *worse*. The cause is upstream, in
+the encoder (F159), which is what the contribution claims.
+
+## Two things this log settles that were open
+
+**The B1 lag-3 baseline, missing from the F157 transcript, is 1.009.** That completes F157's table
+and makes its conclusion stronger, not weaker:
+
+| body | at lag 1, lag-1 model | at lag 3, lag-3 model |
+|---|---|---|
+| insect | 1.028 | 1.032 |
+| **B1** | 1.026 | **1.009** |
+
+**On the quadruped, training at the wider spacing made the action matter *less*.** F157 concluded
+frameskip does not reach the limit from the insect's +0.004; the B1 reads **-0.017**. Nothing about
+the frameskip route survives this.
+
+**And the morphology probe moved a long way.** Body identity is decodable from `z` at **0.974** with
+the body term and **0.732** without it, against a chance of 0.5 on two bodies. **The coordinate
+objective makes `z` substantially more body-identifiable.** Validation motion also ended slightly
+worse without the term, 0.6134 against 0.5360.
+
+## The scoping correction this forces, applied 2026-08-31
+
+**`z` is not body-blind, and every document that said so has been changed.** A probe reading 0.974
+is the first thing a reviewer checks against the word "morphology-agnostic", and it contradicts it
+outright.
+
+**The agnosticism lives in the shared body-motion coordinate -- forward, lateral, yaw, the same
+physical quantities on both robots (F136) -- not in `z`.** The wording is now "`z` maps to a shared
+body-motion coordinate" everywhere.
+
+**This is a scoping correction, not a retraction, and it makes the architecture more coherent rather
+than less.** The decoders are per-body (F129), so `z` *has* to carry body identity for them to work;
+and removing that identity adversarially made transfer 1.2x worse while the frame was used twice as
+much (F24). **A body-blind `z` was never what this pipeline wanted.**
+
+Changed in `doc/direction_plan.md` (three places), `doc/START_HERE.md`, and
+`report/presentation_proposal.md` (three places). **`report/update_slide.md` needed no change** -- it
+never made the claim, and its line "remove body identity from `z` by adversarial training -> transfer
+1.2x worse" already says the opposite. **Earlier findings are left as written**, this file being the
+history; F107's "which is what a morphology-agnostic action is supposed to mean" is superseded by
+this section.
+
+**Do not conflate the two measurements.** `probe` is `MorphProbe(z)` classifying *which body*; it is
+**not** the three-channel body-motion coordinate. The `lambda_body = 0` control has no trained body
+head at all, so no body-motion number exists for it and none is quoted anywhere.
+
+**Read `probe` correctly**: it is `MorphProbe(z)` classifying *which body*, not the three-channel
+body-motion coordinate. The control has no trained body head at all, so no body-motion number exists
+for it and none is quoted.
+
+---
+
+
+### F161. Novelty positioning: three named neighbours, and the scoped claim that survives all three
+
+**The scoped contribution, recorded verbatim as owned by the user. The target-level clause was narrowed on 2026-08-31, after the flag below; this is the canonical wording:**
+
+> In periodic visual locomotion, the joint action is inverse-recoverable from a SINGLE frame (F159:
+> insect R2 0.78, turning 0.93) because gait phase makes the pose encode the command -- so the
+> action is forward-redundant (F158: <3% of prediction error). This closes the loop between two
+> prior observations -- adjacent-frame redundancy (AHA-WAM) and the action-invariant teacher-forcing
+> solution (UWM-JEPA) -- with a measured mechanism, and shows the objective-level fix-family fails
+> on it (ActSWM hinge, F153/F157) and that the residual-target route is closed (F158), since the
+> residual of an action-blind prediction carries no action beyond the frame -- because there is no
+> action-dependent forward signal to recover, only a redundant one.
+
+**The unscoped version -- "visual world models cannot be action-conditioned in locomotion" -- must
+never be written.** A reviewer holding AHA-WAM or UWM-JEPA would sink it, because both papers state
+parts of it already.
+
+## The three neighbours and what separates us from each
+
+| paper | what they have | what we add |
+|---|---|---|
+| **AHA-WAM** (2606.09811) | adjacent frames are "redundant for control" / "weakly informative" -- **the same intuition**, used as architectural motivation for an asynchronous horizon split | they assume it as a design premise; **we measure it, and attribute it to gait periodicity** -- not measured, not tied to periodicity, and not locomotion in their work |
+| **UWM-JEPA** (2605.25313, Sec 4, "Counterfactual Actions Require Counterfactual Targets") | names the structure behind F153/F157: a teacher-forced target contains the action's effect, admitting an **action-invariant solution** that ignores the action channel. Their fix is counterfactual targets | **we show the action-invariant solution is near-optimal in locomotion** because the pose already encodes the command (F159), so a target fix has nothing better to converge to |
+| **Yeom et al.** (2606.07687) | V-JEPA carries inverse-recoverable action signal; CALVIN's static scene lets per-frame appearance substitute for temporal context | **inverse-recoverable is not forward-necessary**, measured; periodicity is the severe, structural form of their CALVIN exception |
+
+**This is a measurement-and-mechanism contribution positioned between named neighbours**, not a
+discovery of the phenomenon. Written that way it is defensible; written as a discovery it is not.
+
+## Why the target-level clause was narrowed, kept so the reasoning is not lost
+
+**As first written -- "target-level (counterfactual/residual targets, F158)" -- it overstated what
+F158 ran.** F158 measured
+whether the **residual** of an action-blind prediction is action-recoverable, and found it is not:
+`r` adds 0.009 R2 over the bare frame on the insect, and matched-action pairs differ by 0.94 of a
+random pair on the B1. That is strong evidence against a **residual** target.
+
+**It is not a test of UWM-JEPA's actual fix.** A counterfactual target is constructed for an action
+that was *not* taken -- it is a different object from the residual of the action that *was* taken,
+and we have never trained against one. **As written, the sentence invites "you did not run our
+method", which is the single most damaging thing a reviewer of that paper can say.**
+
+**Narrowing was chosen over running the arm.** The clause now claims exactly what was measured,
+and UWM-JEPA's counterfactual target is neither run nor claimed to fail. The load-bearing claim is
+the measured mechanism -- single-frame recoverability plus forward redundancy -- and it never
+depended on defeating every proposed fix. **If that counterfactual arm is ever trained, this is the
+sentence that widens.**
+
+## What the failure chain now supports, stated at its true strength
+
+**Measured, on both bodies:** the action contributes under 3% of one-step prediction error (F155);
+no weighting recovers it (F153); no frameskip creates it (F157); the action-blind residual does not
+carry it (F158); and on the insect a single frame reads the command at R2 0.779 against a pair's
+0.887 (F159).
+
+**Not measured:** a counterfactual-target arm, and an encoder other than V-JEPA2. Neither is claimed.
+
+---
+
+
+### F162. Direction B killed in an afternoon: a motion representation does not break the redundancy and destroys the transfer
+
+**The de-risking test, run before any encoder rebuild.** Direction B needs a representation that is
+**both** action-necessary and body-shared, and those may trade off. The cheapest possible candidate
+was used deliberately: **the temporal difference in V-JEPA2 space**, `m_t = e_t+1 - e_t`. No
+training, no new encoder, no world model anywhere in `scripts/diagnostics/motion_rep_check.py`. If
+even this cannot break the redundancy, a learned motion encoder is a much longer bet on the same
+hope.
+
+**Two of three pre-registered outcomes killed B. Both fired.**
+
+## Part 1: the redundancy does not break
+
+Action R2, split by clip, held-out insect body.
+
+| body | family | `e_t` appearance | `m_t` motion | `[m_t, m_t+1]` pair |
+|---|---|---|---|---|
+| **insect** | all | 0.779 | **0.646** | 0.650 |
+| | sideways | 0.610 | 0.451 | 0.412 |
+| | speed | 0.812 | 0.721 | 0.736 |
+| | **turning** | **0.931** | **0.783** | 0.826 |
+| **B1** | all | 0.161 | **0.063** | 0.100 |
+| | sideways | 0.317 | 0.063 | 0.089 |
+| | speed | 0.263 | 0.193 | 0.233 |
+| | turning | -0.166 | -0.076 | -0.029 |
+
+**A single motion snapshot still reads the insect's command at R2 0.646, and its turn at 0.783.**
+The drop from appearance is 0.133, seventeen percent of the way down from a number that was already
+the problem. **Differencing does not remove the pose from the representation** -- an
+appearance-organised space differenced is still appearance-organised.
+
+**Adding a second motion snapshot buys 0.004.** The pair is not the fix either.
+
+## Part 2: and the transfer is destroyed
+
+Correlation of the fitted body-motion coordinate, **fitted on the insect and applied to the B1
+without refitting**.
+
+| representation | test | forward | lateral | yaw |
+|---|---|---|---|---|
+| `e_t` appearance | insect held-out | **0.98** | 0.95 | 0.96 |
+| `e_t` appearance | **B1 unrefitted** | 0.63 | 0.43 | 0.07 |
+| `m_t` motion | insect held-out | **0.60** | 0.52 | 0.84 |
+| `m_t` motion | **B1 unrefitted** | **-0.05** | **0.07** | **0.00** |
+
+**Differencing halves the coordinate within the insect and annihilates it across bodies.** Forward
+transfer goes from 0.63 to -0.05; every channel lands at zero. **This is the fatal trade-off in its
+plainest form: the transform gave up the one result that works and did not buy the property it was
+meant to buy.**
+
+## What this table is not
+
+**The appearance rows are not F136.** This is a raw ridge from frozen embeddings to the coordinate,
+with nothing trained; F136 fits through the model's body head from `z` and reports far higher
+transfer. **The valid comparison here is appearance against motion under one identical protocol**,
+which is what the test needed. **Do not quote 0.63 / 0.43 / 0.07 as the project's transfer numbers.**
+
+## The decision
+
+**Direction B is dead on the cheapest candidate, and dead on both criteria rather than one.** A
+motion transform that halved the working result while leaving the action 83% as readable is not a
+promising start that needs a better encoder; it is the trade-off the test was designed to expose,
+arriving immediately.
+
+**This does not prove no encoder could do it** -- a learned motion encoder is a different object
+from a difference of an appearance encoder, and that is worth one honest sentence rather than a
+claim. **It does mean the cheap evidence points the other way, and Direction A -- finish and write
+up what is measured -- is what the afternoon bought.**
+
+Reproduce: `scripts/diagnostics/motion_rep_check.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt`.
+The Part 2 label columns ran together in the original log; only the formatting was changed after.
 
 ---
 
