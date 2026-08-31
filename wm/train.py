@@ -199,11 +199,11 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
                                  body_pred, body_target)
     if hinge is not None:
         loss = loss + cfg.lambda_hinge * hinge
-        parts["hinge"] = float(hinge)
-        parts["separation"] = float(seps[-1])
+        parts["hinge"] = float(hinge.detach())
+        parts["separation"] = float(seps[-1].detach())
     if readout_loss is not None:
         loss = loss + cfg.lambda_readout * readout_loss
-        parts["readout"] = float(readout_loss)
+        parts["readout"] = float(readout_loss.detach())
     return loss, parts
 
 
@@ -569,6 +569,15 @@ def main():
                if "motion_first" in train_metrics else "")
             + (f" | cross {train_metrics['cross']:.4f}"
                if "cross" in train_metrics else "")
+            # **Printed because the separation curve is the diagnostic, not the endpoint.** At
+            # margin 0.3 it read 0.019, 0.137, 0.496, 0.008 across one short run -- an overshoot,
+            # the hinge switching itself off, and a collapse (F151). A summary that showed only
+            # the final value would have called that a number. Watch it every epoch.
+            + (f" | hinge {train_metrics['hinge']:.4f} sep {train_metrics['separation']:.4f}"
+               f"/{val_metrics['separation']:.4f}"
+               if "hinge" in train_metrics else "")
+            + (f" | readout {train_metrics['readout']:.4f}"
+               if "readout" in train_metrics else "")
             # Printed because it was not. `lambda_body 0.5` ran for 60 epochs contributing 0.002
             # of a 6.0 total, and the line above showed only recon and motion, so the term looked
             # absent rather than negligible. Any term that enters the loss has to enter this line.

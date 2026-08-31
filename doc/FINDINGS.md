@@ -10077,6 +10077,282 @@ calibration F134, selection F136.
 ---
 
 
+### F154. The rebuild fails its pre-registered criterion: one-step prediction survives and everything past it explodes
+
+**Fifty epochs from scratch on com7, both embodiments, the F153 settings.** `beh12_actswm`, commit
+5306889, 01:44 to 08:07 -- six and a half hours. Judged against the pre-registration written before
+it ran.
+
+## Rollout prediction, against a frozen frame, per body
+
+| horizon | hexapod (held-out body) | B1 | the old pretrain, hexapod |
+|---|---|---|---|
+| 1 | **0.743** | **0.707** | 0.732 |
+| 2 | **3.331** | **3.693** | -- |
+| 3 | 3.208 | 4.075 | -- |
+| 5 | 3.139 | 4.007 | 0.764 |
+| 10 | -- | -- | 0.978 |
+| divergence horizon | **2** | **2** | > 10 |
+
+**One step is untouched and everything after it explodes.** The old model was worse than a frozen
+frame only by ten steps; this one is **three to four times worse by two**. `moves` -- predicted
+displacement over actual -- goes from 0.41 to **3.2-4.0**: the rollout does not collapse toward
+standing still, it flies apart.
+
+**This is the pre-registered failure case and then some.** The reading fixed in F153 was "if
+prediction degrades toward the frozen frame with the hinge present from step 0, that is real: stop."
+It did not degrade toward the frozen frame; it went past it by a factor of four. **Stop is the
+answer, and the settings are not the fix.**
+
+## And the mechanism is legible
+
+**The prediction loss is one-step and the hinge is not.** `L_recon` scores `FTM(e_t, z)` against
+`e_{t+1}` and nothing else; the hinge acts at steps 1, 2 and 3. **At steps 2 and 3 the only force
+on the rollout is the one telling it to move away from the null**, and the cheapest way to satisfy
+that is to diverge. Step 1 is anchored by the reconstruction term and is exactly where the damage
+stops -- 0.743 and 0.707, indistinguishable from the 0.732 baseline.
+
+**So the missing piece is a multi-step prediction anchor**, not a smaller `lambda_hinge`. A hinge
+over K steps needs a prediction loss over the same K steps, or it is unopposed everywhere the
+reconstruction term does not reach. **Lowering the margin cannot fix an unopposed term; it only
+slows it.**
+
+## What survived
+
+**The shared coordinate is untouched.** All three channels on both robots: hexapod +0.99 / +0.97 /
++0.98 at 1.0-1.2x compression, B1 +0.98 / +0.97 / +0.95. **The body head does not depend on the
+rollout**, and F134's result stands on this checkpoint too.
+
+**Gradient balance moved as intended**, against F149's baseline:
+
+| | recon | motion | body |
+|---|---|---|---|
+| hexapod, F149 | 40.6% | 22.8% | 36.6% |
+| hexapod, now | **54.4%** | 14.3% | 31.3% |
+| B1, F149 | 22.3% | 46.3% | 31.4% |
+| B1, now | **42.7%** | 28.7% | 28.6% |
+
+Reconstruction's share rose because `lambda_recon` was tripled -- that part did what it was set to
+do. It did not save the rollout, because tripling a **one-step** term cannot anchor steps two and
+three.
+
+## `/mean-z` cannot be read from this run
+
+Hexapod reads 0.94 at one step and 1.04-1.11 beyond it; the B1 reads 0.96 then 0.67-0.74. **The B1's
+apparent improvement is measured on a rollout whose error is four times a frozen frame's** -- a ratio
+between two broken quantities. **No sensitivity claim can be made from a model that has stopped
+predicting**, in either direction.
+
+## A monitoring failure that is mine
+
+**The run has no separation curve.** The epoch line prints `hinge` and `sep` only in a change made
+*after* commit 5306889 was pushed, so six and a half hours produced no record of whether separation
+rose, held, or oscillated. **The one diagnostic F151 and F152 established as essential was absent
+from the run that needed it most.** The print is in the working tree; it must be committed before
+anything else is launched.
+
+## What the next run has to change
+
+1. **A multi-step prediction loss over the same K the hinge spans.** This is the finding, and it is
+   not a hyperparameter.
+2. Only then revisit `lambda_hinge` and the margin.
+3. **Commit the monitoring print first.**
+
+Log kept from the com7 session; run `wm/runs/beh12_actswm/`.
+
+---
+
+
+### F155. One-step prediction does not need the action, so no weighting can make the hinge work
+
+**F154's two candidate explanations, separated by one measurement.** Either `lambda_recon` is out of
+balance -- F151 at 1.0 let the hinge break prediction, F153 at 3.0 smothered it, and the answer is
+in between -- or the one-step task is solvable without reading `z` at all, in which case the balance
+does not exist. `scripts/diagnostics/action_necessity.py` swaps what drives the forward model at a
+single step while holding the state fixed: the real latent, F151's null `ITM(e_t, e_t)`, a real
+latent from a random position in the same clip, the clip's mean, and no motion at all.
+
+**The deciding number is `null/real`.**
+
+| | real | null | shuffled | mean | hold still | **null/real** | shuffled/real | real beats null |
+|---|---|---|---|---|---|---|---|---|
+| **insect**, held-out body, all | 1.5511 | 1.5949 | 1.6531 | 1.6275 | 2.1055 | **1.028** | 1.066 | 70.2% |
+| — sideways | 1.4458 | 1.5150 | 1.5591 | 1.5681 | 1.9057 | 1.048 | 1.078 | 86.9% |
+| — speed | 1.5965 | 1.6425 | 1.7151 | 1.6637 | 2.2517 | 1.029 | 1.074 | 72.5% |
+| — **turning** | 1.6132 | 1.6295 | 1.6878 | 1.6525 | 2.1660 | **1.010** | 1.046 | **51.4%** |
+| **B1**, all | 1.3645 | 1.3994 | 1.4224 | 1.4021 | 1.9425 | **1.026** | 1.042 | 82.3% |
+| — sideways | 1.3246 | 1.3475 | 1.3556 | 1.3477 | 1.8282 | 1.017 | 1.023 | 74.6% |
+| — speed | 1.3799 | 1.4272 | 1.4572 | 1.4261 | 2.0343 | 1.034 | 1.056 | 85.4% |
+| — turning | 1.3891 | 1.4233 | 1.4545 | 1.4325 | 1.9650 | 1.025 | 1.047 | 86.9% |
+
+**Knowing the action that actually happened is worth under three percent, on both robots.** Telling
+the model that *nothing* happened costs 2.6-2.8%; handing it an unrelated action from elsewhere in
+the same clip costs 4-7%. Meanwhile predicting no motion at all costs **36-42%** -- the model is
+predicting a great deal, and almost none of it from `z`.
+
+**Turning on the insect is the sharpest reading and the worst.** Real beats null on **51.4%** of
+samples, a coin flip, on the one behaviour family where the action is least redundant with the
+frame. F119's within-clip objection does not apply here: this is not a periodic gait whose phase the
+frame fixes, it is a direction.
+
+## So the F154 diagnosis was wrong and the answer is not a lambda
+
+**There is no balance point between 1.0 and 3.0.** The hinge asks the forward model to make the real
+rollout differ from the null rollout, and F154 showed it will pay for that with long-horizon
+accuracy. This finding says why it has to: **at one step the two rollouts are already nearly the
+same thing**, so any separation must be manufactured somewhere the prediction loss cannot see. That
+is exactly the divergence at h >= 2 that F154 measured. **Lowering `lambda_recon` will not create a
+signal that is not in the task; it will only let the hinge break prediction faster.**
+
+**This is F54 and F149's last line, now measured rather than suspected.** The prediction target is
+the next embedding at the recorded frame rate, and one frame of legged locomotion is close enough to
+the previous frame that the state carries it. **The objective has to be changed before any
+separation term is worth weighting.**
+
+## What has to change, and it is the target not the weight
+
+The action must be made *necessary* to the prediction, which means widening what one step spans:
+
+1. **Frameskip, or a longer lag between `e_t` and the target.** The cheapest test and it changes only
+   the data pipeline. `action_lag` already exists.
+2. **A multi-step prediction target**, which F154 independently asked for -- it anchors the horizon
+   where the hinge acts *and* it makes each supervised step depend on more action.
+3. Only after `null/real` is meaningfully above 1.0 does a hinge, or its weight, mean anything.
+
+**Measure `null/real` first on any candidate change**, before training anything with a hinge in it.
+It is minutes on a cached checkpoint and it is the precondition the whole ActSWM objective rests on.
+
+## Scope, stated plainly
+
+**Both rows are the pre-rebuild checkpoint `beh12_hex-b1_body3`, which is what exists locally.** The
+rebuild `beh12_actswm` lives on com7 and has not been measured this way;
+`scripts/com7_action_necessity.sh` runs both checkpoints there. The conclusion is expected to hold
+because it is a property of the *task*, not of a set of weights -- but until that script has run,
+**the numbers above are the F138 model's and must be quoted as such.**
+
+*(Numbering: F154 is the F153 run outcome, logged before this diagnostic was requested. This is the
+diagnostic that decides what follows it.)*
+
+---
+
+
+### F156. Lag 3 is the best target spacing on both robots, and the effect is real but small
+
+**F155 said the target has to span more time; this measures how much.** At lag `k` the action is
+`ITM(e_t, e_t+k)`, the target is `e_t+k`, and the forward model is applied once -- exactly what
+training with frameskip `k` would ask of it. Two columns decide: `null/real` says whether the action
+would *matter* at that spacing, `real/hold` says whether anything is predictable there at all.
+Checkpoint `beh12_hex-b1_body3`, held-out body for the insect.
+
+| lag | null/real, insect | real beats null | real/hold | null/real, B1 | real beats null | real/hold |
+|---|---|---|---|---|---|---|
+| 1 | 1.028 | 70.2% | 0.737 | 1.026 | 82.3% | 0.702 |
+| 2 | 1.066 | 93.1% | 0.677 | 1.043 | 91.1% | 0.666 |
+| **3** | **1.078** | **94.6%** | 0.676 | **1.053** | **93.4%** | 0.655 |
+| 5 | 1.072 | 91.5% | 0.693 | 1.049 | 93.1% | 0.661 |
+
+**Lag 3 is the peak on both robots and prediction never stops working.** `real/hold` sits between
+0.65 and 0.74 at every lag -- there is no divergence horizon problem here, because this is one
+application of the forward model rather than a roll. The failure mode F154 found does not appear in
+this measurement and cannot be read from it.
+
+**The sign becomes reliable, and that is the largest change.** Insect turning -- F155's coin flip at
+51.4% -- reads **92.9%** at lag 3. Every family on both bodies moves from 70-87% to 88-97%. **A
+weighting can act on a signal that is right nine times in ten; it cannot act on one that is right
+half the time.**
+
+**But the magnitude stays small.** The best `null/real` anywhere is 1.078, so the action still
+accounts for under eight percent of prediction error on the insect and under six on the B1. F155's
+number was 1.03; lag 3 roughly doubles it and no more.
+
+## The structure the sweep exposes
+
+**`real/hold` is flat across lags.** Holding still costs 2.11 at lag 1 and 3.06 at lag 3; the model
+costs 1.55 and 2.07. **It removes about a third of the motion error at every spacing**, and the
+action's share of that third does not grow with the gap. Widening the target makes every quantity
+larger in proportion rather than changing what the model is using -- which is what a
+representation-level limit looks like: V-JEPA2 embeddings three frames apart are still dominated by
+what is static in the scene.
+
+## The verdict sits between the two branches that were pre-registered
+
+**A viable `k` exists in the sense that matters for weighting** -- lag 3 is a strict improvement over
+lag 1 on both bodies and in every behaviour family, with prediction fully intact. **It is not a
+"clearly beats" in magnitude.** Reporting it as one would be the overclaim.
+
+**And the measurement is a lower bound.** Both the ITM and the forward model were fitted at lag 1, so
+every lag-3 row is off-distribution for them. **A model actually trained at lag 3 could show more --
+or could show that 1.078 was all there was.** That distinction cannot be settled by measuring an
+existing checkpoint, and it is what a full pretrain would be betting six hours on.
+
+## The cheap way to settle it before betting
+
+**Pretrain short at lag 3 with the hinge off** -- `lambda_hinge = 0`, `lambda_readout = 0`, few
+epochs -- and re-run this diagnostic on the result. That removes the off-distribution confound and
+answers the only open question: does `null/real` at lag 3 rise above 1.078 once the model is trained
+there? **If it does, the full pretrain has a target worth weighting against. If it stays near 1.08,
+the problem is the representation and no frameskip reaches it**, and the next move is the encoder or
+the prediction target itself rather than another objective.
+
+**No full pretrain, and no lambda tuning, until that short run reports.** Tuning a weight against a
+six-percent signal is what F153 already spent six hours proving does not work.
+
+*(Both tables are the F138 checkpoint; `beh12_actswm` is on com7 and `scripts/com7_action_necessity.sh`
+now sweeps lags there too.)*
+
+---
+
+
+### F157. The short lag-3 pretrain with the hinge off: pre-registered, wiring confirmed, awaiting com7
+
+**One confound stands between F156 and a decision.** `null/real` peaked at 1.078 on the insect and
+1.053 on the B1 at lag 3, but both the ITM and the forward model producing those rows were fitted at
+lag 1, so every lag-3 measurement is off-distribution for them and 1.078 is a **lower bound**. It
+cannot be used to reject lag 3. Training briefly at lag 3 removes that confound and nothing else.
+
+`scripts/com7_pretrain_lag3.sh`, run `wm/runs/beh12_lag3_nohinge`, about ninety minutes.
+
+| setting | value | why |
+|---|---|---|
+| `frame_stride` | **3** | the peak on both robots and in every behaviour family (F156) |
+| `action_chunk` | 0, meaning follow the stride | **widening the stride without this is measurably wrong** -- `z` summarises k steps while `L_motion` scores one, which took validation motion from 0.218 to 0.928 (F88) |
+| `lambda_hinge` | **0** | no separation pressure, so no explosion risk. F154's divergence came from a hinge acting where the prediction loss could not see |
+| `lambda_readout` | 0 | same |
+| `lambda_recon` | **1.0** | back to default; the 3.0 of F153 existed only to counter the hinge |
+| `epochs` | 10 | enough to fit the new target, far short of a model worth keeping |
+
+**This is not a candidate model and nothing may be tuned against it.**
+
+## The decision, fixed before the run
+
+| `null/real` at lag 3, trained there | what it means | what happens next |
+|---|---|---|
+| **clearly above 1.078** | the lag-3 task genuinely needs the action once a model learns it | add the hinge and pretrain fully, **then** tune `lambda` |
+| **stays near 1.08** | the limit is the representation, not the objective -- no frameskip reaches it | the next move is the **encoder or the prediction target itself, not another objective term**. Report plainly and stop |
+
+Read per body and per family. **Insect turning is the sharpest cell**: 51.4% at lag 1 (F155), 92.9%
+at lag 3 off-distribution (F156).
+
+## Wiring confirmed before spending the time
+
+A one-epoch smoke run locally, `wm/runs/smoke_lag3`, checks the thing F88 says to check. The epoch
+line prints `heads {'hexapod': 18, 'b1': 12}`, which is the **action dimension**, not the head width,
+and reading the width off the checkpoint gives `heads.hexapod.3.weight (54, 512)` and
+`heads.b1.3.weight (36, 512)` -- **18x3 and 12x3, so the command window did widen with the stride**
+and the two halves of the objective describe the same interval. The saved config confirms
+`frame_stride: 3`, `action_chunk: 0`, `lambda_hinge: 0.0`, `lambda_recon: 1.0`.
+
+**One thing to watch in the full ten epochs.** Validation motion read **1.1396** after that single
+epoch, which is around the level of predicting the training mean -- exactly the number F88 uses to
+say the decoder has stopped working. After one epoch it means nothing; **if it is still near 1.0 at
+epoch 10 the run has hit F88's failure and its `null/real` cannot be read**, because a decoder that
+has stopped working says nothing about whether the action was available.
+
+**Outcome not yet recorded.** Nothing about lag 3 is decided until com7 reports.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
