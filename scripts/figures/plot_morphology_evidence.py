@@ -15,7 +15,8 @@ NOT proven here, on purpose: that the signal is leg length RATHER THAN recording
 session. Each of the 3 morphologies is a single session, so morphology and
 session are perfectly confounded in this data. No analysis on this set can
 separate them; only re-recording each body under varied lighting/background can.
-See the caption and report/NUMBERS.md.
+See the caption; the numbers ledger it used to cite was removed, and provenance now sits in
+doc/FINDINGS.md next to each result.
 
 Usage:
   .venv/bin/python scripts/plot_morphology_evidence.py

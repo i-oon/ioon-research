@@ -81,13 +81,17 @@ def main():
                     help="override the measured direction of travel")
     ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"),
                     help="(right, up, forward) in the camera's own basis, metres")
+    ap.add_argument("--align_yaw", action="store_true",
+                    help="rotate the clip so it starts facing +x, matching the insect's fixed "
+                         "spawn. **Required for a paired cross-embodiment set**: without it a slot "
+                         "differs in start pose as well as in body")
     ap.add_argument("--ego_seed", type=int, default=0,
                     help="**appearance seed, and it must be PAIRED with the insect's.** The same "
                          "integer produces the same room on either robot, so a cross-embodiment "
                          "test run on matched seeds differs by body and by nothing else. Unmatched "
                          "seeds make Q2 unreadable: 'the coordinate does not transfer' and 'the two "
                          "sets were collected in different-looking rooms' become the same number")
-    ap.add_argument("--ego_box", type=float, default=0.0,
+    ap.add_argument("--ego_box", type=float, default=0.0,   # 0 = scaled from the insect's by height
                     help="build a textured room this many metres across; an untextured world "
                          "carries no optical flow and the egocentric view would see nothing")
     ap.add_argument("--max_frames", type=int, default=0,
@@ -133,6 +137,36 @@ def main():
     # Replay at the same world point as the insect. Without this B1 stands on a different
     # patch of a 5 m floor and its background differs from the insect's across ~27% of pixels,
     # which a probe would read as an embodiment difference.
+    if args.align_yaw:
+        # **Every clip starts facing the same way, so a slot pairs across bodies.** The insect
+        # spawns identically every time -- [0, 0.01] and 178 degrees in its own aft-referenced
+        # convention, which is +x physically -- while each B1 rollout begins wherever MuJoCo left
+        # it, from -21.5 to 0 degrees. Without this the two bodies' clips differ in start pose as
+        # well as in body, and Q2 cannot tell which caused a coordinate not to transfer.
+        #
+        # A rigid rotation of the whole trajectory about its own first frame: the physics is
+        # untouched because the replay is kinematic, and the room is randomised per seed anyway.
+        import sys as _s3
+        _s3.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        from wm.data.embodiment import heading as _h   # noqa: E402
+        psi = float(_h(base_quat[:1], "b1")[0])
+        c, sn = np.cos(-psi), np.sin(-psi)
+        p0 = base_pos[0, :2].copy()
+        d = base_pos[:, :2] - p0
+        base_pos = base_pos.copy()
+        base_pos[:, 0] = p0[0] + c * d[:, 0] - sn * d[:, 1]
+        base_pos[:, 1] = p0[1] + sn * d[:, 0] + c * d[:, 1]
+        # rotate the orientation by the same amount, in (w,x,y,z)
+        qz = np.array([np.cos(-psi / 2), 0.0, 0.0, np.sin(-psi / 2)])
+        w1, x1, y1, z1 = qz
+        w2, x2, y2, z2 = base_quat[:, 0], base_quat[:, 1], base_quat[:, 2], base_quat[:, 3]
+        base_quat = np.stack([w1*w2 - x1*x2 - y1*y2 - z1*z2,
+                              w1*x2 + x1*w2 + y1*z2 - z1*y2,
+                              w1*y2 - x1*z2 + y1*w2 + z1*x2,
+                              w1*z2 + x1*y2 - y1*x2 + z1*w2], axis=1)
+        print(f"    yaw aligned: start heading {np.degrees(psi):+.1f} -> "
+              f"{np.degrees(_h(base_quat[:1], 'b1')[0]):+.1f} deg")
+
     if args.spawn is not None:
         base_pos = base_pos.copy()
         base_pos[:, 0] += args.spawn[0] - base_pos[0, 0]
@@ -144,24 +178,41 @@ def main():
         # have to be recomputed from the same pose and is one convention error away from silently
         # looking somewhere else.
         import sys as _s
+        ROOTDIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scene"))
         from ego_camera import (attach_ego, build_texture_box,   # noqa: E402
-                                randomise_ground)
+                                randomise_ground, room_for, WALK_PITCH)
+        R = room_for(sim.getObjectPosition(root, sim.handle_world)[2])
         if args.ego_box > 0:
-            build_texture_box(sim, size=args.ego_box, seed=args.ego_seed)
-        randomise_ground(sim, seed=args.ego_seed)
-        # **The direction the base actually travels**, taken from the trajectory in hand rather than
-        # from the base frame's axis convention. Averaged over the clip so one noisy step cannot
-        # point the camera sideways.
+            R["size"] = args.ego_box
+        build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"],
+                          seed=args.ego_seed,
+                          centre=(float(base_pos[0, 0]), float(base_pos[0, 1])))
+        # ground texture is applied AFTER --floor_scale, further down: `sim.scaleObjects` stretches
+        # whatever texture is already on the shape, so texturing first made the B1's floor three
+        # times coarser than the insect's -- measured 1.67 against 0.60 of horizontal detail at
+        # matched image rows, a ratio of 2.8 against a floor_scale of 3.
+        # **Where the body faces, not where it travels.** Deriving forward from the direction of
+        # motion was wrong and only showed up on the sideways clips: a crabbing robot travels along
+        # -y while facing +x, so the camera swung 90 degrees off the body axis and the B1's
+        # sideways view was a different experiment from the insect's, which mounts along
+        # `head - abdomen` and therefore always looks where the body points.
+        #
+        # `heading()` carries the B1's (w,x,y,z)-with-x-forward convention, which is not guessable
+        # and has cost this project a week before (F71, F117).
         if args.ego_forward is not None:
             fwd = args.ego_forward
         else:
-            d = base_pos[min(len(base_pos) - 1, 40)] - base_pos[0]
-            fwd = [float(d[0]), float(d[1]), 0.0]
-            if float(np.linalg.norm(fwd)) < 1e-3:
-                raise SystemExit("the base barely moves in this clip, so its forward direction "
-                                 "cannot be measured; pass --ego_forward")
-        print(f"    ego camera: {attach_ego(sim, cam, root, fwd, args.ego_offset or (0.0, 0.06, 0.28))}")
+            import sys as _s2
+            _s2.path.insert(0, ROOTDIR)
+            from wm.data.embodiment import heading as _heading   # noqa: E402
+            psi = float(_heading(base_quat[:1], "b1")[0])
+            fwd = [float(np.cos(psi)), float(np.sin(psi)), 0.0]
+        _cam_info = attach_ego(sim, cam, root, fwd,
+                               args.ego_offset or (0, 0, 0),
+                               offset_frac=None if args.ego_offset else R["offset_frac"],
+                               pitch_comp=WALK_PITCH["b1"])
+        print(f"    ego camera: {_cam_info}")
     else:
         sim.setObjectPosition(cam, sim.handle_world,
                               [base_pos[0, 0] + off_xy[0] + args.cam_dx,
@@ -182,6 +233,8 @@ def main():
                 q = sim.getObjectPosition(h, sim.handle_world)
                 sim.setObjectPosition(h, sim.handle_world, [q[0], q[1], q[2] - drop])
             print(f"    floor x{args.floor_scale}: surface {before:+.3f} -> {surface():+.3f}")
+    if args.ego:
+        randomise_ground(sim, seed=args.ego_seed, uv=R["ground_uv"])
     if args.cam_back != 1.0:
         # push the camera away along the line it already looks down, so the framing widens without
         # the lens changing -- the insect's shot, taken from further back

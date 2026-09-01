@@ -595,6 +595,7 @@ def precompute_commands(sim, simIK, scene, brel, scale, ik_iters=1):
 
 def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None,
                      ego=False, ego_euler=None, ego_offset=None, ego_box=0.0, ego_seed=0,
+                     cam_fov=0.0,
                      cmd_noise=0.0, noise_tau=5.0, noise_seed=0,
                      active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None):
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
@@ -650,12 +651,21 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__))), "scene"))
         from ego_camera import (attach_ego, build_texture_box, insect_forward,   # noqa: E402
-                                randomise_ground)
+                                randomise_ground, room_for, scale_floor,
+                                WALK_PITCH)
+        R = room_for(sim.getObjectPosition(track, sim.handle_world)[2])
         if ego_box > 0:
-            build_texture_box(sim, size=ego_box, seed=ego_seed)
-        randomise_ground(sim, seed=ego_seed)
+            R["size"] = ego_box
+        scale_floor(sim, R["size"])            # the floor must reach past the walls
+        randomise_ground(sim, seed=ego_seed, uv=R["ground_uv"])
+        # the walls are built AFTER the respawn, further down -- see the note there
         fwd = ego_euler if ego_euler is not None else insect_forward(sim)
-        print(f"    ego camera: {attach_ego(sim, cam, track, fwd, ego_offset or (0.0, 0.02, 0.03))}")
+        # the field of view is set AFTER startSimulation, further down -- see the note there
+        _cam_info = attach_ego(sim, cam, track, fwd,
+                               ego_offset or (0, 0, 0),
+                               offset_frac=None if ego_offset else R["offset_frac"],
+                               pitch_comp=WALK_PITCH["hexapod"])
+        print(f"    ego camera: {_cam_info}")
     cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
     trk0 = np.array(sim.getObjectPosition(track, sim.handle_world))
     off_xy, cam_z = cam0[:2] - trk0[:2], cam0[2]
@@ -687,8 +697,33 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         sim.setObjectPosition(root, sim.handle_world,
                               [spawn[0] + pos[0] - head[0], spawn[1] + pos[1] - head[1], pos[2]])
 
+    if ego:
+        # **Built after the respawn, on the position the robot will actually stand at.** The early
+        # ego block runs before `spawn` moves the robot to the floor centre, so a room centred
+        # there left the insect about 2.8 m off centre: the near wall sat 1.2 m away instead of 4,
+        # the wall/floor junction landed 19.8 degrees below centre where the geometry predicts 6.0,
+        # and the view read as far more zoomed than the B1's. **The room has to follow the spawn,
+        # not the scene's authored pose.**
+        here = np.array(sim.getObjectPosition(track, sim.handle_world))
+        build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"],
+                          seed=ego_seed, centre=(float(here[0]), float(here[1])))
+
     sim.setStepping(True)
     sim.startSimulation()
+    if ego and cam_fov > 0:
+        # **After `startSimulation`, because starting restores the scene file's own values.** Set
+        # before, the request was silently reverted to the authored 15 degrees and every egocentric
+        # insect clip was shot through a portrait lens: the wall/floor junction landed 19.4 degrees
+        # below centre where the geometry predicts 6.0, which reads as the robot standing much
+        # nearer the wall than it is. The preview script never started the simulation, so it showed
+        # the 90 degrees that was asked for and the collector did not.
+        sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
+                                float(np.deg2rad(cam_fov)))
+        got = np.degrees(sim.getObjectFloatParam(cam, sim.visionfloatparam_perspective_angle))
+        print(f"    fov {got:.1f} deg (asked {cam_fov:.0f})")
+        if abs(got - cam_fov) > 1.0:
+            raise SystemExit(f"the sensor kept {got:.1f} deg instead of {cam_fov:.0f}; "
+                             "an egocentric clip at the authored lens is not the experiment")
     # settle holding the first pose
     for _ in range(warmup):
         for h, v in zip(joints, cmds[0]):
@@ -905,6 +940,15 @@ def main():
     ap.add_argument("--stance", type=float, default=0.9,
                     help="fraction of the recorded stance sweep to use, --gait tripod only. Below "
                          "1.0 because the reachable set narrows toward the extremes of the sweep")
+    ap.add_argument("--view", choices=("allocentric", "egocentric"), default="allocentric",
+                    help="**which camera the clip is shot with, stated rather than implied.** "
+                         "`allocentric` is the fixed third-person shot every set before "
+                         "2026-09-01 used and is bit-identical to omitting this flag; `egocentric` "
+                         "mounts the camera on the head, builds a randomised room, **and raises the "
+                         "field of view to 90 degrees unless --cam_fov says otherwise** -- the "
+                         "scene's authored 15 is a portrait lens, and an egocentric run at 15 comes "
+                         "back nearly featureless while every other setting is correct. Coupling "
+                         "them is deliberate: the two must not be settable apart by accident")
     ap.add_argument("--ego", action="store_true",
                     help="**mount the camera on the robot and look forward.** The de-risk gate for "
                          "the egocentric direction: a head view cannot show the robot its own pose, "
@@ -918,6 +962,10 @@ def main():
     ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"),
                     help="camera position as (right, up, forward) in its own basis, metres; the "
                          "default sits 3 cm ahead of the head and 2 cm above it")
+    ap.add_argument("--cam_fov", type=float, default=0.0,
+                    help="perspective angle in degrees; 0 keeps the scene's own. **A head view "
+                         "needs about 90** -- the authored 15 is framed for a third-person shot and "
+                         "leaves an egocentric frame with almost nothing in it")
     ap.add_argument("--ego_seed", type=int, default=0,
                     help="**appearance seed, and it must be PAIRED with the B1's.** Advanced by "
                          "repeat only, so a caller that sets it per *condition* gets the same room "
@@ -975,6 +1023,20 @@ def main():
     args = ap.parse_args()
     # **A turn rate that varies inside the clip**, so the onset frame exists. Built once here
     # because both collection branches take it, and `EP` is the clip length everywhere.
+    if args.view == "egocentric":
+        args.ego = True
+        if args.cam_fov <= 0:
+            args.cam_fov = 90.0
+        if args.ego_box <= 0:
+            args.ego_box = 8.0
+    elif args.ego:                    # the older spelling still works and still means egocentric
+        args.view = "egocentric"
+        if args.cam_fov <= 0:
+            args.cam_fov = 90.0
+    print(f"view: {args.view}"
+          + (f", fov {args.cam_fov:.0f} deg, room {args.ego_box:.0f} m, seed {args.ego_seed}"
+             if args.ego else ", scene camera as authored"))
+
     spin_arg = piecewise(args.spin_schedule, EP) if args.spin_schedule else args.spin
     # the same schedule string, expressed as the oscillator's per-frame pace
     pace_arg = piecewise(args.schedule, EP) if (args.schedule and args.gait == "cpg") else None
@@ -1102,7 +1164,7 @@ def main():
                 f, a, fc, h, o = drive_and_record(
                     sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
                     ego=args.ego, ego_euler=args.ego_forward, ego_offset=args.ego_offset,
-                    ego_box=args.ego_box, ego_seed=args.ego_seed + rep,
+                    ego_box=args.ego_box, ego_seed=args.ego_seed + rep, cam_fov=args.cam_fov,
                     cmd_noise=args.cmd_noise, noise_tau=args.noise_tau,
                     noise_seed=args.noise_seed + 1000 * ep + rep,
                     active_legs=active_legs, remove_legs=remove_legs,

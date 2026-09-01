@@ -49,7 +49,7 @@ sim/
 
 ## diagnostics/
 
-`step_minus1_morphology_gap.py` — the Step -1 morphology gap check, cited in `report/NUMBERS.md`. Predates `scripts/diagnostics/`; the newer measurement toolkit lives there instead.
+`step_minus1_morphology_gap.py` — the Step -1 morphology gap check. **Its long-body figure does not reproduce** (4.125 documented, 4.404 recomputed; see the note in `doc/FINDINGS.md`), and it is still quoted in `doc/PROGRESS.md` and `sim/SOURCES.md`. Predates `scripts/diagnostics/`; the newer measurement toolkit lives there instead.
 
 ## Do not redefine scene/body paths here
 

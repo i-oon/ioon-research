@@ -45,16 +45,22 @@ def main():
     ap.add_argument("--floor_scale", type=float, default=3.0)
     ap.add_argument("--ego", action="store_true",
                     help="head camera and a randomised room instead of the fixed third-person shot")
-    ap.add_argument("--ego_box", type=float, default=8.0)
+    ap.add_argument("--ego_box", type=float, default=0.0)
     ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"))
+    ap.add_argument("--align_yaw", action="store_true",
+                    help="rotate each clip to start facing +x, so a slot pairs with the insect's")
     args = ap.parse_args()
 
     src = os.path.join(ROOT, args.src)
     out = os.path.join(ROOT, args.out)
     os.makedirs(out, exist_ok=True)
     clips = sorted(glob.glob(os.path.join(src, "*.npz")))
-    print(f"{len(clips)} clips, fov {args.cam_fov} deg, spawn {tuple(args.spawn)}, "
-          f"floor x{args.floor_scale}", flush=True)
+    if args.ego and args.cam_fov == 24.0:
+        # **90 degrees, not the third-person 24.** An egocentric clip shot through the allocentric
+        # lens is not the experiment, and the default here is the allocentric one.
+        args.cam_fov = 90.0
+    print(f"{len(clips)} clips, view {'egocentric' if args.ego else 'allocentric'}, "
+          f"fov {args.cam_fov} deg, spawn {tuple(args.spawn)}, floor x{args.floor_scale}", flush=True)
 
     for i, clip in enumerate(clips):
         tag = os.path.basename(clip)
@@ -72,6 +78,8 @@ def main():
             with np.load(clip, allow_pickle=True) as z:
                 room = int(z["expert_episode"]) % 100 if "expert_episode" in z.files else i % 4
             cmd += ["--ego", "--ego_box", str(args.ego_box), "--ego_seed", str(room)]
+            if args.align_yaw:
+                cmd += ["--align_yaw"]
             if args.ego_offset:
                 cmd += ["--ego_offset"] + [str(v) for v in args.ego_offset]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)

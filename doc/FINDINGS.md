@@ -11948,9 +11948,333 @@ unreadable, and F165 is the case where a silently-ignored flag produced eight co
 every gate while carrying no intervention at all. **Both were caught by a check that ran before the
 result was believed.**
 
-**Outcome not yet recorded.** Needs CoppeliaSim with a GUI and exactly one instance. **No
-environment is to be built and no data collected until both questions pass, and Q1 is not to be read
-until the leak check is at chance.**
+## Outcome: both questions pass, and turning is where it pays
+
+48 clips per body, twelve conditions, four rooms fully crossed -- every room hosts every behaviour
+and every behaviour appears in all four rooms, so appearance carries no information about which
+behaviour a clip is. Seeds paired across bodies by slot.
+
+**Guard 2 first, as locked.** Room colour predicts heading on held-out clips at **0.34x chance** on
+the insect and **0.50x** on the B1 -- **below** chance, so there is no landmark and Q1 is measuring
+the view.
+
+## Q1: the redundancy breaks, decisively on the insect
+
+| insect | single frame | pair | gap |
+|---|---|---|---|
+| allocentric (F159) | **0.779** | 0.887 | +0.108 |
+| **egocentric** | **0.293** | 0.578 | **+0.285** |
+
+| B1 | single frame | pair | gap |
+|---|---|---|---|
+| allocentric | 0.161 | 0.328 | +0.167 |
+| **egocentric** | **0.097** | 0.259 | +0.162 |
+
+**Single-frame readability falls by 0.486 on the insect and the pair-minus-single gap nearly
+triples.** This is the first intervention in the whole chain that moves the quantity F153 through
+F169 were all trying and failing to move. Per family the insect reads sideways at **-0.008** from
+one frame, speed 0.421, turn 0.483 -- against 0.609, 0.812 and 0.931 allocentrically.
+
+**The B1's gap is unchanged** at +0.162, because its single-frame readability was already low (0.161)
+and there was little to remove.
+
+## Q2: the coordinate still crosses, and yaw crosses far better
+
+Fitted on the insect's egocentric embeddings, tested on the B1's **without refitting**:
+
+| | forward | lateral | yaw |
+|---|---|---|---|
+| allocentric, insect held-out (F162) | 0.98 | 0.95 | 0.96 |
+| allocentric, **B1 unrefitted** | 0.63 | 0.43 | **0.07** |
+| egocentric, insect held-out | 0.77 | 0.53 | 0.61 |
+| egocentric, **B1 unrefitted** | **0.50** | **0.39** | **0.64** |
+
+**Yaw transfer goes from 0.07 to 0.64.** Turning is the channel this project has fought since F136
+and which F169 nearly lost entirely, and it is the one the view change helps most -- which is what
+the physics predicts, since a head camera sees rotation as global image flow whatever the body
+underneath is doing.
+
+**Forward and lateral transfer fall**, 0.63 to 0.50 and 0.43 to 0.39, and the within-insect fit falls
+further, 0.98 to 0.77 on forward. **The coordinate is harder to read from a head view and it still
+crosses.** That trade is the honest summary and it should not be reported as an unqualified
+improvement.
+
+## Two things this does not say
+
+**`motion_rep_check.py` prints a verdict line of its own** -- "redundancy is NOT broken, Direction B
+is dead" -- which belongs to **F162's** question about a motion *representation*, not to Q1. It is
+computed from that script's Part 1 and must not be read as a verdict on this run.
+
+**Nothing here is a trained model.** Q1 says the action is no longer readable from a pose; it does
+not say a world model trained on this data will use the transition. F155 through F169 are a record of
+signals that existed and were then ignored by a trained predictor. **The next step is to train one
+and measure, and the pre-registration for that has not been written.**
+
+## The pre-registered branch, taken
+
+**Q1 pass and Q2 pass: the direction is alive and the full environment is worth building.** Every
+number above comes from a room built to be the cheapest thing that could answer the question, so the
+first real decision is what a proper environment should have that this one does not.
+
+Data: `data/egocentric/beh12_c10f10t10_ego_flat`, `data/egocentric/beh12_b1_ego_flat`.
+
+---
+
+
+### Note (not a finding): what the shared coordinate actually requires, against Demo-JEPA
+
+**Scoping by code inspection, to locate where a technical claim could sit.** Nothing was run.
+
+## What the coordinate needs
+
+| | this project | Demo-JEPA |
+|---|---|---|
+| **paired data across bodies** | **none.** `body_target = batch["body_motion"]` is that clip's own measurement; batches never pair an insect frame with a B1 frame, and `lambda_cross` -- the term that *would* pair them -- is **0.0** in the checkpoint every result is measured on | end-effector retargeting, to manufacture pairs |
+| **temporal alignment across bodies** | **none.** No DTW, no soft alignment, no shared clock; each clip is consumed on its own timeline | GTCC |
+| **labels** | **none by hand.** Forward and lateral come from differencing the body's recorded position, yaw from its quaternion, both divided by `sqrt(g*h)` and smoothed over one stride | -- |
+| **transfer** | fit on the insect, applied to the B1 **with no refitting** (`motion_rep_check.py` part 2: one `mu`/`sd` and one solve, both from the insect's training half) | -- |
+| **one head or two** | **one.** `body_head(z)` takes the latent alone and is shared across embodiments; only the *action* decoders are per-body | -- |
+
+**So the answer is LESS supervision, and on three separate axes**: no pairing, no alignment, no human
+labels. What makes it possible is that the target is a **physical quantity both bodies possess**
+rather than a correspondence that has to be constructed -- forward, lateral and yaw are measured
+from each robot separately, and Froude scaling is what puts them on one axis (F56: 0.155 against
+0.159 across a fourfold size difference).
+
+## What it does need, and this must not be left out of any claim
+
+**Privileged state.** The target is differenced from the simulator's recorded body position and
+orientation. On hardware that is odometry or motion capture, not vision. **The coordinate is not
+learned from pixels; it is regressed onto a measured quantity**, and a paper that says "no
+correspondence required" while quietly requiring pose ground truth is overclaiming.
+
+**A stride-length smoothing window**, which is a locomotion-specific choice with a measured reason:
+per-frame speed is dominated by body rocking, and between-clip variation sits at 0.63 of within-clip
+rocking at five frames but 1.45 at a stride.
+
+## Where the novelty candidate sits
+
+**Not "we learn a shared latent" -- everyone does.** The candidate is narrower and defensible:
+**a cross-embodiment coordinate that needs no pairing, no temporal alignment and no retargeting,
+because the quantity chosen is one every legged body already has and Froude scaling makes
+commensurable.** Demo-JEPA builds correspondence; this measures a quantity that is already common.
+
+**And it is worth stating as a limitation of scope**: it buys exactly three channels. Anything the
+two bodies do not share -- their joint spaces, their gaits, their contact patterns -- is not carried
+by it, which is precisely what F82 and F83 found when the same question was asked of joint targets.
+
+---
+
+
+### Note (not a finding): gait shake and world motion are separable, and removing the shake helps across bodies
+
+**Scoping a candidate method.** An egocentric camera carries two things at once: where the body is
+going, which both robots share, and how the body shakes getting there, which is a tripod on one and
+a trot on the other. If the second can be removed the first should cross better -- and that would be
+a method rather than a setting. Q2 left this open by moving yaw from 0.07 to 0.64 while moving
+forward and lateral the other way.
+
+## They are separable, and by a wide margin
+
+Decomposing each clip's camera yaw into a linear trend (the net turn) and the rest (the gait):
+
+| | stride peak | share of the oscillation's power at that peak | trend's share of total variance |
+|---|---|---|---|
+| insect | **6 cycles/clip** | 0.53 | 0.57 |
+| B1 | **6 cycles/clip** | 0.51 | 0.56 |
+
+**The gait sits at 6 cycles per clip on both bodies and the net turn at 0 to 1**, so they occupy
+different bands and a projection can separate them. **They are comparable in size** -- gait sd over
+turn sd is 0.79 on the insect and 0.96 on the B1 -- so this is not a small correction to a large
+signal.
+
+## Removing it helps, modestly, and helps *across bodies specifically*
+
+Per clip, `sin` and `cos` at the measured stride frequency plus two harmonics, subtracted from every
+embedding dimension, clip mean kept. Coordinate fitted on the insect, applied to the B1 **without
+refitting**.
+
+| | | forward | lateral | yaw |
+|---|---|---|---|---|
+| egocentric | insect held-out | 0.71 | 0.29 | 0.61 |
+| egocentric | **B1 unrefitted** | 0.45 | 0.38 | 0.57 |
+| **gait removed** | insect held-out | 0.73 | 0.25 | 0.62 |
+| **gait removed** | **B1 unrefitted** | **0.47** | **0.46** | **0.61** |
+
+**All three channels improve across bodies and the within-body fit does not.** That asymmetry is the
+interesting part: 0.71 -> 0.73, 0.29 -> 0.25 and 0.61 -> 0.62 within the insect, against +0.02,
+**+0.08** and +0.04 on the B1. **Removing a body-specific component helps exactly where bodies
+differ**, which is what the hypothesis predicts and what a generic denoising would not do.
+
+## Answering the question Q2 raised
+
+**Lateral comes back and then some**: 0.38 -> 0.46, against **0.43 allocentric**. **Forward does
+not**: 0.47 against **0.63 allocentric**. So the drop Q2 showed is *partly* gait shake and partly
+something else, and forward is where the something else lives.
+
+## What this is and is not
+
+**It is a viable method candidate.** Gait-locked shake is separable, it is body-specific, and
+removing it improves cross-body transfer on every channel. "Extract embodiment-invariant ego-motion
+from gait-coupled egocentric video" is a real problem with a measurable handle.
+
+**The effect is modest and the method here is crude** -- three harmonics of one frequency estimated
+per clip, subtracted linearly. That it works at all with a projection this blunt is the argument for
+trying something learned; it is not evidence that a learned version would do better.
+
+**And the baseline differs slightly from Q2's** -- 0.45/0.38/0.57 here against 0.50/0.39/0.64 --
+because this uses every frame where `motion_rep_check` strides by three, on a different split.
+**Only the two rows of this table may be compared with each other.**
+
+Reproduce: `scripts/diagnostics/degait_coordinate.py`. `gram` now chunks both sides; the egocentric
+sets are three times the size the function was written for and it died on the GPU rather than
+degrading.
+
+---
+
+
+### F171. Which surface V-JEPA2 reads motion from, measured rather than inherited
+
+**Asked because the egocentric room reused the floor's texture recipe on faith.** That recipe was
+chosen for a *floor* under a *third-person* camera, to stop the background drowning the robot
+(`set_floor_texture.py`). **An egocentric wall has the opposite job**: it is not background, it is
+the entire signal.
+
+**No simulator.** A large texture is panned past a 256 px viewport -- what a wall does when a robot
+walks along it -- and the frames go through the pipeline's own encoder. Correlation between true pan
+distance and embedding distance, four pan speeds:
+
+| surface | r | note |
+|---|---|---|
+| blank | -- | no change at all |
+| **checkerboard** | **-0.149** | **reproduces this project's own -0.16** (`set_floor_texture.py`) |
+| white noise | 0.199 | |
+| value noise, 5 octaves -- **the floor recipe** | 0.478 | what was inherited |
+| **value noise, octaves 4/8/16** | **0.723** | what is used now |
+| value noise, octaves 8/16/32 | 0.613 | |
+| the same, tiled 4x4 | 0.474 | repeating costs a third of it |
+
+**The checkerboard row is the method's own control.** It lands on the number this project measured
+years of findings ago by a completely different route, which is why the ranking above is worth
+trusting.
+
+**The floor recipe's fine octaves at 64 and 256 are what cost it** -- the same high-frequency
+aliasing the checkerboard finding is about, in a milder form. And **a repeating surface is ambiguous
+about position**, so embedding distance stops tracking distance travelled: 0.723 falls to 0.474 when
+the same texture is tiled.
+
+## The limit, stated plainly
+
+**The best surface tested reaches r = 0.72 and moves the embedding about twice as far as a one-pixel
+wobble.** Egocentric rests on this relation being strong; measured on a 2D pan, it is not.
+
+**And a 2D pan is not the question.** It has no depth, no parallax and no shadows, and GeoLoco
+(2603.07624) pushes models toward 3D geometry over 2D texture precisely because the two differ.
+**These numbers rank surfaces against each other; they do not establish that the signal is
+sufficient.** That is what F170's Q1 answers, in the rendered scene.
+
+Reproduce: `scripts/diagnostics/texture_for_vjepa.py`.
+
+---
+
+### Note (not a finding): ten defects in the egocentric scene, and what caught each
+
+**Every number in F170 depends on the scene being what it claims**, so this records what it was not,
+in the order the faults surfaced. **Three of the ten were caught by looking at a rendered frame and
+would have passed every statistical gate**; two were caught only because a measurement disagreed
+with geometry; and **two of my own measurements turned out to be the thing that was broken.**
+
+| # | defect | how it presented | what caught it |
+|---|---|---|---|
+| 1 | camera mounted on `/abdomen`, the **rear** segment, facing a guessed axis | dark, flat frames | **looking at a frame** |
+| 2 | `sim.createTexture` returns three values, two were unpacked | walls flat colour, "texture skipped" | reading the log line |
+| 3 | shape colour **and** texture both tinted -> multiplied | near-black walls | **looking** |
+| 4 | texture PNGs cached by filename, so a fixed recipe reused the broken files | looked exactly like a fix that did not work | timestamps on `/tmp` |
+| 5 | 6 m tile on an 8 m wall -> one visible seam | vertical lines splitting each wall | **the user looking** |
+| 6 | plane mapping, tried as the fix for 5, smears the texture | vertical bands | a four-way mapping-mode render |
+| 7 | field of view set **before** `startSimulation`, which restores the scene file's value | every insect clip shot at 15 deg, not 90 | junction 19.4 deg against a predicted 6.0 |
+| 8 | room built before the respawn, so the robot stood 2.8 m off centre | near wall at 1.2 m instead of 4 | the same measurement |
+| 9 | scene floor 5 m inside an 8 m room | view ended in void before the wall | floor/room arithmetic |
+| 10 | insect head carried **+7.53 deg up** while walking, camera parented to it | 13.6 deg junction against 6.0; 32% floor against the B1's 44% | measured over all 48 clips |
+
+**Three more were cross-body asymmetries rather than defects**: the B1's camera aimed along its
+*direction of travel* instead of its body axis (90 degrees off on sideways clips), its clips each
+started at a different heading, and `--floor_scale` stretched its ground texture threefold **after**
+it was applied. All three would have entered Q2 as differences between bodies that are not about
+bodies.
+
+**And two of my own instruments were the fault.** A junction detector using `argmax` picked the
+ceiling edge on some frames and the floor edge on others, which read as the insect's view being
+unstable when the metric was; and a "floor detail" figure compared different image regions on the
+two bodies because the region was defined by that same detector.
+
+**The rule this earns, beyond the ones already recorded:** when a measurement disagrees with
+geometry, **check the measurement before changing the scene.** Two of the ten fixes above were
+applied to a scene that was already correct.
+
+Final settings and the code that carries them: `sim/scene/ego_camera.py`, `--view egocentric`.
+
+---
+
+### Note (not a finding): `data/` reorganised into allocentric and egocentric
+
+**The split is the camera, not the behaviour.** Every set collected before 2026-09-01 moved to
+`data/allocentric/`; the head-camera sets live in `data/egocentric/`. **A number measured under one
+view cannot be compared with one measured under the other**, which is the whole subject of F170.
+
+**278 path references were rewritten across 117 files** -- code, run sheets, docs and saved run
+configs -- in three passes, because the first covered only git-tracked files and missed every script
+written that day, and the second missed prose of the form `data/beh12_*`.
+
+**34 symlinks broke and were repaired rather than re-collected.** `beh12_b1_flat_9clips` and
+`beh10_c10f10t10_intent2_flat` are symlink farms with absolute targets. **A broken symlink presents
+as a missing file several scripts deep**, not as a path problem, and it was caught by running a
+diagnostic rather than by grep.
+
+**Two smoke tests confirm the move is inert**: `check_within_clip_intent` and `branch_divergence`
+both reproduce their pre-move numbers to every digit.
+
+---
+
+
+### Note (not a finding): `report/NUMBERS.md` and `report/retrain_and_remeasure.md` removed, and the two things they carried
+
+**`retrain_and_remeasure.md` deleted on its own terms.** Its header read "delete this file once
+slides 4-12 are re-measured; the conclusions belong in `FINDINGS.md`, not here." They are, and they
+were.
+
+**`NUMBERS.md` deleted because its subject no longer exists** -- it was the provenance ledger for
+`presentation_v2.md` and `proposal_draft.md`, neither of which is in the repo. **Two things in it
+would have been lost silently, so they are moved here.**
+
+## 1. A number that does not reproduce is still cited in two live files
+
+`NUMBERS.md` section 1 marked these ORPHANED after failing to recompute them:
+
+| claim | documented | recomputed from repo data | |
+|---|---|---|---|
+| long body, distance | 4.125 +/- 0.434 m | **4.404 +/- 0.187 m** | **does not match** |
+| medium body, distance | 3.562 +/- 0.015 m | 3.569 +/- 0.010 m | matches |
+
+**The documented long-body figure is still quoted in `doc/PROGRESS.md:255` and
+`sim/SOURCES.md:76`**, where nothing says it failed to reproduce. `SOURCES.md` calls it "bimodal --
+lands on 4.479 *or* 3.593", which is consistent with a mean that moves between runs and is the
+likeliest explanation.
+
+**It is a Step -1 morphology-gap number and nothing current rests on it.** But F115 is this
+project's record of a finding marked fixed that was not, and **a number that fails to reproduce
+should not sit in two documents with no note attached.**
+
+## 2. The standing rule, which is worth keeping
+
+> Every number in a document should be regenerable by a command in this file. Anything that is not
+> gets marked ORPHANED and does not go in front of an advisor.
+
+**That role now belongs to the deck's measurement slide and to this file**, where each entry names
+the script that produced it.
+
+References to the deleted file were removed from `scripts/figures/plot_morphology_evidence.py` and
+`sim/README.md`.
 
 ---
 

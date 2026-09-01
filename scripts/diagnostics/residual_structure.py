@@ -48,11 +48,20 @@ ALPHAS = (1e-2, 1e-1, 1.0, 10.0, 100.0, 1e3, 1e4)
 
 
 def gram(a, b, device, chunk=64):
-    """`a @ b.T` for tall, very wide matrices, held on the CPU in half precision."""
+    """`a @ b.T` for tall, very wide matrices, held on the CPU in half precision.
+
+    **Both sides are chunked.** Moving `b` across whole was fine at 1,000 rows of 360,448 and is
+    4.5 GB at 3,100 -- the egocentric sets are three times the size of the ones this was written
+    for, and it died on the GPU rather than degrading.
+    """
     out = torch.empty(len(a), len(b), dtype=torch.float64)
-    bt = b.to(device).float()
-    for i in range(0, len(a), chunk):
-        out[i:i + chunk] = (a[i:i + chunk].to(device).float() @ bt.T).double().cpu()
+    for j in range(0, len(b), chunk * 8):
+        bt = b[j:j + chunk * 8].to(device).float()
+        for i in range(0, len(a), chunk):
+            out[i:i + chunk, j:j + chunk * 8] = (
+                a[i:i + chunk].to(device).float() @ bt.T).double().cpu()
+        del bt
+        torch.cuda.empty_cache()
     return out
 
 
