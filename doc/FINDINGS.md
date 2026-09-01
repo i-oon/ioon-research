@@ -12331,6 +12331,81 @@ as a side effect. **Nothing in the pipeline was changed.**
 ---
 
 
+### Note (not a finding): scoping step 1 — what training on egocentric needs
+
+**Three questions asked before committing a six-hour run.** Nothing was collected or trained.
+
+## Data: the training sets exist, the *evaluation* set does not
+
+| | allocentric | egocentric |
+|---|---|---|
+| insect `c10f10t10` — trained on | 48 | **48** |
+| B1 — trained on | 48 | **48** |
+| insect `c08f09t09` — **held out, and what every decision is measured on** | 48 | **missing** |
+
+**The scale is already right**: the existing pretrain used exactly these two sets and produced 5,402
+training pairs. **What is missing is the body nothing trains on.** F159's 0.779, F155's 1.03 and
+every rollout figure are measured on `c08f09t09`; without its egocentric twin the gate would be read
+on a body the model had seen, and could not be compared with the allocentric baseline at all.
+
+**Cost: 48 clips, about ten minutes** — the last 48-clip insect collection took that.
+
+## Null: it transfers, and it is better motivated here, but it cannot be verified in advance
+
+`ITM(e_t, e_t)` is defined by **its inputs being identical**, not by the viewpoint, so it carries
+over. **And it is better grounded egocentrically**: "nothing happened" means the robot is stationary,
+which is a real state, where allocentrically it means a pose frozen mid-swing, which is not.
+
+**There is more for the ITM to read, too:** the egocentric transition moves the embedding **1.76x
+further** — 1561 against 887.
+
+**But a pre-training reading raised a flag that cannot be resolved before training:**
+
+| | cos(null z, real z) | cos between consecutive real z |
+|---|---|---|
+| allocentric insect, reference checkpoint | **0.903** (0.922 on turn, its worst family) | 0.339 |
+| egocentric insect, **allocentric ITM** | 0.952 | 0.810 |
+| egocentric B1, **allocentric ITM** | 0.982 | 0.960 |
+
+**The last two rows feed egocentric embeddings to an ITM trained on allocentric ones**, which is out
+of distribution, and the 1.76x larger transition argues the collapse is that artefact rather than a
+property of the view. **It cannot be settled without an egocentric-trained ITM**, so it becomes a
+mid-run gate rather than a prior.
+
+**Why it has to be a gate.** `null/real` contrasts prediction under the real action against
+prediction under the null. **If those two latents are the same vector, a ratio near 1.0 means "two
+identical things predict identically", not "the action is worthless"** — the number could not tell
+the hypothesis from the setup, which is F160's shape.
+
+**`scripts/diagnostics/null_separability.py`** measures it and exits non-zero. **The threshold is
+calibrated on the reference rather than guessed**: 0.94, above the allocentric checkpoint's 0.903 and
+its worst family's 0.922, below the 0.952 and 0.982 that raised the concern. A tighter 0.92 would
+have failed the reference's own turn family.
+
+## Architecture: input swap only
+
+`center_embeddings` is **false**, so no fixed-camera statistics are baked in; ITM, FTM, MotionDecoder
+and the body head take `e_t` and an action and carry no camera assumption; the `body_motion` target
+comes from simulator state and does not change; the encoder cache is keyed by absolute path so the
+two views cannot be mixed. **Only `--sources` changes.**
+
+**One flag for later, not for step 1.** `sim/control/close_loop_b1_physics.py` still captures from
+the fixed `vjepa_cam`. **A closed loop run against an egocentric-trained model would train on one
+view and run on another** and must be switched to the head camera first.
+
+## The sequence, as gates
+
+`scripts/step1_egocentric.sh {collect|train|measure}`
+
+1. collect `c08f09t09` egocentric, paired seeds by slot → **GATE A**, appearance leak, exits non-zero
+2. train, `--sources` swapped, everything else identical to `com7_pretrain_body3.sh`
+3. **GATE B**, null separability on the egocentric-trained ITM — **stop and report if it fails**
+4. **GATE C**, `null/real` on the held-out body against the allocentric **1.03**; above ~1.10 means
+   the trained model uses the action
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
