@@ -12279,6 +12279,58 @@ References to the deleted file were removed from `scripts/figures/plot_morpholog
 ---
 
 
+### Note (not a finding): grayscale input, measured rather than adopted by analogy
+
+**Hu et al. (2207.03386) feed grayscale, and their reason does not transfer.** They run a small
+CNN+LSTM for real-time inference on hardware. We run a frozen V-JEPA2 offline with no latency
+budget, so their rationale is not an argument for us either way.
+
+**But there was a real reason to test it**: no colour means no "red wall = north", which is exactly
+the landmark Guard 2 exists to catch. Against that, V-JEPA2 is RGB-pretrained and colour contributes
+to texture, so grayscale might weaken the very signal Q1 depends on. **A trade-off to measure.**
+
+Grayscale is BT.601 luma replicated to three channels, so the encoder still receives a 3-channel
+tensor and the comparison isolates "colour removed" from "input shape changed".
+
+## Q1: no meaningful difference
+
+| | single frame | pair (+3) | gap |
+|---|---|---|---|
+| insect, RGB | 0.293 | 0.578 | +0.285 |
+| **insect, grayscale** | **0.289** | 0.581 | **+0.292** |
+| B1, RGB | 0.097 | 0.259 | +0.162 |
+| **B1, grayscale** | **0.111** | 0.287 | **+0.176** |
+
+**The downside did not materialise.** Losing colour costs 0.004 on the insect's single frame and
+*gains* on the B1. **V-JEPA2 does not degrade meaningfully on luma-replicated input**, which is worth
+knowing on its own and is contrary to the worry that motivated the test.
+
+## The claimed upside is the opposite of what happens
+
+| leak check: room appearance -> heading | RGB | grayscale |
+|---|---|---|
+| insect | **0.34x chance** | **0.87x** |
+| B1 | **0.50x chance** | **1.04x** |
+
+**Grayscale does not remove the landmark. It converts a colour landmark into a brightness one, and
+makes it easier to read.** Different wall tints map to different luminances -- the upper half of a
+frame ranges from 55 to 120 -- so the probe gets a clean brightness cue where it previously had hue
+mixed with noise, and the leak ratio roughly doubles on both bodies.
+
+Both still pass the 1.25x gate, but **RGB with randomised colour passes it by a much wider margin.**
+
+## Verdict: do not switch
+
+**Q1 is a wash and the guard gets worse.** RGB plus colour randomisation is already at 0.34x and
+0.50x; grayscale would move the pipeline closer to the line for nothing.
+
+**If grayscale is ever wanted** -- for a hardware deployment, where Hu's reason *would* apply -- the
+fix is to randomise wall **luminance** explicitly rather than hue, which the current tint only varies
+as a side effect. **Nothing in the pipeline was changed.**
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

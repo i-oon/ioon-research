@@ -62,17 +62,14 @@ all, in the easy case where the joint spaces do match.
 | | |
 |---|---|
 | Slides 2-3 | what was built, the data, and how every number below is measured |
-| Slides 4-7 | the central result: the geometry is readable, the model ignores it, what fixed that, and what the fix did to the latent |
-| Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it in advance |
+| Slides 4-7 | the central Stage 1 result: the geometry is readable, the model ignores it, what fixed that |
+| Slides 8-10 | where it stops working, why, a test of that explanation, and a check that predicts it |
 | Slides 11-12 | two facts about the task itself that bound what the latent can be worth |
-| Slides 13-15 | status, a first cross-embodiment run, and the B1: zero-shot fails, three clips buy one step |
-| Slide 16 | we decode joint angles and LAC-WM does not — the divergence, and the term it forces |
-| Slide 17 | what the shared axis did to the latent |
-| Slide 18 | what it did not do: the forward model, and why |
-| Slides 19-20 | what we contribute, and the pipeline from pretraining to a controller |
-| Slide 21 | variety was necessary, supervision is what carries a channel |
-| Slide 22 | the conclusion: what was asked, what the measurements say, and the scope |
-| Appendix | last term's three questions, answered |
+| Slide 13 | Stage 2's position: the thesis, the gap, and what is proven against what is not |
+| Slides 14-16 | **the attempt** — ActSWM's method rebuilt, six pre-registered routes closed, and the number underneath all six |
+| Slides 17-19 | **the principle** — pose determines the future; what it explains in the literature and in our own record |
+| Slides 20-23 | **the prediction tested** — egocentric breaks the redundancy, the coordinate survives, and the two contributions |
+| Slides 24-27 | where this stands, the two months, the proposal, and how everything is measured |
 
 ---
 
@@ -553,9 +550,14 @@ set a numeric threshold.
 
 **Scope, and it decides how far this claim reaches.** Everything below is measured on **forward
 walking at a single speed**, where the gait is periodic and one frame fixes the phase. It is a
-structural fact about *that* task, not about the model, and **it does not extend to locomotion with
-varying speed** — slide 15 shows the action mattering as soon as the magnitude varies. Two
-measurements say it independently.
+structural fact about *that* task, not about the model.
+
+> **Correction, added after F155.** This slide originally read "it does not extend to locomotion
+> with varying speed" and pointed at a Stage 2 slide showing the action mattering once the magnitude
+> varies. **That reading did not survive.** F155 asked the same question with a null-action baseline,
+> on twelve conditions that include four speeds, and measured `null/real` = **1.03** — the action is
+> worth under 3% whether or not the magnitude varies. **What this slide observed at one speed turned
+> out to be general**, and slides 14 to 19 are what followed from taking it seriously.
 
 ### The transition is worth about a third
 
@@ -606,8 +608,9 @@ rolling the world forward instead.
 
 **It bounds the action-decoding path at a fixed magnitude, and nothing wider.** Let the speed vary
 and the same measurement reverses: the prediction responds to actions of a different magnitude
-(`/mean-z` 0.485 against 0.951 within one speed, slide 15). **Read this slide as "at one speed",
-never as "the action does not matter in locomotion".**
+(`/mean-z` 0.485 against 0.951 within one speed). **Read the reversal as a property of that
+metric's baseline, not as a rescue** — see the correction on slide 11: with a null-action baseline
+the action is worth under 3% at every magnitude (F155).
 
 ---
 
@@ -646,15 +649,14 @@ than "the world model does nothing". Those are different claims and only the fir
 
 ---
 
-## Slide 13 — Stage 2: the thesis, the gap, and where we actually stand
+## Slide 13 — Stage 2: the thesis, the gap, and where it stood
 
-**The contribution.** A world model that plans toward a goal defined in a coordinate **shared
-across bodies whose action spaces have nothing in common** — an 18-DOF six-legged stick insect and
-a 12-DOF Unitree B1 quadruped — with no kinematic model, no retargeting, and no controller already
-running on the target robot. The only thing the two robots share is what a camera sees.
+**The contribution.** Plan toward a goal defined in a coordinate **shared across bodies whose action
+spaces have nothing in common** — 18-DOF six-legged insect, 12-DOF quadruped — with no kinematic
+model, no retargeting, no controller already running on the target. **The only thing the two robots
+share is what a camera sees.**
 
-**The gap, stated against what exists.**
-
+```
                      needs a kinematic model
                               ▲
                 URMA          │          X-Morph
@@ -665,50 +667,41 @@ running on the target robot. The only thing the two robots share is what a camer
                 QWM           │        ███ THIS WORK ███
         (morphology params,   │        video only, 18-DOF ↔ 12-DOF
          quadrupeds only)     │
-                              │        LAC-WM sits off this map:
-                     needs no kinematics        manipulation, where end-effector
-                                                pose is already shared, and it
-                                                *selects* over a VLA's proposals
+                              │        LAC-WM is off this map: manipulation,
+                     needs no kinematics       where end-effector pose is already
+                                               shared, and it *selects* over a VLA
+```
 
-**Read the axes literally.** Everything that crosses leg count is handed a body model. Everything
-that needs no body model stays inside one leg count. **The lower-right quadrant is empty**, and
-locomotion has no end-effector pose to retreat to: 18 and 12 joint targets share no dimension.
+**Everything that crosses leg count is handed a body model; everything that needs no body model
+stays inside one leg count.** The lower-right quadrant is empty, and locomotion has no end-effector
+pose to retreat to — 18 and 12 joint targets share no dimension.
 
-**Where we stand, said plainly and separately from the goal.**
-
-    ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
-    │  GOAL REPRESENTATION │   │  WORLD MODEL         │   │  CONTROLLER          │
-    │  shared coordinate   │──►│  dynamics            │──►│  a robot being driven│
-    ├──────────────────────┤   ├──────────────────────┤   ├──────────────────────┤
-    │  ✔ PROVEN            │   │  ⚠ DIAGNOSED         │   │  ✘ NOT DONE          │
-    │  70% vs 28% chance   │   │  Context Collapse,   │   │  every number here is│
-    │  all three families  │   │  named + cited,      │   │  offline selection   │
-    │  survives the control│   │  fix identified      │   │  among recorded clips│
-    └──────────────────────┘   └──────────────────────┘   └──────────────────────┘
-        slide 14                   slides 15-16                slide 17 = the plan
-
-**Proven** — a quadruped, shown a stick insect's video and nothing else, picks which of its own
-behaviours matches, and the choice survives the control that destroyed every earlier version of
-this claim.
-
-**Diagnosed** — the predictor extrapolates the next state from context while going insensitive to
-the action it was given. We measured it before we knew it had a name.
-
-**Not done** — the integration. The pieces are measured; the failure between them is now understood
-rather than mysterious.
+```
+   ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+   │  GOAL REPRESENTATION │──►│  WORLD MODEL         │──►│  CONTROLLER          │
+   │  shared coordinate   │   │  dynamics            │   │  a robot being driven│
+   ├──────────────────────┤   ├──────────────────────┤   ├──────────────────────┤
+   │  ✔ PROVEN            │   │  ✘ DOES NOT WORK     │   │  ✘ NOT DONE          │
+   │  70% vs 28% chance   │   │  and slides 14-19    │   │  every number here is│
+   │  all three families  │   │  are why — the cause │   │  offline selection   │
+   │  survives the control│   │  is measured         │   │  among recorded clips│
+   └──────────────────────┘   └──────────────────────┘   └──────────────────────┘
+          slide 21                  slides 14-19               slides 25-26
+```
 
 **What changed since the last update.** Three claims this deck previously made are withdrawn, each
-by a control that had not been run: that the contrastive adaptation term is what crosses
-embodiments, that the closed loop selects behaviours on the quadruped, and that sideways motion
-fails everywhere. The measurements were real; the conclusions drawn from them were not. What
-replaced them is stronger and is on the next slide.
+by a control that had not been run: that the contrastive term is what crosses embodiments, that the
+closed loop selects behaviours on the quadruped, and that sideways motion fails everywhere. **The
+measurements were real; the conclusions were not.**
 
-Speaker note: the honest one-sentence position is *the goal representation crosses bodies and is
-measured; the dynamics model that would act on it does not yet, and we know why.*
+**And one more since:** the middle box read *"⚠ diagnosed — Context Collapse, named and cited, fix
+identified."* **We rebuilt ActSWM's fix and it failed** (slide 14). Context Collapse names the
+symptom; slides 15 to 17 are the cause underneath it.
 
-**Slide 11 is where this deck's next act begins.** It reported, as an oddity, that at one speed a
-single frame nearly determines the command. Slides 14 to 19 are what happened when that oddity was
-chased.
+**Slide 11 is where the next act begins.** It reported, as an oddity at one speed, that a single
+frame nearly determines the command. **Slides 14 to 19 are what happened when that oddity was
+chased** — and slide 11 now carries a correction, because the oddity was not confined to one speed.
+
 
 ---
 
@@ -763,9 +756,15 @@ next: **six of these runs came out negative, and none of the criteria moved afte
 **F160 is the control a committee asks for and it is the one that makes the rest mean something.**
 "Did your own objective cause this?" is answerable: no, and removing it hurts.
 
-**F169 is the sharpest.** Two futures that are unmistakable to a human eye — the videos show a robot
-plainly turning away — are, to the encoder the model sees through, as far apart as two runs of the
-*same* command.
+**F169 is the sharpest, and it is worth watching rather than reading.**
+
+![two futures a human separates instantly; the encoder does not](../results/cf_confirm/insect_forward-vs-turn.mp4)
+
+`results/cf_confirm/insect_forward-vs-turn.mp4` — identical commands to the branch frame, then one
+arm walks on and the other turns. **42 degrees apart by the end.** In embedding space that is
+**1.1× the noise floor** — as far apart as two runs of the *same* command.
+
+**The gap between what you see there and what the encoder encodes is the finding.**
 
 ---
 
@@ -858,23 +857,32 @@ CoppeliaSim does not repeat (F105).
 
 ## Three separate things, kept separate
 
-**What prior work found.** ActSWM (2607.26712) named Context Collapse and proposed rollout
-separation. UWM-JEPA (2605.25313 §4) named the **action-invariant solution**: a teacher-forced target
-already contains the action's effect, so ignoring the action fits the loss — their remedy is
-counterfactual targets. AHA-WAM (2606.09811) takes adjacent-frame redundancy as a **design premise**
-for an asynchronous horizon split. Yeom et al. (2606.07687) measured V-JEPA's inverse-dynamics
-recoverability and **noted that CALVIN's static tabletop lets per-frame appearance substitute for
-temporal context**.
-
-**What we measured where they did not.** How far that substitution goes in *periodic locomotion*: one
-frame recovers 88% of what a pair recovers, 97% on turning, and the recovered command still
-contributes under 3% of prediction error. **Inverse-recoverable is not forward-necessary** — and in
-locomotion the action-invariant solution UWM-JEPA warns about is **near-optimal**, so a target-side
-fix has nothing better to converge to.
-
-**What is ours.** The mechanism that joins the four papers above, measured in the severe case; and
-the consequence that a *viewpoint* choice, not an objective or a target, is what determines whether
-an action-conditioned world model can exist for a given task.
+```
+  PRIOR WORK FOUND                          ┌──────────────────────────────────┐
+    ActSWM       named Context Collapse,    │ four separate observations,      │
+                 proposed rollout separation│ none connected to the others     │
+    UWM-JEPA     named the action-invariant │                                  │
+                 solution; fix = counterfac.│                                  │
+    AHA-WAM      assumed adjacent-frame     │                                  │
+                 redundancy as a design premise                                │
+    Yeom et al.  noted static scenes let a  │                                  │
+                 single frame substitute    └──────────────────────────────────┘
+         │
+         ▼
+  WE MEASURED WHERE THEY DID NOT
+    how far the substitution goes in PERIODIC locomotion
+      one frame = 88% of a pair · 97% on turning
+      and the recovered command is worth <3% of prediction
+         │
+         ▼   INVERSE-RECOVERABLE  ≠  FORWARD-NECESSARY
+         │   so in locomotion the action-invariant solution is NEAR-OPTIMAL
+         │   and a target-side fix has nothing better to converge to
+         ▼
+  OURS
+    the mechanism that joins the four, measured in the severe case
+    ⇒ a VIEWPOINT choice — not an objective, not a target — decides whether
+      an action-conditioned world model can exist for a given task
+```
 
 **Two limits on this slide, stated because a reader will look for them.** We tested the
 **residual-target** version of UWM-JEPA's route and closed it (F158, adds 0.009 R² over the bare
@@ -883,26 +891,46 @@ above read published results *through* the principle — they are not re-measure
 
 ---
 
-## Slide 19 — What the principle does and does not license
+## Slide 19 — Three failures, one cause — and one that is not
 
-**Measured:** two robots, twelve behaviour conditions, simulation, third-person and egocentric.
+```
+   candidate scoring          teacher-student           action-conditioning
+     F127 · F135                F144 · F145                 F153-F169
+         │                          │                            │
+   swap the goal for            teacher ranks              six routes closed
+   another behaviour:           behaviours but not         action worth
+   costs 3-7 points             perturbations              <3% of prediction
+   delete the rollout:                │                            │
+   costs nothing                      │                            │
+   41% vs 42%                         │                            │
+         ▼                            ▼                            ▼
+   ┌───────────────┐          ┌───────────────┐          ┌───────────────┐
+   │   MEASURED    │          │    PARTLY     │          │   MEASURED    │
+   └───────┬───────┘          └───────┬───────┘          └───────┬───────┘
+           │                  physics separated them             │
+           │                  by 0.1304 vs 0.1299 — a            │
+           │                  ranker cannot order outcomes       │
+           │                  that are the same                  │
+           │                          │                          │
+           └──────────┬───────────────┴──────────────┬───────────┘
+                      ▼                              ▼
+        ╔═════════════════════════════╗   ╔═══════════════════════════╗
+        ║  POSE DETERMINES THE FUTURE ║   ║ a second obstacle the     ║
+        ║  removed by egocentric      ║   ║ viewpoint does not touch  ║
+        ║  Q1:  0.779 → 0.293         ║   ╚═══════════════════════════╝
+        ╚═════════════════════════════╝
+```
 
-**Not measured:** manipulation. Slide 18's first and fourth rows are readings, not experiments.
-**A committee should hear the principle as a hypothesis with one domain's worth of evidence.**
+![the teacher made it worse than cloning alone](../results/wm/closed_loop/f142_video/f144_labelled.mp4)
 
-**Falsifiable, and the test was named before the data existed.** The principle predicts that removing
-the body from view breaks the redundancy. Two ways it could have failed, both of which we would have
-had to report:
+`results/wm/closed_loop/f142_video/f144_labelled.mp4` — **recorded walk 100% · cloning alone 36% ·
+cloning + world-model teacher 31%.** The teacher subtracts.
 
-- **a head camera still reads the command from one frame** — then either the principle is wrong, or
-  the leak has to be named and fixed before the claim survives
-- **the redundancy breaks but the cross-body coordinate goes with it** — a trade, not a solution, and
-  the project's one working cross-embodiment result would be gone
+**What this licenses:** two of the three share a mechanism, and the mechanism is gone.
+**What it does not:** that any of them revive. Slide 26 is how we find out.
 
-**A third failure mode was designed against rather than tolerated.** Fixed per-wall colours would let
-a single frame read heading — a landmark is a pose label — so appearance is randomised per clip and a
-leak check gates the result. **That guard is not optional**: with it, Q1 could have passed on a
-property we had built in.
+**Measured** on two robots, twelve conditions, in simulation. **Not measured:** manipulation — slide
+18 reads published results through the principle rather than re-measuring them.
 
 ---
 
@@ -1055,6 +1083,16 @@ helps cross-body.
 
 ## Slide 25 — What the next two months do
 
+```
+  month 1                     month 2                    deliverable
+  ├─ train egocentric WM      ├─ learn the ego-motion    └─ closed loop:
+  │  GATE null/real > 1.10    │  separation                 a behaviour recorded
+  │  (read 1.03 throughout)   │  GATE forward recovers      on the insect drives
+  │                           │  toward 0.63                the B1 through the
+  └─ everything below is      │                             shared coordinate
+     conditional on this      └─ (slide 26, steps 2-3, are conditional)
+```
+
 **One thing at a time, each with its criterion written first.**
 
 **1. Train the world model on egocentric data.** The question Q1 cannot answer: does a trained
@@ -1076,7 +1114,50 @@ demonstration that removing the body from view is necessary but not sufficient.*
 
 ---
 
-## Slide 26 — How everything above is measured
+## Slide 26 — Proposal: does removing the cause unblock them?
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │  STEP 1   train the egocentric world model       UNTESTED    │
+  │           Q1 says the signal EXISTS.                         │
+  │           This asks whether a trained model USES it.         │
+  │           GATE:  null/real > 1.10  (it read 1.03 throughout) │
+  └───────────────────────────┬──────────────────────────────────┘
+                    ┌─────────┴─────────┐
+                 FAILS                PASSES
+                    │                   │
+     ┌──────────────▼──────────┐        ▼
+     │ reportable as it stands:│   ┌────────────────────────────────────┐
+     │ six measurements of why │   │ STEP 2  do the failed mechanisms   │
+     │ locomotion world models │   │         revive?                    │
+     │ collapse, and viewpoint │   │  · can the teacher rank now?       │
+     │ necessary-not-sufficient│   │  · do candidates differ now?       │
+     └─────────────────────────┘   └───────────────┬────────────────────┘
+                                                   ▼
+                                   ┌────────────────────────────────────┐
+                                   │ STEP 3  allocentric, TRAINING ONLY │
+                                   │        deployment stays egocentric │
+                                   │        (AnchorWorld 2606.07326)    │
+                                   └────────────────────────────────────┘
+```
+
+| step 3 role | what it is | status |
+|---|---|---|
+| **A — the forward gap** | 0.63 → 0.50. Target = the **measured coordinate**, which is `lambda_body` and already exists. **Not** the allocentric embedding | **measure where forward is lost first** — Check B showed it is not all gait shake |
+| **B — bootstrap** | babble → allocentric measures the outcome in the shared Froude coordinate → shape the babble toward the goal | **the valuable one.** F137 is unsolved; forward is only degraded |
+
+**Type B is rejected on evidence, not taste:** `z` is already more pose-readable than the action
+(F168: 0.856 against 0.779) and 64–89% gait phase (F19, F26).
+
+**Risks.** Everything rests on step 1 · F145 may be physics rather than viewpoint · F137 still needs
+exploration into a gait · bootstrap could collapse into F127 or AMP.
+
+**Proposal sense — the advisor decides scope.** AnchorWorld does this for human video generation;
+**no one has done it for locomotion cross-embodiment.**
+
+---
+
+## Slide 27 — How everything above is measured
 
 **Every number in this deck names the script that produced it**, and the entries in
 `doc/FINDINGS.md` carry the pre-registered criterion above the result.
@@ -1091,17 +1172,14 @@ demonstration that removing the body from view is necessary but not sufficient.*
 | gait removal | `scripts/diagnostics/degait_coordinate.py` |
 | which surface the encoder reads motion from | `scripts/diagnostics/texture_for_vjepa.py` |
 
-**Four guards run before results are read, each added after a specific failure:**
+**Four guards run before results are read. Each was added after a specific failure.**
 
-- **paired seeds across bodies** — or a cross-body test cannot separate "the bodies differ" from
-  "the rooms differed" (the shape of F160)
-- **appearance-leak check** — colour must not predict heading, or Q1 measures the landmark that
-  randomisation was introduced to remove; it exits non-zero and gates the run
-- **physical intervention check** — a flag that is accepted, echoed into the log and then ignored
-  passes every statistical gate; F165 was voided by exactly that and eight of twelve conditions
-  carried no intervention while the log said they did
-- **watch the videos** — three of the ten defects in the egocentric scene were caught by looking at
-  a rendered frame and would have passed every number in this deck
+| guard | without it | the failure that added it |
+|---|---|---|
+| **paired seeds across bodies** | "the bodies differ" and "the rooms differed" become the same number | F160's shape |
+| **appearance-leak check** | Q1 measures the landmark randomisation was meant to remove | exits non-zero, gates the run |
+| **physical intervention check** | a flag accepted, echoed to the log and ignored passes every statistical gate | F165 — eight of twelve conditions carried no intervention while the log said they did |
+| **watch the videos** | numbers pass on a scene that is not what it claims | three of ten scene defects were caught only by looking |
 
 Speaker note: two of those ten "defects" turned out to be the measuring instrument rather than the
 scene. **When a measurement disagrees with geometry, check the measurement first.**
