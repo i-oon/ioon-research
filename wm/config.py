@@ -248,7 +248,7 @@ class Config:
     body_dim: int = 1            # must equal len(body_channels)
     # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
     # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise
-    # (F58: AUC 0.788 from that column alone) and yaw is the candidate `data/beh12_*` was built to
+    # (F58: AUC 0.788 from that column alone) and yaw is the candidate `data/allocentric/beh12_*` was built to
     # test (F77). Kept in the config rather than as a module constant so a control arm and a
     # widened arm are the same code path with different settings.
     body_channels: tuple = (0,)

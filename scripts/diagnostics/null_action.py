@@ -116,8 +116,8 @@ def hexapod(args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--b1_clip", default="data/beh12_b1_flat/b1_ep3.npz")
-    ap.add_argument("--hex_clip", default="data/beh12_c10f10t10_flat/hexapod_ep100.npz")
+    ap.add_argument("--b1_clip", default="data/allocentric/beh12_b1_flat/b1_ep3.npz")
+    ap.add_argument("--hex_clip", default="data/allocentric/beh12_c10f10t10_flat/hexapod_ep100.npz")
     ap.add_argument("--steps", type=int, default=60)
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--skip_hex", action="store_true")
@@ -128,10 +128,10 @@ def main():
     # up is a question, not an assumption -- F137 measured sampling around it travelling backwards.
     args.b1_mean = np.concatenate([load(f, REGISTRY["b1"])["actions"]
                                    for f in sorted(glob.glob(os.path.join(
-                                       ROOT, "data/beh12_b1_flat/*.npz")))]).mean(0).astype(np.float64)
+                                       ROOT, "data/allocentric/beh12_b1_flat/*.npz")))]).mean(0).astype(np.float64)
     args.hex_mean = np.concatenate([load(f, REGISTRY["hexapod"])["actions"]
                                     for f in sorted(glob.glob(os.path.join(
-                                        ROOT, "data/beh12_c10f10t10_flat/*.npz")))]).mean(0).astype(np.float32)
+                                        ROOT, "data/allocentric/beh12_c10f10t10_flat/*.npz")))]).mean(0).astype(np.float32)
 
     rb = b1(args)
     for k, v in rb.items():

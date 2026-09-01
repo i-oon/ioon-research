@@ -1,7 +1,7 @@
 """How much does the *transition* add over a single frame, for reading the action?
 
     .venv/bin/python3 scripts/diagnostics/inverse_dynamics_r2.py \\
-        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/beh12_c08f09t09_flat \\
+        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
 **Stated in the metric Yeom et al. (2606.07687) use.** They show V-JEPA carries
@@ -42,6 +42,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.adapt3 import gather  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
+from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from residual_structure import FAMILY, gram, ridge_r2  # noqa: E402
@@ -53,6 +54,15 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--pair_lags", type=int, nargs="+", default=[1, 3])
+    ap.add_argument("--target", choices=("action", "z"), default="action",
+                    help="**`action` is F159's question, `z` is the one never asked.** `z` is "
+                         "`ITM(e_t, e_t+1)`, built from two frames by construction, and our "
+                         "pipeline then pushes it toward the action from both sides -- the "
+                         "projector fits `proj(a) ~ z` and the body head fits `z -> motion`. So a "
+                         "redundant `z` could mean the transition itself is pose-determined, or "
+                         "only that we forced `z` to be the action. Reading it from a single frame "
+                         "separates those. **Unlike the action target this depends on the "
+                         "checkpoint**, since `z` is that checkpoint's latent.")
     ap.add_argument("--cache", default="")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=3)
@@ -61,6 +71,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ck = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     cfg = from_checkpoint(ck["config"])
+    itm = None
+    if args.target == "z":
+        itm = InverseTransitionModel(cfg).to(device).eval()
+        itm.load_state_dict(ck["itm"])
 
     cache_path = os.path.join(ROOT, args.cache or f"results/wm/cache/fid_{args.embodiment}.pt")
     cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
@@ -85,7 +99,12 @@ def main():
             cols[0].append(e[t].flatten().half())
             for k in args.pair_lags:
                 cols[k].append(e[t + k].flatten().half())
-            A.append(c["a"][t].flatten().float())
+            if itm is None:
+                A.append(c["a"][t].flatten().float())
+            else:
+                with torch.no_grad():
+                    A.append(itm(e[t:t + 1].to(device),
+                                 e[t + 1:t + 2].to(device))[0].flatten().float().cpu())
             fam.append(FAMILY(c["cond"]))
             clip_id.append(ci)
     cols = {k: torch.stack(v) for k, v in cols.items()}
@@ -103,7 +122,7 @@ def main():
 
     print(f"{args.ckpt}\n{len(clips)} clips of {args.embodiment} from {args.data}")
     print(f"{tr.sum()} train / {te.sum()} test transitions, split by clip, "
-          f"action width {A.shape[1]}, embedding dimension {cols[0].shape[1]}\n")
+          f"{args.target} width {A.shape[1]}, embedding dimension {cols[0].shape[1]}\n")
 
     # a linear kernel on a concatenation is the sum of the parts' kernels
     K = {k: gram(v, v, device).numpy() for k, v in cols.items()}
@@ -112,7 +131,7 @@ def main():
         feats[f"[e_t, e_t+{k}]  (pair)"] = K[0] + K[k]
 
     preds = {}
-    print(f"  {'features':>26}{'action R2':>11}{'vs single':>11}{'alpha':>9}")
+    print(f"  {'features':>26}{args.target + ' R2':>11}{'vs single':>11}{'alpha':>9}")
     base = None
     for name, Kf in feats.items():
         r2, pred, alpha = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], A[tr], A[te], folds)

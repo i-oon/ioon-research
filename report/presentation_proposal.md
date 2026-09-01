@@ -594,7 +594,7 @@ Recorded per step: RGB, proprioception, command, contact, next RGB.
 
 | Behaviour in zₜ | Morphology in zₜ | Prediction / transfer | Interpretation |
 |---|---|---|---|
-| Preserved | Reduced | Improved | **Intended result** — a morphology-invariant behaviour representation. |
+| Preserved | Reduced | Improved | **Intended result** — a behaviour representation that maps to a shared body-motion coordinate. Note `z` itself keeps body identity, and measurably should: probe 0.974, and stripping it made transfer worse (F160, F24). |
 | Preserved | Still high | Improved | Useful representation, but it did not remove body shape — partial success. |
 | Lost | Reduced | Poor | Representation collapse — morphology dropped by destroying the signal. |
 | Preserved | Reduced | No improvement | Clean latent space, but no measurable transfer benefit over eₜ. |
@@ -630,7 +630,7 @@ Recorded per step: RGB, proprioception, command, contact, next RGB.
 
 ## Slide 24 — Where this lands: adapting a new body by matching behaviour in latent space
 
-**What this thesis delivers (Phase 1 — the product).** A pretrained **visual latent-action world model** = a **frozen encoder + ITM + FTM + Motion Decoder**, with a **morphology-agnostic latent action zₜ** (behaviour, not body). The thesis tests this directly (the two-sided probe, Slide 18). **Adapting it to a new, unseen body is future work** — this is the cleanest route.
+**What this thesis delivers (Phase 1 — the product).** A pretrained **visual latent-action world model** = a **frozen encoder + ITM + FTM + Motion Decoder**, with a latent action zₜ that **maps to a shared body-motion coordinate** (forward, lateral, yaw — the same physical quantities on both robots). **`zₜ` itself is not body-blind**: body identity is decodable from it at 0.974, and the per-body decoders need that (F160). The thesis tests this directly (the two-sided probe, Slide 18). **Adapting it to a new, unseen body is future work** — this is the cleanest route.
 
 **Adapt by matching behaviour in latent space — no action labels.** For the new body, close a loop:
 1. demo → **ITM** → **z_target** (the behaviour to reproduce);
@@ -639,7 +639,7 @@ Recorded per step: RGB, proprioception, command, contact, next RGB.
 4. reward **r = −‖z_achieved − z_target‖²**; **update the decoder** so achieved → target. Repeat.
 
 **Two things this buys:**
-- **Supervision is in zₜ-space → morphology-invariant.** We compare achieved-vs-target *behaviour*, not raw embeddings, so **body shape can't leak in** (no cross-body confound).
+- **Supervision is in zₜ-space → a shared body-motion coordinate.** We compare achieved-vs-target *behaviour*, not raw embeddings. **Not "body shape can't leak in"** — it does, by design: body identity is decodable from `z` at 0.974 (F160), and the per-body decoders need it. What is shared is the coordinate, not the latent.
 - **No ground-truth commands needed.** The signal is "did the body *achieve* the intended behaviour?", not "match this exact aₜ."
 
 **Honest cost — it is RL, not backprop.** `aₜ → eₜ₊₁` is **real physics (not differentiable)**, so the match error is a **reward** and the decoder is trained by **RL**. Use a **sample-efficient** method (**CEM / off-policy actor-critic like SAC**) — **not PPO** (on-policy, sample-hungry, fights the few-shot goal). Because the loop reads the body's **real state each step**, phase can't drift.

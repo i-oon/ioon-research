@@ -11,7 +11,7 @@ Replays each condition's own commands through the same physics the closed loop u
 camera and spawn, and compares the achieved body speed against the clip's recording.
 
     .venv/bin/python3 scripts/diagnostics/hexapod_replay_fidelity.py \\
-        --data data/beh12_c08f09t09_flat --scene medauroidea_c08f09t09.ttt
+        --data data/allocentric/beh12_c08f09t09_flat --scene medauroidea_c08f09t09.ttt
 """
 import argparse
 import glob

@@ -86,8 +86,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True, help="the body-head checkpoint (F136's refit)")
     ap.add_argument("--projector", required=True, help="the stage-3 checkpoint carrying the projector")
-    ap.add_argument("--data", default="data/beh12_b1_flat")
-    ap.add_argument("--goal_dir", default="data/beh12_c08f09t09_flat")
+    ap.add_argument("--data", default="data/allocentric/beh12_b1_flat")
+    ap.add_argument("--goal_dir", default="data/allocentric/beh12_c08f09t09_flat")
     ap.add_argument("--goal_embodiment", default="hexapod")
     ap.add_argument("--seed_clip", default="b1_ep3.npz",
                     help="supplies the physical state the robot starts from, and nothing else")

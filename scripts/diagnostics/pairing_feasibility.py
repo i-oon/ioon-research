@@ -130,8 +130,8 @@ def print_pattern_table(hexapod_codes, b1_codes):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hexapod_dir", default="data/fwd_hex8body")
-    parser.add_argument("--b1_dir", default="data/fwd_b1_50hz")
+    parser.add_argument("--hexapod_dir", default="data/allocentric/fwd_hex8body")
+    parser.add_argument("--b1_dir", default="data/allocentric/fwd_b1_50hz")
     parser.add_argument("--draws", type=int, default=4000,
                         help="sampled pairs per body for the intent ratio")
     parser.add_argument("--seed", type=int, default=0)

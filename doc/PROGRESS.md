@@ -914,7 +914,7 @@ python3 sim/collect_ik.py --port 23000 --episodes <100 eps> --repeats 1 --scale 
     --travel 0.8 --cam_dx -0.6 --spawn 0 0 --out data/ik_walk_100_framed
 
 python3 sim/render_b1_replay.py --scene sim/env/b1_flat.ttt --traj data/b1_traj/fwd_vx0.4.npz \
-    --spawn 0 0 --cam_dx -0.6 --travel 0.8 --out data/fwd_b1_50hz
+    --spawn 0 0 --cam_dx -0.6 --travel 0.8 --out data/allocentric/fwd_b1_50hz
 ```
 
 ### 16.10 สถานะ / ต้องทำต่อ
@@ -991,7 +991,7 @@ fold 2 (`fold_short`, กัน `short` ไว้) ยืนยันซ้ำ: 
 
 แก้ให้รับ `--coxa --femur --tibia` แยกกัน และ `sim/collect_ik.py` รับ `--morphs NAME=SCENE` เก็บหุ่นกี่ตัวก็ได้
 
-สร้าง 9 หุ่น เก็บ `data/fwd_hex8body` 30 clips ต่อหุ่น หุ่นทดสอบ `c08f09t09` (0.8, 0.9, 0.9) ตรวจด้วย
+สร้าง 9 หุ่น เก็บ `data/allocentric/fwd_hex8body` 30 clips ต่อหุ่น หุ่นทดสอบ `c08f09t09` (0.8, 0.9, 0.9) ตรวจด้วย
 linear programming ว่าอยู่ใน convex hull ของหุ่นเทรน และห่างจากเส้นตรงระหว่างคู่หุ่นทุกคู่ 0.082
 จึงเป็นการทดสอบ **composition** ไม่ใช่ interpolation
 
@@ -1073,8 +1073,8 @@ Smoke test บนชุดจิ๋ว 975 pairs เทียบกับ contro
 `adv_warmup_epochs = 5` และ `heldout/motion_zero_x` เพื่อวัดว่า decoder หันไปพึ่งภาพจริงไหม
 
 ### 18.8 สถานะ / ต้องทำต่อ
-- ☑ `data/fwd_hex8body` 7 หุ่นสะอาด
-- ☑ `data/fwd_b1_50hz` render-locked (แก้ FOV กล้อง 24° → 15°, พื้นหลังต่าง 5.03 → 0.52/255)
+- ☑ `data/allocentric/fwd_hex8body` 7 หุ่นสะอาด
+- ☑ `data/allocentric/fwd_b1_50hz` render-locked (แก้ FOV กล้อง 24° → 15°, พื้นหลังต่าง 5.03 → 0.52/255)
 - ☑ B1 trajectory 2 policy × 7 ความเร็ว ครอบคลุมช่วงความเร็วตั๊กแตน
 - ☐ `m3d_adv01` — ผลตัดสินว่าปิดทางลัดแล้ว decoder หันไปอ่านภาพไหม
 - ☐ Stage 2 — รอผล `m3d` ตัดสินว่าจับคู่ B1 กับตั๊กแตนกี่ตัว
@@ -2596,7 +2596,7 @@ B1 เหลือ 43-66% ขณะที่แมลงอยู่ที่ 89
 เพราะแถบนั้นเหมือนกันทุกคลิป ตัววัดที่เทียบระหว่างคลิปจึงมองไม่เห็น ยกไฟจาก 2.5 m เป็น 6 และ 12
 ไม่ช่วยเลย มีแต่การขยายพื้นที่ช่วย
 
-| | เดิม 15° | `data/beh12_b1_fixed` | แมลง |
+| | เดิม 15° | `data/allocentric/beh12_b1_fixed` | แมลง |
 |---|---|---|---|
 | เฟรมที่ตัดขอบ เฉลี่ย | 61% | **0.0%** | 0.0% |
 | คลิปที่แย่สุด | 100% | **0%** | 0% |
@@ -2619,7 +2619,7 @@ B1 เหลือ 43-66% ขณะที่แมลงอยู่ที่ 89
 ของ B1 เทียบกับของแมลงขยับจาก 5.47 เป็น 6.41 เพราะมุม 25° เห็นพื้นคนละปริมาณกับ 15° ของแมลง
 ซึ่งลดไม่ได้ตราบใดที่สองฉากใช้มุมต่างกัน
 
-**ชุดใหม่คือ `data/beh12_b1_fov25`** สร้างด้วย `scripts/dataset/rerender_b1_framing.py` MuJoCo
+**ชุดใหม่คือ `data/allocentric/beh12_b1_fov25`** สร้างด้วย `scripts/dataset/rerender_b1_framing.py` MuJoCo
 ไม่ได้รันใหม่เลยเพราะ state เก็บอยู่ในไฟล์แล้ว **เหลือฟิต stage 3 ใหม่ ซึ่งต้องใช้ fibo7** (F113)
 
 **และคำถามสุดท้ายของคืนก็มาจากการเปิดวิดีโอดูอีกครั้ง** — *"รู้ตัวไหมว่าอันนี้ไม่ได้เลี้ยว"* ชี้ไปที่

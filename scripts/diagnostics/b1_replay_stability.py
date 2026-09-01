@@ -15,7 +15,7 @@ work on a robot whose kinematics are unknown -- and replaying one requires the s
 If the B1 falls, candidates-as-recorded-sequences do not transfer to robots whose gait is closed
 loop, and that is a finding about the method rather than a missing feature.
 
-Uses `data/b1_traj/*.npz` at the native 50 Hz, not the 20 Hz clips in `data/beh12_b1_flat`:
+Uses `data/b1_traj/*.npz` at the native 50 Hz, not the 20 Hz clips in `data/allocentric/beh12_b1_flat`:
 resampling a control signal to 40% of its rate would be a second reason to fall and would confound
 the answer.
 

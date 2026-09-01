@@ -30,7 +30,7 @@ echo "=== stage 3 on the hexapod, contrastive  $(date '+%F %T')"
 if [ -f "$OUT" ]; then echo "skip $OUT"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt3 \
     --ckpt $RUN/best.pt --projector $RUN/projector_b1_adapted.pt \
-    --data data/beh12_c10f10t10_flat --embodiment hexapod --train_clips $HEX_CLIPS \
+    --data data/allocentric/beh12_c10f10t10_flat --embodiment hexapod --train_clips $HEX_CLIPS \
     --steps 15000 --lambda_nce 1.0 --batch 8 --seed 0 \
     --cache results/wm/cache/hex_c10.pt --out "$OUT"
 fi
@@ -38,7 +38,7 @@ fi
 echo
 echo "=== the gate: fidelity and action-sensitivity on a body it never trained on  $(date '+%F %T')"
 $PY -u scripts/diagnostics/rollout_fidelity.py --ckpt "$OUT" \
-  --data data/beh12_c08f09t09_flat --embodiment hexapod \
+  --data data/allocentric/beh12_c08f09t09_flat --embodiment hexapod \
   --cache results/wm/cache/fid_hexapod.pt --latent projector --mean_z --horizons 1 2 3 5
 
 echo

@@ -1,0 +1,40 @@
+=== insect: shared prefix to frame 33, then branch
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0    frames=(66, 256, 256, 3) forward=+0.54m lateral=0.09m  hip=0.178m Fr=0.125 wander=1.69  ok
+
+1 clips, 66 frames -> data/cf_confirm/insect_forward
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0    frames=(66, 256, 256, 3) forward=+0.55m lateral=0.08m  hip=0.177m Fr=0.128 wander=1.65  ok
+
+1 clips, 66 frames -> data/cf_confirm/insect_forward_repeat
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0    frames=(66, 256, 256, 3) forward=+0.52m lateral=0.13m  hip=0.177m Fr=0.123 wander=1.70  ok
+
+1 clips, 66 frames -> data/cf_confirm/insect_turn
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0    frames=(66, 256, 256, 3) forward=+0.47m lateral=0.35m  hip=0.175m Fr=0.135 wander=1.58  FAILS lateral, veering
+
+1 clips, 66 frames -> data/cf_confirm/insect_side
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0    frames=(66, 256, 256, 3) forward=+0.75m lateral=0.05m  hip=0.176m Fr=0.174 wander=1.25  ok
+
+1 clips, 66 frames -> data/cf_confirm/insect_faster
+
+--- insect divergence after the branch, position AND heading
+Traceback (most recent call last):
+  File "/home/aria/ioon-research/scripts/diagnostics/branch_divergence.py", line 121, in <module>
+    main()
+  File "/home/aria/ioon-research/scripts/diagnostics/branch_divergence.py", line 76, in main
+    nz = [load(p, emb) for p in args.noise]
+  File "/home/aria/ioon-research/scripts/diagnostics/branch_divergence.py", line 76, in <listcomp>
+    nz = [load(p, emb) for p in args.noise]
+  File "/home/aria/ioon-research/scripts/diagnostics/branch_divergence.py", line 35, in load
+    with np.load(os.path.join(ROOT, path), allow_pickle=True) as z:
+  File "/home/aria/.local/lib/python3.10/site-packages/numpy/lib/_npyio_impl.py", line 451, in load
+    fid = stack.enter_context(open(os.fspath(file), "rb"))
+FileNotFoundError: [Errno 2] No such file or directory: '/home/aria/ioon-research/data/cf_confirm/insect_forward.npz'

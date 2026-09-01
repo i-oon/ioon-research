@@ -13,7 +13,7 @@ Usage:
 CHOOSING PROPORTIONS
 ====================
 
-Read this before picking scales. Two bodies already in `data/fwd_hex8body` collapse and rotate
+Read this before picking scales. Two bodies already in `data/allocentric/fwd_hex8body` collapse and rotate
 on the spot rather than walking, and two more veer 0.40 m off course, all because of the one
 constraint below. See FINDINGS.md F42.
 

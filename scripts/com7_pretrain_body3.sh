@@ -38,7 +38,7 @@ echo "=== pretrain, both embodiments, 3-channel shared target  $(date '+%F %T')"
 if [ -f "$RUN/best.pt" ]; then echo "skip $RUN/best.pt"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.train \
     --name beh12_hex-b1_body3 \
-    --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \
+    --sources hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat \
     --lambda_body 0.5 --body_dim 3 --body_channels 0 1 2
 fi
 
@@ -50,33 +50,33 @@ echo "=== calibration A: straight off the pretrain, both robots  $(date '+%F %T'
 # means", and no stage adapts the head to follow. If that repeats here, the pass bar can be met at
 # A and lost at B, and only running both shows it.
 $PY scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/best.pt" \
-  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+  --data hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat
 
 echo
 echo "=== stage 1: adapt ITM and forward model to the B1  $(date '+%F %T')"
 [ -f "$RUN/adapted_b1.pt" ] || PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt \
-  --ckpt "$RUN/best.pt" --data data/beh12_b1_flat --embodiment b1 \
+  --ckpt "$RUN/best.pt" --data data/allocentric/beh12_b1_flat --embodiment b1 \
   --clips 9 --stratify --train_clips $CLIPS --out "$RUN/adapted_b1.pt"
 
 echo
 echo "=== stage 2: fit the action projector against the adapted ITM  $(date '+%F %T')"
 [ -f "$RUN/projector_b1_adapted.pt" ] || PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u \
   -m wm.fit_projector --ckpt "$RUN/adapted_b1.pt" \
-  --hex_dir data/beh12_c10f10t10_flat --b1_dir data/beh12_b1_flat --exclude $HOLDOUT \
+  --hex_dir data/allocentric/beh12_c10f10t10_flat --b1_dir data/allocentric/beh12_b1_flat --exclude $HOLDOUT \
   --cache results/wm/cache/beh12_embeddings_body3.pt --out "$RUN/projector_b1_adapted.pt"
 
 echo
 echo "=== stage 3: contrastive, one seed to start  $(date '+%F %T')"
 [ -f "$RUN/stage3_b1_nce_s0.pt" ] || PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u \
   -m wm.adapt3 --ckpt "$RUN/adapted_b1.pt" --projector "$RUN/projector_b1_adapted.pt" \
-  --data data/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
+  --data data/allocentric/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
   --steps 15000 --lambda_nce 1.0 --batch 8 --seed 0 \
   --cache results/wm/cache/b1.pt --out "$RUN/stage3_b1_nce_s0.pt"
 
 echo
 echo "=== calibration B: after stage 3, on the checkpoint the planner would use  $(date '+%F %T')"
 $PY scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/stage3_b1_nce_s0.pt" \
-  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+  --data hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat
 
 echo
 echo "=== done  $(date '+%F %T')"
@@ -95,13 +95,13 @@ echo "then here:  calibration on both robots first, scoring only after it passes
 # After the stages finish, fit the head on the latents it will be shown and score with the control:
 #
 #   .venv/bin/python3 -m wm.fit_body_head --ckpt $RUN/stage3_b1_nce_s0.pt \
-#       --data data/beh12_b1_flat --latent projector \
-#       --also hexapod=data/beh12_c10f10t10_flat \
+#       --data data/allocentric/beh12_b1_flat --latent projector \
+#       --also hexapod=data/allocentric/beh12_c10f10t10_flat \
 #       --out $RUN/stage3_b1_nce_s0_bodyfit_proj.pt
 #
 #   .venv/bin/python3 scripts/diagnostics/score_by_body_motion.py \
 #       --ckpt $RUN/stage3_b1_nce_s0_bodyfit_proj.pt --projector $RUN/stage3_b1_nce_s0.pt \
-#       --data data/beh12_b1_flat --goal_dir data/beh12_c08f09t09_flat --goal_embodiment hexapod
+#       --data data/allocentric/beh12_b1_flat --goal_dir data/allocentric/beh12_c08f09t09_flat --goal_embodiment hexapod
 #
 # **Only the mismatched-versus-goal column decides, and the bar is now 42%, not 38%** (F132). That
 # is what forward speed alone reaches in the honest condition -- frames and rollout on both sides,

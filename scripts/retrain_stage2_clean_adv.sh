@@ -10,7 +10,7 @@ mkdir -p "wm/runs/${RUN_NAME}/summary" results/wm
 
 .venv/bin/python3 -m wm.train \
   --name "${RUN_NAME}" \
-  --sources hexapod=data/fwd_hex8body b1=data/fwd_b1_50hz \
+  --sources hexapod=data/allocentric/fwd_hex8body b1=data/allocentric/fwd_b1_50hz \
   --heldout_bodies c06f10t06 c08f09t09 c10f10t06 \
   --clips_per_body hexapod=5 \
   --action_lag 1 \

@@ -51,7 +51,7 @@ from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 
 SCENE = "medauroidea_stick_insect.ttt"
-DATA = "data/beh12_c10f10t10_flat"
+DATA = "data/allocentric/beh12_c10f10t10_flat"
 STEPS = 66
 
 

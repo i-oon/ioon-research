@@ -41,7 +41,7 @@ echo "=== short lag-3 pretrain, hinge off  $(date '+%F %T')"
 if [ -f "$RUN/best.pt" ]; then echo "skip $RUN/best.pt"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.train \
     --name beh12_lag3_nohinge \
-    --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \
+    --sources hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat \
     --lambda_body 0.5 --body_dim 3 --body_channels 0 1 2 \
     --frame_stride 3 --action_chunk 0 \
     --lambda_recon 1.0 --lambda_hinge 0.0 --lambda_readout 0.0 \
@@ -51,14 +51,14 @@ fi
 echo
 echo "=== does the action matter now?  the one number this run exists for"
 $PY -u scripts/diagnostics/action_necessity.py --ckpt "$RUN/best.pt" \
-  --data data/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
+  --data data/allocentric/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
 $PY -u scripts/diagnostics/action_necessity.py --ckpt "$RUN/best.pt" \
-  --data data/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
+  --data data/allocentric/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
 
 echo
 echo "=== and did anything else break?  a stride change is not free (F88)"
 $PY -u scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/best.pt" \
-  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+  --data hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat
 
 echo
 echo "=== done  $(date '+%F %T')   send back this whole log"

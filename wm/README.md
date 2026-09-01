@@ -129,7 +129,7 @@ A smoke run reached 0.002 that way.
 
 ### Reference values
 
-Five training bodies, `data/fwd_hex8body`, held-out `c08f09t09`:
+Five training bodies, `data/allocentric/fwd_hex8body`, held-out `c08f09t09`:
 
 | | control (`m3d_bracketed`) |
 |---|---|

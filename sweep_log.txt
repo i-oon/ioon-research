@@ -1,0 +1,436 @@
+=== collect cmd_noise 0.0 -> data/beh12_c10f10t10_sweepn00_flat
+c10f10t10 <- medauroidea_c10f10t10.ttt   12 conditions, expert episode 0 -> data/beh12_c10f10t10_sweepn00_raw
+
+  speed_c5.8     --cycles 5.8 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.55m lateral=0.12m  hip=0.178m Fr=0.129 wander=1.65  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.53m lateral=0.12m  hip=0.177m Fr=0.125 wander=1.69  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/speed_c5.8
+  speed_c7.1     --cycles 7.1 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.66m lateral=0.07m  hip=0.177m Fr=0.153 wander=1.42  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.67m lateral=0.10m  hip=0.176m Fr=0.157 wander=1.39  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/speed_c7.1
+  speed_c8.15    --cycles 8.15 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(64, 256, 256, 3) forward=+0.80m lateral=0.09m  hip=0.173m Fr=0.193 wander=1.18  ok
+  c10f10t10_ep0_r1 frames=(65, 256, 256, 3) forward=+0.79m lateral=0.15m  hip=0.174m Fr=0.189 wander=1.19  ok
+
+2 clips, 129 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/speed_c8.15
+  speed_c8.8     --cycles 8.8 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(64, 256, 256, 3) forward=+0.79m lateral=0.15m  hip=0.173m Fr=0.193 wander=1.14  ok
+  c10f10t10_ep0_r1 frames=(65, 256, 256, 3) forward=+0.81m lateral=0.02m  hip=0.172m Fr=0.192 wander=1.17  ok
+
+2 clips, 129 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/speed_c8.8
+  turn_s0.05     --spin 0.05 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.56m lateral=0.02m  hip=0.177m Fr=0.129 wander=1.65  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.57m lateral=0.04m  hip=0.178m Fr=0.130 wander=1.60  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/turn_s0.05
+  turn_s0.15     --spin 0.15 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.52m lateral=0.15m  hip=0.178m Fr=0.125 wander=1.66  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.51m lateral=0.18m  hip=0.178m Fr=0.123 wander=1.68  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/turn_s0.15
+  turn_s0.29     --spin 0.29 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.41m lateral=0.36m  hip=0.178m Fr=0.126 wander=1.62  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.50m lateral=0.31m  hip=0.177m Fr=0.135 wander=1.54  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/turn_s0.29
+  turn_s0.56     --spin 0.56 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.16m lateral=0.51m  hip=0.178m Fr=0.124 wander=1.71  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.12m lateral=0.46m  hip=0.177m Fr=0.110 wander=1.89  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/turn_s0.56
+  side_L_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.4 --spin 0.19 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.05m lateral=0.05m  hip=0.171m Fr=0.017 wander=6.39  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.05m lateral=0.07m  hip=0.172m Fr=0.019 wander=5.76  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/side_L_lvl0
+  side_L_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.8 --spin 0.19 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.06m lateral=0.31m  hip=0.167m Fr=0.075 wander=1.79  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.07m lateral=0.30m  hip=0.167m Fr=0.072 wander=1.85  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/side_L_lvl1
+  side_R_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.4 --spin -0.24 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.02m lateral=0.11m  hip=0.170m Fr=0.026 wander=3.72  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.01m lateral=0.12m  hip=0.170m Fr=0.029 wander=3.35  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/side_R_lvl0
+  side_R_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.8 --spin -0.24 --cmd_noise 0.0 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.02m lateral=0.60m  hip=0.166m Fr=0.143 wander=1.18  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.06m lateral=0.55m  hip=0.166m Fr=0.131 wander=1.18  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn00_raw/side_R_lvl1
+
+now flatten:
+  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py --src data/beh12_c10f10t10_sweepn00_raw --out data/beh12_c10f10t10_flat --embodiment hexapod
+24 clips -> data/beh12_c10f10t10_sweepn00_flat
+  speed  speed_c5.8:2  speed_c7.1:2  speed_c8.15:2  speed_c8.8:2
+  turn   turn_s0.05:2  turn_s0.15:2  turn_s0.29:2  turn_s0.56:2
+  side   side_L_lvl0:2  side_L_lvl1:2  side_R_lvl0:2  side_R_lvl1:2
+clips per condition: [2]
+=== collect cmd_noise 0.02 -> data/beh12_c10f10t10_sweepn002_flat
+c10f10t10 <- medauroidea_c10f10t10.ttt   12 conditions, expert episode 0 -> data/beh12_c10f10t10_sweepn002_raw
+
+  speed_c5.8     --cycles 5.8 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.48m lateral=0.35m  hip=0.178m Fr=0.137 wander=1.56  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.44m lateral=0.41m  hip=0.177m Fr=0.139 wander=1.51  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/speed_c5.8
+  speed_c7.1     --cycles 7.1 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.67m lateral=0.31m  hip=0.176m Fr=0.170 wander=1.31  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.66m lateral=0.18m  hip=0.179m Fr=0.156 wander=1.41  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/speed_c7.1
+  speed_c8.15    --cycles 8.15 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(58, 256, 256, 3) forward=+0.72m lateral=0.37m  hip=0.173m Fr=0.215 wander=1.17  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(62, 256, 256, 3) forward=+0.78m lateral=0.21m  hip=0.173m Fr=0.201 wander=1.20  FAILS lateral, veering
+
+2 clips, 120 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/speed_c8.15
+  speed_c8.8     --cycles 8.8 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(60, 256, 256, 3) forward=+0.67m lateral=0.45m  hip=0.170m Fr=0.208 wander=1.13  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(56, 256, 256, 3) forward=+0.68m lateral=0.44m  hip=0.169m Fr=0.225 wander=1.09  FAILS lateral, veering
+
+2 clips, 116 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/speed_c8.8
+  turn_s0.05     --spin 0.05 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.57m lateral=0.18m  hip=0.177m Fr=0.137 wander=1.61  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.53m lateral=0.01m  hip=0.177m Fr=0.122 wander=1.67  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/turn_s0.05
+  turn_s0.15     --spin 0.15 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.52m lateral=0.04m  hip=0.177m Fr=0.120 wander=1.73  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.49m lateral=0.09m  hip=0.177m Fr=0.114 wander=1.73  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/turn_s0.15
+  turn_s0.29     --spin 0.29 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.48m lateral=0.22m  hip=0.176m Fr=0.122 wander=1.73  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.47m lateral=0.10m  hip=0.177m Fr=0.111 wander=1.82  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/turn_s0.29
+  turn_s0.56     --spin 0.56 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.20m lateral=0.43m  hip=0.176m Fr=0.109 wander=1.92  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.37m lateral=0.28m  hip=0.176m Fr=0.107 wander=1.98  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/turn_s0.56
+  side_L_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.4 --spin 0.19 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.01m lateral=0.01m  hip=0.173m Fr=0.003 wander=30.38  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.03m lateral=0.05m  hip=0.169m Fr=0.012 wander=8.42  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/side_L_lvl0
+  side_L_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.8 --spin 0.19 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.07m lateral=0.34m  hip=0.169m Fr=0.082 wander=1.62  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.05m lateral=0.41m  hip=0.166m Fr=0.098 wander=1.40  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/side_L_lvl1
+  side_R_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.4 --spin -0.24 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.03m lateral=0.08m  hip=0.170m Fr=0.021 wander=5.25  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.00m lateral=0.03m  hip=0.173m Fr=0.006 wander=18.78  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/side_R_lvl0
+  side_R_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.8 --spin -0.24 --cmd_noise 0.02 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.12m lateral=0.53m  hip=0.168m Fr=0.128 wander=1.22  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.09m lateral=0.35m  hip=0.168m Fr=0.085 wander=1.54  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn002_raw/side_R_lvl1
+
+now flatten:
+  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py --src data/beh12_c10f10t10_sweepn002_raw --out data/beh12_c10f10t10_flat --embodiment hexapod
+24 clips -> data/beh12_c10f10t10_sweepn002_flat
+  speed  speed_c5.8:2  speed_c7.1:2  speed_c8.15:2  speed_c8.8:2
+  turn   turn_s0.05:2  turn_s0.15:2  turn_s0.29:2  turn_s0.56:2
+  side   side_L_lvl0:2  side_L_lvl1:2  side_R_lvl0:2  side_R_lvl1:2
+clips per condition: [2]
+=== collect cmd_noise 0.03 -> data/beh12_c10f10t10_sweepn003_flat
+c10f10t10 <- medauroidea_c10f10t10.ttt   12 conditions, expert episode 0 -> data/beh12_c10f10t10_sweepn003_raw
+
+  speed_c5.8     --cycles 5.8 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.47m lateral=0.36m  hip=0.176m Fr=0.138 wander=1.53  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.41m lateral=0.43m  hip=0.177m Fr=0.136 wander=1.54  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/speed_c5.8
+  speed_c7.1     --cycles 7.1 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.69m lateral=0.27m  hip=0.176m Fr=0.170 wander=1.30  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.64m lateral=0.29m  hip=0.179m Fr=0.161 wander=1.36  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/speed_c7.1
+  speed_c8.15    --cycles 8.15 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(55, 256, 256, 3) forward=+0.64m lateral=0.49m  hip=0.172m Fr=0.225 wander=1.14  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.69m lateral=0.29m  hip=0.174m Fr=0.173 wander=1.24  FAILS lateral, veering
+
+2 clips, 121 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/speed_c8.15
+  speed_c8.8     --cycles 8.8 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(58, 256, 256, 3) forward=+0.62m lateral=0.51m  hip=0.168m Fr=0.215 wander=1.12  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(53, 256, 256, 3) forward=+0.65m lateral=0.48m  hip=0.170m Fr=0.236 wander=1.08  FAILS lateral, veering
+
+2 clips, 111 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/speed_c8.8
+  turn_s0.05     --spin 0.05 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.55m lateral=0.16m  hip=0.175m Fr=0.133 wander=1.58  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.50m lateral=0.09m  hip=0.177m Fr=0.116 wander=1.74  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/turn_s0.05
+  turn_s0.15     --spin 0.15 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.55m lateral=0.07m  hip=0.177m Fr=0.127 wander=1.67  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.48m lateral=0.11m  hip=0.176m Fr=0.114 wander=1.70  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/turn_s0.15
+  turn_s0.29     --spin 0.29 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.51m lateral=0.11m  hip=0.175m Fr=0.120 wander=1.76  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.49m lateral=0.00m  hip=0.177m Fr=0.113 wander=1.83  ok
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/turn_s0.29
+  turn_s0.56     --spin 0.56 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.33m lateral=0.34m  hip=0.172m Fr=0.110 wander=1.97  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.39m lateral=0.23m  hip=0.176m Fr=0.104 wander=2.06  FAILS lateral, veering
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/turn_s0.56
+  side_L_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.4 --spin 0.19 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.01m lateral=0.02m  hip=0.176m Fr=0.005 wander=22.02  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.02m lateral=0.09m  hip=0.171m Fr=0.023 wander=4.91  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/side_L_lvl0
+  side_L_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.8 --spin 0.19 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.04m lateral=0.60m  hip=0.171m Fr=0.140 wander=1.26  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.05m lateral=0.40m  hip=0.169m Fr=0.095 wander=1.45  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/side_L_lvl1
+  side_R_lvl0    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.4 --spin -0.24 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.06m lateral=0.02m  hip=0.173m Fr=0.015 wander=7.60  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.03m lateral=0.09m  hip=0.175m Fr=0.021 wander=5.63  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/side_R_lvl0
+  side_R_lvl1    --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.8 --spin -0.24 --cmd_noise 0.03 --noise_tau 5
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.10m lateral=0.42m  hip=0.169m Fr=0.102 wander=1.35  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.11m lateral=0.24m  hip=0.170m Fr=0.063 wander=1.97  FAILS forward
+
+2 clips, 132 frames -> /home/aria/ioon-research/data/beh12_c10f10t10_sweepn003_raw/side_R_lvl1
+
+now flatten:
+  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py --src data/beh12_c10f10t10_sweepn003_raw --out data/beh12_c10f10t10_flat --embodiment hexapod
+24 clips -> data/beh12_c10f10t10_sweepn003_flat
+  speed  speed_c5.8:2  speed_c7.1:2  speed_c8.15:2  speed_c8.8:2
+  turn   turn_s0.05:2  turn_s0.15:2  turn_s0.29:2  turn_s0.56:2
+  side   side_L_lvl0:2  side_L_lvl1:2  side_R_lvl0:2  side_R_lvl1:2
+clips per condition: [2]
+
+############ SEPARABILITY -- read this before any R2 ############
+--- cmd_noise 0.0
+condition       forward  lateral      yaw  clips
+side_L_lvl0      -0.014    0.018   -0.015      2
+side_L_lvl1       0.015    0.072   -0.000      2
+side_R_lvl0      -0.009   -0.022    0.020      2
+side_R_lvl1       0.015   -0.133   -0.003      2
+speed_c5.8        0.137    0.011    0.004      2
+speed_c7.1        0.163   -0.006   -0.003      2
+speed_c8.15       0.206    0.002    0.000      2
+speed_c8.8        0.196    0.019   -0.012      2
+turn_s0.05        0.138   -0.008   -0.006      2
+turn_s0.15        0.134   -0.017   -0.021      2
+turn_s0.29        0.144   -0.022   -0.039      2
+turn_s0.56        0.143   -0.041   -0.084      2
+
+**FAILS the semantic check** -- separable, and not what the names claim:
+  speed_c8.8 is weaker than speed_c8.15 on its own channel (0.196 <= 0.206)
+
+Re-derive these for this body. The commands are not portable across geometries;
+what strafes gently on the base body may not move a shorter-legged one at all.
+
+closest pairs, separation in units of their combined spread:
+  turn_s0.15    turn_s0.29        1.4x
+  speed_c8.15   speed_c8.8        2.1x
+  turn_s0.05    turn_s0.15        2.9x
+  turn_s0.05    turn_s0.29        3.1x
+  speed_c7.1    turn_s0.29        3.3x
+  turn_s0.29    turn_s0.56        3.6x
+
+1 of 66 pairs closer than 2x their own spread
+--- cmd_noise 0.02
+condition       forward  lateral      yaw  clips
+side_L_lvl0      -0.006    0.009   -0.016      2
+side_L_lvl1       0.013    0.088    0.000      2
+side_R_lvl0      -0.009   -0.011    0.027      2
+side_R_lvl1       0.008   -0.092    0.008      2
+speed_c5.8        0.129    0.039    0.018      2
+speed_c7.1        0.167    0.020    0.004      2
+speed_c8.15       0.207    0.012    0.009      2
+speed_c8.8        0.208    0.047    0.011      2
+turn_s0.05        0.137    0.008   -0.004      2
+turn_s0.15        0.128   -0.010   -0.020      2
+turn_s0.29        0.135   -0.006   -0.033      2
+turn_s0.56        0.141   -0.018   -0.071      2
+
+semantic check passed: every condition moves the way its name says, and each level
+exceeds the one below it on its own channel.
+
+closest pairs, separation in units of their combined spread:
+  turn_s0.15    turn_s0.29        0.9x
+  speed_c8.15   speed_c8.8        1.0x
+  turn_s0.29    turn_s0.56        1.1x
+  turn_s0.05    turn_s0.29        1.1x
+  turn_s0.05    turn_s0.15        1.3x
+  speed_c5.8    turn_s0.05        1.4x
+
+11 of 66 pairs closer than 2x their own spread
+--- cmd_noise 0.03
+condition       forward  lateral      yaw  clips
+side_L_lvl0      -0.006    0.011   -0.011      2
+side_L_lvl1       0.006    0.109    0.002      2
+side_R_lvl0      -0.009    0.019    0.034      2
+side_R_lvl1      -0.000   -0.058    0.018      2
+speed_c5.8        0.120    0.041    0.018      2
+speed_c7.1        0.165    0.026    0.005      2
+speed_c8.15       0.189    0.038    0.017      2
+speed_c8.8        0.211    0.053    0.018      2
+turn_s0.05        0.126    0.005   -0.004      2
+turn_s0.15        0.123    0.007   -0.012      2
+turn_s0.29        0.130    0.003   -0.026      2
+turn_s0.56        0.132   -0.014   -0.065      2
+
+**FAILS the semantic check** -- separable, and not what the names claim:
+  side_R_lvl0: lateral +0.019, should travel right (negative)
+
+Re-derive these for this body. The commands are not portable across geometries;
+what strafes gently on the base body may not move a shorter-legged one at all.
+
+closest pairs, separation in units of their combined spread:
+  turn_s0.05    turn_s0.15        0.3x
+  speed_c8.15   speed_c8.8        0.4x
+  turn_s0.15    turn_s0.29        0.6x
+  speed_c7.1    speed_c8.15       0.7x
+  turn_s0.05    turn_s0.29        0.8x
+  turn_s0.29    turn_s0.56        0.9x
+
+19 of 66 pairs closer than 2x their own spread
+
+############ ACTION R2 -- only meaningful where separability passed ############
+--- cmd_noise 0.0
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  94%|█████████▍| 793/843 [00:00<00:00, 7883.32it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7822.44it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_sweepn00_flat
+370 train / 370 test transitions, split by clip, action width 18, embedding dimension 360448
+
+                    features  action R2  vs single    alpha
+         e_t  (single frame)      0.729     +0.000     0.01
+        [e_t, e_t+1]  (pair)      0.815     +0.085     0.01
+        [e_t, e_t+3]  (pair)      0.832     +0.102     0.01
+
+  per family, action R2 on held-out clips
+      family       e_t  (single frame)      [e_t, e_t+1]  (pair)      [e_t, e_t+3]  (pair)      n
+        side                     0.649                     0.832                     0.862    124
+       speed                     0.780                     0.813                     0.829    122
+        turn                     0.764                     0.798                     0.803    124
+
+  the widest pair beats a single frame by +0.102 R2.  the transition carries action information a single frame does not
+--- cmd_noise 0.02
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  95%|█████████▌| 805/843 [00:00<00:00, 8049.45it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8120.39it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_sweepn002_flat
+365 train / 365 test transitions, split by clip, action width 18, embedding dimension 360448
+
+                    features  action R2  vs single    alpha
+         e_t  (single frame)      0.383     +0.000     0.01
+        [e_t, e_t+1]  (pair)      0.539     +0.156     0.01
+        [e_t, e_t+3]  (pair)      0.581     +0.198     0.01
+
+  per family, action R2 on held-out clips
+      family       e_t  (single frame)      [e_t, e_t+1]  (pair)      [e_t, e_t+3]  (pair)      n
+        side                     0.202                     0.466                     0.539    124
+       speed                     0.463                     0.610                     0.634    117
+        turn                     0.496                     0.548                     0.574    124
+
+  the widest pair beats a single frame by +0.198 R2.  the transition carries action information a single frame does not
+--- cmd_noise 0.03
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  94%|█████████▍| 795/843 [00:00<00:00, 7924.99it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7943.72it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_sweepn003_flat
+362 train / 365 test transitions, split by clip, action width 18, embedding dimension 360448
+
+                    features  action R2  vs single    alpha
+         e_t  (single frame)      0.344     +0.000    1e+04
+        [e_t, e_t+1]  (pair)      0.484     +0.140     0.01
+        [e_t, e_t+3]  (pair)      0.516     +0.172     0.01
+
+  per family, action R2 on held-out clips
+      family       e_t  (single frame)      [e_t, e_t+1]  (pair)      [e_t, e_t+3]  (pair)      n
+        side                     0.110                     0.372                     0.416    124
+       speed                     0.458                     0.544                     0.571    117
+        turn                     0.481                     0.545                     0.568    124
+
+  the widest pair beats a single frame by +0.172 R2.  the transition carries action information a single frame does not
+
+=== the nulls to read against: clean +0.084 gap at 0.764 single frame, 0.05 rad +0.173 at 0.196
+=== done  2026-08-31 20:25:20   send back this whole log

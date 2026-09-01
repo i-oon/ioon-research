@@ -83,7 +83,7 @@ def cell(x_tr, y_tr, x_te, y_te):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/s2_fwd_hex7-b1_body0.5/last.pt")
-    ap.add_argument("--insect_dir", default="data/fwd_hex7speed")
+    ap.add_argument("--insect_dir", default="data/allocentric/fwd_hex7speed")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -96,7 +96,7 @@ def main():
     itm.eval()
 
     sources = (("insect", insect_paths(os.path.join(ROOT, args.insect_dir)), "head"),
-               ("b1", sorted(glob.glob(os.path.join(ROOT, "data/fwd_b1_50hz/*.npz"))), "base_pos"))
+               ("b1", sorted(glob.glob(os.path.join(ROOT, "data/allocentric/fwd_b1_50hz/*.npz"))), "base_pos"))
     data = {}
     for name, paths, key in sources:
         Z, Y, C = [], {False: [], True: []}, []

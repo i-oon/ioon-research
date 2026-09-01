@@ -6,9 +6,9 @@ the wrong things.
 
 | prefix | set | role |
 |---|---|---|
-| `hex_c10f10t10__` | `data/beh12_c10f10t10_flat` | the body the world model is pretrained on |
-| `hex_c08f09t09__` | `data/beh12_c08f09t09_flat` | a held-out body of the same embodiment |
-| `b1__` | `data/beh12_b1_flat` | the quadruped, the only executable candidates |
+| `hex_c10f10t10__` | `data/allocentric/beh12_c10f10t10_flat` | the body the world model is pretrained on |
+| `hex_c08f09t09__` | `data/allocentric/beh12_c08f09t09_flat` | a held-out body of the same embodiment |
+| `b1__` | `data/allocentric/beh12_b1_flat` | the quadruped, the only executable candidates |
 
 **`turn_all_three.png` is the one to look at first.** All three sets rotate **anticlockwise on
 screen** through their strongest turn. They did not until 2026-08-29: the pretraining insect turned

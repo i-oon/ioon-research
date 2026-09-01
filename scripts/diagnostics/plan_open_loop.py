@@ -50,7 +50,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--projector", default="")
-    ap.add_argument("--candidates_dir", default="data/beh12_c10f10t10_flat")
+    ap.add_argument("--candidates_dir", default="data/allocentric/beh12_c10f10t10_flat")
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--demo_dir", default="",
                     help="clips supplying `e_t`, the frames the planner is standing in. Defaults "

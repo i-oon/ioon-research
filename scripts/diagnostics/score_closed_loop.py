@@ -30,7 +30,7 @@ from wm.data.embodiment import body_velocity, yaw_rate  # noqa: E402
 
 SPEED_TOLERANCE = 0.15
 # A fall is unambiguous well before the body reaches the floor; 0.75 of the starting height is
-# below anything a walking clip in `data/beh12_c10f10t10_flat` shows.
+# below anything a walking clip in `data/allocentric/beh12_c10f10t10_flat` shows.
 HEIGHT_FLOOR = 0.75
 
 
@@ -121,7 +121,7 @@ def channel_for(condition, ref):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+", help="closed-loop npz files")
-    ap.add_argument("--demo_dir", default="data/beh12_c10f10t10_flat",
+    ap.add_argument("--demo_dir", default="data/allocentric/beh12_c10f10t10_flat",
                     help="where the demonstration clips live, for the reference Froude")
     ap.add_argument("--goal_dir", default="",
                     help="where the **goal** clips live, when the goal is a different robot from "

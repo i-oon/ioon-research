@@ -13,7 +13,7 @@ proprioception come from the MuJoCo rollout (where the policy actually walks).
 # the scene's own way, the B1 touches an image edge in 61% of frames against the insect's 0%, every
 # clip carries its own background because the camera is never pinned, and a 24-degree view reaches
 # the far edge of the 15 m floor. `--cam_fov 24 --spawn 0 0 --floor_scale 3` is what
-# `data/beh12_b1_flat` was built with, and anything rendered differently cannot be mixed with it
+# `data/allocentric/beh12_b1_flat` was built with, and anything rendered differently cannot be mixed with it
 # (F113). Pass `--cam_fov 15 --floor_scale 0` to reproduce the old, defective framing.
 import argparse
 import os
@@ -61,7 +61,7 @@ def main():
                          "the reason is worth not rediscovering**: the B1 sits at image y=0.35 "
                          "where the insect sits at 0.49, so it is framed high and clips the top; "
                          "moving along the optical axis shrinks the robot without moving it in "
-                         "frame, and the sideways clips stayed 100% clipped at 1.7x. Widening "
+                         "frame, and the sideways clips stayed 100%% clipped at 1.7x. Widening "
                          "the angle is the only motion that adds room on the side the robot is "
                          "leaving (F113). Left at 1.0 for every collected set.")
     ap.add_argument("--cam_fov", type=float, default=24.0,
@@ -69,11 +69,27 @@ def main():
                          "identical 15-deg cameras, and that is not the same as an identical view.** "
                          "The field is 2.11 m wide at the robot; the B1 is 1.29 m across and travels "
                          "up to 1.56 m, needing 2.85 m, while the insect needs 1.75 m and fits. "
-                         "Matched camera parameters produced a quadruped clipped in 36-100% of "
+                         "Matched camera parameters produced a quadruped clipped in 36-100%% of "
                          "frames beside an insect clipped in none (F113). What has to match is that "
                          "both robots stay whole, not that the two numbers agree.")
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0), metavar=("X", "Y"),
                     help="replay from this world x y; use the same value as the insect collector")
+    ap.add_argument("--ego", action="store_true",
+                    help="mount the camera on the base and look forward; the egocentric de-risk "
+                         "gate. **Look at a frame before trusting the orientation default**")
+    ap.add_argument("--ego_forward", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"),
+                    help="override the measured direction of travel")
+    ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"),
+                    help="(right, up, forward) in the camera's own basis, metres")
+    ap.add_argument("--ego_seed", type=int, default=0,
+                    help="**appearance seed, and it must be PAIRED with the insect's.** The same "
+                         "integer produces the same room on either robot, so a cross-embodiment "
+                         "test run on matched seeds differs by body and by nothing else. Unmatched "
+                         "seeds make Q2 unreadable: 'the coordinate does not transfer' and 'the two "
+                         "sets were collected in different-looking rooms' become the same number")
+    ap.add_argument("--ego_box", type=float, default=0.0,
+                    help="build a textured room this many metres across; an untextured world "
+                         "carries no optical flow and the egocentric view would see nothing")
     ap.add_argument("--max_frames", type=int, default=0,
                     help="stop after this many frames, so every condition yields the same clip "
                          "length regardless of how fast the robot happens to walk")
@@ -122,9 +138,34 @@ def main():
         base_pos[:, 0] += args.spawn[0] - base_pos[0, 0]
         base_pos[:, 1] += args.spawn[1] - base_pos[0, 1]
 
-    sim.setObjectPosition(cam, sim.handle_world,
-                          [base_pos[0, 0] + off_xy[0] + args.cam_dx,
-                           base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
+    if args.ego:
+        # **Mounted on the base, and the room it looks at built first.** The replay teleports
+        # `root` every frame, so a parented sensor rides it for free; a world-positioned one would
+        # have to be recomputed from the same pose and is one convention error away from silently
+        # looking somewhere else.
+        import sys as _s
+        _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scene"))
+        from ego_camera import (attach_ego, build_texture_box,   # noqa: E402
+                                randomise_ground)
+        if args.ego_box > 0:
+            build_texture_box(sim, size=args.ego_box, seed=args.ego_seed)
+        randomise_ground(sim, seed=args.ego_seed)
+        # **The direction the base actually travels**, taken from the trajectory in hand rather than
+        # from the base frame's axis convention. Averaged over the clip so one noisy step cannot
+        # point the camera sideways.
+        if args.ego_forward is not None:
+            fwd = args.ego_forward
+        else:
+            d = base_pos[min(len(base_pos) - 1, 40)] - base_pos[0]
+            fwd = [float(d[0]), float(d[1]), 0.0]
+            if float(np.linalg.norm(fwd)) < 1e-3:
+                raise SystemExit("the base barely moves in this clip, so its forward direction "
+                                 "cannot be measured; pass --ego_forward")
+        print(f"    ego camera: {attach_ego(sim, cam, root, fwd, args.ego_offset or (0.0, 0.06, 0.28))}")
+    else:
+        sim.setObjectPosition(cam, sim.handle_world,
+                              [base_pos[0, 0] + off_xy[0] + args.cam_dx,
+                               base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
     if args.floor_scale > 0:
         floors = [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
                   if sim.getObjectAlias(h, 1).startswith("/Floor")]

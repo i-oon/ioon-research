@@ -150,7 +150,7 @@ def rollout(itm, ftm, clips, horizons, device):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/s1_fwd_m3d_cross/best.pt")
-    ap.add_argument("--data", default="data/fwd_b1_50hz")
+    ap.add_argument("--data", default="data/allocentric/fwd_b1_50hz")
     ap.add_argument("--clips", type=int, nargs="+", default=[1, 3, 5, 7])
     ap.add_argument("--test_clips", type=int, default=4)
     ap.add_argument("--steps", type=int, default=1000,

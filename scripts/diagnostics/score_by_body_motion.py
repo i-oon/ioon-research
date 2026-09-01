@@ -28,7 +28,7 @@ A negative result is therefore evidence about *this* head, not about body-motion
 general; a positive one would be worth widening the head for.
 
     .venv/bin/python3 scripts/diagnostics/score_by_body_motion.py \\
-        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt --data data/beh12_b1_flat
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt --data data/allocentric/beh12_b1_flat
 """
 import argparse
 import glob

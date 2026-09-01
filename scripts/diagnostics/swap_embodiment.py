@@ -71,7 +71,7 @@ def main():
                     help="the body whose geometry the 4-leg shares, so its commands are the "
                          "4-leg's ground truth on the corner legs")
     ap.add_argument("--episodes", type=int, nargs="+", default=[101, 130, 144])
-    ap.add_argument("--hexapod_dir", default="data/fwd_hex8body")
+    ap.add_argument("--hexapod_dir", default="data/allocentric/fwd_hex8body")
     ap.add_argument("--fourleg_dir", default="data/ik_4leg_middleloss_clean9")
     ap.add_argument("--chunk", type=int, default=4)
     ap.add_argument("--encode_device", default="")

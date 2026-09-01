@@ -13,7 +13,7 @@ for arm in "wm/runs/beh12_actswm/best.pt|the rebuild (F153/F154)" \
   [ -f "$ckpt" ] || { echo "== skip $label -- $ckpt absent"; continue; }
   echo "== $label"
   .venv/bin/python3 scripts/diagnostics/action_necessity.py \
-      --ckpt "$ckpt" --data data/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
+      --ckpt "$ckpt" --data data/allocentric/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
   .venv/bin/python3 scripts/diagnostics/action_necessity.py \
-      --ckpt "$ckpt" --data data/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
+      --ckpt "$ckpt" --data data/allocentric/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
 done

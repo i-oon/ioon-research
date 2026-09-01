@@ -63,6 +63,32 @@ reference point. Blockquotes are reserved for caveats.
 
 ## 1. Claim
 
+### Positioning against three named neighbours
+
+**The scoped contribution, verbatim, and the only version to be written:**
+
+> In periodic visual locomotion, the joint action is inverse-recoverable from a SINGLE frame (F159:
+> insect R2 0.78, turning 0.93) because gait phase makes the pose encode the command -- so the
+> action is forward-redundant (F158: <3% of prediction error). This closes the loop between two
+> prior observations -- adjacent-frame redundancy (AHA-WAM) and the action-invariant teacher-forcing
+> solution (UWM-JEPA) -- with a measured mechanism, and shows the objective-level fix-family fails
+> on it (ActSWM hinge, F153/F157) and that the residual-target route is closed (F158), since the
+> residual of an action-blind prediction carries no action beyond the frame -- because there is no
+> action-dependent forward signal to recover, only a redundant one.
+
+**Never the unscoped version** -- "we discover visual world models cannot be action-conditioned in
+locomotion". AHA-WAM and UWM-JEPA each state part of it already.
+
+| paper | theirs | ours |
+|---|---|---|
+| **AHA-WAM** 2606.09811 | adjacent frames "redundant for control", used as architectural motivation | we **measure** it and attribute it to **gait periodicity** |
+| **UWM-JEPA** 2605.25313 Sec 4 | the action-invariant solution as a training-target problem; fix is counterfactual targets | in locomotion that solution is **near-optimal**, so target fixes have nothing better to reach |
+| **Yeom et al.** 2606.07687 | V-JEPA inverse-recoverable action signal; CALVIN's static-scene note | **inverse-recoverable is not forward-necessary**; periodicity is the severe form of their exception |
+
+**The claim is deliberately narrow about target-level fixes.** F158 tested a *residual* target;
+UWM-JEPA's *counterfactual* target has never been trained and is **not** claimed to fail. Widening
+that clause requires running the arm -- see F161.
+
 ### Positioning against Yeom et al. (2606.07687)
 
 **Their result:** V-JEPA carries action-relevant structure that is inverse-dynamics recoverable --
@@ -93,8 +119,16 @@ dissociation itself is unharmed and is in fact sharpest on the insect -- R2 0.88
 overclaim on the quadruped.** See F159 for the per-family numbers.
 
 
-Learn a **morphology-agnostic latent action z_t** from simulation video that separates *what
-movement is happening* from *which body is doing it*, given no morphology label and no kinematics.
+Learn a latent action `z_t` from simulation video that **maps to a shared body-motion coordinate**
+-- forward, lateral and yaw, the same physical quantities on both robots (F136) -- given no
+morphology label and no kinematics.
+
+**`z_t` itself is not body-blind, and saying it is contradicts our own measurement.** Body identity
+is decodable from `z` at **0.974** against a chance of 0.5, and at 0.732 with the coordinate term
+switched off (F160). **The agnosticism lives in the coordinate `z` maps to, not in `z`.** That is
+also the more coherent reading of the architecture: the decoders are per-body (F129), so `z` has to
+carry body identity for them to work at all, and removing it adversarially made transfer 1.2x worse
+(F24).
 
 Two claims, at two scopes, because they turned out to need different words:
 
@@ -190,7 +224,7 @@ where proprioception can't be shared at all but vision (pixels) can.
 - **Stage 2 — cross-embodiment / compositional transfer**: train on **6-leg stick insect + Unitree B1
   quadruped (12-D)**. The train set contains two disjoint action spaces (hexapod 18-D and B1 12-D),
   which one camera describes in the same coordinates and a joint-space model has no correspondence
-  for. B1 data + render pipeline exist (`data/fwd_b1_50hz`, MuJoCo rollout → CoppeliaSim kinematic
+  for. B1 data + render pipeline exist (`data/allocentric/fwd_b1_50hz`, MuJoCo rollout → CoppeliaSim kinematic
   replay, same camera/floor as insect = render-consistent).
 
   > **The 4-leg stick insect was the intended test body and it does not qualify.** It was built by
@@ -357,7 +391,7 @@ insect's speed varies (F57, F60). Cross-robot speed transfer goes from **-7.08 t
 `lambda_body 0.1` (F65). Measured as direction agreement rather than R^2, the control reads
 **-0.01** and the treated runs **0.85 to 0.92** (F66).
 
-**The behaviour set that was blocking everything now exists.** `data/beh12_*`: twelve conditions per
+**The behaviour set that was blocking everything now exists.** `data/allocentric/beh12_*`: twelve conditions per
 robot, balanced 4/4/4 across speed, turn and sideways, forward matched to 4% and yaw to 2%, at a
 common 20 Hz and 66 frames. Building it exposed four defects in existing code -- a frame-rate
 mismatch that made a stored transition mean 20 ms on one robot and 50 ms on the other (F74), a sign
@@ -465,7 +499,7 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 
 | # | Step | Tests / produces | Status | ~Week |
 |---|---|---|---|---|
-| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | done — `data/fwd_b1_50hz`, 14 clips | done |
+| 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | done — `data/allocentric/fwd_b1_50hz`, 14 clips | done |
 | 2b | 4-leg insect candidate | "middle-loss" variant, built by removing ML/MR from the base scene | **abandoned as the test body** — F47: the latent places it 0.578 from the body it was cut from against a chance of 0.981, so it tests a new *action space*, not a new embodiment | dropped |
 | 2c | Train latent WM across {insect, B1} | shared ITM/FTM backbone + **per-embodiment Motion Decoder head** (18-D / 12-D) | done — `stage2_clean` and variants; transfer works and the embodiment identity is passive (F43) | done |
 | 2d | **Hold the B1 out entirely** | backbone trained on insects only, never a quadruped; fit a 12-D head on a few B1 clips against the same head on a random backbone | done — **1.28x**, velocity-matched, and **all of it travels through `z`**: zeroing the latent gives 0.98x, identical to random weights (F50, slide 16) | done |
@@ -476,12 +510,12 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 | 2j | **Widen the shared target from 1 DOF to 6** | `lambda_body` supervises forward speed alone. The full shared quantity is a **body pose delta** -- three translation, three rotation, dimensionless. **Joint angles stay as the per-embodiment target** (see the note below on why the task-space version was withdrawn) | open — needs 2k first, since five of the six are constants today |
 | 2k | **Behavioural coverage** | **done.** `--gait cpg` gives the hexapod a commandable gait with no IK, ported from the lab's Olaf scene: straight, `--spin` for turning, a sideways gait, and a speed range via `--cycles`, all at `--scale 0.65`. Its drive is a tripod; its contacts are not, and neither are the lab's own (F71, F73) | done (F71) |
 | 2k' | **Record body orientation for the hexapod** | **done 2026-08-21** -- `body_quat` per frame, off the abdomen. Head orientation and Euler angles were both tried first and both read straight walking as a large turn (F72) | done, but every clip before this date lacks it |
-| 2k'' | **Collect the matched set** | **done** — `data/beh12_c10f10t10_flat` and `data/beh12_b1_flat`, 48 clips each. Hexapod `--spin` 0.05 / 0.15 / 0.29 / 0.56 against B1 `--wz` 0 / 0.055 / 0.139 / 0.294, matched within 3% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides. Speed matched by widening the hexapod's foot path rather than moving either robot's pace (F71, F72) | done |
+| 2k'' | **Collect the matched set** | **done** — `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat`, 48 clips each. Hexapod `--spin` 0.05 / 0.15 / 0.29 / 0.56 against B1 `--wz` 0 / 0.055 / 0.139 / 0.294, matched within 3% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides. Speed matched by widening the hexapod's foot path rather than moving either robot's pace (F71, F72) | done |
 | 2k''' | **More distinct behaviours** | **partly addressed.** Effective n is the number of behaviours, not clips: within a condition the clips agreed to 2-10% of the between-condition spread. Running the B1's **two** policies at 2.00 and 1.67 Hz gives it genuinely different dynamics inside a condition (F80). The hexapod side still has one gait per condition | open, revisit if the screen stays underpowered |
 | 2k''''' | **Why do the channels compete?** | F83: adding yaw costs forward 68% and buys a yaw channel at +0.37 +/- 0.27. **"Yaw carries less signal" was tested and refuted** -- both channels have signal share 0.86 and yaw's between-condition spread is the larger. Capacity and optimisation remain. Cheapest test is widening the body head alone, holding the data fixed. **Separately**, yaw's signal is concentrated in ~6 of 12 conditions, which explains its +/-0.27 to +/-0.56 spread across condition-level splits -- evaluation leverage, not model instability, and more turn levels would tighten it without changing the trade. **And its noise floor cannot be cleaned**: the hexapod's yaw sd is 2.6x the B1's, giving the insect the same PI heading control makes it *worse* at every gain, so the gap is the gait rather than a missing controller (F85) | open |
-| 2k'''' | **Train the three arms** | control / body head forward-only / body head forward+yaw, on `data/beh12_*`. Arm 2 re-tests F66's 0.85-0.92 on rate-fixed data (F74); arm 3 asks the question the collection was built for. Commands written; `body_channels` is a config field now. **fibo7, not the 2080 Ti** | **next** |
+| 2k'''' | **Train the three arms** | control / body head forward-only / body head forward+yaw, on `data/allocentric/beh12_*`. Arm 2 re-tests F66's 0.85-0.92 on rate-fixed data (F74); arm 3 asks the question the collection was built for. Commands written; `body_channels` is a config field now. **fibo7, not the 2080 Ti** | **next** |
 | 2o | **A third embodiment** | **The single experiment that would make the scaling claim available, and it is not cheap.** LAC-WM's headline is that downstream performance rises with the number of pretraining embodiments while its explicit-action baseline degrades. **Two embodiments cannot produce that curve** (F82), so we currently declare it as a limitation. Pretraining on hexapod + B1 and few-shot adapting a **third** body would convert "our two robots transfer to each other" into "our two robots are pretraining data for a third". Nothing suitable is on disk -- `sim/assets/` holds only the B1 and the hexapod family, and `olaf` is another 18-DOF hexapod, which is within-family and solves the wrong problem. Cost is what the B1 cost: source a model, get a controller that walks, build a render-locked scene on the identical camera, calibrate matched conditions, collect. **Choose for topology, not convenience** -- the thesis argument is *incomparable* topology, so a body sharing topology with neither (a biped, or a different leg count) is worth far more than a second quadruped | open, weeks |
-| 2p | **Few-shot curve on the current model** | Slide 16's curve was measured with a Stage 1 backbone. Redoing it needs a **hexapod-only** run with the body head, since `beh12_body_fwd` trained on B1 clips and so cannot hold the B1 out. Smoke-tested: `--sources hexapod=data/beh12_c10f10t10_flat --lambda_body 0.5 --body_dim 1 --body_channels 0` trains, 2779 pairs. Then `finetune_ftm.py --ckpt wm/runs/beh12_hexonly/best.pt --data data/beh12_b1_flat`. **Asks something the original did not**: whether the body term's benefit survives to a robot the model has never seen | ready, 1 run |
+| 2p | **Few-shot curve on the current model** | Slide 16's curve was measured with a Stage 1 backbone. Redoing it needs a **hexapod-only** run with the body head, since `beh12_body_fwd` trained on B1 clips and so cannot hold the B1 out. Smoke-tested: `--sources hexapod=data/allocentric/beh12_c10f10t10_flat --lambda_body 0.5 --body_dim 1 --body_channels 0` trains, 2779 pairs. Then `finetune_ftm.py --ckpt wm/runs/beh12_hexonly/best.pt --data data/allocentric/beh12_b1_flat`. **Asks something the original did not**: whether the body term's benefit survives to a robot the model has never seen | ready, 1 run |
 | 2l | **Re-test the published motion decoder** | with several futures available from one state, a still stops answering the question, so the frame-conditioned head (F64, −10.5 today) should become runnable and the forward model should move | open, follows 2k |
 | 2m | **Balance the data, not just the sampler** | after `clips_per_body hexapod=7` the training set is still **2.43:1 in frames** (2,780 against 1,143), and `balance_embodiments` closes that by repeating the B1 about 2.4 times an epoch. Repetition is not data: it invites memorisation on a validation split too small to detect it, which `config.py` already warns about. **Collect more B1 rather than capping the hexapod further** -- capping throws away bodies, and F13 says bodies are what matters | open, rides with 2l |
 | 2n | **Make the measurement read the same data as training** | `body_motion_probe.py` and `plot_z_umap.py` read the whole directory and see **5.9:1**, where training sees 2.43:1. The probe fits each embodiment separately so its numbers are unaffected, but the UMAP layout is dominated by the larger set and every quoted ratio has to say which of the two it means. One data-selection path for both | open — do it *after* the current deck is presented, since it moves the quoted numbers |
@@ -492,7 +526,7 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 > stored transition was **50 ms on one robot and 20 ms on the other**. The ITM consumes `(e_t,
 > e_{t+1})`, so every number computed across the pair — F43/F46 sharing, F51 forward model, F58
 > channel AUCs, F45 pairing — compared latents describing 2.5x different durations. Fixed by
-> `--fps 20` on the replay (physics untouched at 50 Hz, frames subsampled). `data/fwd_b1_50hz` still
+> `--fps 20` on the replay (physics untouched at 50 Hz, frames subsampled). `data/allocentric/fwd_b1_50hz` still
 > carries the old rate and is kept only so published results stay reproducible.
 
 > **Data quality — read before trusting any pre-2026-08-07 number.**
@@ -713,7 +747,8 @@ require variance well above machine epsilon.
 
 ### Step 1.5 — Latent validation
 **Status** done. Behaviour transfer passes; morphology invariance does not.
-**Goal**: prove z_t is morphology-agnostic before testing transfer
+**Goal**: prove z_t maps to a shared body-motion coordinate before testing transfer. **Not** that
+`z_t` is body-blind -- it is not, and F160 measures how far from it (probe 0.974)
 
 | Task | Collect z_t from short + long + medium leg × 3 behaviors |
 |---|---|
@@ -790,7 +825,7 @@ episodes each across 6–8 bodies before running this.
 
 `sim/scene/make_leg_morphology.py` now scales coxa, femur and tibia independently, so morphology is a
 volume rather than a line and a held-out body can be a combination no training body has.
-`data/fwd_hex8body` holds 7 usable bodies at 30 clips each with 0.0% edge clipping.
+`data/allocentric/fwd_hex8body` holds 7 usable bodies at 30 clips each with 0.0% edge clipping.
 
 > **Coverage is the only intervention that has worked.** Five training bodies instead of two cut
 > held-out error from 11.04 to **3.57 deg**, and for the first time the model beats the baseline
@@ -1144,7 +1179,7 @@ were already only correct or incorrect relative to it, so it was recorded here t
 B1's own policy in `(vx, vy, wz)`, which concedes the task-space question this project exists to
 avoid; or give the planner closed-loop primitives per robot instead of sequences, which adds the
 per-robot component the recorded-sequence design was chosen to avoid. **A held-out *hexapod* body
-is the cross-body test that stays inside the design**, and needs `data/beh12_*` collected for a
+is the cross-body test that stays inside the design**, and needs `data/allocentric/beh12_*` collected for a
 second body.
 
 **What it can and cannot claim, decided in advance so the result is not over-read.**
@@ -1338,7 +1373,7 @@ reads the body's **actual** state every step, so phase cannot drift.
 - **maximize a task reward** — RL in imagination, adds reward model + Critic. This **is candidate A (Dreamer)**.
 - **behaviour-matching RL (2026-07-25, current preferred variant)** — feed the demo's `z_target`, execute on the
   new body, **re-encode the achieved transition with ITM → `z_achieved`**, and train the decoder by RL with
-  reward `r = −‖z_achieved − z_target‖²`. Two wins: supervision is in **`z`-space (morphology-invariant → no
+  reward `r = −‖z_achieved − z_target‖²`. Two wins: supervision is in **`z`-space (a shared body-motion coordinate, not a body-blind one -- F160 → no
   cross-body confound)** and needs **no ground-truth `a_t` labels**. Cost: it is **RL, not backprop** — `a_t →
   e_{t+1}` is real physics (non-differentiable), and the FTM can't substitute (it is `z`-conditioned, not
   `a`-conditioned). Use a **sample-efficient** method (CEM / off-policy SAC), **not PPO** (on-policy, sample-hungry
@@ -1424,7 +1459,7 @@ from a summary and got three things wrong.
 |---|---|---|
 | λ_recon, λ_motion | **open** | LAC-WM reports no numeric λ (nor LR, optimiser or schedule). Currently 1.0 / 1.0, but the terms sit on different scales — reconstruction ≈ 1.3, motion ≈ 0.002 — so equal weights do not mean equal influence. Ablate. |
 | `z_t` dimension | 64, following LAC-WM §4.2 | Also the lever for the invariance ablation: shrinking it should evict morphology first, since `e_t` already supplies body identity to both losses. |
-| Turn / stop behaviours | **collected, and it was not the lever** | `data/beh12_c10f10t10_flat` and `data/beh12_b1_flat` hold twelve matched conditions per robot -- four speeds, four turn rates, two lateral levels each side -- forward matched to 4% and yaw to 2%. **Collecting them changed nothing on its own**: on the frozen encoder the new channels still read zero, and yaw only moves from -5.2 to +0.37 when a loss term supervises it. The variety bought the possibility; the term realises it (F83, slide 14). |
+| Turn / stop behaviours | **collected, and it was not the lever** | `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat` hold twelve matched conditions per robot -- four speeds, four turn rates, two lateral levels each side -- forward matched to 4% and yaw to 2%. **Collecting them changed nothing on its own**: on the frozen encoder the new channels still read zero, and yaw only moves from -5.2 to +0.37 when a loss term supervises it. The variety bought the possibility; the term realises it (F83, slide 14). |
 | Step 2 evaluation metric | **settled and measured** | Sample efficiency, pretrained against from-scratch, at N = 1/3/5/7/9 clips rather than episodes -- the B1 set has 14 clips, so 10 is the largest budget that leaves a clean held-out four. Reported for the action head (F50) and the forward model (F52). |
 | Baseline exact setup | **open, and it is Step 1e** | Section 9 calls an EAC-WM analogue required rather than optional, and it has never been run. Either run it or write down why it is out of scope. |
 | **Pipeline: Dreamer or candidate scoring** | **open, and it is the decision Week 13 asked for** | The advisor's note is that we are sitting between two designs and should commit. *Candidate scoring* needs an answer to "where do the candidates come from that is not itself a controller" -- ours is a recorded library, the source paper's is a pretrained VLA sampled with 500 noise seeds, and **both are circular**. *Dreamer / teacher-student* moves the search into training: the reward is *reach this latent*, so no library and no kinematics are needed, the run-time cost drops from twelve forward-model rolls to one, and the student is trained on the states it actually reaches rather than on recorded ones. **The evidence collected on 2026-08-26/27 points at the second**, with the caveat that it leans on long-horizon rollout accuracy, which is this project's weakest measurement -- so it should be started on the hexapod, where the forward model holds to half a second, not on the B1, where it does not. |

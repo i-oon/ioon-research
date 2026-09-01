@@ -19,7 +19,7 @@ from wm.data.augment import apply, sample_params
 from wm.evaluate import encode_clip
 
 enc=VJEPA2FrameEncoder(device='cpu', dtype=torch.float32)
-paths=clip_paths(os.path.join(ROOT,'data/fwd_hex8body'), ('c10f10t10',))[:4]
+paths=clip_paths(os.path.join(ROOT,'data/allocentric/fwd_hex8body'), ('c10f10t10',))[:4]
 rng=np.random.default_rng(0)
 clean, noise = [], []
 for p in paths:

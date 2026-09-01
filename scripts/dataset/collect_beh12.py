@@ -1,6 +1,6 @@
 """Collect the twelve matched behaviour conditions for one body, from a recipe kept in code.
 
-**The existing `data/beh12_c10f10t10_flat` was collected by hand, one command per condition, and the
+**The existing `data/allocentric/beh12_c10f10t10_flat` was collected by hand, one command per condition, and the
 commands were never written down.** Ten of the twelve are recoverable from the condition names --
 `speed_c7.1` is `--cycles 7.1`, `turn_s0.29` is `--spin 0.29` -- and the two sideways levels per
 direction are recoverable from nothing at all. The base sideways recipe survives in FINDINGS F71,
@@ -31,7 +31,7 @@ is the twelve **distinguishable** conditions, which is what a planner needs to c
 
   .venv/bin/python3 scripts/dataset/collect_beh12.py --verify
   .venv/bin/python3 scripts/dataset/collect_beh12.py --morph c08f09t09=medauroidea_c08f09t09.ttt \\
-      --out data/beh12_c08f09t09
+      --out data/allocentric/beh12_c08f09t09
 """
 import argparse
 import os
@@ -53,7 +53,7 @@ COMMON = ["--gait", "cpg", "--scale", "0.65", "--cam_dx", "-0.6", "--behavior", 
 # **`--episodes` is an index into the expert recording, 0-999, and it is not the episode number
 # the clips carry.** `merge_behaviour_dirs` overwrites `expert_episode` with its own
 # `axis*1000 + level*100 + clip`, so the value actually used at collection time is not recoverable
-# from `data/beh12_c10f10t10_flat` -- reading 1000 and 2300 back as expert indices is out of range and
+# from `data/allocentric/beh12_c10f10t10_flat` -- reading 1000 and 2300 back as expert indices is out of range and
 # is what made the first verification run die on the fifth condition.
 #
 # One expert episode for all twelve. In `--gait cpg` the behaviour comes from the oscillator flags;
@@ -99,7 +99,7 @@ SIDE = side_conditions()
 
 CONDITIONS = SPEED + TURN + SIDE
 
-# What `data/beh12_c10f10t10_flat` achieved, measured from the clips. `--verify` reproduces these.
+# What `data/allocentric/beh12_c10f10t10_flat` achieved, measured from the clips. `--verify` reproduces these.
 REFERENCE = {"speed_c5.8": (0.126, 0.007, 0.002), "speed_c7.1": (0.151, -0.025, -0.003),
              "speed_c8.15": (0.174, 0.010, 0.003), "speed_c8.8": (0.205, -0.047, 0.001),
              "turn_s0.05": (0.137, -0.003, 0.003), "turn_s0.15": (0.135, 0.001, 0.014),
@@ -137,11 +137,11 @@ def run_condition(name, expert, flags, morph, scene, out_root, port, dry, repeat
     subprocess.run(cmd, check=True, cwd=ROOT)
 
 
-def separability(root):
+def separability(root, turn_sign=0.0):
     """Are the conditions further apart than their own spread? Prints the closest pairs.
 
     A planner cannot resolve two conditions the *robot* does not resolve, so this bounds what any
-    representation could do. Measured on `data/beh12_c10f10t10_flat` it also explains nothing about
+    representation could do. Measured on `data/allocentric/beh12_c10f10t10_flat` it also explains nothing about
     F91's failure -- there the turn levels are 2.7x to 6.8x apart and the speed levels 1.7x, and
     the planner resolves speed 9/9 and turn 2/9. It succeeds on the closest axis.
     """
@@ -190,9 +190,9 @@ def separability(root):
         if len(signs) > 1:
             bad.append("turn levels disagree on direction: "
                        + ", ".join(f"{c} {w:+.4f}" for c, w in sorted(turns.items())))
-        elif args.turn_sign and signs and args.turn_sign not in signs:
+        elif turn_sign and signs and turn_sign not in signs:
             bad.append(f"turns rotate {'positive' if 1 in signs else 'negative'}, "
-                       f"--turn_sign asked for {'positive' if args.turn_sign > 0 else 'negative'}; "
+                       f"--turn_sign asked for {'positive' if turn_sign > 0 else 'negative'}; "
                        "a body whose turns oppose the reference is not collecting the same behaviour")
     for fam, ch in (("side_L", 1), ("side_R", 1), ("turn", 2), ("speed", 0)):
         levels = sorted((c for c in mean if c.startswith(fam)), key=str)
@@ -240,7 +240,7 @@ def _channels(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--morph", default="c08f09t09=medauroidea_c08f09t09.ttt", metavar="NAME=SCENE")
-    ap.add_argument("--out", default="data/beh12_c08f09t09_raw",
+    ap.add_argument("--out", default="data/allocentric/beh12_c08f09t09_raw",
                     help="one subdirectory per condition; flatten afterwards with "
                          "scripts/dataset/merge_behaviour_dirs.py")
     ap.add_argument("--only", nargs="*", default=[], help="condition names, for a partial re-run")
@@ -261,10 +261,10 @@ def main():
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--dry_run", action="store_true", help="print the commands and collect nothing")
     ap.add_argument("--verify", action="store_true",
-                    help="re-collect on c10f10t10 and compare against data/beh12_c10f10t10_flat. **Run "
+                    help="re-collect on c10f10t10 and compare against data/allocentric/beh12_c10f10t10_flat. **Run "
                          "this first**: two of the twelve recipes are reconstructed, and a wrong "
                          "one produces a dataset that differs from the original without saying so.")
-    ap.add_argument("--verify_out", default="data/beh12_verify_raw")
+    ap.add_argument("--verify_out", default="data/allocentric/beh12_verify_raw")
     ap.add_argument("--spin_sign", type=float, default=1.0,
                     help="multiply every turn level's --spin by this. **The same positive spin "
                          "rotates c10f10t10 one way and c08f09t09 the other** (F117), so a body "
@@ -296,7 +296,7 @@ def main():
                   " ".join(f"{n}={c[1]}" for n, c in TURN))
 
     if args.separability:
-        separability(os.path.join(ROOT, args.separability))
+        separability(os.path.join(ROOT, args.separability), args.turn_sign)
         return
 
     if args.verify:
@@ -318,7 +318,7 @@ def main():
         return
     if not args.verify:
         print(f"\nnow flatten:\n  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py "
-              f"--src {os.path.relpath(out_root, ROOT)} --out data/beh12_{morph}_flat "
+              f"--src {os.path.relpath(out_root, ROOT)} --out data/allocentric/beh12_{morph}_flat "
               f"--embodiment hexapod")
         return
 

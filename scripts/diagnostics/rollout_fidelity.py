@@ -1,7 +1,7 @@
 """How far can the forward model be imagined forward before its *state* stops being right?
 
     .venv/bin/python3 scripts/diagnostics/rollout_fidelity.py \\
-        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/beh12_c08f09t09_flat \\
+        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
 **The bar a distilled policy would be trained against, and it is tighter than any measured so far.**

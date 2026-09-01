@@ -49,7 +49,7 @@ from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--dir", default="data/beh12_c10f10t10_flat")
+    ap.add_argument("--dir", default="data/allocentric/beh12_c10f10t10_flat")
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--clips", type=int, default=8)

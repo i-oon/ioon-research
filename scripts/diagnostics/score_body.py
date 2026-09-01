@@ -18,7 +18,7 @@ constant pose scores, with both decoder inputs ablated:
                 previously *hurt*, which is the pathway failure F18 named.
 
   .venv/bin/python3 scripts/score_body.py --ckpt wm/runs/tib_cross/best.pt \\
-      --bodies c10f10t06:data/fwd_hex8body c10f10t08:data/fwd_bracket
+      --bodies c10f10t06:data/allocentric/fwd_hex8body c10f10t08:data/allocentric/fwd_bracket
 """
 import argparse
 import glob
@@ -113,7 +113,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--bodies", nargs="+", required=True,
-                    help="body:data_dir, e.g. c10f10t08:data/fwd_bracket")
+                    help="body:data_dir, e.g. c10f10t08:data/allocentric/fwd_bracket")
     ap.add_argument("--clips", type=int, default=6)
     ap.add_argument("--embodiment", default="hexapod",
                     help="which head to score through, for cross-embodiment checkpoints")

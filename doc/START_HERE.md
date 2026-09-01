@@ -7,7 +7,8 @@ data.
 
 ## What the project is trying to do
 
-Learn a **morphology-agnostic latent action** from simulated video, so that a behaviour recorded on
+Learn a latent action from simulated video that **maps to a shared body-motion coordinate** (not a
+body-blind latent -- body identity is decodable from `z` at 0.974, F160), so that a behaviour recorded on
 one robot can drive a **different** robot with an incomparable body -- an 18-DOF six-legged stick
 insect and a 12-DOF Unitree B1 quadruped. No kinematic model, no retargeting, no shared joint space:
 the only thing the two robots share is what a camera sees.
@@ -32,7 +33,7 @@ actions and keep the one whose prediction lands nearest the goal.
 August by watching preview videos rather than reading tables: the robot clipped by the image edge in
 61% of frames, an unpinned camera, a forward clip filed as the weakest turn level, and turns running
 opposite to the insect's. The data is now corrected; **all B1 checkpoints were deleted and stages 1,
-2 and 3 have to be rebuilt from `data/beh12_b1_flat`.**
+2 and 3 have to be rebuilt from `data/allocentric/beh12_b1_flat`.**
 
 **What the withdrawn runs pointed at, worth keeping as hypotheses:** forward selection works even
 when the forward model demonstrably ignores its action input, so forward is not evidence the world
@@ -42,7 +43,7 @@ not; sideways fails on every measurement.
 ## The immediate next steps
 
 1. Rebuild stage 1 (`wm/adapt.py`), stage 2 (`wm/fit_projector.py`), stage 3 (`wm/adapt3.py`) on
-   `data/beh12_b1_flat`. About two and a half hours.
+   `data/allocentric/beh12_b1_flat`. About two and a half hours.
 2. Three seeds per stage-3 arm at one budget -- `scripts/com7_stage3_seeds.sh` -- because the
    MSE-vs-contrastive ordering flipped between two budgets on single runs.
 3. Close the loop and re-measure. `sim/control/close_loop_b1_physics.py`, defaults already correct.

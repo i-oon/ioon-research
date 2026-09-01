@@ -1,7 +1,7 @@
 """Is the one-step prediction task easy enough to solve without reading the action at all?
 
     .venv/bin/python3 scripts/diagnostics/action_necessity.py \\
-        --ckpt wm/runs/beh12_actswm/best.pt --data data/beh12_c08f09t09_flat \\
+        --ckpt wm/runs/beh12_actswm/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
 **This decides whether a separation term can ever bite.** F154 found the hinge cost long-horizon

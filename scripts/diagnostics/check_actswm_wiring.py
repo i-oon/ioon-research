@@ -80,8 +80,8 @@ def main():
     ap.add_argument("--ckpt", default="wm/runs/beh12_hex-b1_body3/best.pt")
     ap.add_argument("--projector", default="wm/runs/beh12_hex-b1_body3/projector_b1_adapted.pt")
     ap.add_argument("--bodies", nargs="+",
-                    default=["hexapod=data/beh12_c10f10t10_flat:results/wm/cache/hex_c10.pt",
-                             "b1=data/beh12_b1_flat:results/wm/cache/b1_body3.pt"])
+                    default=["hexapod=data/allocentric/beh12_c10f10t10_flat:results/wm/cache/hex_c10.pt",
+                             "b1=data/allocentric/beh12_b1_flat:results/wm/cache/b1_body3.pt"])
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 2, 3, 4, 5])
     ap.add_argument("--clips", type=int, default=6)
     ap.add_argument("--stride", type=int, default=10)

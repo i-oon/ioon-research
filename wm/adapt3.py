@@ -43,7 +43,7 @@ is exactly a discriminator, so this is the closed-loop result available without 
 
     .venv/bin/python3 -m wm.adapt3 --ckpt wm/runs/beh12_hexonly/adapted_b1.pt \\
         --projector wm/runs/beh12_hexonly/projector_b1_adapted.pt \\
-        --data data/beh12_b1_flat --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
+        --data data/allocentric/beh12_b1_flat --embodiment b1 --out wm/runs/beh12_hexonly/stage3_b1.pt
 """
 import argparse
 import glob
@@ -88,7 +88,11 @@ def gather(directory, name, encoder, checkpoint, cache, chunk, lag, device):
         if len(actions) < n + lag:  # a padded action is a wrong label, and F45 priced wrong labels
             continue
         with np.load(path, allow_pickle=True) as raw:
-            cond = str(raw["condition"])
+            # **`condition` is written by `merge_behaviour_dirs.py`, not by the collector.** Sets
+            # that never went through the twelve-condition flatten -- the Stage 1 `fwd_*` ones --
+            # carry `behavior` instead, and reading them used to raise here rather than fall back.
+            cond = str(raw["condition"] if "condition" in raw.files else
+                       raw["behavior"] if "behavior" in raw.files else "walk")
         clips.append({"path": os.path.basename(path), "cond": cond, "n": n,
                       "e": e.half(), "a": actions[lag:lag + n]})
     return clips

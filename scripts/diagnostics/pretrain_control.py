@@ -150,7 +150,7 @@ def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save, min_gap=10
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="data/fwd_m3d")
+    ap.add_argument("--data", default="data/allocentric/fwd_m3d")
     ap.add_argument("--arch_ckpt", default="wm/runs/s1_fwd_m3d_cross/best.pt",
                     help="only its Config is used, so both arms match the run they explain")
     ap.add_argument("--out_dir", default="wm/runs")

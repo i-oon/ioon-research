@@ -22,7 +22,7 @@ the probe error against the *mixture gap*, not on its own: the probe recovering 
 only interesting when that body is outside what a mixture could already reach.
 
   .venv/bin/python3 scripts/diagnostics/encoder_scale_probe.py \\
-      --data_dir data/fwd_cov_narrow \\
+      --data_dir data/allocentric/fwd_cov_narrow \\
       --train c10f10t10 c06f10t10 c10f06t06 c08f09t09 --test c10f10t08
 """
 import argparse

@@ -55,8 +55,8 @@
 #   that, a better score is just more data. It takes two directories, because the same body
 #   cannot hold 24 clips for one run and 16 for the other:
 #
-#     data/fwd_cov_narrow   4 bodies x 24 clips = 96     tib_cross, tib_ctrl
-#     data/fwd_cov_wide     6 bodies x 16 clips = 96     bracket_cross
+#     data/allocentric/fwd_cov_narrow   4 bodies x 24 clips = 96     tib_cross, tib_ctrl
+#     data/allocentric/fwd_cov_wide     6 bodies x 16 clips = 96     bracket_cross
 #
 #   96 rather than 120 because c06f10t10 has only 25 usable clips, and matching has to level
 #   down to the scarcest body. The wide run's four shared bodies are a subset of the narrow
@@ -112,7 +112,7 @@ preflight ik_walk_cov_wide 116     #  96 training + 20 held out
 common=(--action_lag 1 --seed 0)
 
 run_m3d_cross() {
-  $PY -m wm.train --data_dir data/fwd_m3d \
+  $PY -m wm.train --data_dir data/allocentric/fwd_m3d \
     --train_morphs c10f10t10 c06f10t10 c10f06t06 c06f06t06 \
     --heldout_morph c08f09t09 \
     --lambda_cross 0.5 "${common[@]}" \
@@ -122,7 +122,7 @@ run_m3d_cross() {
 
 # identical to m3d_cross but for lambda_cross: this is the matched control slide 5 rests on
 run_m3d_bracketed() {
-  $PY -m wm.train --data_dir data/fwd_m3d \
+  $PY -m wm.train --data_dir data/allocentric/fwd_m3d \
     --train_morphs c10f10t10 c06f10t10 c10f06t06 c06f06t06 \
     --heldout_morph c08f09t09 \
     --lambda_cross 0.0 "${common[@]}" \
@@ -132,7 +132,7 @@ run_m3d_bracketed() {
 
 # four bodies all at femur/tibia 0.83, held out one where they differ: slide 8's limit
 run_tib_cross() {
-  $PY -m wm.train --data_dir data/fwd_cov_narrow \
+  $PY -m wm.train --data_dir data/allocentric/fwd_cov_narrow \
     --train_morphs c10f10t10 c06f10t10 c10f06t06 c08f09t09 \
     --heldout_morph c10f10t08 \
     --lambda_cross 0.5 "${common[@]}" \
@@ -142,7 +142,7 @@ run_tib_cross() {
 
 # the control slide 3 names but which was never run
 run_tib_ctrl() {
-  $PY -m wm.train --data_dir data/fwd_cov_narrow \
+  $PY -m wm.train --data_dir data/allocentric/fwd_cov_narrow \
     --train_morphs c10f10t10 c06f10t10 c10f06t06 c08f09t09 \
     --heldout_morph c10f10t08 \
     --lambda_cross 0.0 "${common[@]}" \
@@ -153,7 +153,7 @@ run_tib_ctrl() {
 # same held-out body and the same 20 clips of it as tib_cross, two more bodies where femur and
 # tibia differ: slide 9's coverage experiment is tib_cross against this, so the pair has to match
 run_bracket_cross() {
-  $PY -m wm.train --data_dir data/fwd_cov_wide \
+  $PY -m wm.train --data_dir data/allocentric/fwd_cov_wide \
     --train_morphs c10f10t10 c06f10t10 c10f06t06 c08f09t09 c10f09t07 c10f08t06 \
     --heldout_morph c10f10t08 \
     --lambda_cross 0.5 "${common[@]}" \

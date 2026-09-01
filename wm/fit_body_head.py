@@ -1,7 +1,7 @@
 """Fit the shared body-motion head on a robot the pretrain never showed it.
 
     .venv/bin/python3 -m wm.fit_body_head \\
-        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt --data data/beh12_b1_flat
+        --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt --data data/allocentric/beh12_b1_flat
 
 **Why this is now allowed, when `wm/adapt.py` deliberately leaves the motion decoder alone.** That
 file's reason is written down and was correct: the decoder "is an auxiliary loss during pretraining

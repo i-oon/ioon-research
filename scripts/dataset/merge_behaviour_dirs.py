@@ -21,7 +21,7 @@ turned on it pairs matched behaviours rather than matched filenames. It is 0.0 i
 today (F71's collection notes), so nothing depends on that yet.
 
   .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py \\
-      --src data/beh12_hex --out data/beh12_c10f10t10_flat --embodiment hexapod
+      --src data/allocentric/beh12_hex --out data/allocentric/beh12_c10f10t10_flat --embodiment hexapod
 """
 import argparse
 import glob

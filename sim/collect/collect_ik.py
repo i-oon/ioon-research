@@ -228,7 +228,7 @@ def cpg_frame(recipe, leg_gain, leg_off, t, spin):
 
 def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20),
                  lead=0.25, mirror_joints=(0, 1, 2), strafe=0.0, spin=0.0,
-                 spin_amp=None, ft_phase=0.0, symmetric=False, legtune=None):
+                 spin_amp=None, ft_phase=0.0, symmetric=False, legtune=None, pace=None):
     """Joint-space oscillator, the pattern from the lab's `student_Locomotion_Control_olaf_6legs`.
 
     **No IK.** Two sinusoids a quarter cycle apart drive the three joints of every leg, with the
@@ -335,7 +335,18 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     # same operation as mirroring the sides, and it steers instead. Neither does flipping the
     # mirror. Only moving the sweep relative to the lift decides which half of the stroke the foot
     # is planted for.
-    ph = 2 * np.pi * cycles * np.arange(frames) / frames
+    # **The oscillator's own clock, and `--schedule` has to live here or it does nothing.**
+    # `schedule_path` retimes the recorded *foot path*, but `--gait cpg` keeps only `cmds.mean(0)`
+    # from it as a bias pose and regenerates the stroke from `cycles` -- so a schedule passed to a
+    # CPG run was silently discarded, and F165's first collection produced eight conditions with no
+    # within-clip speed change at all while its log said otherwise. Advancing the phase by a
+    # per-frame rate is the same operation in the oscillator's own terms: rate 1 is the recorded
+    # pace, 0 holds the pose, 1.4 is forty percent faster.
+    #
+    # **`cumsum(rate) - rate` starts the clock at zero**, so a run with `rate` identically 1
+    # reproduces `arange(frames)` exactly and every clip collected before this is bit-identical.
+    rate = np.ones(frames) if pace is None else np.asarray(pace, dtype=float)
+    ph = 2 * np.pi * cycles * (np.cumsum(rate) - rate) / frames
     # **The extend joint gets its own phase.** Driving it from the same signal as the lift, which
     # is what the Olaf scene does, makes the foot trace a circle: lowest for an instant and rising
     # everywhere else. Offsetting it flattens the bottom of that path into something a stance can
@@ -400,14 +411,14 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
         # The first attempt at sideways motion used the lift joint on the reasoning that any
         # un-mirrored term would translate. It rolled and yawed instead: over three runs, sideways
         # travel 0.05 of forward against straight walking's 0.01, with a 24 degree heading change.
-        if spin:
+        if np.any(spin):
             # **Spin needs a swing amplitude of its own, because the sideways gait sets `amps[0]`
             # to zero.** Scaling it by the fore-aft amplitude, as this did until 2026-08-22, made
             # `--spin` multiply by zero in exactly the configuration that needed it -- a sweep of
             # `--spin 0.15` against `0.25` moved the heading by 1 degree and read as "spin cannot
             # cancel this yaw" when spin had not been applied at all.
             cmds[:, i * 3] += sign * spin * swing * o[:, 0]
-        if strafe:
+        if np.any(strafe):
             # Splitting this by leg row was tried and does not cancel the yaw: front alone
             # yaws +1 degree, middle +12, hind +80, so it is not a front-against-hind couple and
             # the best of four gain sets still left 20 degrees. Switching the fore-aft swing off
@@ -419,7 +430,7 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
                       leg_gain=leg_gain.copy(), leg_off=leg_off.copy(), **recipe)
 
 
-def parse_schedule(spec):
+def parse_schedule(spec, require_moving=True):
     """`"1@0.4 0@0.2 1@0.4"` -> [(1.0, 0.4), (0.0, 0.2), (1.0, 0.4)].
 
     Each segment is `rate@fraction`: how fast the foot path plays, and what share of the clip's
@@ -434,12 +445,32 @@ def parse_schedule(spec):
         segments.append((float(rate), float(frac)))
     if not segments:
         raise SystemExit("empty --schedule")
-    if all(r == 0 for r, _ in segments):
+    if require_moving and all(r == 0 for r, _ in segments):
+        # **Only the pace schedule owns this rule.** `--spin_schedule` and `--strafe_schedule` reuse
+        # the grammar, and for them an all-zero spec means "do not turn" and "do not crab", which is
+        # exactly what the reference arm of a counterfactual branch has to be able to say.
         raise SystemExit("--schedule has no moving segment, so the clip would cover no ground")
     if sum(f for _, f in segments) > 1.001:
         raise SystemExit(f"--schedule fractions sum to {sum(f for _, f in segments):.2f}; "
                          "they are shares of one clip and cannot exceed 1")
     return segments
+
+
+def piecewise(spec, frames):
+    """`"0@0.35 0.4@0.3 0@0.35"` -> a per-frame value, held constant inside each segment.
+
+    **The turn equivalent of `--schedule`, and the point is the onset.** `--spin` is one number for
+    a whole clip, so a turn is a *property* of the clip and the frame that starts it never exists.
+    A probe on such a set can read "this is a turning clip" off any frame; it can never be asked
+    "is the turn about to begin", which is what a controller needs and what F164's random jitter
+    could not supply. Segments share `parse_schedule`'s grammar so one habit covers both.
+    """
+    segments = parse_schedule(spec, require_moving=False)
+    out = []
+    for value, frac in segments:
+        out += [value] * max(1, int(round(frac * frames)))
+    out = (out + [segments[-1][0]] * frames)[:frames]
+    return np.asarray(out, dtype=np.float64)
 
 
 def schedule_path(brel, segments):
@@ -563,6 +594,8 @@ def precompute_commands(sim, simIK, scene, brel, scale, ik_iters=1):
 
 
 def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, spawn=None,
+                     ego=False, ego_euler=None, ego_offset=None, ego_box=0.0, ego_seed=0,
+                     cmd_noise=0.0, noise_tau=5.0, noise_seed=0,
                      active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None):
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
 
@@ -610,6 +643,19 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
 
     # authored camera offset (encodes RUNWAY_AIM); must be read BEFORE any respawn, or it
     # measures the camera against the moved robot instead of the authored framing
+    if ego:
+        # **On the head, facing the way the head points.** `ROBOT_ROOT` is `/abdomen`, the rear
+        # segment, and mounting there was the first version's bug. The direction comes from
+        # `head - abdomen` rather than from either frame's axis convention.
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "scene"))
+        from ego_camera import (attach_ego, build_texture_box, insect_forward,   # noqa: E402
+                                randomise_ground)
+        if ego_box > 0:
+            build_texture_box(sim, size=ego_box, seed=ego_seed)
+        randomise_ground(sim, seed=ego_seed)
+        fwd = ego_euler if ego_euler is not None else insect_forward(sim)
+        print(f"    ego camera: {attach_ego(sim, cam, track, fwd, ego_offset or (0.0, 0.02, 0.03))}")
     cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
     trk0 = np.array(sim.getObjectPosition(track, sim.handle_world))
     off_xy, cam_z = cam0[:2] - trk0[:2], cam0[2]
@@ -671,9 +717,12 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     if policy is not None:
         p0 = np.array(sim.getObjectPosition(track, sim.handle_world))
         start_xy = p0[:2].copy()
-        sim.setObjectPosition(cam, sim.handle_world,
-                              [p0[0] + off_xy[0] + cam_dx, p0[1] + off_xy[1] + cam_dy, cam_z])
+        if not ego:
+            sim.setObjectPosition(cam, sim.handle_world,
+                                  [p0[0] + off_xy[0] + cam_dx, p0[1] + off_xy[1] + cam_dy, cam_z])
         observation = capture(sim, cam)
+    _rng = np.random.default_rng(noise_seed)
+    _noise = np.zeros(len(cmds[0]), np.float64)
     for t in range(len(cmds)):
         step_cmd = cmds[t]
         if policy is not None:
@@ -690,6 +739,18 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             trim = float(np.clip(heading["kp"] * err + heading["ki"] * yaw_int, -1.0, 1.0))
             step_cmd = cpg_frame(heading["recipe"], heading["leg_gain"], heading["leg_off"],
                                  t, heading["recipe"]["spin"] + trim).astype(np.float32)
+        if cmd_noise > 0.0:
+            # **Off-rhythm exploration, and the logged action is the perturbed one.** A gait makes
+            # the pose predict the next frame by rhythm alone (F159), so testing whether that
+            # redundancy is a property of the *data* needs commands that leave the rhythm. The
+            # noise is temporally correlated -- white noise at 20 Hz is filtered out by the joint
+            # controller and never reaches the pose -- and it is added **after** the heading and
+            # oscillator branches, so nothing downstream re-derives a clean command.
+            # `actions.append(step_cmd)` below therefore records what was actually sent, which is
+            # the entire validity of the measurement.
+            _noise = (_noise * (1.0 - 1.0 / noise_tau)
+                      + cmd_noise * np.sqrt(2.0 / noise_tau) * _rng.standard_normal(len(step_cmd)))
+            step_cmd = (np.asarray(step_cmd, np.float64) + _noise).astype(np.float32)
         for h, v in zip(joints, step_cmd):
             sim.setJointTargetPosition(h, float(v))
         for leg in remove_legs:
@@ -702,8 +763,9 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         p = np.array(sim.getObjectPosition(track, sim.handle_world))
         if start_xy is None:
             start_xy = p[:2].copy()
-            sim.setObjectPosition(cam, sim.handle_world,
-                                  [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
+            if not ego:
+                sim.setObjectPosition(cam, sim.handle_world,
+                                      [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
         frames.append(capture(sim, cam))
         if policy is not None:
             observation = frames[-1]
@@ -843,6 +905,45 @@ def main():
     ap.add_argument("--stance", type=float, default=0.9,
                     help="fraction of the recorded stance sweep to use, --gait tripod only. Below "
                          "1.0 because the reachable set narrows toward the extremes of the sweep")
+    ap.add_argument("--ego", action="store_true",
+                    help="**mount the camera on the robot and look forward.** The de-risk gate for "
+                         "the egocentric direction: a head view cannot show the robot its own pose, "
+                         "so the single-frame action redundancy that F159 measured should break. "
+                         "**Look at a frame before trusting it** -- the orientation defaults are "
+                         "conventions, not measurements")
+    ap.add_argument("--ego_forward", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"),
+                    help="override the world-space direction the camera looks. **Not needed unless "
+                         "the measured `head - abdomen` is wrong**, which it can only be if the "
+                         "scene names those parts differently")
+    ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"),
+                    help="camera position as (right, up, forward) in its own basis, metres; the "
+                         "default sits 3 cm ahead of the head and 2 cm above it")
+    ap.add_argument("--ego_seed", type=int, default=0,
+                    help="**appearance seed, and it must be PAIRED with the B1's.** Advanced by "
+                         "repeat only, so a caller that sets it per *condition* gets the same room "
+                         "on both robots for the same condition -- which is what makes Q2 a test of "
+                         "the body rather than of the room. Wall colours, wall "
+                         "textures and the ground texture are all redrawn from it, so no colour "
+                         "means a direction across the dataset. A fixed per-side colour would be a "
+                         "landmark, and a landmark is a pose label -- the exact readability the "
+                         "egocentric view is meant to remove (1703.06907)")
+    ap.add_argument("--ego_box", type=float, default=0.0,
+                    help="build a textured room this many metres across. **An egocentric view of an "
+                         "untextured world carries no optical flow**, which is the entire signal "
+                         "the view change exists to provide")
+    ap.add_argument("--strafe_schedule", type=str, default="",
+                    help="piecewise sideways drive as 'strafe@fraction'. The sideways twin of "
+                         "--spin_schedule, needed for the same reason: a constant --strafe makes "
+                         "crabbing a property of the clip, so no frame is the one where it starts. "
+                         "--gait cpg only")
+    ap.add_argument("--spin_schedule", type=str, default="",
+                    help="piecewise turn rate as 'spin@fraction' segments, e.g. "
+                         "'0@0.35 0.4@0.3 0@0.35' to walk straight, turn for a third of the clip, "
+                         "then walk straight again. **This is what makes a turn an event rather "
+                         "than a label**: with a constant --spin every frame says 'turning clip' "
+                         "and no frame is the one where the turn begins. --gait cpg only, and not "
+                         "combinable with the heading loop, which regenerates frames from a single "
+                         "stored spin")
     ap.add_argument("--schedule", type=str, default="",
                     help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
                          "walk, stand still for a fifth of the clip, then walk. Rate 0 is a stop. "
@@ -853,6 +954,17 @@ def main():
                          "are relative to sim/env. Names must not contain '_' because "
                          "wm/data/dataset.py reads the body from the filename prefix. "
                          "Defaults to the three uniform-scale bodies.")
+    ap.add_argument("--cmd_noise", type=float, default=0.0,
+                    help="**off-rhythm exploration, in radians.** Adds temporally correlated noise "
+                         "to the final joint command and logs the perturbed command as `a_t`, so a "
+                         "set can be collected in which the pose does not determine the next frame "
+                         "by rhythm alone. 0 reproduces every set collected before 2026-08-31. "
+                         "Start at 0.05 and **watch the video before measuring anything** (F163)")
+    ap.add_argument("--noise_tau", type=float, default=5.0,
+                    help="correlation time of --cmd_noise, in steps. White noise (tau 1) is "
+                         "filtered out by the joint controller and never reaches the pose")
+    ap.add_argument("--noise_seed", type=int, default=0,
+                    help="offset only; each episode and repeat gets its own stream")
     ap.add_argument("--active_legs", type=str, default=",".join(LEGS),
                     help="comma-separated legs to save in actions/forces, leg-major order. "
                          "Use FL,HL,FR,HR for the middle-loss 4-leg insect.")
@@ -861,6 +973,20 @@ def main():
                          "Handles stay present for scene scripts, but shapes are hidden/non-respondable.")
     ap.add_argument("--out", type=str, required=True)
     args = ap.parse_args()
+    # **A turn rate that varies inside the clip**, so the onset frame exists. Built once here
+    # because both collection branches take it, and `EP` is the clip length everywhere.
+    spin_arg = piecewise(args.spin_schedule, EP) if args.spin_schedule else args.spin
+    # the same schedule string, expressed as the oscillator's per-frame pace
+    pace_arg = piecewise(args.schedule, EP) if (args.schedule and args.gait == "cpg") else None
+    strafe_arg = piecewise(args.strafe_schedule, EP) if args.strafe_schedule else args.strafe
+    if args.strafe_schedule and args.gait != "cpg":
+        raise SystemExit("--strafe_schedule needs --gait cpg")
+    if args.spin_schedule and (args.head_kp or args.head_ki):
+        raise SystemExit("--spin_schedule and the heading loop both write the turn rate; the loop "
+                         "regenerates frames from one stored spin and would silently discard the "
+                         "schedule")
+    if args.spin_schedule and args.gait != "cpg":
+        raise SystemExit("--spin_schedule needs --gait cpg; the recorded gait applies no spin")
 
     episodes = [int(x) for x in args.episodes.split(",")]
     active_legs = [x for x in args.active_legs.split(",") if x]
@@ -899,8 +1025,8 @@ def main():
                 cmds, ikdiag = cpg_commands(sim, scene, EP, cmds.mean(0), cycles=args.cycles,
                                             amps=tuple(args.amps), lead=args.lead,
                                             mirror_joints=tuple(args.mirror),
-                                            strafe=args.strafe,
-                                            spin=args.spin, spin_amp=args.spin_amp,
+                                            strafe=strafe_arg,
+                                            spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
                                             ft_phase=args.ft_phase,
                                             symmetric=args.symmetric, legtune=legtune)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
@@ -953,8 +1079,8 @@ def main():
                 cmds, ikdiag = cpg_commands(sim, scene, EP, cmds.mean(0), cycles=args.cycles,
                                             amps=tuple(args.amps), lead=args.lead,
                                             mirror_joints=tuple(args.mirror),
-                                            strafe=args.strafe,
-                                            spin=args.spin, spin_amp=args.spin_amp,
+                                            strafe=strafe_arg,
+                                            spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
                                             ft_phase=args.ft_phase,
                                             symmetric=args.symmetric, legtune=legtune)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
@@ -975,6 +1101,10 @@ def main():
                                 leg_gain=ikdiag["leg_gain"], leg_off=ikdiag["leg_off"])
                 f, a, fc, h, o = drive_and_record(
                     sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
+                    ego=args.ego, ego_euler=args.ego_forward, ego_offset=args.ego_offset,
+                    ego_box=args.ego_box, ego_seed=args.ego_seed + rep,
+                    cmd_noise=args.cmd_noise, noise_tau=args.noise_tau,
+                    noise_seed=args.noise_seed + 1000 * ep + rep,
                     active_legs=active_legs, remove_legs=remove_legs,
                     yaw=args.yaw, heading=loop)  # fresh draw each
                 tag = f"{morph}_{pre}ep{ep}_r{rep}" if args.repeats > 1 else f"{morph}_{pre}ep{ep}"

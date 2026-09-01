@@ -1,0 +1,204 @@
+=== speed_stopmid   --cycles 7.1 --schedule 1@0.4 0@0.2 1@0.4
+usage: collect_ik.py [-h] [--port PORT] [--episodes EPISODES] [--scale SCALE]
+                     [--travel TRAVEL] [--warmup WARMUP] [--cam_dx CAM_DX]
+                     [--cam_dy CAM_DY] [--spawn X Y] [--repeats REPEATS]
+                     [--speed SPEED] [--speed_end SPEED_END] [--loops LOOPS]
+                     [--behavior BEHAVIOR] [--stop STOP] [--dump_brel]
+                     [--gait {recorded,cpg}] [--cycles CYCLES] [--yaw YAW]
+                     [--symmetric] [--ft_phase FT_PHASE] [--legtune LEGTUNE]
+                     [--head_kp HEAD_KP] [--head_ki HEAD_KI]
+                     [--spin_amp SPIN_AMP] [--strafe STRAFE] [--spin SPIN]
+                     [--mirror [J ...]] [--lead LEAD] [--amps TC CF FT]
+                     [--ik_iters IK_ITERS] [--stance STANCE]
+                     [--spin_schedule SPIN_SCHEDULE] [--schedule SCHEDULE]
+                     [--morphs NAME=SCENE [NAME=SCENE ...]]
+                     [--cmd_noise CMD_NOISE] [--noise_tau NOISE_TAU]
+                     [--noise_seed NOISE_SEED] [--active_legs ACTIVE_LEGS]
+                     [--remove_legs REMOVE_LEGS] --out OUT
+collect_ik.py: error: unrecognized arguments: 0@0.2 1@0.4
+=== speed_stopmid   --cycles 7.1 --schedule '1@0.4 0@0.2 1@0.4'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(65, 256, 256, 3) forward=+0.81m lateral=0.04m  hip=0.176m Fr=0.191 wander=1.17  ok
+  c10f10t10_ep0_r1 frames=(64, 256, 256, 3) forward=+0.81m lateral=0.02m  hip=0.176m Fr=0.192 wander=1.17  ok
+
+2 clips, 129 frames -> data/beh12_c10f10t10_intent_raw/speed_stopmid
+=== speed_slowfast   --cycles 7.1 --schedule '0.7@0.5 1.3@0.5'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.69m lateral=0.07m  hip=0.178m Fr=0.160 wander=1.37  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.69m lateral=0.08m  hip=0.177m Fr=0.160 wander=1.37  ok
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/speed_slowfast
+=== speed_fastslow   --cycles 7.1 --schedule '1.3@0.5 0.7@0.5'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.68m lateral=0.02m  hip=0.176m Fr=0.156 wander=1.43  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.67m lateral=0.04m  hip=0.176m Fr=0.154 wander=1.44  ok
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/speed_fastslow
+=== speed_breakrun   --cycles 7.1 --schedule '1@0.3 0@0.15 1.4@0.55'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.62m lateral=0.15m  hip=0.178m Fr=0.146 wander=1.50  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.63m lateral=0.12m  hip=0.178m Fr=0.148 wander=1.50  ok
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/speed_breakrun
+=== turn_onsetlate   --cycles 7.1 --spin_schedule '0@0.6 0.4@0.4'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.64m lateral=0.06m  hip=0.177m Fr=0.148 wander=1.47  ok
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.64m lateral=0.05m  hip=0.177m Fr=0.147 wander=1.46  ok
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/turn_onsetlate
+=== turn_onsetearly   --cycles 7.1 --spin_schedule '0@0.25 0.4@0.75'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.49m lateral=0.26m  hip=0.177m Fr=0.128 wander=1.63  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.49m lateral=0.24m  hip=0.177m Fr=0.126 wander=1.64  FAILS lateral, veering
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/turn_onsetearly
+=== turn_pulse   --cycles 7.1 --spin_schedule '0@0.3 0.4@0.4 0@0.3'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.57m lateral=0.20m  hip=0.177m Fr=0.140 wander=1.50  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.56m lateral=0.19m  hip=0.177m Fr=0.136 wander=1.55  ok
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/turn_pulse
+=== turn_reverse   --cycles 7.1 --spin_schedule '0.4@0.35 0@0.3 -0.4@0.35'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.56m lateral=0.24m  hip=0.177m Fr=0.140 wander=1.42  FAILS lateral, veering
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.54m lateral=0.29m  hip=0.176m Fr=0.140 wander=1.43  FAILS lateral, veering
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/turn_reverse
+=== side_L_stopmid   --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.4 --spin 0.19 --schedule '1@0.4 0@0.2 1@0.4'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.08m lateral=0.09m  hip=0.178m Fr=0.028 wander=3.90  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.11m lateral=0.03m  hip=0.177m Fr=0.025 wander=4.04  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/side_L_stopmid
+=== side_L_slowfast   --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe -0.8 --spin 0.19 --schedule '0.7@0.5 1.3@0.5'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.06m lateral=0.33m  hip=0.168m Fr=0.080 wander=1.75  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.07m lateral=0.30m  hip=0.168m Fr=0.072 wander=1.84  FAILS forward
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/side_L_slowfast
+=== side_R_stopmid   --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.4 --spin -0.24 --schedule '1@0.4 0@0.2 1@0.4'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=-0.05m lateral=0.07m  hip=0.176m Fr=0.020 wander=5.69  FAILS forward (BACKWARDS)
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=-0.09m lateral=0.05m  hip=0.176m Fr=0.023 wander=4.73  FAILS forward (BACKWARDS)
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/side_R_stopmid
+=== side_R_slowfast   --amps 0.00 0.20 0.30 --ft_phase 0.5 --symmetric --spin_amp 0.25 --ik_iters 8 --strafe 0.8 --spin -0.24 --schedule '0.7@0.5 1.3@0.5'
+bodies: c10f10t10 <- medauroidea_c10f10t10.ttt
+  c10f10t10 leg=0.7714m shared-scale=1.000 IK residual mean/max=0.00/0.00mm
+  c10f10t10_ep0_r0 frames=(66, 256, 256, 3) forward=+0.02m lateral=0.60m  hip=0.166m Fr=0.142 wander=1.17  FAILS forward
+  c10f10t10_ep0_r1 frames=(66, 256, 256, 3) forward=+0.05m lateral=0.42m  hip=0.168m Fr=0.099 wander=1.39  FAILS forward
+
+2 clips, 132 frames -> data/beh12_c10f10t10_intent_raw/side_R_slowfast
+24 clips -> data/beh12_c10f10t10_intent_flat
+  speed  speed_breakrun:2  speed_fastslow:2  speed_slowfast:2  speed_stopmid:2
+  turn   turn_onsetearly:2  turn_onsetlate:2  turn_pulse:2  turn_reverse:2
+  side   side_L_slowfast:2  side_L_stopmid:2  side_R_slowfast:2  side_R_stopmid:2
+clips per condition: [2]
+
+############ SEPARABILITY -- context only, NOT the result ############
+condition       forward  lateral      yaw  clips
+side_L_slowfast    0.015    0.077   -0.000      2
+side_L_stopmid   -0.025    0.017   -0.017      2
+side_R_slowfast    0.011   -0.114    0.000      2
+side_R_stopmid   -0.023   -0.005    0.025      2
+speed_breakrun    0.157    0.015    0.004      2
+speed_fastslow    0.166   -0.015   -0.007      2
+speed_slowfast    0.169   -0.001   -0.003      2
+speed_stopmid     0.201   -0.004    0.006      2
+turn_onsetearly    0.155   -0.036   -0.056      2
+turn_onsetlate    0.166   -0.026   -0.017      2
+turn_pulse        0.154   -0.027   -0.024      2
+turn_reverse      0.149   -0.017   -0.016      2
+
+**FAILS the semantic check** -- separable, and not what the names claim:
+  side_L_stopmid is weaker than side_L_slowfast on its own channel (0.017 <= 0.077)
+  side_R_stopmid is weaker than side_R_slowfast on its own channel (0.005 <= 0.114)
+  turn_onsetlate is weaker than turn_onsetearly on its own channel (0.017 <= 0.056)
+  turn_reverse is weaker than turn_pulse on its own channel (0.016 <= 0.024)
+
+Re-derive these for this body. The commands are not portable across geometries;
+what strafes gently on the base body may not move a shorter-legged one at all.
+
+closest pairs, separation in units of their combined spread:
+  turn_pulse    turn_reverse      2.2x
+  side_L_stopmidside_R_stopmid    2.6x
+  speed_fastslowturn_reverse      3.3x
+  turn_onsetlateturn_pulse        3.3x
+  turn_onsetlateturn_reverse      3.5x
+  side_L_stopmidside_R_slowfast    4.1x
+
+0 of 66 pairs closer than 2x their own spread
+
+############ GAP, against F164's clean null: 0.729 single frame, +0.102 gap ############
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  79%|███████▉  | 667/843 [00:00<00:00, 6643.33it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6369.10it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_intent_flat
+371 train / 371 test transitions, split by clip, action width 18, embedding dimension 360448
+
+                    features  action R2  vs single    alpha
+         e_t  (single frame)      0.757     +0.000    1e+04
+        [e_t, e_t+1]  (pair)      0.842     +0.085     0.01
+        [e_t, e_t+3]  (pair)      0.860     +0.103     0.01
+
+  per family, action R2 on held-out clips
+      family       e_t  (single frame)      [e_t, e_t+1]  (pair)      [e_t, e_t+3]  (pair)      n
+        side                     0.590                     0.777                     0.813    124
+       speed                     0.865                     0.903                     0.914    123
+        turn                     0.817                     0.846                     0.852    124
+
+  the widest pair beats a single frame by +0.103 R2.  the transition carries action information a single frame does not
+
+############ INTENT -- the da row is the result ############
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  79%|███████▉  | 670/843 [00:00<00:00, 6698.57it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6480.19it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_intent_flat
+372 train / 371 test, split by clip, embedding dimension 360448
+
+                          target   single frame      pair      gap
+     a_t   instantaneous command          0.757     0.842   +0.086
+   da    command change (INTENT)          0.836     0.846   +0.011
+         family  label (CONTROL)          0.980     0.985   +0.005   accuracy 1.000 -> 1.000, chance 0.334
+
+  per family, the INTENT row only
+      family   single frame      pair      gap      n
+        side          0.797     0.777   -0.019    124
+       speed          0.873     0.898   +0.025    123
+        turn          0.828     0.848   +0.020    124
+
+  **the `da` row is the result.** A gap on `family` and not on `da` means a label was recovered,
+  which we already have and already rejected. Separability improving is not a result either.
+--- the same three targets on F164's CLEAN arm, so the da row has its own null
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  92%|█████████▏| 774/843 [00:00<00:00, 7738.11it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7555.03it/s]
+wm/runs/beh12_hex-b1_body3/best.pt
+24 clips of hexapod from data/beh12_c10f10t10_sweepn00_flat
+370 train / 372 test, split by clip, embedding dimension 360448
+
+                          target   single frame      pair      gap
+     a_t   instantaneous command          0.728     0.813   +0.085
+   da    command change (INTENT)          0.764     0.781   +0.017
+         family  label (CONTROL)          0.992     0.993   +0.001   accuracy 1.000 -> 1.000, chance 0.333
+
+  per family, the INTENT row only
+      family   single frame      pair      gap      n
+        side          0.840     0.818   -0.022    124
+       speed          0.721     0.753   +0.032    124
+        turn          0.756     0.788   +0.031    124
+
+  **the `da` row is the result.** A gap on `family` and not on `da` means a label was recovered,
+  which we already have and already rejected. Separability improving is not a result either.
+
+=== done  2026-08-31 21:18:05   send back this whole log

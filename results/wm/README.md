@@ -119,7 +119,7 @@ standardisation is computed from each one's own training bodies. Degrees are.
 | `head_linear` | long, short | medium | `md_head linear` |
 | `fold_short` | long, medium | short | extrapolation |
 
-### `data/fwd_hex8body` — five training bodies, three morphology parameters
+### `data/allocentric/fwd_hex8body` — five training bodies, three morphology parameters
 
 Segment scales are in the name: `c08f09t09` is coxa 0.8, femur 0.9, tibia 0.9.
 Training bodies `c10f10t10 c06f10t10 c10f10t06 c06f10t06 c10f06t06` throughout.

@@ -97,14 +97,14 @@ def load_side(encoder, chunk, mode, cache_path):
     feats, stance = [], []
     for body in INSECT_BODIES:
         for ep in INSECT_EPS:
-            path = f"{ROOT}/data/fwd_hex8body/{body}_ep{ep}.npz"
+            path = f"{ROOT}/data/allocentric/fwd_hex8body/{body}_ep{ep}.npz"
             clip = np.load(path)
             feats.append(features(tokens_for(path, clip["frames"]), mode))
             stance.append((clip["forces"] > CONTACT_THRESHOLD).mean(axis=1))
     out["insect"] = (np.concatenate(feats), np.concatenate(stance))
 
     feats, stance = [], []
-    for path in sorted(glob.glob(f"{ROOT}/data/fwd_b1_50hz/*.npz")):
+    for path in sorted(glob.glob(f"{ROOT}/data/allocentric/fwd_b1_50hz/*.npz")):
         clip = np.load(path, allow_pickle=True)
         feats.append(features(tokens_for(path, clip["frames"]), mode))
         stance.append(clip["foot_contact"].mean(axis=1))

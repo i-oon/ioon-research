@@ -60,7 +60,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpts", nargs="+", required=True)
     ap.add_argument("--labels", nargs="+", default=[])
-    ap.add_argument("--insect_dir", default="data/fwd_hex7speed")
+    ap.add_argument("--insect_dir", default="data/allocentric/fwd_hex7speed")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--seed", type=int, default=0)

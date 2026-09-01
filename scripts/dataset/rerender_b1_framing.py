@@ -21,7 +21,7 @@ so the physics is replayed from the file and only CoppeliaSim's camera changes.
 copied back from the source clip here. Without this the re-rendered set has frames and actions and
 no idea which condition each clip is.
 
-  .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/beh12_b1_fov25
+  .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/allocentric/beh12_b1_fov25
 """
 import argparse
 import glob
@@ -37,12 +37,16 @@ CARRY = ("condition", "behaviour", "level", "expert_episode", "embodiment")
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--src", default="data/beh12_b1_flat")
-    ap.add_argument("--out", default="data/beh12_b1_fov25")
+    ap.add_argument("--src", default="data/allocentric/beh12_b1_flat")
+    ap.add_argument("--out", default="data/allocentric/beh12_b1_fov25")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--cam_fov", type=float, default=24.0)
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0))
     ap.add_argument("--floor_scale", type=float, default=3.0)
+    ap.add_argument("--ego", action="store_true",
+                    help="head camera and a randomised room instead of the fixed third-person shot")
+    ap.add_argument("--ego_box", type=float, default=8.0)
+    ap.add_argument("--ego_offset", type=float, nargs=3, default=None, metavar=("R", "U", "F"))
     args = ap.parse_args()
 
     src = os.path.join(ROOT, args.src)
@@ -60,6 +64,16 @@ def main():
                "--cam_fov", str(args.cam_fov),
                "--spawn", str(args.spawn[0]), str(args.spawn[1]),
                "--floor_scale", str(args.floor_scale)]
+        if args.ego:
+            # **The room is the clip's index within its condition, and that is the whole pairing
+            # scheme.** `expert_episode` is `axis*1000 + cond*100 + clip`, so `% 100` is the clip
+            # index -- 0 to 3 -- and the insect derives the same number from its repeat counter.
+            # Same slot on either robot therefore means the same room, and Q2 differs by body alone.
+            with np.load(clip, allow_pickle=True) as z:
+                room = int(z["expert_episode"]) % 100 if "expert_episode" in z.files else i % 4
+            cmd += ["--ego", "--ego_box", str(args.ego_box), "--ego_seed", str(room)]
+            if args.ego_offset:
+                cmd += ["--ego_offset"] + [str(v) for v in args.ego_offset]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
         if r.returncode != 0:
             print(f"  FAILED {tag}\n{r.stdout[-400:]}{r.stderr[-800:]}", flush=True)

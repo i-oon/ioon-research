@@ -1,7 +1,7 @@
 """Which body-motion channels carry shared meaning, now that both robots actually vary in them.
 
 F70 screened six channels and only forward speed passed, and its stated cause was that the other
-five were **constants in our data** -- both robots only ever walked forwards. `data/beh12_*` removes
+five were **constants in our data** -- both robots only ever walked forwards. `data/allocentric/beh12_*` removes
 that: twelve matched conditions per robot spanning speed (Froude 0.12-0.21), turn (w_hat
 0.007-0.076) and sideways travel (Froude 0.07-0.19), balanced 4/4/4. So this is a direct re-test of
 a negative result whose stated failure mode has been deliberately removed.
@@ -177,8 +177,8 @@ def load(name, directory, encoder, itm, checkpoint, cache, chunk, features="z", 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", default="wm/runs/s2_fwd_hex7-b1_body0.5/last.pt")
-    ap.add_argument("--hex_dir", default="data/beh12_c10f10t10_flat")
-    ap.add_argument("--b1_dir", default="data/beh12_b1_flat",
+    ap.add_argument("--hex_dir", default="data/allocentric/beh12_c10f10t10_flat")
+    ap.add_argument("--b1_dir", default="data/allocentric/beh12_b1_flat",
                     help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)

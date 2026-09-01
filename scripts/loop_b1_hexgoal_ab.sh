@@ -43,7 +43,7 @@ CENTER=${CENTER:-0}
 CFLAG=""; TAG=""
 [ "$CENTER" = 1 ] && { CFLAG="--center_goal"; TAG="ctr"; }
 RUN=wm/runs/beh12_hexonly
-DEMO=data/beh12_b1_flat/b1_ep3.npz
+DEMO=data/allocentric/beh12_b1_flat/b1_ep3.npz
 
 # two per family; the sideways pair is both signs, since behaviour-family accuracy cannot see
 # direction and a run that strafes the wrong way scores identically to one that does not (F109)
@@ -57,7 +57,7 @@ for ARM in nce mse; do
     echo "=== $ARM $G"
     $PY -u sim/control/close_loop_b1_physics.py \
       --ckpt "$CK" --projector "$CK" --demo "$DEMO" \
-      --goal data/beh12_c08f09t09_flat/${G}.npz --goal_embodiment hexapod \
+      --goal data/allocentric/beh12_c08f09t09_flat/${G}.npz --goal_embodiment hexapod \
       --commit "$COMMIT" --warm_start "$WARM" $CFLAG \
       --out "$OUT"
   done

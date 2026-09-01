@@ -39,7 +39,7 @@ echo "=== pretrain with the ActSWM objective  $(date '+%F %T')"
 if [ -f "$RUN/best.pt" ]; then echo "skip $RUN/best.pt"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.train \
     --name beh12_actswm \
-    --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \
+    --sources hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat \
     --lambda_body 0.5 --body_dim 3 --body_channels 0 1 2 \
     --lambda_recon 3.0 --lambda_hinge 0.5 --lambda_readout 1.0 \
     --hinge_margin 0.1 --hinge_K 3 --readout_hidden 512
@@ -47,8 +47,8 @@ fi
 
 echo
 echo "=== per-body readout: sensitivity and prediction, on a body neither run trained on"
-for SPEC in "hexapod data/beh12_c08f09t09_flat results/wm/cache/fid_hexapod.pt" \
-            "b1 data/beh12_b1_flat results/wm/cache/b1_body3.pt"; do
+for SPEC in "hexapod data/allocentric/beh12_c08f09t09_flat results/wm/cache/fid_hexapod.pt" \
+            "b1 data/allocentric/beh12_b1_flat results/wm/cache/b1_body3.pt"; do
   set -- $SPEC
   echo "--- $1"
   $PY -u scripts/diagnostics/rollout_fidelity.py --ckpt "$RUN/best.pt" \
@@ -58,12 +58,12 @@ done
 echo
 echo "=== the shared coordinate, both robots, straight off the pretrain"
 $PY -u scripts/diagnostics/body_head_calibration.py --ckpt "$RUN/best.pt" \
-  --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+  --data hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat
 
 echo
 echo "=== gradient balance against the F149 baseline"
-for SPEC in "hexapod data/beh12_c10f10t10_flat results/wm/cache/hex_c10.pt" \
-            "b1 data/beh12_b1_flat results/wm/cache/b1_body3.pt"; do
+for SPEC in "hexapod data/allocentric/beh12_c10f10t10_flat results/wm/cache/hex_c10.pt" \
+            "b1 data/allocentric/beh12_b1_flat results/wm/cache/b1_body3.pt"; do
   set -- $SPEC
   $PY -u scripts/diagnostics/loss_gradient_balance.py --ckpt "$RUN/best.pt" \
     --dir "$2" --embodiment "$1" --cache "$3" --batch 24

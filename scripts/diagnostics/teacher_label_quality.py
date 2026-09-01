@@ -43,7 +43,7 @@ from teacher_student_insect import Student, body_goal, load_teacher, pooled  # n
 from wm.data.embodiment import REGISTRY, body_velocity, load, yaw_rate  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 
-DATA = "data/beh12_c10f10t10_flat"
+DATA = "data/allocentric/beh12_c10f10t10_flat"
 
 
 def family(cond):

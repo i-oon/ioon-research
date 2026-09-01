@@ -38,13 +38,13 @@ for LAM in 0.1 0.25 0.5 0.75; do
   if [ -f "$OUT" ]; then echo "skip $OUT"; else
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.adapt3 \
       --ckpt $RUN/adapted_b1.pt --projector $RUN/projector_b1_adapted.pt \
-      --data data/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
+      --data data/allocentric/beh12_b1_flat --embodiment b1 --train_clips $CLIPS \
       --steps 15000 --lambda_nce "$LAM" --batch 8 --seed 0 \
       --cache results/wm/cache/b1.pt --out "$OUT"
   fi
   echo "--- state fidelity, lambda $LAM"
   $PY -u scripts/diagnostics/rollout_fidelity.py --ckpt "$OUT" \
-    --data data/beh12_b1_flat --embodiment b1 --cache results/wm/cache/b1.pt \
+    --data data/allocentric/beh12_b1_flat --embodiment b1 --cache results/wm/cache/b1.pt \
     --mean_z --horizons 1 3 5
 done
 

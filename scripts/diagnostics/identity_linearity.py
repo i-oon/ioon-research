@@ -45,7 +45,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder
 enc=VJEPA2FrameEncoder(device="cuda", dtype=torch.float32)
 ck=torch.load(f"{R}/wm/runs/s2_fwd_hex7-b1_body0.5/last.pt", map_location="cpu", weights_only=False)
 itm=InverseTransitionModel(from_checkpoint(ck["config"])); itm.load_state_dict(ck["itm"]); itm.eval()
-d=gather(enc, 2, "data/fwd_hex7speed", f"{R}/results/wm/cache/probe_ik_walk_speed7.pt", itm, ck)
+d=gather(enc, 2, "data/allocentric/fwd_hex7speed", f"{R}/results/wm/cache/probe_ik_walk_speed7.pt", itm, ck)
 del enc
 raw=np.concatenate([d[n][0] for n in ("insect","b1")])
 std=np.concatenate([standardise(d[n][0]) for n in ("insect","b1")])

@@ -82,8 +82,8 @@ def split(cid, clips):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--hex_data", default="data/beh12_c08f09t09_flat")
-    ap.add_argument("--b1_data", default="data/beh12_b1_flat")
+    ap.add_argument("--hex_data", default="data/allocentric/beh12_c08f09t09_flat")
+    ap.add_argument("--b1_data", default="data/allocentric/beh12_b1_flat")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=3)
     args = ap.parse_args()

@@ -54,7 +54,7 @@ echo "=== lambda_body 0 control  $(date '+%F %T')"
 if [ -f "$RUN/best.pt" ]; then echo "skip $RUN/best.pt"; else
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.train \
     --name beh12_lag3_nobody \
-    --sources hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat \
+    --sources hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat \
     --lambda_body 0.0 --body_dim 3 --body_channels 0 1 2 \
     --frame_stride 3 --action_chunk 0 \
     --lambda_recon 1.0 --lambda_hinge 0.0 --lambda_readout 0.0 \
@@ -64,17 +64,17 @@ fi
 echo
 echo "=== null/real, the same path as the baseline, at this checkpoint's own stride"
 $PY -u scripts/diagnostics/action_necessity.py --ckpt "$RUN/best.pt" \
-  --data data/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
+  --data data/allocentric/beh12_c08f09t09_flat --embodiment hexapod --lags 1 2 3 5
 $PY -u scripts/diagnostics/action_necessity.py --ckpt "$RUN/best.pt" \
-  --data data/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
+  --data data/allocentric/beh12_b1_flat --embodiment b1 --lags 1 2 3 5
 
 echo
 echo "=== and the baseline again, so both tables are in one log and cannot be mismatched"
 if [ -f wm/runs/beh12_lag3_nohinge/best.pt ]; then
   $PY -u scripts/diagnostics/action_necessity.py --ckpt wm/runs/beh12_lag3_nohinge/best.pt \
-    --data data/beh12_c08f09t09_flat --embodiment hexapod --lags 3
+    --data data/allocentric/beh12_c08f09t09_flat --embodiment hexapod --lags 3
   $PY -u scripts/diagnostics/action_necessity.py --ckpt wm/runs/beh12_lag3_nohinge/best.pt \
-    --data data/beh12_b1_flat --embodiment b1 --lags 3
+    --data data/allocentric/beh12_b1_flat --embodiment b1 --lags 3
 fi
 
 echo

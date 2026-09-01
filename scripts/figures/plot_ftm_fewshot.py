@@ -5,7 +5,7 @@ the same clips**, so 1.0 is the line that matters: below it the rollout is worse
 motion and cannot support planning however low its training loss went.
 
 **The horizon is in seconds, not steps, and that is why the panel titles carry both.** The earlier
-version of this measurement used `data/fwd_b1_50hz` at 20 ms per stored transition against the
+version of this measurement used `data/allocentric/fwd_b1_50hz` at 20 ms per stored transition against the
 insect's 50 ms (F74), so its h=10 spanned 0.2 s where this one spans 0.5 s. The two curves are not
 comparable at matched step counts and this figure replaces rather than extends the old one.
 

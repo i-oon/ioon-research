@@ -25,7 +25,7 @@ steps at 50 Hz, six seconds; this loop is three.
     .venv/bin/python3 sim/control/close_loop_b1_physics.py \\
         --ckpt wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt \\
         --projector wm/runs/beh12_hexonly/projector_stage3_nce_s0.pt \\
-        --demo data/beh12_b1_flat/b1_ep2.npz --out results/wm/closed_loop/b1_physics
+        --demo data/allocentric/beh12_b1_flat/b1_ep2.npz --out results/wm/closed_loop/b1_physics
 """
 import argparse
 import os
@@ -75,7 +75,7 @@ def main():
                          "(F123). Only the goal moves: `e_t` is the forward model's input and "
                          "shifting that would trade one confound for another. No effect when the "
                          "goal is the demonstration.")
-    ap.add_argument("--candidates_dir", default="data/beh12_b1_flat",
+    ap.add_argument("--candidates_dir", default="data/allocentric/beh12_b1_flat",
                     help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The original set clips the robot "
                          "in 61% of frames, never pins its camera, files the forward clip under "
                          "`turn_wz0.00`, and turns the opposite way from the insect -- so its "
@@ -99,7 +99,7 @@ def main():
                     help="body height below this fraction of its settled height counts as fallen")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--floor_scale", type=float, default=3.0,
-                    help="scale the floor about the origin, as the dataset render does. At 24 degrees the camera reaches the far edge of the scene's 15 m floor and draws a band across the upper third of the frame; enlarging it removes the band. **Must match whatever `data/beh12_b1_fixed` was rendered with** -- a loop planning on frames that differ from its adaptation set in any static way is measuring that difference (F113).")
+                    help="scale the floor about the origin, as the dataset render does. At 24 degrees the camera reaches the far edge of the scene's 15 m floor and draws a band across the upper third of the frame; enlarging it removes the band. **Must match whatever `data/allocentric/beh12_b1_fixed` was rendered with** -- a loop planning on frames that differ from its adaptation set in any static way is measuring that difference (F113).")
     ap.add_argument("--cam_fov", type=float, default=24.0,
                     help="perspective angle in degrees. **24, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 24 it is 0% on all 48 (F113). The floor also has to be enlarged -- see `render_b1_replay.py --floor_scale`. Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
     ap.add_argument("--out", default="results/wm/closed_loop/b1_physics")

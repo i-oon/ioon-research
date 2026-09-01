@@ -19,7 +19,7 @@ robots**.
 
     .venv/bin/python3 scripts/diagnostics/body_head_calibration.py \\
         --ckpt wm/runs/beh12_hexonly/best.pt \\
-        --data hexapod=data/beh12_c10f10t10_flat b1=data/beh12_b1_flat
+        --data hexapod=data/allocentric/beh12_c10f10t10_flat b1=data/allocentric/beh12_b1_flat
 """
 import argparse
 import collections

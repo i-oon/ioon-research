@@ -1,243 +1,114 @@
-(.venv) fibo07@fibo07:~/ioon/ioon-research$ bash scripts/com7_pretrain_body3.sh
-=== repository ba12c71
-
-=== pretrain, both embodiments, 3-channel shared target  2026-08-30 05:37:23
+=== repository 3d86ebc
+=== lambda_body 0 control  2026-08-31 15:26:33
 hexapod: 43 train / 5 val clips, stratified over 1 body
 b1: 43 train / 5 val clips, stratified over 1 body
-cross-embodiment: {'hexapod': 2779, 'b1': 2795} | heads {'hexapod': 18, 'b1': 12}
+cross-embodiment: {'hexapod': 2693, 'b1': 2709} | heads {'hexapod': 18, 'b1': 12}
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 5116.86it/s]
-config -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_hex-b1_body3/config.yaml
-train 5574 pairs | val 648 pairs | heldout n/a (cross-embodiment) | trainable 96.0M
-epoch   1 | train 5.2934 (recon 4.0879 motion 0.9683) | val 4.4564 (recon 2.8327 motion 1.1692) | body 0.4745 probe 0.585
-epoch   2 | train 3.2822 (recon 2.4371 motion 0.6720) | val 3.5607 (recon 2.1731 motion 0.9359) | body 0.3462 probe 0.786
-epoch   3 | train 2.7029 (recon 2.0694 motion 0.4772) | val 3.0767 (recon 1.9502 motion 0.8015) | body 0.3126 probe 0.784
-epoch   4 | train 2.4459 (recon 1.9279 motion 0.3795) | val 2.7621 (recon 1.8331 motion 0.6519) | body 0.2770 probe 0.836
-epoch   5 | train 2.3081 (recon 1.8552 motion 0.3249) | val 2.5209 (recon 1.7742 motion 0.5391) | body 0.2561 probe 0.890
-epoch   6 | train 2.2124 (recon 1.8094 motion 0.2812) | val 2.3262 (recon 1.7381 motion 0.4242) | body 0.2436 probe 0.928
-epoch   7 | train 2.1277 (recon 1.7781 motion 0.2390) | val 2.4194 (recon 1.7186 motion 0.4434) | body 0.2213 probe 0.962
-epoch   8 | train 2.0858 (recon 1.7598 motion 0.2229) | val 2.2692 (recon 1.6951 motion 0.4002) | body 0.2062 probe 0.974
-epoch   9 | train 2.0289 (recon 1.7323 motion 0.2009) | val 2.2341 (recon 1.6739 motion 0.3412) | body 0.1914 probe 0.980
-epoch  10 | train 1.9880 (recon 1.7137 motion 0.1847) | val 2.1000 (recon 1.6523 motion 0.3009) | body 0.1794 probe 0.989
-epoch  11 | train 1.9582 (recon 1.7013 motion 0.1733) | val 2.0704 (recon 1.6417 motion 0.2778) | body 0.1671 probe 0.984
-epoch  12 | train 1.9276 (recon 1.6906 motion 0.1572) | val 2.0252 (recon 1.6309 motion 0.2476) | body 0.1597 probe 0.988
-epoch  13 | train 1.9076 (recon 1.6825 motion 0.1507) | val 2.1372 (recon 1.6185 motion 0.3599) | body 0.1489 probe 0.992
-epoch  14 | train 1.8841 (recon 1.6721 motion 0.1408) | val 2.1375 (recon 1.6114 motion 0.2749) | body 0.1422 probe 0.993
-epoch  15 | train 1.8577 (recon 1.6626 motion 0.1277) | val 1.9937 (recon 1.5977 motion 0.2329) | body 0.1347 probe 0.996
-epoch  16 | train 1.8460 (recon 1.6525 motion 0.1249) | val 2.0040 (recon 1.5898 motion 0.2398) | body 0.1372 probe 0.997
-epoch  17 | train 1.8262 (recon 1.6417 motion 0.1211) | val 1.9354 (recon 1.5815 motion 0.1913) | body 0.1268 probe 0.996
-epoch  18 | train 1.8120 (recon 1.6395 motion 0.1129) | val 1.9930 (recon 1.5857 motion 0.2450) | body 0.1192 probe 0.997
-epoch  19 | train 1.7957 (recon 1.6306 motion 0.1075) | val 2.0793 (recon 1.5771 motion 0.3101) | body 0.1152 probe 0.998
-epoch  20 | train 1.7859 (recon 1.6296 motion 0.0991) | val 2.0079 (recon 1.5706 motion 0.2218) | body 0.1144 probe 0.999
-epoch  21 | train 1.7721 (recon 1.6240 motion 0.0945) | val 1.9197 (recon 1.5663 motion 0.1848) | body 0.1072 probe 0.998
-epoch  22 | train 1.7615 (recon 1.6182 motion 0.0910) | val 1.9239 (recon 1.5676 motion 0.2056) | body 0.1046 probe 0.999
-epoch  23 | train 1.7445 (recon 1.6091 motion 0.0862) | val 1.8713 (recon 1.5630 motion 0.1767) | body 0.0983 probe 0.999
-epoch  24 | train 1.7405 (recon 1.6038 motion 0.0880) | val 1.9218 (recon 1.5550 motion 0.2196) | body 0.0974 probe 0.999
-epoch  25 | train 1.7310 (recon 1.6066 motion 0.0798) | val 1.8507 (recon 1.5482 motion 0.1725) | body 0.0894 probe 0.999
-epoch  26 | train 1.7226 (recon 1.6012 motion 0.0777) | val 1.8228 (recon 1.5438 motion 0.1635) | body 0.0876 probe 0.999
-epoch  27 | train 1.7081 (recon 1.5964 motion 0.0687) | val 1.8449 (recon 1.5387 motion 0.1648) | body 0.0860 probe 0.999
-epoch  28 | train 1.7021 (recon 1.5895 motion 0.0710) | val 1.8186 (recon 1.5356 motion 0.1539) | body 0.0831 probe 0.999
-epoch  29 | train 1.6898 (recon 1.5853 motion 0.0638) | val 1.8269 (recon 1.5348 motion 0.1655) | body 0.0813 probe 1.000
-epoch  30 | train 1.6829 (recon 1.5827 motion 0.0627) | val 1.7978 (recon 1.5351 motion 0.1512) | body 0.0750 probe 1.000
-epoch  31 | train 1.6776 (recon 1.5771 motion 0.0632) | val 1.8104 (recon 1.5289 motion 0.1354) | body 0.0744 probe 1.000
-epoch  32 | train 1.6641 (recon 1.5703 motion 0.0589) | val 1.7974 (recon 1.5234 motion 0.1323) | body 0.0698 probe 0.999
-epoch  33 | train 1.6611 (recon 1.5716 motion 0.0549) | val 1.7741 (recon 1.5225 motion 0.1214) | body 0.0693 probe 1.000
-epoch  34 | train 1.6623 (recon 1.5760 motion 0.0535) | val 1.7643 (recon 1.5208 motion 0.1177) | body 0.0655 probe 1.000
-epoch  35 | train 1.6520 (recon 1.5689 motion 0.0517) | val 1.7780 (recon 1.5198 motion 0.1309) | body 0.0628 probe 1.000
-epoch  36 | train 1.6467 (recon 1.5631 motion 0.0528) | val 1.7731 (recon 1.5179 motion 0.1301) | body 0.0614 probe 1.000
-epoch  37 | train 1.6407 (recon 1.5611 motion 0.0492) | val 1.7485 (recon 1.5116 motion 0.1165) | body 0.0608 probe 1.000
-epoch  38 | train 1.6330 (recon 1.5554 motion 0.0485) | val 1.7653 (recon 1.5159 motion 0.1234) | body 0.0581 probe 1.000
-epoch  39 | train 1.6265 (recon 1.5549 motion 0.0434) | val 1.7626 (recon 1.5113 motion 0.1187) | body 0.0565 probe 1.000
-epoch  40 | train 1.6297 (recon 1.5572 motion 0.0453) | val 1.7364 (recon 1.5081 motion 0.1204) | body 0.0544 probe 1.000
-epoch  41 | train 1.6216 (recon 1.5539 motion 0.0405) | val 1.7447 (recon 1.5074 motion 0.1164) | body 0.0544 probe 1.000
-epoch  42 | train 1.6181 (recon 1.5536 motion 0.0388) | val 1.7429 (recon 1.5064 motion 0.1136) | body 0.0513 probe 1.000
-epoch  43 | train 1.6142 (recon 1.5472 motion 0.0417) | val 1.7492 (recon 1.5040 motion 0.1143) | body 0.0506 probe 0.999
-epoch  44 | train 1.6143 (recon 1.5531 motion 0.0366) | val 1.7426 (recon 1.5042 motion 0.1128) | body 0.0493 probe 1.000
-epoch  45 | train 1.6132 (recon 1.5498 motion 0.0387) | val 1.7375 (recon 1.5028 motion 0.1121) | body 0.0493 probe 1.000
-epoch  46 | train 1.6112 (recon 1.5472 motion 0.0389) | val 1.7407 (recon 1.5023 motion 0.1121) | body 0.0501 probe 1.000
-epoch  47 | train 1.6064 (recon 1.5466 motion 0.0363) | val 1.7452 (recon 1.5032 motion 0.1135) | body 0.0471 probe 1.000
-epoch  48 | train 1.6095 (recon 1.5498 motion 0.0357) | val 1.7414 (recon 1.5025 motion 0.1131) | body 0.0481 probe 1.000
-epoch  49 | train 1.6048 (recon 1.5457 motion 0.0350) | val 1.7383 (recon 1.5020 motion 0.1112) | body 0.0482 probe 1.000
-epoch  50 | train 1.6096 (recon 1.5475 motion 0.0379) | val 1.7380 (recon 1.5019 motion 0.1112) | body 0.0484 probe 0.999
-best val selection 1.6131 | motion 0.1112 -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_hex-b1_body3
+Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 5038.02it/s]
+config -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_lag3_nobody/config.yaml
+train 5402 pairs | val 628 pairs | heldout n/a (cross-embodiment) | trainable 96.1M
+epoch   1 | train 5.3007 (recon 4.3097 motion 0.9910) | val 4.2882 (recon 3.1432 motion 1.1450) | motion@1 0.9930/1.1306 probe 0.500
+epoch   2 | train 3.5812 (recon 2.7912 motion 0.7899) | val 3.7712 (recon 2.5413 motion 1.2299) | motion@1 0.7860/1.1534 probe 0.505
+epoch   3 | train 3.1305 (recon 2.4608 motion 0.6698) | val 3.4294 (recon 2.3507 motion 1.0787) | motion@1 0.6525/0.9813 probe 0.531
+epoch   4 | train 2.9284 (recon 2.3218 motion 0.6066) | val 3.2938 (recon 2.2480 motion 1.0458) | motion@1 0.5901/0.9387 probe 0.595
+epoch   5 | train 2.7983 (recon 2.2446 motion 0.5536) | val 3.2856 (recon 2.2017 motion 1.0839) | motion@1 0.5282/0.9705 probe 0.634
+epoch   6 | train 2.6802 (recon 2.1935 motion 0.4867) | val 3.0842 (recon 2.1514 motion 0.9328) | motion@1 0.4677/0.9386 probe 0.594
+epoch   7 | train 2.5329 (recon 2.1525 motion 0.3804) | val 2.9057 (recon 2.1120 motion 0.7937) | motion@1 0.3634/0.7421 probe 0.532
+epoch   8 | train 2.4361 (recon 2.1260 motion 0.3101) | val 2.7923 (recon 2.0935 motion 0.6989) | motion@1 0.2978/0.6759 probe 0.558
+summepoch   9 | train 2.3720 (recon 2.1058 motion 0.2661) | val 2.7159 (recon 2.0816 motion 0.6343) | motion@1 0.2640/0.6078 probe 0.662
+epoch  10 | train 2.3613 (recon 2.1025 motion 0.2587) | val 2.6901 (recon 2.0767 motion 0.6134) | motion@1 0.2569/0.5936 probe 0.732
+best val selection 2.6901 | motion 0.6134 -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_lag3_nobody
 
-=== calibration A: straight off the pretrain, both robots  2026-08-30 10:37:15
+=== null/real, the same path as the baseline, at this checkpoint's own stride
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 18851.06it/s]
-wm/runs/beh12_hex-b1_body3/best.pt: body_dim 3, channels [0, 1, 2] (forward, lateral, yaw)
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 11765.56it/s]
+wm/runs/beh12_lag3_nobody/best.pt
+48 clips of hexapod from data/beh12_c08f09t09_flat
 
-  hexapod  (48 clips, 288 samples)
-    channel       corr   measured  predicted  compression
-    forward      +0.99      0.196      0.191         1.0x
-    lateral      +0.98      0.361      0.294         1.2x
-    yaw          +0.98      0.097      0.096         1.0x
-    family           forward t/p       lateral t/p           yaw t/p
-    side_L        0.020 /  0.019    0.116 /  0.111   -0.002 / -0.001
-    side_R        0.020 /  0.015   -0.151 / -0.119   -0.001 / -0.001
-    speed         0.160 /  0.159   -0.013 / -0.014   -0.000 / -0.000
-    turn          0.131 /  0.131    0.014 /  0.013    0.032 /  0.031
+   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
+     1       all    1.9305    1.9408    1.9597    1.9556    2.1062      1.005      1.015      56.5%      0.917   1512
+     1      side    1.8231    1.8313    1.8529    1.8575    1.9075      1.004      1.016      59.4%      0.956    512
+     1     speed    1.9712    1.9875    2.0114    1.9987    2.2506      1.008      1.020      54.5%      0.876    488
+     1      turn    1.9992    2.0059    2.0172    2.0127    2.1675      1.003      1.009      55.5%      0.922    512
 
-  b1  (48 clips, 288 samples)
-    channel       corr   measured  predicted  compression
-    forward      +0.99      0.198      0.195         1.0x
-    lateral      +0.97      0.292      0.251         1.2x
-    yaw          +0.97      0.068      0.069         1.0x
-    family           forward t/p       lateral t/p           yaw t/p
-    side_L       -0.000 /  0.000    0.105 /  0.105    0.002 /  0.002
-    side_R        0.007 /  0.005   -0.139 / -0.111    0.002 /  0.002
-    speed         0.160 /  0.160   -0.008 / -0.009    0.002 /  0.003
-    turn          0.122 /  0.123   -0.004 / -0.003    0.038 /  0.038
+     2       all    2.0772    2.0990    2.1098    2.0977    2.7089      1.010      1.016      64.6%      0.767   1466
+     2      side    2.0036    2.0230    2.0421    2.0279    2.4796      1.010      1.019      69.4%      0.808    496
+     2     speed    2.0867    2.1144    2.1269    2.1088    2.8552      1.013      1.019      65.4%      0.731    474
+     2      turn    2.1418    2.1602    2.1610    2.1570    2.7984      1.009      1.009      59.1%      0.765    496
 
-  compression is the measured range over the predicted range, 5th-95th percentile.
-  **A head that has never seen an embodiment returns that embodiment's mean** and shows
-  a large compression with a near-zero correlation -- which is F129, not a broken head.
+     3       all    2.1824    2.2148    2.2127    2.2010    3.0613      1.015      1.014      74.4%      0.713   1464
+     3      side    2.1025    2.1377    2.1384    2.1241    2.7796      1.017      1.017      78.2%      0.756    496
+     3     speed    2.1965    2.2412    2.2361    2.2219    3.2443      1.020      1.018      76.9%      0.677    472
+     3      turn    2.2489    2.2668    2.2647    2.2580    3.1689      1.008      1.007      68.1%      0.710    496
 
-=== stage 1: adapt ITM and forward model to the B1  2026-08-30 10:41:35
+     5       all    2.3510    2.3980    2.3781    2.3702    3.4306      1.020      1.012      80.8%      0.685   1416
+     5      side    2.2170    2.2786    2.2458    2.2362    3.0990      1.028      1.013      86.0%      0.715    480
+     5     speed    2.4018    2.4571    2.4388    2.4314    3.6022      1.023      1.015      82.5%      0.667    456
+     5      turn    2.4367    2.4613    2.4526    2.4461    3.5992      1.010      1.007      74.0%      0.677    480
+
+   lag  null/real  real/hold  real<null   reading
+     1      1.005      0.917      56.5%   predictable, but the action still buys nothing
+     2      1.010      0.767      64.6%   predictable, but the action still buys nothing
+     3      1.015      0.713      74.4%   predictable, but the action still buys nothing
+     5      1.020      0.685      80.8%   predictable, but the action still buys nothing
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 14394.35it/s]
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 18008.27it/s]
+wm/runs/beh12_lag3_nobody/best.pt
+48 clips of b1 from data/beh12_b1_flat
 
-adapted on 9 clips of b1, 1000 updates, final loss 1.0538
-  horizon   before    after    moves
-        1     1.42     1.42     0.52
-        3     1.49     1.29     0.77
-        5     1.43     1.13     0.89
-       10     1.17     0.84     1.15
+   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
+     1       all    1.5961    1.5989    1.6065    1.6042    1.9436      1.002      1.006      65.6%      0.821   1536
+     1      side    1.5508    1.5524    1.5546    1.5530    1.8287      1.001      1.002      63.9%      0.848    512
+     1     speed    1.6129    1.6160    1.6270    1.6249    2.0347      1.002      1.009      64.6%      0.793    512
+     1      turn    1.6248    1.6284    1.6378    1.6346    1.9675      1.002      1.008      68.4%      0.826    512
 
-Ratios are against holding the frame still; 1.0 means no better than predicting no
-motion. `moves` is predicted displacement over actual -- near 0 would be a model that
-learned to sit still, which scores 1.0 by construction.
--> wm/runs/beh12_hex-b1_body3/adapted_b1.pt
+     2       all    1.6963    1.7037    1.7071    1.7039    2.2786      1.004      1.006      74.9%      0.744   1488
+     2      side    1.6612    1.6655    1.6673    1.6642    2.1211      1.003      1.004      72.6%      0.783    496
+     2     speed    1.7172    1.7266    1.7310    1.7281    2.4135      1.005      1.008      75.0%      0.712    496
+     2      turn    1.7104    1.7191    1.7230    1.7193    2.3011      1.005      1.007      77.0%      0.743    496
 
-=== stage 2: fit the action projector against the adapted ITM  2026-08-30 10:44:08
+     3       all    1.7773    1.7910    1.7883    1.7834    2.5053      1.008      1.006      83.2%      0.709   1488
+     3      side    1.7354    1.7413    1.7401    1.7375    2.3157      1.003      1.003      74.6%      0.749    496
+     3     speed    1.7907    1.8098    1.8055    1.7995    2.6551      1.011      1.008      86.3%      0.674    496
+     3      turn    1.8059    1.8219    1.8193    1.8131    2.5452      1.009      1.007      88.7%      0.710    496
+
+     5       all    1.9126    1.9343    1.9213    1.9189    2.8081      1.011      1.005      91.4%      0.681   1440
+     5      side    1.8491    1.8577    1.8526    1.8508    2.5661      1.005      1.002      82.9%      0.721    480
+     5     speed    1.9499    1.9815    1.9611    1.9595    3.0035      1.016      1.006      96.9%      0.649    480
+     5      turn    1.9388    1.9636    1.9501    1.9464    2.8549      1.013      1.006      94.4%      0.679    480
+
+   lag  null/real  real/hold  real<null   reading
+     1      1.002      0.821      65.6%   predictable, but the action still buys nothing
+     2      1.004      0.744      74.9%   predictable, but the action still buys nothing
+     3      1.008      0.709      83.2%   predictable, but the action still buys nothing
+     5      1.011      0.681      91.4%   predictable, but the action still buys nothing
+
+=== and the baseline again, so both tables are in one log and cannot be mismatched
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 17045.99it/s]
-b1: excluded 24 clips matching ['b1_ep0.npz', 'b1_ep100.npz', 'b1_ep1000.npz', 'b1_ep1003.npz', 'b1_ep103.npz', 'b1_ep1100.npz', 'b1_ep1103.npz', 'b1_ep1200.npz', 'b1_ep1203.npz', 'b1_ep1300.npz', 'b1_ep1303.npz', 'b1_ep200.npz', 'b1_ep2000.npz', 'b1_ep2003.npz', 'b1_ep203.npz', 'b1_ep2100.npz', 'b1_ep2103.npz', 'b1_ep2200.npz', 'b1_ep2203.npz', 'b1_ep2300.npz', 'b1_ep2303.npz', 'b1_ep3.npz', 'b1_ep300.npz', 'b1_ep303.npz']
-hexapod    48 clips, 580 of 3102 transitions held out
-b1         24 clips, 260 of 1560 transitions held out
-epoch   50  train 4.3571
-epoch  100  train 3.6460
-epoch  150  train 3.3360
-epoch  200  train 3.1446
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 17670.51it/s]
+wm/runs/beh12_lag3_nohinge/best.pt
+48 clips of hexapod from data/beh12_c08f09t09_flat
 
-embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
-hexapod         1.7204      0.318        0.0504      0.404
-b1              2.5004      0.535        0.0944      0.693
+   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
+     3       all    2.1609    2.2293    2.2286    2.1969    3.0613      1.032      1.031      82.9%      0.706   1464
+     3      side    2.0707    2.1551    2.1577    2.1147    2.7796      1.041      1.042      87.1%      0.745    496
+     3     speed    2.1767    2.2580    2.2394    2.2169    3.2443      1.037      1.029      86.0%      0.671    472
+     3      turn    2.2361    2.2763    2.2893    2.2600    3.1689      1.018      1.024      75.8%      0.706    496
 
-Ratios are against predicting the mean z: below 1.0 is better than knowing nothing,
-and the rollout column is the one that decides whether planning can use this.
--> wm/runs/beh12_hex-b1_body3/projector_b1_adapted.pt
-
-=== stage 3: contrastive, one seed to start  2026-08-30 10:47:35
+   lag  null/real  real/hold  real<null   reading
+     3      1.032      0.706      82.9%   predictable, but the action still buys nothing
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 18235.73it/s]
-48 clips | fit on 24 (1560 transitions) | test on 12 held-out clips (780) | 12 candidate conditions from the holdout set
-  fit: ['b1_ep1.npz', 'b1_ep1001.npz', 'b1_ep1002.npz', 'b1_ep101.npz', 'b1_ep102.npz', 'b1_ep1101.npz', 'b1_ep1102.npz', 'b1_ep1201.npz', 'b1_ep1202.npz', 'b1_ep1301.npz', 'b1_ep1302.npz', 'b1_ep2.npz', 'b1_ep2001.npz', 'b1_ep2002.npz', 'b1_ep201.npz', 'b1_ep202.npz', 'b1_ep2101.npz', 'b1_ep2102.npz', 'b1_ep2201.npz', 'b1_ep2202.npz', 'b1_ep2301.npz', 'b1_ep2302.npz', 'b1_ep301.npz', 'b1_ep302.npz']
-  projector initialised from stage 2 (wm/runs/beh12_hex-b1_body3/projector_b1_adapted.pt)
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 16453.92it/s]
+wm/runs/beh12_lag3_nohinge/best.pt
+48 clips of b1 from data/beh12_b1_flat
 
-  step     train   /hold  /mean-z   moves   cond  family
-stage2    1.4542   0.742    0.974    0.71    14%     37%   <- before stage 3
-   250    2.1826   0.759    0.863    0.75    20%     53%
-   500    1.8299   0.745    0.826    0.73    30%     67%
-   750    1.6552   0.733    0.772    0.72    27%     70%
-  1000    1.5553   0.735    0.753    0.72    29%     64%
-  1250    1.5071   0.734    0.738    0.72    32%     70%
-  1500    1.4867   0.740    0.690    0.72    27%     60%
-  1750    1.4308   0.737    0.676    0.72    27%     61%
-  2000    1.4002   0.729    0.643    0.72    28%     65%
-  2250    1.3922   0.727    0.665    0.72    28%     65%
-  2500    1.3706   0.735    0.630    0.73    26%     65%
-  2750    1.3590   0.726    0.661    0.72    28%     62%
-  3000    1.3320   0.737    0.621    0.73    30%     66%
-  3250    1.3310   0.757    0.612    0.75    28%     66%
-  3500    1.2980   0.762    0.562    0.74    28%     61%
-  3750    1.2861   0.743    0.593    0.74    28%     66%
-  4000    1.2884   0.747    0.610    0.74    26%     62%
-  4250    1.2519   0.747    0.567    0.74    28%     62%
-  4500    1.2383   0.764    0.591    0.75    28%     65%
-  4750    1.2298   0.749    0.581    0.74    27%     60%
-  5000    1.2254   0.756    0.596    0.75    27%     60%
-  5250    1.2110   0.762    0.572    0.75    28%     57%
-  5500    1.2119   0.761    0.556    0.75    30%     67%
-  5750    1.1789   0.788    0.610    0.77    29%     64%
-  6000    1.2039   0.770    0.588    0.76    27%     62%
-  6250    1.1668   0.751    0.598    0.75    30%     68%
-  6500    1.1485   0.768    0.578    0.76    28%     63%
-  6750    1.1512   0.756    0.579    0.76    26%     60%
-  7000    1.1360   0.785    0.540    0.78    26%     62%
-  7250    1.1387   0.773    0.615    0.77    30%     65%
-  7500    1.1290   0.766    0.590    0.76    23%     62%
-  7750    1.1081   0.784    0.572    0.78    27%     65%
-  8000    1.1103   0.775    0.585    0.77    29%     68%
-  8250    1.0987   0.788    0.581    0.78    28%     63%
-  8500    1.0981   0.781    0.579    0.78    27%     68%
-  8750    1.0813   0.777    0.571    0.77    26%     62%
-  9000    1.0808   0.782    0.566    0.78    26%     64%
-  9250    1.0620   0.810    0.547    0.80    26%     66%
-  9500    1.0570   0.789    0.541    0.78    26%     64%
-  9750    1.0477   0.825    0.531    0.80    29%     61%
- 10000    1.0489   0.808    0.537    0.80    26%     61%
- 10250    1.0555   0.842    0.513    0.82    28%     62%
- 10500    1.0279   0.848    0.540    0.82    30%     68%
- 10750    1.0330   0.799    0.572    0.80    26%     62%
- 11000    1.0338   0.799    0.539    0.79    25%     61%
- 11250    1.0012   0.790    0.566    0.79    29%     68%
- 11500    1.0107   0.827    0.541    0.81    28%     64%
- 11750    1.0124   0.813    0.552    0.80    26%     62%
- 12000    0.9945   0.799    0.538    0.80    26%     63%
- 12250    1.0013   0.823    0.567    0.81    30%     63%
- 12500    0.9816   0.829    0.513    0.81    29%     64%
- 12750    0.9758   0.835    0.528    0.82    29%     68%
- 13000    0.9778   0.847    0.510    0.82    28%     66%
- 13250    0.9752   0.826    0.553    0.82    28%     67%
- 13500    0.9510   0.839    0.524    0.82    25%     62%
- 13750    0.9532   0.843    0.521    0.83    27%     66%
- 14000    0.9517   0.823    0.564    0.82    28%     67%
- 14250    0.9423   0.910    0.526    0.86    26%     61%
- 14500    0.9367   0.839    0.541    0.83    28%     67%
- 14750    0.9217   0.841    0.562    0.83    28%     68%
- 15000    0.9187   0.820    0.543    0.81    26%     66%
+   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
+     3       all    1.7709    1.7874    1.7862    1.7783    2.5053      1.009      1.009      86.1%      0.707   1488
+     3      side    1.7258    1.7319    1.7306    1.7274    2.3157      1.004      1.003      78.8%      0.745    496
+     3     speed    1.7858    1.8093    1.8015    1.7949    2.6551      1.013      1.009      90.9%      0.673    496
+     3      turn    1.8011    1.8209    1.8264    1.8128    2.5452      1.011      1.014      88.5%      0.708    496
 
-`/hold` and `/mean-z` are ratios: below 1.0 beats the baseline. `moves` is predicted over
-actual displacement -- near 0 is the collapse where the model copies its input, which scores well
-on MSE and cannot control anything.
+   lag  null/real  real/hold  real<null   reading
+     3      1.009      0.707      86.1%   predictable, but the action still buys nothing
 
-`cond` picks 1 of 12 exactly (chance 8%); `family` allows the right behaviour at the
-wrong amplitude. **Chance for `family` is 28%, not 8%** -- the families hold unequal
-numbers of conditions, and an unadapted model scores the chance rate exactly. Selection is
-happening only if `family` clears it by a margin: 66% vs 28% is SELECTION.
--> wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0.pt
-
-=== calibration B: after stage 3, on the checkpoint the planner would use  2026-08-30 11:48:04
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 17971.20it/s]
-wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0.pt: body_dim 3, channels [0, 1, 2] (forward, lateral, yaw)
-
-  hexapod  (48 clips, 288 samples)
-    channel       corr   measured  predicted  compression
-    forward      +0.88      0.196      0.132         1.5x
-    lateral      +0.81      0.361      0.135         2.7x   <- fails the 1.5x bar
-    yaw          +0.83      0.097      0.087         1.1x
-    family           forward t/p       lateral t/p           yaw t/p
-    side_L        0.020 /  0.053    0.116 /  0.066   -0.002 /  0.001
-    side_R        0.020 /  0.047   -0.151 / -0.031   -0.001 / -0.011
-    speed         0.160 /  0.134   -0.013 / -0.002   -0.000 / -0.006
-    turn          0.131 /  0.113    0.014 /  0.028    0.032 /  0.034
-
-  b1  (48 clips, 288 samples)
-    channel       corr   measured  predicted  compression
-    forward      +0.82      0.198      0.117         1.7x   <- fails the 1.5x bar
-    lateral      +0.60      0.292      0.077         3.8x   <- fails the 1.5x bar
-    yaw          +0.80      0.068      0.048         1.4x
-    family           forward t/p       lateral t/p           yaw t/p
-    side_L       -0.000 /  0.049    0.105 /  0.043    0.002 /  0.008
-    side_R        0.007 /  0.057   -0.139 / -0.005    0.002 /  0.006
-    speed         0.160 /  0.122   -0.008 /  0.005    0.002 /  0.007
-    turn          0.122 /  0.104   -0.004 /  0.013    0.038 /  0.028
-
-  compression is the measured range over the predicted range, 5th-95th percentile.
-  **A head that has never seen an embodiment returns that embodiment's mean** and shows
-  a large compression with a near-zero correlation -- which is F129, not a broken head.
-
-=== done  2026-08-30 11:48:19
-send back wm/runs/beh12_hex-b1_body3/{best.pt,config.yaml,adapted_b1.pt,projector_b1_adapted.pt,stage3_b1_nce_s0.pt}
-then here:  calibration on both robots first, scoring only after it passes
+=== done  2026-08-31 16:29:47   send back this whole log

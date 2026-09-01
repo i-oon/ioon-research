@@ -25,7 +25,7 @@ at the same state and is deterministic, so four runs of one command are the same
 The windows do not overlap. The insect's four come from four separate CoppeliaSim episodes, which
 differ because that engine does not repeat (F105); this is the closest available equivalent.
 
-  .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/beh12_b1_turns
+  .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/allocentric/beh12_b1_turns
 """
 import argparse
 import os
@@ -89,7 +89,7 @@ def _face_forward(pos, quat):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="data/beh12_b1_turns")
+    ap.add_argument("--out", default="data/allocentric/beh12_b1_turns")
     ap.add_argument("--vx", type=float, default=0.30)
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--cam_fov", type=float, default=24.0)

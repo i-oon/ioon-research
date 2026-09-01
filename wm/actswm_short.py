@@ -106,8 +106,8 @@ def main():
     for p in proj.parameters():
         p.requires_grad_(False)
 
-    bodies = {"hexapod": ("data/beh12_c10f10t10_flat", "results/wm/cache/hex_c10.pt", 18),
-              "b1": ("data/beh12_b1_flat", "results/wm/cache/b1_body3.pt", 12)}
+    bodies = {"hexapod": ("data/allocentric/beh12_c10f10t10_flat", "results/wm/cache/hex_c10.pt", 18),
+              "b1": ("data/allocentric/beh12_b1_flat", "results/wm/cache/b1_body3.pt", 12)}
     readout = {n: FrozenActionReadout(cfg.token_dim, d, hidden=args.hidden).to(device)
                for n, (_, _, d) in bodies.items()}
     data, znull = {}, {}

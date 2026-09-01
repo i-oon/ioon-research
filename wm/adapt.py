@@ -18,7 +18,7 @@ calls. The saved checkpoint carries the original decoder weights unchanged so th
 rebuilding a full model from it still work.
 
   .venv/bin/python3 -m wm.adapt --ckpt wm/runs/beh12_hexonly/best.pt \\
-      --data data/beh12_b1_flat --embodiment b1 --clips 9 --out wm/runs/beh12_hexonly/adapted_b1.pt
+      --data data/allocentric/beh12_b1_flat --embodiment b1 --clips 9 --out wm/runs/beh12_hexonly/adapted_b1.pt
 """
 import argparse
 import glob
@@ -99,7 +99,7 @@ def main():
                          "how many of them it adapts on, and the rollout test comes from the "
                          "rest of the *same* pool. **Pass stage 3's training list here.** "
                          "Without it stage 1 permutes the whole directory, and on "
-                         "`data/beh12_b1_flat` at seed 0 that puts two of stage 3's twelve "
+                         "`data/allocentric/beh12_b1_flat` at seed 0 that puts two of stage 3's twelve "
                          "candidate clips and three of its twelve validation clips inside the "
                          "forward model's adaptation set -- the candidate library is what the "
                          "planner picks from, so contaminating it flatters the number stage 3 "

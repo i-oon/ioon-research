@@ -41,10 +41,10 @@ for ARM in nce mse; do
     echo "=== $ARM $G"
     $PY -u sim/control/close_loop_b1_physics.py \
       --ckpt "$CK" --projector "$CK" \
-      --demo data/beh12_b1_flat/${G}.npz --commit "$COMMIT" --out "$OUT"
+      --demo data/allocentric/beh12_b1_flat/${G}.npz --commit "$COMMIT" --out "$OUT"
   done
 done
 
 echo
 echo "score with:"
-echo "  $PY scripts/diagnostics/score_closed_loop.py results/wm/closed_loop/b1_{nce,mse}_s0_*/*.npz --demo_dir data/beh12_b1_flat"
+echo "  $PY scripts/diagnostics/score_closed_loop.py results/wm/closed_loop/b1_{nce,mse}_s0_*/*.npz --demo_dir data/allocentric/beh12_b1_flat"

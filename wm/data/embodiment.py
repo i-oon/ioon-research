@@ -192,6 +192,26 @@ def body_velocity(position, quat, dt, embodiment):
     return np.stack([np.convolve(out[:, c], k, mode="same") for c in (0, 1)], axis=1).astype(np.float32)
 
 
+def heading(quat, embodiment):
+    """Absolute heading angle per frame, in radians, with each robot's own convention.
+
+    **Factored out of `yaw_rate` so there is exactly one place these formulas live.** The hexapod's
+    `body_quat` is (x, y, z, w) off an **aft-pointing** abdomen axis and the B1's `base_quat` is
+    MuJoCo's (w, x, y, z) with base x forward; hand-rolling either has already cost this project a
+    week (F71, F117). `yaw_rate` differences this, so the aft-pointing axis cancels there as a
+    constant -- **anything using the absolute angle must only ever compare two headings of the same
+    robot**, never a heading against zero.
+    """
+    q = np.asarray(quat, dtype=np.float64)
+    if embodiment == "hexapod":
+        x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+        fx, fy = 2 * (x * z + w * y), 2 * (y * z - w * x)
+    else:
+        w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
+    return np.arctan2(fy, fx)
+
+
 def yaw_rate(quat, dt, embodiment, height):
     """Dimensionless turn rate, smoothed over the same window as `body_motion`.
 
@@ -204,14 +224,7 @@ def yaw_rate(quat, dt, embodiment, height):
     robots were turning opposite ways -- and in signed data that made yaw separate the robots at
     AUC 0.871, the exact failure the embodiment gate exists to catch.
     """
-    q = np.asarray(quat, dtype=np.float64)
-    if embodiment == "hexapod":
-        x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
-        fx, fy = 2 * (x * z + w * y), 2 * (y * z - w * x)
-    else:
-        w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
-        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
-    omega = np.gradient(np.unwrap(np.arctan2(fy, fx)), dt)
+    omega = np.gradient(np.unwrap(heading(quat, embodiment)), dt)
     window = max(3, int(round(BODY_WINDOW_S / dt)))
     omega = np.convolve(omega, np.ones(window) / window, mode="same")
     return (omega * np.sqrt(max(height, 1e-6) / G)).astype(np.float32)[:, None]

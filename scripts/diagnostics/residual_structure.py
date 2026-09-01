@@ -1,7 +1,7 @@
 """Is what the null-action prediction misses **structured by the action**, or is it noise?
 
     .venv/bin/python3 scripts/diagnostics/residual_structure.py \\
-        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/beh12_c08f09t09_flat \\
+        --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
 **F157 closed the objective-level path**: no weighting and no frameskip makes the action matter more
