@@ -174,18 +174,36 @@ def clone(args, device):
     target = (Y - student.mean) / student.std
 
     opt = torch.optim.Adam(student.parameters(), lr=args.lr)
+    # **Keep the best held-out weights, not the last.** Egocentrically the curve bottoms early and
+    # then climbs -- 0.5629 at epoch 200 against 0.6202 at 2000 -- so saving the final state ships a
+    # measurably worse policy than the run produced. Everything downstream perturbs around this
+    # student, so the difference is not cosmetic.
+    best = {"v": float("inf"), "epoch": 0, "state": None}
     for epoch in range(args.epochs):
         student.train(); opt.zero_grad()
         loss = nn.functional.mse_loss(student(X[~V], G[~V]), target[~V])
         loss.backward(); opt.step()
-        if (epoch + 1) % 200 == 0:
+        if (epoch + 1) % args.eval_every == 0:
             student.eval()
             with torch.no_grad():
                 v = nn.functional.mse_loss(student(X[V], G[V]), target[V]).item()
-            print(f"  epoch {epoch + 1:4d}  train {loss.item():.4f}  held out {v:.4f}")
+            if v < best["v"]:
+                best = {"v": v, "epoch": epoch + 1,
+                        "state": {k: t.detach().clone() for k, t in student.state_dict().items()}}
+            print(f"  epoch {epoch + 1:4d}  train {loss.item():.4f}  held out {v:.4f}"
+                  + ("   <- best" if v == best["v"] else ""))
+    if best["state"] is not None:
+        student.load_state_dict(best["state"])
+    # **The targets are standardised, so held-out MSE is 1 - R2 and the two are the same statement.**
+    # Reported explicitly because the clone's bar comes from P3, which is quoted as R2.
+    print(f"\n  best held out {best['v']:.4f} at epoch {best['epoch']}  =  R2 {1 - best['v']:+.3f}")
+    print("  **Not comparable to P3's 0.263 unless the condition set matches** -- `--forward_only`")
+    print("  clones on the walking clips alone, a much narrower target than the twelve conditions")
+    print("  P3 measured, so a higher number here is not a better policy.")
     out = os.path.join(ROOT, args.out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    torch.save({"student": student.state_dict(), "token_dim": X.shape[-1],
+    torch.save({"student": student.state_dict(), "val_mse": best["v"], "val_epoch": best["epoch"],
+                "forward_only": bool(args.forward_only), "token_dim": X.shape[-1],
                 "goal_dim": G.shape[-1], "action_dim": Y.shape[-1],
                 "channels": channels, "data": args.data,
                 "val_paths": sorted(os.path.basename(p) for p in val_paths)}, out)
@@ -405,6 +423,9 @@ def main():
                          "to fit before the question is even asked")
     ap.add_argument("--steps", type=int, default=STEPS)
     ap.add_argument("--epochs", type=int, default=2000)
+    ap.add_argument("--eval_every", type=int, default=200,
+                    help="held-out evaluations, which are also the checkpoint candidates: the best "
+                         "of them is what gets saved.")
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--port", type=int, default=23000)

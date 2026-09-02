@@ -12907,6 +12907,90 @@ Logs from the com7 run of `scripts/diagnostics/pooled_student_check.py`.
 ---
 
 
+### Note. The egocentric teacher does not inherit F144's scope limit -- and Q1's body changes
+
+**F144 bounded its teacher to `c10f10t10`**: on the held-out `c08f09t09` its state fidelity read
+**1.052**, worse than holding the frame still, with the standing instruction not to use it off that
+body. Whether the egocentric teacher inherits that was unmeasured and gated Q1's choice of body.
+
+`rollout_fidelity.py` on `teacher_ego.pt`, **held-out `c08f09t09`, egocentric**:
+
+| horizon | ratio | moves | off-manifold | shuffled z |
+|---|---|---|---|---|
+| 1 | **0.510** | 0.52 | 0.526 | 0.622 |
+| 3 | 0.500 | 0.60 | 0.508 | 0.602 |
+| 5 | 0.527 | 0.61 | 0.533 | 0.601 |
+| 10 | **0.596** | 0.63 | 0.600 | 0.637 |
+
+**0.510 against 1.052, and it does not diverge out to ten steps.** `moves` at 0.52-0.63 rules out the
+collapse where the model copies its input and scores well by construction. **The limit does not
+transfer**, so Q1 runs on `c08f09t09` -- the genuinely held-out body, and the one GATE B, GATE C,
+F173 and F175 were all measured on. **My earlier lean toward `c10f10t10` was made before this number
+existed and is withdrawn.**
+
+## A prediction about Q1, recorded before Q1 runs
+
+**`shuffled z` costs only 22%** -- 0.622 against 0.510 -- and an off-manifold perturbation at one
+latent sd costs **3%**, 0.526 against 0.510. Feeding a latent from a state the model never followed
+barely hurts it.
+
+**The teacher ranks by rolling and reading body motion, and F144's candidates are Gaussian
+perturbations at 0.5 sd -- far smaller than a shuffle.** If a whole shuffle is worth 22%, the
+separation available for local perturbations is small enough that **Q1 should be expected to come
+back near chance**, and for reason (b) -- the candidates are near-identical through the model and the
+physics -- rather than (a) pose-redundancy, which GATE C already removed.
+
+**This is written down now so it cannot be retrofitted either way.** If Q1 nonetheless ranks well
+above a coin, this prediction was wrong and the mechanism is not what these columns suggest.
+
+## A flag correction
+
+**The `itm` path was the wrong flag; the labelling path has now been run.** `teacher_label_quality.py`
+scores candidates through `proj(a)`, and F139 established that the forward model is action-sensitive
+**only** inside the projector's region -- the ITM's latents sit outside it.
+
+| projector path, `c08f09t09` egocentric | h=1 | 3 | 5 | 10 |
+|---|---|---|---|---|
+| ratio | **0.533** | 0.523 | 0.548 | 0.613 |
+| `moves` | 0.50 | 0.59 | 0.60 | 0.61 |
+| shuffled z | 0.621 | 0.602 | 0.604 | 0.647 |
+| `/mean-z` within-clip | **0.888** | 0.868 | 0.880 | 0.884 |
+| `/mean-z` within-family | 0.887 | 0.869 | 0.877 | 0.871 |
+| `/mean-z` across-all | 0.880 | 0.866 | 0.877 | 0.874 |
+
+**0.533 against the ITM path's 0.510: the labelling path is as sound as the model.** That clears the
+prerequisite -- Q1 will not be measuring a broken teacher.
+
+**The three `/mean-z` columns have collapsed onto each other at about 0.88**, and that is the
+striking part. Allocentrically they were far apart: the real action against an *average behaviour*
+read 0.49 (F119) while the real action against a *different amount of the same behaviour* read 0.951
+(F140) -- strong coarse sensitivity, none fine. **Egocentrically both are 0.88.** Read at face value
+that is fine sensitivity improving and coarse sensitivity getting much worse.
+
+**But it must not be read at face value, and this is the trap rather than the finding.** F119's 0.49
+and F140's 0.951 were measured on **stage-3 contrastively adapted** checkpoints. `teacher_ego.pt` is
+a stage-1 pretrain with a fitted projector and **no stage 3**. So 0.88 against 0.49 compares two
+viewpoints *and* two adaptation stages, and this project has had to withdraw numbers for exactly that
+before. **No claim about egocentric changing coarse or fine sensitivity can be made from these
+numbers.**
+
+**The control that would make it readable** is the same measurement on the allocentric pretrain
+`beh12_hex-b1_body3/best.pt` with a projector fitted against *that* checkpoint. The local
+`projector_b1_adapted.pt` is fitted against `adapted_b1.pt` and is the wrong latent space, so the
+control needs a projector fit first. **Until it exists, only the within-run reading stands: the real
+action beats a mean action by 12% at every scale, uniformly.**
+
+## What this does to the prediction above
+
+The prediction that Q1 comes back near chance was argued from `shuffled z` costing 22%. **The
+projector path agrees** -- 0.621 against 0.533, 17% -- and adds that an off-manifold perturbation at
+one latent sd costs 1%, 0.540 against 0.533. **A whole shuffle is worth 17% and a 1-sd perturbation
+is worth 1%; F144's candidates are 0.5-sd perturbations.** The prediction stands and is now argued
+from the path the teacher actually uses.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
