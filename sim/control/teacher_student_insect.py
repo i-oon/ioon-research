@@ -50,7 +50,22 @@ from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 
+# **The base 1.0x body, and it is NOT the scene either behaviour dataset was collected from.**
+# `beh12_c10f10t10_*` comes from `medauroidea_c10f10t10.ttt` and `beh12_c08f09t09_*` from
+# `medauroidea_c08f09t09.ttt`; all three files are distinct on disk. Camera, lighting and floor are
+# authored per scene and are part of the data, so a loop driving this file evaluates a policy in a
+# world its training clips were not shot in. Override with `--scene`.
 SCENE = "medauroidea_stick_insect.ttt"
+
+# **The egocentric camera, and every value here is part of the data.** `--view egocentric` in the
+# collector expands to fov 90 and an 8 m textured room, and neither is recorded in the npz -- so a
+# loop that does not repeat them films a different world from the one the model was trained on and
+# measures that difference. `ego_offset` and `ego_euler` stay at the collector's defaults (3 cm ahead
+# of the head, 2 cm above, pitch-compensated for the walking posture) for the same reason.
+#
+# `ego_seed` is the appearance seed and advances by REPEAT in the dataset, so a loop reproducing a
+# particular clip's world has to be given that clip's repeat index rather than 0.
+EGO = dict(ego=True, cam_fov=90.0, ego_box=8.0)
 DATA = "data/allocentric/beh12_c10f10t10_flat"
 STEPS = 66
 
@@ -177,8 +192,14 @@ def clone(args, device):
     print(f"-> {args.out}")
 
 
-def run_in_sim(student, goal, device, port, steps, seed_cmds, encoder):
-    """Drive the insect with the student and return frames, head track and orientation."""
+def run_in_sim(student, goal, device, port, steps, seed_cmds, encoder, ego=False, ego_seed=0,
+               scene=SCENE):
+    """Drive the insect with the student and return frames, head track and orientation.
+
+    **`ego` must match how the student's training clips were shot.** A policy fitted on egocentric
+    frames and evaluated through the fixed chase camera is being fed a distribution it never saw,
+    and the run would measure the viewpoint swap rather than the policy.
+    """
     from coppeliasim_zmqremoteapi_client import RemoteAPIClient
     from collect_ik import drive_and_record
     g = torch.tensor(goal, dtype=torch.float32, device=device).unsqueeze(0)
@@ -189,8 +210,9 @@ def run_in_sim(student, goal, device, port, steps, seed_cmds, encoder):
             return student.act(pooled(e), g)[0].cpu().numpy()
 
     sim = RemoteAPIClient("localhost", port=port).getObject("sim")
-    return drive_and_record(sim, SCENE, seed_cmds[:steps], 0.0, 20,
-                            cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy)
+    return drive_and_record(sim, scene, seed_cmds[:steps], 0.0, 20,
+                            cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy,
+                            **(dict(EGO, ego_seed=ego_seed) if ego else {}))
 
 
 def verdict(heads, d_real, fall_ratio=0.6):
@@ -217,7 +239,9 @@ def evaluate(args, device):
 
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     frames, actions, forces, heads, oris = run_in_sim(student, goal, device, args.port,
-                                                      args.steps, seed, encoder)
+                                                      args.steps, seed, encoder,
+                                                      ego=args.ego, ego_seed=args.ego_seed,
+                                                      scene=args.scene)
     v = verdict(heads, d_real)
     print(f"\n  travelled {v['distance']:.4f} m = {v['fraction']:.0%} of D_real"
           f"   upright {v['upright']} (min head z {v['min_z']:.4f} against {v['z0']:.4f})")
@@ -330,7 +354,10 @@ def improve(args, device):
             return policy(observation, t)
 
         frames, actions, forces, heads, oris = run_in_sim_raw(student, g_t, device, args.port,
-                                                              args.steps, seed, policy_wrapper)
+                                                              args.steps, seed, policy_wrapper,
+                                                              ego=args.ego,
+                                                              ego_seed=args.ego_seed,
+                                                              scene=args.scene)
         d = float(np.linalg.norm(np.asarray(heads)[-1, :2] - np.asarray(heads)[0, :2]))
         X = torch.cat([BX, torch.stack(TX).to(device)])
         G = torch.cat([BG, torch.stack(TG).to(device)])
@@ -353,12 +380,14 @@ def improve(args, device):
     print(f"-> {args.out}")
 
 
-def run_in_sim_raw(student, goal, device, port, steps, seed_cmds, policy):
+def run_in_sim_raw(student, goal, device, port, steps, seed_cmds, policy, ego=False, ego_seed=0,
+                   scene=SCENE):
     from coppeliasim_zmqremoteapi_client import RemoteAPIClient
     from collect_ik import drive_and_record
     sim = RemoteAPIClient("localhost", port=port).getObject("sim")
-    return drive_and_record(sim, SCENE, seed_cmds[:steps], 0.0, 20,
-                            cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy)
+    return drive_and_record(sim, scene, seed_cmds[:steps], 0.0, 20,
+                            cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy,
+                            **(dict(EGO, ego_seed=ego_seed) if ego else {}))
 
 
 def main():
@@ -379,6 +408,21 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--scene", default=SCENE,
+                    help="**must be the scene the student's clips were collected from.** "
+                         "`medauroidea_c10f10t10.ttt` for `beh12_c10f10t10_*`, "
+                         "`medauroidea_c08f09t09.ttt` for `beh12_c08f09t09_*`. The default is the "
+                         "base body and matches neither.")
+    ap.add_argument("--ego", action="store_true",
+                    help="**film the loop from the head camera, matching an egocentric training "
+                         "set.** Expands to fov 90 and an 8 m textured room, which is what "
+                         "`--view egocentric` expands to in the collector; neither value is stored "
+                         "in the npz, so a loop that omits this films a different world from the "
+                         "one the student was fitted on and measures the swap rather than the "
+                         "policy.")
+    ap.add_argument("--ego_seed", type=int, default=0,
+                    help="the room's appearance seed. It advances by REPEAT in the datasets, so "
+                         "reproducing a particular clip's world needs that clip's repeat index.")
     ap.add_argument("--iters", type=int, default=10, help="simulator episodes of teacher labels")
     ap.add_argument("--samples", type=int, default=32, help="candidates the teacher ranks per step")
     ap.add_argument("--sigma", type=float, default=0.5, help="candidate spread, in action sd")

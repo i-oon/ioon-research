@@ -46,6 +46,10 @@ from wm.evaluate import encode_clip  # noqa: E402
 DATA = "data/allocentric/beh12_c10f10t10_flat"
 
 
+# the collector's egocentric expansion, repeated here because the npz does not record it
+EGO_CAM = dict(ego=True, cam_fov=90.0, ego_box=8.0)
+
+
 def family(cond):
     return "side" if cond.startswith("side") else cond.split("_")[0]
 
@@ -69,6 +73,26 @@ def main():
     ap.add_argument("--horizon", type=int, default=3)
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--coarse_only", action="store_true")
+    ap.add_argument("--scene", default="medauroidea_stick_insect.ttt",
+                    help="**must be the scene the goal clip was collected from.** All three insect "
+                         "scenes are distinct files with their own authored camera and floor: the "
+                         "default is the base body, `beh12_c10f10t10_*` came from "
+                         "`medauroidea_c10f10t10.ttt` and `beh12_c08f09t09_*` from "
+                         "`medauroidea_c08f09t09.ttt`.")
+    ap.add_argument("--ego", action="store_true",
+                    help="**film the branch points from the head camera**, which an egocentric "
+                         "teacher requires: it was fitted on head-camera frames and reading it off "
+                         "the fixed chase shot feeds it a distribution it never saw. Expands to "
+                         "the collector's `--view egocentric`: fov 90, an 8 m textured room, "
+                         "default offset and pitch. **None of those are stored in the npz.**")
+    ap.add_argument("--repeat_control", type=int, default=4,
+                    help="**branch points where the student's own action is executed TWICE.** The "
+                         "insect's simulator does not repeat (F105), so the spread this produces is "
+                         "the noise floor the teacher-versus-student gap has to clear. A ranking "
+                         "score reported without it cannot be read: 0 disables, and disabling it "
+                         "means the run answers less than it appears to.")
+    ap.add_argument("--ego_seed", type=int, default=0,
+                    help="the room's appearance seed, which advances by REPEAT in the datasets.")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -136,12 +160,13 @@ def main():
         """Drive the recorded clip to `t_branch`, then hold `tail` for the horizon."""
         def policy(observation, t):
             return seed[t] if t < t_branch else tail
-        return drive_and_record(sim, "medauroidea_stick_insect.ttt",
+        return drive_and_record(sim, args.scene,
                                 seed[:t_branch + args.horizon], 0.0, 20,
-                                cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy)
+                                cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy,
+                                **(dict(EGO_CAM, ego_seed=args.ego_seed) if args.ego else {}))
 
     wins = ties = 0
-    rows = []
+    rows, repeats = [], []
     for bt in branch:
         frames, _a, _f, heads, oris = run_to(int(bt), seed[int(bt)])
         obs = frames[int(bt) - 1]
@@ -170,6 +195,17 @@ def main():
         d_t = float(np.linalg.norm(got["teacher"] - goal))
         wins += d_t < d_s
         ties += pick == 0
+        # **The simulator's own reproducibility, at the same branch point.** F105 records that
+        # CoppeliaSim does not repeat: rerunning one configuration returns a different number. So
+        # the identical action is executed a second time here and the movement in `d` that produces
+        # is the floor any teacher-versus-student difference has to clear. **Without it a ranking
+        # score is unreadable** -- F145 reported 0.1304 against 0.1299 and had no way to say whether
+        # that gap was small or merely inside the noise.
+        if len(rows) < args.repeat_control:
+            _fr, _ac, _fo, hh, oo = run_to(int(bt), base[0].cpu().numpy())
+            hh, oo = np.asarray(hh, np.float64), np.asarray(oo, np.float64)
+            again = channels_of(hh[-args.horizon - 1:], oo[-args.horizon - 1:])[:, channels].mean(0)
+            repeats.append(abs(float(np.linalg.norm(again - goal)) - d_s))
         rows.append((int(bt), d_s, d_t, pick))
         print(f"  t={bt:3d}  student {d_s:.4f}  teacher {d_t:.4f}  "
               f"{'teacher' if d_t < d_s else 'student'} closer"
@@ -180,8 +216,23 @@ def main():
     print(f"  teacher closer on {wins}/{n} states = {wins / max(n, 1):.0%}   "
           f"(a coin is 50%)")
     print(f"  the teacher kept the student's own action on {ties}/{n}")
+    gaps = [abs(r[2] - r[1]) for r in rows]
     print(f"  mean distance to the goal: student {np.mean([r[1] for r in rows]):.4f}, "
           f"teacher {np.mean([r[2] for r in rows]):.4f}")
+    print(f"  mean |teacher - student| per state: {np.mean(gaps):.4f}")
+    if repeats:
+        floor = float(np.mean(repeats))
+        print(f"  **the simulator's own noise floor**, the same action run twice at "
+              f"{len(repeats)} states: {floor:.4f}")
+        print(f"  signal over floor: {np.mean(gaps) / max(floor, 1e-9):.2f}x")
+        print("\n  **Read the ranking score and this ratio together or report neither.** If the")
+        print("  teacher-versus-student gap is not clearly larger than the floor, physics did not")
+        print("  separate the candidates, and a score above 50% is measuring noise rather than")
+        print("  ranking. F145's 0.1304 against 0.1299 was reported without this and could not be")
+        print("  read either way.")
+    else:
+        print("  **no noise floor measured** -- --repeat_control 0 was passed, so the ranking score")
+        print("  below cannot be told apart from simulator noise and must not be quoted alone.")
 
 
 if __name__ == "__main__":

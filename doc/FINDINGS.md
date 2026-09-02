@@ -12824,6 +12824,89 @@ which is F174's spatial hypothesis. **Until they read out, no student bar is fin
 ---
 
 
+### F175. P3: the pooled student is dead on the egocentric B1, and causal `z` does not rescue it
+
+**P1 done first** -- `teacher_ego.pt` assembled from `best.pt` (itm, ftm), `projector_ego.pt` and
+`md_refit.pt`, a merge of measured parts with no stage 3, so every gate this teacher faces was
+measured on these exact weights.
+
+## The row that bounds the student
+
+`Student` is handed `(pooled(e_t), goal)` and the goal is constant within an episode, so inside one
+episode the policy produces the command from the pooled frame alone.
+
+| MLP on pooled alone | allocentric | **egocentric** |
+|---|---|---|
+| insect | 0.800 | **0.263** |
+| B1 | 0.250 | **0.081** |
+
+**0.081.** A pooled student on egocentric B1 frames cannot represent the command at all, and 0.250
+allocentrically was already close to nothing. **This is an architectural bound, reached before any
+teacher exists**, and it is a candidate explanation of F144 that F145 never separated from teacher
+quality.
+
+## Pooling itself is cheap; what pooling gives up is the token grid
+
+**F174's spatial hypothesis predicted pooling would cost more egocentrically. Read on the
+like-for-like rows it does not:**
+
+| ridge, `[pooled, z]` as a share of `[e_t, z]` | insect | B1 |
+|---|---|---|
+| allocentric | 98% | 96% |
+| egocentric | **97%** | **98%** |
+
+**Linearly, pooling costs two or three percent either way.** The hypothesis survives only on the
+row that compares the *strong* readouts -- the pooled MLP against the cross-attention decoder over
+all tokens:
+
+| | insect | B1 |
+|---|---|---|
+| allocentric | 97% | 87% |
+| egocentric | **75%** | **54%** |
+
+**So it is not pooling that hurts, it is losing the attention over tokens, and that loss roughly
+doubles egocentrically.** Those are different claims and the earlier framing conflated them.
+
+## The causal-`z` proposal is answered, and the answer is no
+
+`z = ITM(e_t, e_t+1)` needs the future, so the student cannot be handed it; `proj(a_t-1)` is the
+causal substitute. **The autoregression control decides it, and it decides against:**
+
+| Student MLP | insect | B1 |
+|---|---|---|
+| pooled alone | 0.263 | 0.081 |
+| **+ `proj(a_t-1)`** | 0.785 | 0.482 |
+| **+ `a_t-1` raw, the control** | **0.807** | **0.496** |
+
+**The raw previous command beats its own projection on both bodies.** `proj(a_t-1)` adds nothing
+over `a_t-1` -- it is a lossy map of it -- so **the +0.5 lift is autoregression and not the latent.**
+Feeding the student a causal `z` is not worth an architecture change; the projector is not the
+missing input.
+
+**And the lift itself must not be read as competence.** In periodic locomotion `a_t-1` nearly states
+`a_t`, which is F159's finding restated. A student that reaches 0.5 by continuing its own pattern
+produces a gait it cannot be **steered** out of -- the same coarse-not-fine wall as F145. **An
+autoregressive student would score well on this metric and still fail the closed-loop bar**, so this
+row is a diagnosis, not a design.
+
+## What P3 decides
+
+**The pooled student is not the architecture.** On the egocentric B1 it represents 0.081 of the
+command from what it is given, and the fix indicated by the measurements is **the token grid, not a
+`z` injection** -- attention over tokens is worth 46% of the reference on that body against a pooled
+MLP's 54%-of-nothing. **The 20 Hz budget the pooling was adopted for has to be revisited before a
+student is built.**
+
+**F144 is now half-reattributed, and honestly only half.** A student bounded this low produces
+exactly the symptoms F145 blamed on the teacher. **Q1 is what separates them and it has not run.**
+Neither explanation is established, and F145's conclusion should not be quoted as settled until Q1
+reads out.
+
+Logs from the com7 run of `scripts/diagnostics/pooled_student_check.py`.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
