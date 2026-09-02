@@ -13318,6 +13318,261 @@ and written up as F44 -- plus a run-directory accident note now three weeks stal
 ---
 
 
+### F180. The teacher ranks at 83% on recorded conditions and at chance on perturbations
+
+> **The reading below -- that the limit is the separation -- is withdrawn by F181.** A sigma sweep
+> reaches 10.0% separation and still ranks at 42%. The 83% is real and the cause named for it is
+> not: what distinguishes the library candidates is that they stay inside the recorded command
+> range and carry gait structure, not that their outcomes lie further apart.
+
+**The de-risk that decides whether ActSWM-on-egocentric is worth a retrain, run before the retrain.**
+Two causes were tangled in F179's 47%: a world model too insensitive to rank, or a separation too
+small for anything to rank. Same instrument, same body, same goal clip, same physics judging --
+**only the candidate set changed**, from Gaussian perturbations at 0.5 sd to the twelve recorded
+conditions.
+
+| | F179, perturbations | **F180, conditions** |
+|---|---|---|
+| separation between the two executed outcomes | **2.5%** | **12.8%** |
+| teacher's pick closer to the goal | 7/15 = **47%** | **10/12 = 83%** |
+| a coin | 50% | 50% |
+| mean distance, student / teacher | 0.1360 / 0.1358 | **0.1359 / 0.1261** |
+| teacher kept the student's own action | 1/15 | 0/12 |
+| simulator noise floor, same action twice | 0.0000 | 0.0009 |
+| signal over floor | 180x | **20x** |
+
+**83% against a coin, and the teacher's picks land 7% closer to the goal on average.** The world
+model can rank. **F179's failure was the separation, not the sensitivity.**
+
+## The answer is (b), and it changes what should be built rather than what should be trained
+
+**ActSWM-on-egocentric is not justified by this evidence.** Its premise was that the model is too
+insensitive to the action to order candidates; the model orders them fine when they differ by 12.8%.
+An objective that sharpens action-sensitivity addresses a cause that has now been measured not to be
+the binding one. **That is a retrain not run, which is the point of running this first.**
+
+**F144's design is where the failure sits.** It generated candidates as Gaussian perturbations of
+the student's own action at 0.5 sd, and F145 correctly found the teacher could not rank them --
+**but the fix indicated is the candidate generator, not the teacher and not the objective.** A
+teacher-student scheme whose candidates differ by ten percent of the outcome has a labeller that is
+right five times in six.
+
+## What is not established
+
+**Two points do not give a threshold.** 47% at 2.5% and 83% at 12.8% bracket it; where between them
+the signal appears is unmeasured, and it is the number a candidate generator would have to be
+designed against. A sigma sweep on the same instrument would give the curve.
+
+**And ranking whole recorded conditions is close to what the project already does.** Selecting among
+a library of twelve behaviours is F131's setting, and 83% here is a physics-judged version of that
+rather than a new capability. **The open question is whether candidates can be made to differ by ten
+percent while still being generated rather than recorded** -- which is F137's problem, where sampled
+action sequences all produced the same motion, returning under a new name.
+
+**The noise floor moved**, 0.0000 to 0.0009, so F179's exact zero was fortunate rather than a
+property of the simulator. Both runs still sit far above it, 180x and 20x.
+
+Run `scripts/diagnostics/teacher_label_quality.py --candidates conditions --states 12`, CoppeliaSim
+on port 23000, held-out `c08f09t09`, egocentric.
+
+---
+
+
+### F181. The sweep corrects F180: separation is not the limit -- the manifold is
+
+**F180 read two points and drew a line through them. Four more points say the line is wrong**, and
+the correction is to a finding written an hour earlier by the same hand.
+
+| candidates | separation | teacher closer | one-sided p | joints outside the recorded range | upright |
+|---|---|---|---|---|---|
+| perturb, sigma 0.5 (F179) | 2.5% | 7/15 = 47% | 0.70 | not measured | not measured |
+| perturb, sigma 1.0 | 4.4% | 6/12 = 50% | 0.61 | 14.8% | 12/12 |
+| **perturb, sigma 2.0** | **10.0%** | **5/12 = 42%** | 0.81 | 33.3% | 12/12 |
+| perturb, sigma 4.0 | 9.3% | 7/12 = 58% | 0.39 | 40.3% | 12/12 |
+| **the twelve recorded conditions** | **12.8%** | **10/12 = 83%** | **0.019** | -- | -- |
+
+**Sigma 2.0 reaches 10.0% separation -- most of the way to the library's 12.8% -- and ranks at 42%,
+below a coin.** Every perturbation arm sits at chance whatever the separation; only the library arm
+is distinguishable from one.
+
+**So F180's conclusion is withdrawn.** "The limit is the separation, and a candidate generator has
+only to make candidates differ by ten percent" is contradicted by the arm that does exactly that and
+ranks no better than before.
+
+## What separates the library candidates is what kind of action they are
+
+**Not how far apart the outcomes land -- whether the action is one the model was fitted on.** The
+off-range column is the measurement: **14.8%, 33.3% and 40.3% of commanded joints fall outside the
+range the whole dataset ever used**, and it climbs with sigma exactly as the ranking fails to. The
+recorded conditions are inside that range by construction, and they are structured -- periodic
+gaits, not noise around a pose.
+
+**This is F139 restated and now measured in physics.** F139 found the forward model action-sensitive
+*only* inside the region the projector produces; a Gaussian perturbation leaves that region, and
+leaving it is what breaks the ranking. **Magnitude was never the variable. Kind was.**
+
+**Realizability did not rule any of it out**, which is worth saying because it was the expected
+failure mode: **all four sigmas stayed upright 12/12**. The robot does not fall; it is driven by
+commands the model cannot predict the consequences of, and it keeps walking while the teacher
+guesses.
+
+## What this does to the candidate-generator problem
+
+**Gaussian perturbation is disqualified as a generator, and not because it is too small.** No sigma
+works: small ones separate too little to matter and large ones leave the manifold. **There is no
+setting of this knob that produces rankable candidates**, which is a stronger statement than F144
+and F145 could make and it is the one that closes that design.
+
+**The requirement a generator has to meet is now stated in measured terms**: produce actions that
+stay inside the recorded command range *and* carry gait structure, while still differing enough in
+outcome. **The recorded library meets it; nothing generated has.** That is F137's result -- sampled
+action sequences all produce the same motion -- arriving from the other side, and it remains the
+open problem.
+
+**A caution on n.** Twelve branch points give a standard error near 14 points, so 42%, 47%, 50% and
+58% are one number and should be reported as one. Only 10/12 clears, at p = 0.019. **The sweep
+establishes that no perturbation arm beats chance; it does not resolve them against each other.**
+
+Runs `scripts/diagnostics/teacher_label_quality.py --sigma {1,2,4} --states 12`, egocentric,
+held-out `c08f09t09`, CoppeliaSim on port 23000.
+
+---
+
+
+### F182. The world model's gradient is not usable, and it fails at one step with every excuse ruled out
+
+**The de-risk before an actor-critic in imagination.** Backprop the imagined F136 body-motion reward
+through `body head <- ITM <- FTM^K <- projector` into the action sequence, take one normalised step,
+**execute it in the simulator** and see whether the real motion moved toward the goal. Six branch
+points, held-out `c08f09t09`, egocentric, step 0.5 sd.
+
+| K | grad better | random better | mean base | mean grad | mean random | mean \|grad\| | joints out of range |
+|---|---|---|---|---|---|---|---|
+| 1 | 3/6 | 3/6 | 0.1366 | **0.1370** | 0.1366 | 1.97 | 0.9% |
+| 3 | 3/6 | 4/6 | 0.1325 | 0.1327 | 0.1330 | 3.71 | 1.9% |
+| 5 | 3/6 | 4/6 | 0.1314 | 0.1311 | **0.1308** | 3.67 | 1.7% |
+
+**The gradient never beats its own random control at any horizon.** At K=1 following it is worse
+than not moving at all; at K=5 a random step of the same norm does better.
+
+## Every escape route was closed by a control rather than by argument
+
+**The gradient flows.** Norms of 2 to 9, finite and non-zero, through five FTM applications. **No
+vanishing and no exploding** -- which was the stated risk, and it is not what happened.
+
+**The steps stay on the manifold.** 0.9 to 1.9% of joints outside the recorded command range,
+against the 33% that broke ranking at sigma 2.0 in F181. **The gradient is not being read off a
+region the model never saw.**
+
+**And it fails at K=1.** Not at long horizon, so this is not the compounding the three-to-five-step
+accuracy limit (F138, F150) would predict. **A clean, in-range, one-step gradient points nowhere
+better than chance.**
+
+**Read as pre-registered: failure at K=1-2 means the model predicts and its gradient misleads, and
+an actor trained through it would be pushed the wrong way. Dreamer is not built.**
+
+## Two limits, and the second unifies three findings
+
+**n = 6 per horizon.** 3/6 is chance exactly and cannot separate 50% from 65%. **The mean distances
+are the sharper statistic** and they agree to the third decimal: gradient, random and doing nothing
+are one number, about 0.3% apart on 0.13.
+
+**The step is 0.5 sd, and there is a squeeze rather than a fix.** F179 measured that 0.5 sd separates
+outcomes by only 2.5%, so a small step changes little; F181 measured that sigma 2.0 puts 33% of
+joints outside the range, where the model cannot predict. **Taken together with this run:
+there is no step size at which the model's own signal is both effective and trustworthy** -- too
+small and nothing moves, too large and the model is guessing. That is one statement covering F179,
+F181 and F182, and it is stronger than any of them alone.
+
+Run `scripts/diagnostics/dreamer_gradient.py --states 6 --horizons 1 3 5`, CoppeliaSim on port
+23000.
+
+---
+
+
+### F183. LDAD's baseline, and a measurement that argues against the method before it is run
+
+**Delta-JEPA's Latent Difference Action Decoding, scoped on the egocentric model before any
+retrain.** LDAD trains the world model so that the difference of consecutive state latents carries
+the action, at a weight of 10 to 50. **Its explanation of why endpoints are not enough is F168's
+result verbatim**: from `[z_t, z_t+1]` a decoder reads the action off action-correlated cues in
+`z_t+1` without modelling the transition, and a difference cannot be read that way.
+
+**The architectural mapping matters and is easy to get wrong.** Delta-JEPA's `z` is a *state*
+latent; ours is the *action* latent and the state is the V-JEPA2 embedding. So `dz` here is
+`e_t+1 - e_t`. Decoding the action from `z_t+1 - z_t` would be decoding it from a difference of
+action codes, a different and much easier question.
+
+## The untrained baseline the LDAD arms have to beat
+
+Held-out `c08f09t09`, egocentric, split by clip, 499/499:
+
+| features | action R2 | **within cond** |
+|---|---|---|
+| `dz = e_t+1 - e_t`, **LDAD's input** | 0.199 | **0.167** |
+| `e_t` alone, the endpoint contrast | 0.329 | 0.302 |
+| `[e_t, dz]`, F168's setting | 0.490 | 0.469 |
+
+**`dz` already carries the action at 0.199 untrained**, so the term starts from signal rather than
+from nothing. **This is not a contradiction of F158**, which measured the residual of an
+*action-blind prediction*, `e_t+k - FTM(e_t, ITM(e_t, e_t))` -- a different quantity from the raw
+state difference, and the two should not be quoted against each other.
+
+## The response-separation diagnostic, and it points away from the method
+
+Delta-JEPA's Figure 6 question, asked here: hold `e_t`, vary the action, and measure how far the
+model's predicted response moves, relative to the response's own size.
+
+| | |
+|---|---|
+| action perturbed by 0.5 sd -- **the candidates F179 ranked at 47%** | **0.147** |
+| action from another transition entirely | 0.461 |
+| **ratio, coarse over fine** | **3.1x** |
+
+**The model is not blind to a fine perturbation.** A 0.5-sd change moves its prediction by 15% of
+the response's own magnitude -- that is a real response, not a collapsed one.
+
+**And the ratio is the argument.** In physics the same two classes separate by 12.8% and 2.5%, a
+**5.1x** gap; in the model they separate by 3.1x. **The model treats fine perturbations as
+relatively more distinct than the world does**, which is the opposite of the collapse LDAD exists to
+repair.
+
+**Stated as a limit rather than a proof.** The two ratios are computed in different spaces -- one an
+embedding-space response norm, one an outcome distance -- so only the *ratio of ratios* is being
+compared, and that comparison is suggestive rather than decisive.
+
+## The reframe this forces, and it is about every earlier finding as much as this one
+
+**The fine-grained wall was read as blindness and it is not blindness.** F145, F179 and F182 were
+each written as the model failing to *see* a difference: a ranker that cannot order what it cannot
+resolve, a gradient that carries nothing. **The model resolves fine perturbations perfectly well** --
+0.147 of the response's own magnitude, against 0.461 for a wholly different action.
+
+**What is wrong is the proportion.** Physics separates those two classes by 5.1x; the model by 3.1x.
+**The model responds to a fine perturbation more, relative to a coarse one, than the world does.**
+So a ranker following the model is not reading noise -- it is reading a real response that
+over-weights small differences, and ordering candidates by it lands somewhere the world does not
+agree with. **Mis-calibration, not blindness**, and the two call for different repairs.
+
+**That also explains why every escape route in F182 was closed.** A gradient through a
+mis-proportioned response is finite, clean, in-range and confidently wrong at one step, which is
+exactly what was measured.
+
+**Held with its limits.** The two ratios are computed in different spaces, so only the ratio of
+ratios is comparable; and 3.1x versus 5.1x is one measurement on one body at one perturbation size.
+**It reframes the wall as a hypothesis worth testing, not as an established mechanism.**
+
+## Pre-registered before the arms run, and locked
+
+Implementation: `wm/models/ldad.py` (three transformer layers, per-embodiment heads), `lambda_ldad`
+and `ldad_layers` in `wm/config.py`, the term in `wm/train.py` taken on the **prediction**
+`FTM(e_t, z) - e_t` rather than on two true frames, so the gradient reaches the forward model.
+Run sheet `scripts/f183_ldad.sh`; arms at lambda 10 and 50, 15 epochs, everything else identical to
+`beh12_ego`.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second

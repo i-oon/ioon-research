@@ -43,6 +43,7 @@ LEGACY_DEFAULTS = {
     "lambda_body": 0.0,
     "lambda_hinge": 0.0,
     "lambda_readout": 0.0,
+    "lambda_ldad": 0.0,
     "hinge_margin": 0.1,
     "hinge_K": 3,
     "readout_hidden": 512,
@@ -240,6 +241,11 @@ class Config:
     # (F55). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
     # --- ActSWM (F146). Zero by default: every run before 2026-08-31 reproduces unchanged.
+    lambda_ldad: float = 0.0      # Delta-JEPA's LDAD: decode the action from the PREDICTED
+    # state difference `FTM(e_t, z) - e_t`. Their sweep puts the useful range at 10-50 and their
+    # best at 50, which is far above every other term here -- the term is meant to dominate, and a
+    # small value reproduces the collapse it exists to prevent.
+    ldad_layers: int = 3          # their decoder depth
     lambda_hinge: float = 0.0     # separation between the real-action and null-action rollouts
     lambda_readout: float = 0.0   # the frozen readout must recover the action from the prediction
     hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F151)

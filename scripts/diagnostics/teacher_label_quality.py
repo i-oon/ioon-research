@@ -76,7 +76,18 @@ def main():
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--states", type=int, default=15, help="branch points for the local test")
     ap.add_argument("--samples", type=int, default=32)
-    ap.add_argument("--sigma", type=float, default=0.5)
+    ap.add_argument("--sigma", type=float, default=0.5,
+                    help="perturbation size for `--candidates perturb`, in units of each joint's "
+                         "own sd. **F179 ran 0.5 and the resulting outcomes were 2.5% apart**; "
+                         "raising it is the middle of the sweep between that and whole conditions.")
+    ap.add_argument("--candidates", choices=("perturb", "conditions"), default="perturb",
+                    help="**what the teacher is asked to rank, and it is the de-risking knob.** "
+                         "`perturb` is F144's and F179's setting. `conditions` uses the twelve "
+                         "recorded behaviours instead, so the outcomes differ by far more than "
+                         "2.5%. If the teacher ranks those and not the perturbations, the limit is "
+                         "the separation and no training objective fixes it; if it fails on these "
+                         "too, the world model is genuinely weak and ActSWM-on-egocentric is worth "
+                         "the retrain.")
     ap.add_argument("--horizon", type=int, default=3)
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--coarse_only", action="store_true")
@@ -186,8 +197,15 @@ def main():
                                 cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy,
                                 **(dict(EGO_CAM, ego_seed=args.ego_seed) if args.ego else {}))
 
+    # **The command range the world model has actually seen**, per joint, over the whole set. A
+    # candidate outside it is one the projector and the forward model were never fitted on, so a
+    # separation bought by leaving that range is bought with a prediction nobody should trust.
+    allacts = np.concatenate([np.asarray(load(p_, REGISTRY["hexapod"])["actions"], np.float64)
+                              for p_ in sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz")))])
+    lo, hi = allacts.min(0), allacts.max(0)
+
     wins = ties = 0
-    rows, repeats = [], []
+    rows, repeats, upright, offrange = [], [], [], []
     for bt in branch:
         frames, _a, _f, heads, oris = run_to(int(bt), seed[int(bt)])
         obs = frames[int(bt) - 1]
@@ -195,9 +213,20 @@ def main():
             e_full = encode_clip(encoder, np.asarray(obs)[None], 1).float().to(device)
             g_t = torch.tensor(goal, dtype=torch.float32, device=device).unsqueeze(0)
             base = student.act(pooled(e_full), g_t)
-            pert = base + (args.sigma * student.std.to(device)) * torch.randn(
-                args.samples, base.shape[-1], device=device)
-            allc = torch.cat([base, pert])
+            if args.candidates == "conditions":
+                # **Candidates that differ a LOT, judged by the same physics.** F179 ranked
+                # Gaussian perturbations at 0.5 sd and the two outcomes sat 2.5% apart. That leaves
+                # two causes tangled: a world model too insensitive to rank, or a separation too
+                # small for anything to rank. Swapping in the twelve recorded conditions moves the
+                # separation up by an order of magnitude and holds everything else fixed, so the
+                # two come apart. **Index 0 is still the student's own action**, so `pick == 0` and
+                # the win rate keep their meaning across both modes.
+                pool = torch.stack([acts[c][min(int(bt), len(acts[c]) - 1)] for c in conds])
+                allc = torch.cat([base, pool.to(device)])
+            else:
+                pert = base + (args.sigma * student.std.to(device)) * torch.randn(
+                    args.samples, base.shape[-1], device=device)
+                allc = torch.cat([base, pert])
             z = proj(allc, "hexapod")
             roll = e_full.expand(len(allc), -1, -1)
             for _ in range(args.horizon):
@@ -212,6 +241,16 @@ def main():
             _fr, _ac, _fo, hh, oo = run_to(int(bt), a.cpu().numpy())
             hh, oo = np.asarray(hh, np.float64), np.asarray(oo, np.float64)
             got[tag] = channels_of(hh[-args.horizon - 1:], oo[-args.horizon - 1:])[:, channels].mean(0)
+            if tag == "teacher":
+                # **Realizability, reported beside the separation because one without the other
+                # decides nothing.** A sigma that separates the outcomes by falling over, or by
+                # commanding joints the model never saw, has bought its separation with something
+                # unusable. F142's fall rule is reused rather than reinvented: the head must stay
+                # above 0.6 of its own starting height for the whole window.
+                z0 = float(np.median(hh[:5, 2]))
+                upright.append(bool((hh[:, 2] >= 0.6 * z0).all()))
+                cmd = a.cpu().numpy().astype(np.float64)
+                offrange.append(float(np.mean((cmd < lo) | (cmd > hi))))
         d_s = float(np.linalg.norm(got["student"] - goal))
         d_t = float(np.linalg.norm(got["teacher"] - goal))
         wins += d_t < d_s
@@ -238,9 +277,14 @@ def main():
           f"(a coin is 50%)")
     print(f"  the teacher kept the student's own action on {ties}/{n}")
     gaps = [abs(r[2] - r[1]) for r in rows]
+    sep = float(np.mean(gaps) / max(np.mean([r[1] for r in rows]), 1e-9))
     print(f"  mean distance to the goal: student {np.mean([r[1] for r in rows]):.4f}, "
           f"teacher {np.mean([r[2] for r in rows]):.4f}")
-    print(f"  mean |teacher - student| per state: {np.mean(gaps):.4f}")
+    print(f"  mean |teacher - student| per state: {np.mean(gaps):.4f}"
+          f"   = {sep:.1%} of the student's own distance   [candidates: {args.candidates}"
+          + (f", sigma {args.sigma}" if args.candidates == "perturb" else "") + "]")
+    print("  **The separation is the covariate, not a detail.** A win rate is only comparable "
+          "with\n  another run at a similar separation; F179 read 47% at 2.5%.")
     if repeats:
         floor = float(np.mean(repeats))
         print(f"  **the simulator's own noise floor**, the same action run twice at "
@@ -254,6 +298,14 @@ def main():
     else:
         print("  **no noise floor measured** -- --repeat_control 0 was passed, so the ranking score")
         print("  below cannot be told apart from simulator noise and must not be quoted alone.")
+
+    print(f"\n  **realizability of the teacher's pick, which decides whether the separation above "
+          f"is usable**")
+    print(f"  upright for the whole window: {sum(upright)}/{len(upright)}"
+          f"   joints outside the dataset's own command range: {np.mean(offrange):.1%}")
+    print("  A separation bought by falling over, or by commanding joints the projector and the")
+    print("  forward model were never fitted on, is not a candidate generator -- it is a way to")
+    print("  make two rollouts differ. **Read it with the separation or read neither.**")
 
 
 if __name__ == "__main__":

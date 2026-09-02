@@ -187,6 +187,16 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
                                       action.reshape(len(action), -1)[:, :models["readout"][
                                           embodiment].out_dim])
 
+    # --- Delta-JEPA's LDAD (F183). Off unless `lambda_ldad` is set, so every earlier run is
+    # unchanged. **The difference is taken on the PREDICTION, not on the true next frame**: the
+    # gradient has to reach the forward model, which is the module that collapses, and a difference
+    # of two true embeddings would train the decoder alone.
+    ldad_loss = None
+    if cfg.lambda_ldad > 0 and "ldad" in models:
+        ldad_loss = F.mse_loss(models["ldad"](pred_next - views["view2_t"], embodiment),
+                               action.reshape(len(action), -1)[:, :models["ldad"].heads[
+                                   embodiment].out_features])
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -204,6 +214,9 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     if readout_loss is not None:
         loss = loss + cfg.lambda_readout * readout_loss
         parts["readout"] = float(readout_loss.detach())
+    if ldad_loss is not None:
+        loss = loss + cfg.lambda_ldad * ldad_loss
+        parts["ldad"] = float(ldad_loss.detach())
     return loss, parts
 
 
@@ -324,6 +337,10 @@ def build_models(cfg, device, heads=None, n_bodies=0):
              for name, dim in heads_spec.items()}).to(device)
         for head in models["readout"].values():
             head.out_dim = head.net[-1].out_features
+    if cfg.lambda_ldad > 0:
+        from wm.models.ldad import LatentDifferenceDecoder
+        models["ldad"] = LatentDifferenceDecoder(
+            cfg, dict(heads or {}), layers=cfg.ldad_layers).to(device)
     return models
 
 
