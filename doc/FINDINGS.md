@@ -12574,10 +12574,152 @@ read it from `z` rather than from the frame, and **teacher-student opens as a re
 and `z`-only both fall, neither input carries the command, no refit recovers it, and teacher-student
 is being rethought rather than repaired.
 
-The egocentric arm and the allocentric B1 arm are outstanding; `wm/runs/beh12_ego` is on com7.
-Run sheet `scripts/step2_gate_projector.sh`.
+## The quadruped's reference does not resemble the insect's, and that was not predicted
+
+Same checkpoint, same script, `beh12_b1_flat`, 504 train / 504 test:
+
+| features | insect | **B1** |
+|---|---|---|
+| `e_t`, the frame alone | 0.773 | **0.166** |
+| `z`, the latent alone | 0.903 | 0.790 |
+| `[e_t, z]`, the decoder's input | 0.938 | **0.789** |
+
+**The quadruped's pose never determined its command.** 0.166 against the insect's 0.773, and
+`[e_t, z]` at 0.789 is *below* `z` alone at 0.790 -- **on the B1 the frame contributes nothing the
+latent does not already have.**
+
+**This narrows the project's central mechanism to one body.** F159's finding -- the joint command is
+readable from a single frame, so the action contributes almost nothing to prediction and the world
+model collapses -- **is an insect result.** The B1's action was never recoverable from its pose, and
+its `null/real` still sat at allocentric 1.03 all the same. So pose-redundancy is *a* route to an
+ignored action channel and it cannot be the only one, and **"egocentric fixes it because it removes
+the pose" cannot be the explanation for the B1's move to 1.13** (F172) -- there was no pose to
+remove.
+
+That is a real gap in the account, not a defect in the data. It does not touch GATE C, which
+measures the outcome rather than the cause, and it does not touch this gate, which asks only whether
+the command is readable. **It does mean the egocentric B1 arm has to be read against 0.166 / 0.790 /
+0.789 and never against the insect's numbers**, and that the deck's mechanism slide is currently
+stated more broadly than the evidence carries.
+
+The egocentric arms are outstanding; `wm/runs/beh12_ego` is on com7. Run sheet
+`scripts/step2_gate_projector.sh`.
 
 ---
+
+
+### F173. The projector survives egocentric intact; the decoder's ceiling drops, and `z` did not compensate
+
+**GATE D, both arms, run before teacher-student is opened.** The pre-registered rule was: `e_t`-only
+is *expected* to fall, so pass or fail turns on whether the burden shifted to `z`. **It did not, and
+saying otherwise would be reading the gate backwards.**
+
+## D1 -- the command is still readable, but from less
+
+| features | insect allo | **insect ego** | B1 allo | **B1 ego** |
+|---|---|---|---|---|
+| `e_t`, frame alone | 0.773 | **0.329** | 0.164 | **0.117** |
+| `z`, latent alone | 0.903 | **0.614** | 0.790 | **0.345** |
+| `[e_t, z]`, the decoder's input | 0.938 | **0.608** | 0.789 | **0.334** |
+
+*(the allocentric B1 arm re-ran on com7 at 0.164 / 0.790 / 0.789 against 0.166 / 0.790 / 0.789 here
+-- the measurement repeats)*
+
+**`e_t` fell as predicted, 0.773 to 0.329, and that fall is Q1 and is the point.** What was not
+predicted is that **`z` fell with it** -- 0.903 to 0.614 on the insect, **0.790 to 0.345 on the B1,
+less than half.** The pre-registered PASS wanted `z` holding near its allocentric level while the
+frame dropped. **It does not hold, on either body, and the gate's own PASS wording is not met.**
+
+Nor is the FAIL wording met, which required neither input carrying the command. Both still do:
+
+| | trained head | ridge on the same input | headroom |
+|---|---|---|---|
+| insect | -0.530 | **+0.608** | **+1.138** |
+| B1 | -0.530 | **+0.334** | **+0.864** |
+
+**So the val-motion 1.53 is settled as a training failure, not a representation failure.** The
+information the trained `MotionDecoder` needed was in front of it and it extracted none of it -- a
+refit recovers most of the gap on the insect and a real part of it on the B1. That is the question
+F172 left open and it is answered.
+
+**What the drop in `z` means, stated separately from GATE C because they are different questions.**
+GATE C asks whether the *forward model uses* `z`, and egocentrically it does, 1.03 to 1.16 (F172).
+This asks whether `z` *encodes the joint command*, and egocentrically it does so **less**. Both can
+move at once and here they moved in opposite directions: with the pose gone from `e_t`, `z` became
+more load-bearing for prediction while becoming a worse action code. **Nothing here contradicts
+F172; it does mean "egocentric makes `z` carry the action" is not a claim this run supports.**
+
+## D2 -- the projector is unaffected
+
+`rollout gap` is the column that decides whether planning can use it, and **the ratio against
+predicting the mean `z` is the reading**; the raw gaps are not comparable across two runs with
+different latent scales.
+
+| | allo gap | allo ratio | ego gap | **ego ratio** |
+|---|---|---|---|---|
+| insect | 0.0422 | 0.352 | 0.2304 | **0.355** |
+| B1 | 0.0094 | 0.235 | 0.0441 | **0.169** |
+
+**Identical on the insect and better on the B1.** `a -> z` is as learnable egocentrically as it ever
+was, and this half of the gate passes without qualification.
+
+## The verdict, and it is not the pre-registered one
+
+**Teacher-student is not blocked and it is not cleanly cleared.** The projector passes; the decoder's
+failure is repairable rather than fundamental; but the ceiling a student could be trained against
+has fallen from 0.938 to **0.608** on the insect and from 0.789 to **0.334** on the B1. **A B1
+student emitting joint commands from egocentric video can account for at most a third of the
+variance even with a perfect head**, and that is the number any teacher-student result has to be
+read against rather than discovered afterwards.
+
+Logged from the com7 run of `scripts/step2_gate_projector.sh`; projector at
+`wm/runs/beh12_ego/projector_ego.pt`.
+
+---
+
+
+### Standing rule, corrected. 0.608 / 0.334 is a linear *reference*, not a ceiling
+
+**Pre-registered before the refit, and the word "ceiling" was wrong within the hour.** F173 measured
+what a dual ridge reads out of `(e_t, z)` on the egocentric checkpoint, split by clip: **0.608 on the
+insect, 0.334 on the B1**, against 0.938 / 0.789 allocentric. The intent was to stop a B1 student
+near 0.3 being read as a near-total failure when it is at the limit of its input.
+
+**The control arm broke the word.** Refitting the decoder on the *allocentric* checkpoint, with the
+ITM frozen and the same clip split, held-out R2 lands **above** the ridge on both bodies:
+
+| | ridge reference | refit decoder | |
+|---|---|---|---|
+| insect | 0.938 | **0.982** | 105% |
+| B1 | 0.789 | **0.910** | 115% |
+
+**The ridge is linear and the decoder is not**, so the ridge was never an upper bound -- it is a
+lower bound on what a head with cross-attention can extract. Calling it a ceiling would have made
+any egocentric refit that exceeded it look impossible instead of ordinary, and 105% and 115% are
+what "ordinary" turns out to be here.
+
+**The rule that survives, restated.**
+
+1. **Read every refit and every teacher-student number against its own body's reference -- 0.608
+   insect, 0.334 B1 -- and never against 1.0.** A B1 student near 0.35 is at the limit of what an
+   egocentric frame plus `z` states about the command. **This half is unchanged and is the point.**
+2. **Expect the refit to land slightly above the reference, not at it.** The allocentric control
+   gives 105-115%, so roughly **0.64-0.70 insect and 0.35-0.38 B1**. Landing *at* 0.608 / 0.334 is a
+   pass; landing far under is the stop.
+3. The reference is not a proof of impossibility. It bounds what a *linear* readout finds, so
+   "0.334 bounds the controller" is **too strong as stated** and becomes "0.334 is the level a
+   linear readout reaches, and the nonlinear head beat that by 15% allocentrically."
+
+**What does not change: egocentric helps the world model and costs the decoder.** `e_t` fell 0.773
+to 0.329 by design, `z` fell 0.903 to 0.614 and 0.790 to 0.345 unpredicted, and the allocentric
+decoder refits to 0.982 / 0.910 while the egocentric one is being asked to reach a third of that on
+the B1. **Both halves get stated wherever either is**, and the pressure that motivates
+allocentric-training-only supervision (Role A) is real whichever word is used for the number.
+
+Control arms: `wm/refit_decoder.py` on `beh12_hex-b1_body3`, 60 epochs, hexapod and B1 separately.
+
+---
+
 
 
 ## Files

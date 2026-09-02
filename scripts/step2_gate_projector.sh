@@ -49,24 +49,25 @@ echo "############ GATE D1 -- is the command readable from what the decoder is s
 # command is still in what the decoder is shown and the head only has to be refitted to read it from
 # `z` rather than from the frame.
 #
-# The allocentric B1 arm runs first because its three values are the reference the egocentric B1 is
-# read against and nothing has measured them yet.
 #
 # **The allocentric hexapod arm is already measured** -- e_t 0.773, z 0.903, [e_t, z] 0.938, on
 # `beh12_hex-b1_body3` against held-out `c08f09t09`. `e_t` at 0.773 reproduces F159's 0.779 from a
 # different script, which is what says the instrument is sound. It is passed to the egocentric
-# hexapod arm as `--reference` rather than re-run.
-$PY scripts/diagnostics/motion_decoder_ceiling.py --ckpt "$ALLO" --data "$ALLO_B1" \
-    --embodiment b1 --cache results/wm/cache/fid_b1.pt
+# hexapod arm as `--reference` rather than re-run. **The allocentric B1 arm is measured too** --
+# e_t 0.166, z 0.790, [e_t, z] 0.789 -- and it does not resemble the insect's at all: the quadruped's
+# pose never determined its command, and the frame adds nothing over `z`. Its egocentric arm has to
+# be read against those numbers and not against the insect's.
+# $PY scripts/diagnostics/motion_decoder_ceiling.py --ckpt "$ALLO" --data "$ALLO_B1" \
+#     --embodiment b1 --cache results/wm/cache/fid_b1.pt
 
 # `--bar` is the trained head's own R2 on the same scale, `1 - val_motion`. The egocentric run ends
 # at val motion 1.53, so -0.53.
 $PY scripts/diagnostics/motion_decoder_ceiling.py --ckpt "$EGO" --data "$EGO_HEX" \
     --embodiment hexapod --bar -0.53 --reference 0.773 0.903 0.938 \
     --cache results/wm/cache/ego_hex.pt
-# no `--reference` here: read it against the allocentric B1 block printed above, in this same log
 $PY scripts/diagnostics/motion_decoder_ceiling.py --ckpt "$EGO" --data "$EGO_B1" \
-    --embodiment b1 --bar -0.53 --cache results/wm/cache/ego_b1.pt
+    --embodiment b1 --bar -0.53 --reference 0.166 0.790 0.789 \
+    --cache results/wm/cache/ego_b1.pt
 
 echo
 echo "############ GATE D2 -- the action projector, egocentric against allocentric ############"
