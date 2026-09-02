@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.adapt3 import gather  # noqa: E402
+from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
 from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -126,7 +127,22 @@ def main():
         projector = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
         projector.load_state_dict(saved.get("projector", saved))
 
-    E, P, Z, A, Aprev, Zprev, clip_id = [], [], [], [], [], [], []
+    # **The goal the student is handed, and it is per clip.** `Student` takes `(pooled(e_t), goal)`
+    # and the goal is the clip's own mean body motion -- so it differs BETWEEN conditions and is
+    # constant WITHIN one. Leaving it out of the features measured a bound the student is not
+    # actually under; leaving it in and pooling the R2 over all twelve conditions measures mostly
+    # behaviour selection, which F145 already showed the pipeline can do. Both rows are needed.
+    # **`body_channels` comes back as strings from the saved config** -- `['0', '1', '2']` -- so it
+    # has to be coerced, not trusted. Indexing with them raises rather than silently misreading,
+    # which is the good case; the bad one would have been a config that stringifies something
+    # numpy accepts.
+    chans = [int(c) for c in getattr(cfg, "body_channels", (0, 1, 2))]
+    goal_of = {}
+    for c in clips:
+        rec = load(os.path.join(ROOT, args.data, c["path"]), REGISTRY[args.embodiment])
+        goal_of[c["path"]] = np.asarray(rec["body_motion"])[:, chans].mean(0).astype(np.float32)
+
+    E, P, Z, A, Aprev, Zprev, G, cond_id, clip_id = [], [], [], [], [], [], [], [], []
     for ci, c in enumerate(clips):
         e = c["e"].float()
         if len(e) < 4:
@@ -143,8 +159,12 @@ def main():
             if projector is not None:
                 with torch.no_grad():
                     Zprev.append(projector(prev[None].to(device), args.embodiment)[0].cpu())
+            G.append(torch.from_numpy(goal_of[c["path"]]))
+            cond_id.append(c["cond"])
             clip_id.append(ci)
     E = torch.stack(E)
+    G = torch.stack(G)
+    cond_id = np.array(cond_id)
     P = torch.stack(P); Z = torch.stack(Z); A = torch.stack(A); Aprev = torch.stack(Aprev)
     Zprev = torch.stack(Zprev) if Zprev else None
     clip_id = np.array(clip_id)
@@ -154,7 +174,7 @@ def main():
         order[FAMILY(clips[ci]["cond"])].append(ci)
     test_clips = {ci for v in order.values() for ci in v[1::2]}
     te = np.array([c in test_clips for c in clip_id]); tr = ~te
-    for M in ([P, Z, A, Aprev] + ([Zprev] if Zprev is not None else [])):
+    for M in ([P, Z, A, Aprev, G] + ([Zprev] if Zprev is not None else [])):
         M.sub_(M[tr].mean(0)).div_(M[tr].std(0) + 1e-6)
     folds = np.array([hash(int(c)) % 4 for c in clip_id[tr]])
     An = A.numpy()
@@ -167,14 +187,27 @@ def main():
     K_p = (P @ P.T).numpy(); K_p /= max(np.trace(K_p) / len(K_p), 1e-12)
     K_z = (Z @ Z.T).numpy(); K_z /= max(np.trace(K_z) / len(K_z), 1e-12)
     POOLED = "pooled(e_t)  (the student's input)"
-    rows = {"e_t  (every token)": K_e, POOLED: K_p, "[pooled(e_t), z]": K_p + K_z}
+    K_g = (G @ G.T).numpy(); K_g /= max(np.trace(K_g) / len(K_g), 1e-12)
+    rows = {"e_t  (every token)": K_e, POOLED: K_p,
+            "[pooled, goal]  (the Student's real input)": K_p + K_g,
+            "[pooled(e_t), z]": K_p + K_z}
 
-    print(f"  {'features':>38}{'action R2':>11}{'alpha':>9}")
-    got = {}
+    # **Within condition, the goal is constant and explains nothing.** Scoring against each
+    # condition's own mean removes behaviour selection from the number and leaves only whether the
+    # right MAGNITUDE was produced -- the coarse-versus-fine cut of F145 and F111, asked of the
+    # student. **This is the column a closed-loop result is read against.**
+    base_of = {c: An[tr][cond_id[tr] == c].mean(0) for c in set(cond_id[tr].tolist())}
+    centre_te = np.stack([base_of.get(c, An[tr].mean(0)) for c in cond_id[te]])
+    def within(pred):
+        ss = ((pred - An[te]) ** 2).sum()
+        return 1 - ss / max(float(((An[te] - centre_te) ** 2).sum()), 1e-9)
+
+    print(f"  {'features':>38}{'action R2':>11}{'within cond':>13}{'alpha':>9}")
+    got, got_w = {}, {}
     for name, Kf in rows.items():
-        r2, _, alpha = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
-        got[name] = r2
-        print(f"  {name:>38}{r2:>11.3f}{alpha:>9.3g}")
+        r2, pred, alpha = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
+        got[name] = r2; got_w[name] = within(pred)
+        print(f"  {name:>38}{r2:>11.3f}{got_w[name]:>13.3f}{alpha:>9.3g}")
 
     if Zprev is not None:
         K_zp = (Zprev @ Zprev.T).numpy(); K_zp /= max(np.trace(K_zp) / len(K_zp), 1e-12)
@@ -185,9 +218,9 @@ def main():
         # command as a fourth row separates them: if raw does as well, the lift is not about `z`.
         for name, Kf in (("[pooled, proj(a_t-1)]  (causal z)", K_p + K_zp),
                          ("[pooled, a_t-1]  (the autoregression control)", K_p + K_ap)):
-            r2, _, alpha = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
-            got[name] = r2
-            print(f"  {name:>38}{r2:>11.3f}{alpha:>9.3g}")
+            r2, pred, alpha = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
+            got[name] = r2; got_w[name] = within(pred)
+            print(f"  {name:>38}{r2:>11.3f}{got_w[name]:>13.3f}{alpha:>9.3g}")
 
     mlp_p = fit_mlp(P[tr], A[tr], P[te], A[te], device)
     mlp_pz = fit_mlp(torch.cat([P, Z], 1)[tr], A[tr], torch.cat([P, Z], 1)[te], A[te], device)
@@ -208,6 +241,17 @@ def main():
               f"{mlp_pz / max(r_refit, 1e-9):>8.0%}")
         print(f"\n  {'what the student can actually be given':>38}{'':>11}")
         print(f"  {'pooled alone, Student MLP':>38}{mlp_p:>11.3f}")
+        mlp_g = fit_mlp(torch.cat([P, G], 1)[tr], A[tr],
+                        torch.cat([P, G], 1)[te], A[te], device)
+        print(f"  {'[pooled, goal], the Student exactly':>38}{mlp_g:>11.3f}")
+        print(f"\n  **Neither pooled-alone nor [pooled, goal] is the bar.** Pooled-alone drops an")
+        print("  input the student receives and reads too low; [pooled, goal] pooled over all")
+        print("  twelve conditions is mostly behaviour SELECTION, which F145 already showed the")
+        print("  pipeline does at 55% against 33%. **The `within cond` column above is the one a")
+        print("  closed-loop result is read against** -- goal held constant, so it asks only")
+        print("  whether the right MAGNITUDE was produced. A student high on the first and low on")
+        print("  the second picks the right behaviour and cannot steer it, which fails the closed")
+        print("  loop with a perfect teacher: the F145 wall, arriving at the student.")
         if Zprev is not None:
             mlp_zp = fit_mlp(torch.cat([P, Zprev], 1)[tr], A[tr],
                              torch.cat([P, Zprev], 1)[te], A[te], device)

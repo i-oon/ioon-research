@@ -12991,6 +12991,53 @@ from the path the teacher actually uses.
 ---
 
 
+### Note. Q2's clone beats P3's bound, and the reason is that the bound was the wrong row
+
+**Egocentric behaviour cloning on `c08f09t09`, best held-out weights kept rather than the last:**
+
+| | clips | best held out | R2 | at epoch |
+|---|---|---|---|---|
+| `--forward_only` | 13, 3 held out | 0.6040 | **+0.396** | 400 |
+| all twelve conditions | 39, 9 held out | 0.5671 | **+0.433** | 200 |
+
+**0.433 against P3's pooled-alone 0.263, on the same body and the same viewpoint.** A student cannot
+exceed its own information bound, so one of the two numbers is not what it was labelled.
+
+**It is the bound.** P3 measured `pooled(e_t)` **alone**; `Student` takes `(pooled(e_t), goal)`, and
+the goal is a 3-D body motion that **differs per condition**. The R2 is pooled over all twelve
+conditions, so between-condition variance is most of the action variance and the goal hands the
+student almost all of it. **P3's 0.263 excluded an input the student actually receives**, and the
+row that should have been measured -- `[pooled(e_t), goal]` -- was not.
+
+**The locked reading frame is wrong as stated and this is a correction to it, not to the data.**
+"Read the student against pooled-alone ego, 0.263 insect / 0.081 B1" understates what the
+architecture can reach.
+
+## The number that would actually predict the closed loop
+
+**Within an episode the goal is constant**, so the goal explains between-condition variance and
+nothing else. A student scoring 0.433 by reading its goal is **selecting a behaviour**, which F145
+already established the pipeline can do -- 55% against 33% chance -- and it says nothing about
+producing the right *amount* of that behaviour, which is what steering and what F145's local test
+require.
+
+**So the quantity to measure is R2 computed within condition, with the goal partialled out.** It is
+the same coarse-versus-fine cut as F145 and F111, arriving now on the student instead of the teacher,
+and **it is the number a closed-loop result should be read against.** Neither 0.263 nor 0.433 is it.
+
+## Two smaller things, recorded rather than fixed
+
+**The clone barely trains before it overfits.** Both runs bottom at epoch 200-400 of 2000 and climb
+after; the forward-only run's *training* loss rises from 0.3914 to 0.6720 between epochs 200 and 400,
+which is full-batch Adam at `lr 1e-3` on 13 clips. **The best-weights fix now keeps the good epoch,
+but the run is not a healthy fit and should not be described as one.**
+
+**`--forward_only` narrows the target**, so its 0.396 is not comparable with the twelve-condition
+0.433 either. The script now prints that warning itself.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
