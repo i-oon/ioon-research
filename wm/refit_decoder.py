@@ -98,6 +98,12 @@ def main():
     ap.add_argument("--sources", nargs="+", required=True, metavar="EMBODIMENT=DIR")
     ap.add_argument("--cache_dir", default="results/wm/cache")
     ap.add_argument("--cache_prefix", default="ego")
+    ap.add_argument("--cache", nargs="+", default=[], metavar="EMBODIMENT=PATH",
+                    help="point one embodiment at an existing cache instead of "
+                         "`<cache_dir>/<prefix>_<embodiment>.pt`. **The egocentric hexapod cache is "
+                         "`ego_hex.pt`, not `ego_hexapod.pt`** -- GATE D wrote it under the short "
+                         "name, and without this the run silently re-encodes 48 clips and writes a "
+                         "second multi-gigabyte copy of embeddings that already exist.")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=3)
     ap.add_argument("--epochs", type=int, default=300)
@@ -127,10 +133,12 @@ def main():
     for p in itm.parameters():
         p.requires_grad_(False)
 
+    overrides = dict(spec.split("=", 1) for spec in args.cache)
     data = {}
     for spec in args.sources:
         name, directory = spec.split("=", 1)
-        cache = os.path.join(ROOT, args.cache_dir, f"{args.cache_prefix}_{name}.pt")
+        cache = os.path.join(ROOT, overrides.get(
+            name, os.path.join(args.cache_dir, f"{args.cache_prefix}_{name}.pt")))
         data[name] = collect(name, directory, ck, cfg, itm, cache,
                              args.chunk, args.stride, device)
         E, Z, A, te, n = data[name]
