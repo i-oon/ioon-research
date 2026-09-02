@@ -1,114 +1,99 @@
-=== repository 3d86ebc
-=== lambda_body 0 control  2026-08-31 15:26:33
-hexapod: 43 train / 5 val clips, stratified over 1 body
-b1: 43 train / 5 val clips, stratified over 1 body
-cross-embodiment: {'hexapod': 2693, 'b1': 2709} | heads {'hexapod': 18, 'b1': 12}
+(.venv) fibo07@fibo07:~/ioon/ioon-research$ .venv/bin/python3 scripts/diagnostics/pooled_student_check.py --ckpt wm/runs/beh12_ego/best.pt --data data/egocentric/beh12_c08f09t09_ego_flat --embodiment hexapod --cache results/wm/cache/ego_hex.pt --projector wm/runs/beh12_ego/projector_ego.pt --reference 0.608 0.847 && .venv/bin/python3 scripts/diagnostics/pooled_student_check.py --ckpt wm/runs/beh12_ego/best.pt --data data/egocentric/beh12_b1_ego_flat --embodiment b1 --cache results/wm/cache/ego_b1.pt --projector wm/runs/beh12_ego/projector_ego.pt --reference 0.334 0.778
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 5038.02it/s]
-config -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_lag3_nobody/config.yaml
-train 5402 pairs | val 628 pairs | heldout n/a (cross-embodiment) | trainable 96.1M
-epoch   1 | train 5.3007 (recon 4.3097 motion 0.9910) | val 4.2882 (recon 3.1432 motion 1.1450) | motion@1 0.9930/1.1306 probe 0.500
-epoch   2 | train 3.5812 (recon 2.7912 motion 0.7899) | val 3.7712 (recon 2.5413 motion 1.2299) | motion@1 0.7860/1.1534 probe 0.505
-epoch   3 | train 3.1305 (recon 2.4608 motion 0.6698) | val 3.4294 (recon 2.3507 motion 1.0787) | motion@1 0.6525/0.9813 probe 0.531
-epoch   4 | train 2.9284 (recon 2.3218 motion 0.6066) | val 3.2938 (recon 2.2480 motion 1.0458) | motion@1 0.5901/0.9387 probe 0.595
-epoch   5 | train 2.7983 (recon 2.2446 motion 0.5536) | val 3.2856 (recon 2.2017 motion 1.0839) | motion@1 0.5282/0.9705 probe 0.634
-epoch   6 | train 2.6802 (recon 2.1935 motion 0.4867) | val 3.0842 (recon 2.1514 motion 0.9328) | motion@1 0.4677/0.9386 probe 0.594
-epoch   7 | train 2.5329 (recon 2.1525 motion 0.3804) | val 2.9057 (recon 2.1120 motion 0.7937) | motion@1 0.3634/0.7421 probe 0.532
-epoch   8 | train 2.4361 (recon 2.1260 motion 0.3101) | val 2.7923 (recon 2.0935 motion 0.6989) | motion@1 0.2978/0.6759 probe 0.558
-summepoch   9 | train 2.3720 (recon 2.1058 motion 0.2661) | val 2.7159 (recon 2.0816 motion 0.6343) | motion@1 0.2640/0.6078 probe 0.662
-epoch  10 | train 2.3613 (recon 2.1025 motion 0.2587) | val 2.6901 (recon 2.0767 motion 0.6134) | motion@1 0.2569/0.5936 probe 0.732
-best val selection 2.6901 | motion 0.6134 -> /home/fibo07/ioon/ioon-research/wm/runs/beh12_lag3_nobody
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 17067.63it/s]
+wm/runs/beh12_ego/best.pt
+48 clips of hexapod from data/egocentric/beh12_c08f09t09_ego_flat
+499 train / 499 test transitions, split by clip, pooled width 1408
 
-=== null/real, the same path as the baseline, at this checkpoint's own stride
+                                features  action R2  within cond    alpha
+                      e_t  (every token)      0.329        0.302      0.1
+      pooled(e_t)  (the student's input)      0.308        0.279        1
+  [pooled, goal]  (the Student's real input)      0.322        0.294        1
+                        [pooled(e_t), z]      0.592        0.576        1
+       [pooled, proj(a_t-1)]  (causal z)      0.869        0.863      0.1
+  [pooled, a_t-1]  (the autoregression control)      0.914        0.910        1
+
+                     pooled, Student MLP      0.263
+                [pooled, z], Student MLP      0.634
+
+                       like against like     pooled     full    kept
+                             ridge, no z      0.308    0.329     93%
+                           ridge, with z      0.592    0.608     97%
+                       nonlinear, with z      0.634    0.847     75%
+
+  what the student can actually be given           
+               pooled alone, Student MLP      0.263
+     [pooled, goal], the Student exactly      0.264
+
+  **Neither pooled-alone nor [pooled, goal] is the bar.** Pooled-alone drops an
+  input the student receives and reads too low; [pooled, goal] pooled over all
+  twelve conditions is mostly behaviour SELECTION, which F145 already showed the
+  pipeline does at 55% against 33%. **The `within cond` column above is the one a
+  closed-loop result is read against** -- goal held constant, so it asks only
+  whether the right MAGNITUDE was produced. A student high on the first and low on
+  the second picks the right behaviour and cannot steer it, which fails the closed
+  loop with a perfect teacher: the F145 wall, arriving at the student.
+              + proj(a_t-1), Student MLP      0.785   +0.522
+                + a_t-1 raw, the control      0.807   +0.544
+
+  **Read the two causal rows against each other, not against pooled alone.**
+  A gait is periodic, so a_t-1 nearly states a_t by itself; if the raw control
+  lifts as much as proj(a_t-1) does, the lift is autoregression and says nothing
+  about the latent. Only proj(a_t-1) clearly beating raw a_t-1 is evidence that
+  feeding the student a causal z is worth the architecture change.
+
+  **The comparison is against the same rows on the allocentric checkpoint, never
+  against these alone.** The question is not what pooling costs -- it is whether it
+  costs MORE egocentrically, which is what F174's spatial hypothesis predicts and what
+  would mean a pooling student trains toward the linear floor instead of the refit
+  reference. **If it does, the student needs the token grid and the 20 Hz budget has to
+  be revisited before anything is built; no teacher quality repairs it.**
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 11765.56it/s]
-wm/runs/beh12_lag3_nobody/best.pt
-48 clips of hexapod from data/beh12_c08f09t09_flat
+Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 15528.80it/s]
+wm/runs/beh12_ego/best.pt
+48 clips of b1 from data/egocentric/beh12_b1_ego_flat
+504 train / 504 test transitions, split by clip, pooled width 1408
 
-   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
-     1       all    1.9305    1.9408    1.9597    1.9556    2.1062      1.005      1.015      56.5%      0.917   1512
-     1      side    1.8231    1.8313    1.8529    1.8575    1.9075      1.004      1.016      59.4%      0.956    512
-     1     speed    1.9712    1.9875    2.0114    1.9987    2.2506      1.008      1.020      54.5%      0.876    488
-     1      turn    1.9992    2.0059    2.0172    2.0127    2.1675      1.003      1.009      55.5%      0.922    512
+                                features  action R2  within cond    alpha
+                      e_t  (every token)      0.117        0.084      0.1
+      pooled(e_t)  (the student's input)      0.067        0.032        1
+  [pooled, goal]  (the Student's real input)      0.093        0.059        1
+                        [pooled(e_t), z]      0.328        0.303        1
+       [pooled, proj(a_t-1)]  (causal z)      0.477        0.458      0.1
+  [pooled, a_t-1]  (the autoregression control)      0.681        0.669        1
 
-     2       all    2.0772    2.0990    2.1098    2.0977    2.7089      1.010      1.016      64.6%      0.767   1466
-     2      side    2.0036    2.0230    2.0421    2.0279    2.4796      1.010      1.019      69.4%      0.808    496
-     2     speed    2.0867    2.1144    2.1269    2.1088    2.8552      1.013      1.019      65.4%      0.731    474
-     2      turn    2.1418    2.1602    2.1610    2.1570    2.7984      1.009      1.009      59.1%      0.765    496
+                     pooled, Student MLP      0.081
+                [pooled, z], Student MLP      0.419
 
-     3       all    2.1824    2.2148    2.2127    2.2010    3.0613      1.015      1.014      74.4%      0.713   1464
-     3      side    2.1025    2.1377    2.1384    2.1241    2.7796      1.017      1.017      78.2%      0.756    496
-     3     speed    2.1965    2.2412    2.2361    2.2219    3.2443      1.020      1.018      76.9%      0.677    472
-     3      turn    2.2489    2.2668    2.2647    2.2580    3.1689      1.008      1.007      68.1%      0.710    496
+                       like against like     pooled     full    kept
+                             ridge, no z      0.067    0.117     57%
+                           ridge, with z      0.328    0.334     98%
+                       nonlinear, with z      0.419    0.778     54%
 
-     5       all    2.3510    2.3980    2.3781    2.3702    3.4306      1.020      1.012      80.8%      0.685   1416
-     5      side    2.2170    2.2786    2.2458    2.2362    3.0990      1.028      1.013      86.0%      0.715    480
-     5     speed    2.4018    2.4571    2.4388    2.4314    3.6022      1.023      1.015      82.5%      0.667    456
-     5      turn    2.4367    2.4613    2.4526    2.4461    3.5992      1.010      1.007      74.0%      0.677    480
+  what the student can actually be given           
+               pooled alone, Student MLP      0.081
+     [pooled, goal], the Student exactly      0.124
 
-   lag  null/real  real/hold  real<null   reading
-     1      1.005      0.917      56.5%   predictable, but the action still buys nothing
-     2      1.010      0.767      64.6%   predictable, but the action still buys nothing
-     3      1.015      0.713      74.4%   predictable, but the action still buys nothing
-     5      1.020      0.685      80.8%   predictable, but the action still buys nothing
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 18008.27it/s]
-wm/runs/beh12_lag3_nobody/best.pt
-48 clips of b1 from data/beh12_b1_flat
+  **Neither pooled-alone nor [pooled, goal] is the bar.** Pooled-alone drops an
+  input the student receives and reads too low; [pooled, goal] pooled over all
+  twelve conditions is mostly behaviour SELECTION, which F145 already showed the
+  pipeline does at 55% against 33%. **The `within cond` column above is the one a
+  closed-loop result is read against** -- goal held constant, so it asks only
+  whether the right MAGNITUDE was produced. A student high on the first and low on
+  the second picks the right behaviour and cannot steer it, which fails the closed
+  loop with a perfect teacher: the F145 wall, arriving at the student.
+              + proj(a_t-1), Student MLP      0.482   +0.402
+                + a_t-1 raw, the control      0.496   +0.415
 
-   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
-     1       all    1.5961    1.5989    1.6065    1.6042    1.9436      1.002      1.006      65.6%      0.821   1536
-     1      side    1.5508    1.5524    1.5546    1.5530    1.8287      1.001      1.002      63.9%      0.848    512
-     1     speed    1.6129    1.6160    1.6270    1.6249    2.0347      1.002      1.009      64.6%      0.793    512
-     1      turn    1.6248    1.6284    1.6378    1.6346    1.9675      1.002      1.008      68.4%      0.826    512
+  **Read the two causal rows against each other, not against pooled alone.**
+  A gait is periodic, so a_t-1 nearly states a_t by itself; if the raw control
+  lifts as much as proj(a_t-1) does, the lift is autoregression and says nothing
+  about the latent. Only proj(a_t-1) clearly beating raw a_t-1 is evidence that
+  feeding the student a causal z is worth the architecture change.
 
-     2       all    1.6963    1.7037    1.7071    1.7039    2.2786      1.004      1.006      74.9%      0.744   1488
-     2      side    1.6612    1.6655    1.6673    1.6642    2.1211      1.003      1.004      72.6%      0.783    496
-     2     speed    1.7172    1.7266    1.7310    1.7281    2.4135      1.005      1.008      75.0%      0.712    496
-     2      turn    1.7104    1.7191    1.7230    1.7193    2.3011      1.005      1.007      77.0%      0.743    496
-
-     3       all    1.7773    1.7910    1.7883    1.7834    2.5053      1.008      1.006      83.2%      0.709   1488
-     3      side    1.7354    1.7413    1.7401    1.7375    2.3157      1.003      1.003      74.6%      0.749    496
-     3     speed    1.7907    1.8098    1.8055    1.7995    2.6551      1.011      1.008      86.3%      0.674    496
-     3      turn    1.8059    1.8219    1.8193    1.8131    2.5452      1.009      1.007      88.7%      0.710    496
-
-     5       all    1.9126    1.9343    1.9213    1.9189    2.8081      1.011      1.005      91.4%      0.681   1440
-     5      side    1.8491    1.8577    1.8526    1.8508    2.5661      1.005      1.002      82.9%      0.721    480
-     5     speed    1.9499    1.9815    1.9611    1.9595    3.0035      1.016      1.006      96.9%      0.649    480
-     5      turn    1.9388    1.9636    1.9501    1.9464    2.8549      1.013      1.006      94.4%      0.679    480
-
-   lag  null/real  real/hold  real<null   reading
-     1      1.002      0.821      65.6%   predictable, but the action still buys nothing
-     2      1.004      0.744      74.9%   predictable, but the action still buys nothing
-     3      1.008      0.709      83.2%   predictable, but the action still buys nothing
-     5      1.011      0.681      91.4%   predictable, but the action still buys nothing
-
-=== and the baseline again, so both tables are in one log and cannot be mismatched
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 17670.51it/s]
-wm/runs/beh12_lag3_nohinge/best.pt
-48 clips of hexapod from data/beh12_c08f09t09_flat
-
-   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
-     3       all    2.1609    2.2293    2.2286    2.1969    3.0613      1.032      1.031      82.9%      0.706   1464
-     3      side    2.0707    2.1551    2.1577    2.1147    2.7796      1.041      1.042      87.1%      0.745    496
-     3     speed    2.1767    2.2580    2.2394    2.2169    3.2443      1.037      1.029      86.0%      0.671    472
-     3      turn    2.2361    2.2763    2.2893    2.2600    3.1689      1.018      1.024      75.8%      0.706    496
-
-   lag  null/real  real/hold  real<null   reading
-     3      1.032      0.706      82.9%   predictable, but the action still buys nothing
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████| 843/843 [00:00<00:00, 16453.92it/s]
-wm/runs/beh12_lag3_nohinge/best.pt
-48 clips of b1 from data/beh12_b1_flat
-
-   lag    family      real      null      shuf      mean      hold  null/real  shuf/real  real<null  real/hold      n
-     3       all    1.7709    1.7874    1.7862    1.7783    2.5053      1.009      1.009      86.1%      0.707   1488
-     3      side    1.7258    1.7319    1.7306    1.7274    2.3157      1.004      1.003      78.8%      0.745    496
-     3     speed    1.7858    1.8093    1.8015    1.7949    2.6551      1.013      1.009      90.9%      0.673    496
-     3      turn    1.8011    1.8209    1.8264    1.8128    2.5452      1.011      1.014      88.5%      0.708    496
-
-   lag  null/real  real/hold  real<null   reading
-     3      1.009      0.707      86.1%   predictable, but the action still buys nothing
-
-=== done  2026-08-31 16:29:47   send back this whole log
+  **The comparison is against the same rows on the allocentric checkpoint, never
+  against these alone.** The question is not what pooling costs -- it is whether it
+  costs MORE egocentrically, which is what F174's spatial hypothesis predicts and what
+  would mean a pooling student trains toward the linear floor instead of the refit
+  reference. **If it does, the student needs the token grid and the 20 Hz budget has to
+  be revisited before anything is built; no teacher quality repairs it.**

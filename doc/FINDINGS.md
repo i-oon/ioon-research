@@ -13038,6 +13038,110 @@ but the run is not a healthy fit and should not be described as one.**
 ---
 
 
+### F176. The prediction failed: the goal is redundant egocentrically too, and the closed-loop bar is 0.294 / 0.059
+
+**Written before the run and read against it unchanged.** The prediction was that egocentrically the
+goal would add a lot -- the frame no longer states the behaviour, so the student would have to lean
+on it -- and that `within cond` would drop clearly below the pooled figure. **Neither happened.**
+
+| Student MLP, `[pooled, goal]` minus `pooled` alone | allocentric | **egocentric** |
+|---|---|---|
+| insect | +0.001 | **+0.001** |
+| B1 | -0.003 | **+0.043** |
+
+**The goal adds one thousandth on the insect, egocentrically exactly as allocentrically.** The B1
+gains 0.043, on numbers so small that it is 0.081 becoming 0.124. **The prediction is wrong and the
+explanation it was defending is withdrawn**: the goal does not account for the clone reaching 0.433
+against P3's 0.263.
+
+## What the gap probably is, and neither candidate is exotic
+
+**Two mundane biases, identified but not established, and they are not being asserted as the answer.**
+
+1. **The clone early-stops on the set it reports.** Ten held-out evaluations, the best kept; that
+   best is the maximum of ten noisy readings on the same clips it is scored on. The curve's spread
+   is about 0.04 in MSE, so the reported 0.5671 flatters a fair value by roughly that much. P3's
+   ridge chose its penalty by cross-validation **inside the training half** and never touched the
+   test clips.
+2. **The clone trains on more and holds out less** -- 39 clips with 9 held out, against P3's
+   split-by-family halving.
+
+**Neither has been measured, and the honest statement is that P3's 0.263 and the clone's 0.433 were
+never comparable in the first place, for reasons that have nothing to do with the goal.**
+
+## The closed-loop bar, which is what this run was for
+
+`within cond` holds the goal constant, so it asks only whether the right *magnitude* is produced.
+
+| | overall | **within cond** |
+|---|---|---|
+| insect, `[pooled, goal]` | 0.322 | **0.294** |
+| B1, `[pooled, goal]` | 0.093 | **0.059** |
+
+**0.059.** Egocentrically the B1 student, given everything it actually receives, can account for six
+percent of the command's within-condition variance. **A perfect teacher does not repair that** -- the
+policy cannot represent the magnitudes it would be taught.
+
+**And behaviour selection is not what is carrying the numbers, on either body or either viewpoint.**
+`within cond` sits 0.01 to 0.04 below overall everywhere, so the F145 coarse-versus-fine wall does
+**not** reappear at the student in the form predicted. The student is not selecting behaviour well
+and steering badly; **it is doing both badly, and the goal is nearly useless to it.**
+
+## What this leaves for Q1
+
+**Q1 is read against 0.294 and 0.059, per body, not against 0.263 and not against 1.0.**
+
+**And the insect is the only body where Q1 can mean anything.** At 0.059 the B1 student is close
+enough to nothing that a teacher's ranking cannot be separated from it -- the perturbations Q1 ranks
+are perturbations of a policy that is not producing the command.
+
+Logs in `paste_from_com7.txt`.
+
+---
+
+
+### F177. Pooling never bought the budget it was adopted for: the encoder is 95.5 ms, every head is under 0.3
+
+**`Student` pools the token grid to hold 20 Hz, and its own docstring accepts the spatial trap for
+that reason.** The budget was never measured. On the allocentric checkpoint, held-out `c08f09t09`,
+2080 Ti:
+
+| head | params | R2 | within cond | ms/frame | of a 50 ms step |
+|---|---|---|---|---|---|
+| **pooled**, the current Student | 1.0M | 0.748 | 0.738 | **0.09** | 0.2% |
+| **conv**, spatial and cheap | 0.7M | 0.767 | 0.757 | **0.23** | 0.5% |
+| **attention**, F175's path | 2.0M | **0.804** | **0.796** | **0.29** | 0.6% |
+
+| | |
+|---|---|
+| **the frozen V-JEPA2 encoder alone** | **95.5 ms per frame** |
+| as a share of a 50 ms step | **191%** |
+
+**The encoder is 329 times the cost of the attention head and already overruns the step on its own.**
+Pooling saves 0.2 ms out of 95.8 and cannot make 20 Hz reachable, because 20 Hz was never reachable
+with this encoder in the loop. **The trade the architecture was built around does not exist.**
+
+**So the head choice is free and should be made on accuracy alone.** Attention costs 0.06 percent of
+a step more than pooling and reads 0.056 higher; conv sits between. The literature agrees on the
+principle from the other direction -- Hu et al. (2207.03386) pair a ResNet with an RNN, Xiao et al. a
+CNN with an LSTM, and 2605.14106 states outright that its four-layer CNN is there for spatial
+inductive bias. **None of them pool the grid away.** Their encoders are trained end to end and ours
+is frozen, so the mechanism differs; the principle -- read where things are -- does not.
+
+**Two limits on the timing, stated rather than left implicit.** It is one GPU, and com7's is faster,
+so the absolute 95.5 ms will differ -- **but a 329x ratio does not invert on a faster card**, and the
+number that matters is measured on whichever machine runs the loop. And the encoder cost is per
+frame with no batching or caching; a real loop might amortise it. **Neither changes the conclusion
+that the head is not the bottleneck.**
+
+**What this does not settle.** Whether attention recovers the gap *egocentrically* -- where pooled
+reads 0.263 and 0.081 against the token grid's 0.847 and 0.778 -- is the run that decides the
+architecture, and it is outstanding. Allocentrically the gap between pooled and attention is only
+0.056, because allocentrically the pose is in the frame however it is read.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
