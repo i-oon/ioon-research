@@ -12406,6 +12406,180 @@ view and run on another** and must be switched to the head camera first.
 ---
 
 
+### F172. Step 1 passes: a world model trained on egocentric video uses the action
+
+**The gate everything after it depends on.** Q1 showed the action is no longer redundant with the
+pose; **it did not show a trained model uses it**, and F155-F169 are a record of signals that existed
+and were then ignored. 50 epochs, `wm/runs/beh12_ego`, `--sources` swapped and every other flag
+identical to the allocentric run.
+
+## GATE B — the null is a distinct latent, and more so than allocentrically
+
+| | cos(null z, real z) |
+|---|---|
+| allocentric reference, on which `null/real` = 1.03 was meaningful | 0.903 |
+| **egocentric insect** | **0.756** |
+| **egocentric B1** | **0.812** |
+
+**The pre-training reading of 0.952 and 0.982 was an out-of-distribution artefact**, exactly as the
+1.76x larger transition suggested. Trained on egocentric, the null separates *better* than it did
+allocentrically. **The gate that could have voided everything downstream cleared with margin.**
+
+## GATE C — `null/real` moves for the first time in the whole chain
+
+| lag | insect | B1 | allocentric baseline |
+|---|---|---|---|
+| 1 | **1.161** | 1.079 | 1.026-1.032 |
+| 2 | **1.190** | **1.134** | — |
+| 3 | **1.171** | **1.135** | 1.032 |
+| 5 | **1.156** | **1.121** | — |
+
+**Against 1.03, which every intervention from F153 to F169 failed to move.** Supporting columns move
+with it: the real action beats the null on **86.8% to 96.1%** of samples against allocentric's 70%,
+and prediction against a frozen frame reads **0.515** against 0.737.
+
+**Read at true strength.** The insect clears the pre-registered 1.10 at every lag. **The B1 reads
+1.079 at lag 1 -- below the bar -- and clears it from lag 2.** That is a pass at the horizon the
+model is trained for and a miss at one step, and it should be reported that way rather than rounded.
+
+**Per family, sideways is still the exception**: insect speed 1.229 and turn 1.208 against
+**side 1.047**, which is allocentric's level. The family that read -0.008 in Q1 has not moved.
+
+## What did not survive: the insect's lateral channel
+
+| channel | insect | B1 |
+|---|---|---|
+| forward | +0.98, 1.0x | +0.96, 1.1x |
+| **lateral** | **+0.30, 1.7x — fails the bar** | +0.95, 1.2x |
+| yaw | +0.96, 1.0x | +0.97, 1.0x |
+
+`side_R` lateral reads **-0.074 measured against +0.009 predicted** -- **the sign is wrong.** The
+allocentric run had both signs correct on both directions.
+
+**And it is not the viewpoint's fault.** The egocentric set's sideways clips simply move less:
+
+| | allocentric set | egocentric set |
+|---|---|---|
+| `side_R_lvl1` lateral | **-0.176** (sd 0.006) | **-0.120** (sd 0.003) |
+
+**A fresh *allocentric* collection today reproduces the weak value, not the stored one** -- -0.103
+against -0.176 -- so the change is in the collector, not in the camera. Two fresh runs today are
+bit-identical to each other, so it is not noise; the sideways commands differ from the stored
+dataset's by up to **1.07 rad**, worst on the FT joint the strafe drives, while `speed_c7.1`
+reproduces **bit for bit**.
+
+**Something between commit `ff0e003` -- which collected the matched 4/4/4 set -- and now changed the
+sideways command path and nothing else. The bisect has not been run.** Until it is, **the sideways
+family of `beh12_c10f10t10_flat` cannot be reproduced**, and the insect's lateral calibration in this
+run is measuring weaker data rather than a weaker model.
+
+## The action decoder never generalised
+
+Train motion falls 0.83 to **0.076** over 50 epochs; validation motion stays at **1.53** and never
+improves. **Above 1.0 is worse than predicting the training mean** (F88's own reference is 0.928).
+
+**This is the flip side of Q1 passing, not a separate failure.** `MotionDecoder` predicts joint
+commands from `(e_t, z)`, and Q1 is the measurement that egocentric `e_t` no longer supplies the
+command. The head that reads `z` alone -- the body coordinate -- trains normally, 0.77 to **0.078**
+with the morphology probe at 1.000.
+
+**It does not touch the gates**, which use only the ITM and FTM. **It does bear on everything that
+decodes actions** -- teacher-student, the projector -- and that has to be measured before those are
+attempted.
+
+## Where this leaves the plan
+
+**Step 1 passes and step 2 has ground to stand on.** Three things go into it, not one:
+
+1. **sideways did not move**, on either the `null/real` or the calibration side, and the collector
+   discrepancy has to be bisected before that can be attributed to anything
+2. **the action decoder does not generalise** from an egocentric frame
+3. **the B1 is marginal at one step** and only clears from lag 2
+
+Log in `paste_from_com7.md`; run `wm/runs/beh12_ego`.
+
+---
+
+
+### Note. The sideways bisect: there is no regression commit, the commands were never recorded
+
+**F172 left the sideways discrepancy as "something between `ff0e003` and now changed the sideways
+command path". That framing was wrong and the bisect closed it in the repository rather than in the
+simulator.**
+
+`scripts/dataset/collect_beh12.py` -- the generator every collection since has run through, including
+both egocentric sets -- **did not exist at `ff0e003`.** It was added in `e29284c`, after
+`data/allocentric/beh12_c10f10t10_flat` was already on disk. Its own opening paragraph says what
+happened:
+
+> The existing `beh12_c10f10t10_flat` was collected by hand, one command per condition, and **the
+> commands were never written down.** Ten of the twelve are recoverable from the condition names --
+> `speed_c7.1` is `--cycles 7.1` -- and **the two sideways levels per direction are recoverable from
+> nothing at all.**
+
+**That is the whole explanation, and it predicts both halves of what was measured.** `speed_c7.1`
+reproduces **bit for bit** because `--cycles 7.1` is written in its own name. The sideways commands
+differ by up to **1.07 rad**, worst on the FT joint the strafe drives, because `SIDE_BASE`,
+`LVL0_STRAFE = 0.4` and the per-direction yaw-cancelling `--spin` are **a reconstruction** from F71
+plus a fit to the recorded lateral speeds, and the file says so in the word "reconstruction".
+
+**The reconstruction lands weaker than the original**: `side_R_lvl1` reaches -0.120 lateral against
+the stored -0.176, and the generator's own `--verify` already fails on both left strafes.
+
+**What this changes.** The egocentric camera is cleared -- a fresh *allocentric* collection lands at
+the same weak value, and now there is a cause rather than a coincidence. **No commit needs reverting
+and nothing is broken**; what is true is that **four of the twelve conditions in
+`beh12_c10f10t10_flat` cannot be regenerated**, and every set collected since is a different, weaker
+sideways behaviour wearing the same condition names.
+
+**The consequence for reporting is the harder one.** F172's insect `lateral` failure (+0.30, 1.7x,
+`side_R` sign inverted) and its `side` family reading 1.047 are measured on the reconstruction, not
+on the data the allocentric baselines were measured on, **so the sideways column is not comparable
+across the two viewpoints and no sideways number may be quoted as a viewpoint effect.** The fix is
+to re-derive the sideways magnitudes against the stored clips' achieved lateral speed and re-collect
+both sets, or to drop sideways from the claim; it is not to bisect further.
+
+Forward and turning are unaffected -- their commands are in their names -- so **GATE C and the
+teacher-student gate stand.**
+
+---
+
+
+### Note. GATE D's reference arm: allocentrically the decoder is shown almost the whole command
+
+**The egocentric arm cannot be read without this one**, and it is measured first so the comparison
+is against a number rather than against a recollection. `scripts/diagnostics/motion_decoder_ceiling.py`
+puts a dual ridge on `MotionDecoder`'s own input -- split by clip, in families -- so it asks what the
+head *could* extract with the architecture and the optimiser removed. Its R2 sits on the same scale
+as the training curve's normalised MSE, `R2 = 1 - MSE`, so the two read against each other directly.
+
+`beh12_hex-b1_body3` against held-out `c08f09t09`, 499 train / 498 test transitions:
+
+| features | action R2 |
+|---|---|
+| `e_t`, the frame alone | **0.773** |
+| `z`, the latent alone | 0.903 |
+| **`[e_t, z]`, the decoder's input** | **0.938** |
+
+**`e_t` at 0.773 reproduces F159's 0.779 from a different script on a different feature path**, which
+is what says the instrument is sound before it is pointed at the question.
+
+**The three columns are the reading, not the last one.** Egocentrically `e_t` is *expected* to fall
+-- Q1 is exactly that fall, 0.779 to 0.293 -- and it is the fall that made the forward model use the
+action at all (F172). So `[e_t, z]` landing under 0.938 is not by itself a failure, and judging on
+that column alone would score the intended change as a defect. **The question is whether the burden
+shifted to `z`**: F168 has `z` carrying the action, so if `z`-only holds near 0.903 while `e_t`-only
+drops, the command still exists in what the decoder is shown, the head merely has to be refitted to
+read it from `z` rather than from the frame, and **teacher-student opens as a repair.** If `e_t`-only
+and `z`-only both fall, neither input carries the command, no refit recovers it, and teacher-student
+is being rethought rather than repaired.
+
+The egocentric arm and the allocentric B1 arm are outstanding; `wm/runs/beh12_ego` is on com7.
+Run sheet `scripts/step2_gate_projector.sh`.
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
