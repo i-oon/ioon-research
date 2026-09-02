@@ -61,7 +61,22 @@ def describe(path):
 
 def main():
     out = os.path.join(ROOT, "results", "wm", "RUNS.md")
-    records = [describe(p) for p in sorted(glob.glob(os.path.join(ROOT, "wm/runs/*/best.pt")))]
+    # **`best.pt` first, but not only.** A run whose `best.pt` lives on another machine still has
+    # its config inside whatever checkpoint IS here -- `beh12_ego` is here only as `teacher_ego.pt`
+    # -- and the whole point of this file is that a run's config exists nowhere else. Skipping such
+    # a run records nothing about it precisely when there is least to fall back on.
+    records = []
+    for d in sorted(glob.glob(os.path.join(ROOT, "wm/runs/*/"))):
+        best = os.path.join(d, "best.pt")
+        found = [best] if os.path.exists(best) else sorted(glob.glob(os.path.join(d, "*.pt")))
+        for path in found:
+            # not every `.pt` in a run directory is a run -- fitted projectors and cloned students
+            # live there too and carry no config. Take the first that does.
+            try:
+                records.append(describe(path))
+                break
+            except KeyError:
+                continue
     empty = sorted(os.path.basename(d.rstrip("/")) for d in glob.glob(os.path.join(ROOT, "wm/runs/*/"))
                    if not glob.glob(os.path.join(d, "*.pt")))
 

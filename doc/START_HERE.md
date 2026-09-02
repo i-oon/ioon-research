@@ -84,8 +84,9 @@ explicit retargeting.
 | **2. a joint target crosses robots only with a body term** | within one robot the joint decoder works unsupervised (0.35 error); across robots it is -28.9 / -43.1 without the term and +0.61 / +0.57 with it (F82, F83). **The conditional is the finding**, not "joint targets work" | the A/B contrast survives its data's defects, since both arms carry them; **the figures do not** -- forward walking only, and a frame-rate mismatch (F74) |
 | **3. the adaptation objective** | MSE adaptation makes the forward model discard the action channel across morphology families; a contrastive term restores it. CAPE reports the same failure mode elsewhere, so what is new is that it appears across morphology families and is invisible in the loss curve -- **not** the technique | the most fragile of the three: the ordering flipped between budgets on single runs, and three seeds per arm is outstanding |
 
-**Claim 1 is the one to lead with** and the one the literature table is built around. `Q17_ANS.md`
-works the positioning out in full; it is a draft the user owns.
+**Claim 1 is the one to lead with** and the one the literature table is built around. The
+positioning is worked out in full in `report/update_slide.md`; `Q17_ANS.md`, which used to hold it,
+has been removed.
 
 **Two things are still overclaimed there and are flagged in that file**: "a camera is the only thing
 it needs" is untrue while the candidate library is 24 curated clips, and the shared-body-target

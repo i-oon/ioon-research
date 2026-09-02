@@ -15,7 +15,7 @@ results/wm/
   stage2/          figures/ gait/ logs/ measurements/ 4leg_head/ ablation_replay/
   dataset/         setup and data-quality checks that belong to neither stage
   cache/           encoded embeddings and latents, shared and regenerable
-  README.md        RUNS.md   OVERNIGHT.md
+  README.md        RUNS.md
 ```
 
 **`stage1_correct/` is separate because the retrained runs reuse the same names** --

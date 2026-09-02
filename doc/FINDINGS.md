@@ -7875,8 +7875,8 @@ chance before under a model whose `/mean-z` was 0.977.
 
 `scripts/diagnostics/summarise_stage3_seeds.py` produces the table; `adapt3` stores only the final
 step in its checkpoint, and the final step is not the run -- `family` wanders about four points
-between evaluations, so nce seed 0 ends on 57% against a 53.7% mean. Log kept at
-`results/wm/stage3_b1_seeds_2026-08-29.txt`.
+between evaluations, so nce seed 0 ends on 57% against a 53.7% mean. **No log kept**; rerun the
+script above against the seed checkpoints to reproduce the table.
 
 ---
 
@@ -8767,7 +8767,7 @@ calibrated on both bodies; turning and strafing are now *in* it, where F128 coul
 forward speed alone, and the three-channel version has to beat it under mode C with the mismatch
 control. That needs the checkpoints, which are still on com7.
 
-Log: `paste_from_com7.txt`, run `beh12_hex-b1_body3`, commit ba12c71.
+Run `beh12_hex-b1_body3`, commit ba12c71. **No log kept** -- the file it named was a scratch paste, reused and then removed.
 
 ---
 
@@ -11101,7 +11101,7 @@ sweep was the cheap proxy for whether phase-breaking works at all. It does.** Th
 collecting the meaningful version worth the investment, and it is still a separate thing that has
 not been measured.
 
-Data: `data/allocentric/beh12_c10f10t10_sweepn{00,002,003}_flat`; log `sweep_log.txt`.
+Data: `data/allocentric/beh12_c10f10t10_sweepn{00,002,003}_flat`. **No log kept.**
 
 ---
 
@@ -11225,7 +11225,7 @@ assumed. Verified on the stop schedule: the phase freezes at 26 for the whole pa
 ## The lesson worth more than the run
 
 **A flag that is accepted, printed into the log, and then ignored is worse than one that errors.**
-`--schedule` appeared in every condition line of `intent_log.txt`. The only reason this was caught
+`--schedule` appeared in every condition line of the collection log, since removed. The only reason this was caught
 is that the within-clip variance was checked against the clean arm *before* the result was written
 up -- **the separability gate and the R2 tables both passed and neither could have caught it.**
 
@@ -12496,7 +12496,7 @@ attempted.
 2. **the action decoder does not generalise** from an egocentric frame
 3. **the B1 is marginal at one step** and only clears from lag 2
 
-Log in `paste_from_com7.md`; run `wm/runs/beh12_ego`.
+Run `wm/runs/beh12_ego`, on com7. **No log was saved**; the numbers above are the transcription.
 
 ---
 
@@ -12672,7 +12672,7 @@ student emitting joint commands from egocentric video can account for at most a 
 variance even with a perfect head**, and that is the number any teacher-student result has to be
 read against rather than discovered afterwards.
 
-Logged from the com7 run of `scripts/step2_gate_projector.sh`; projector at
+Run `scripts/step2_gate_projector.sh` on com7, no log saved; projector at
 `wm/runs/beh12_ego/projector_ego.pt`.
 
 ---
@@ -12902,7 +12902,7 @@ exactly the symptoms F145 blamed on the teacher. **Q1 is what separates them and
 Neither explanation is established, and F145's conclusion should not be quoted as settled until Q1
 reads out.
 
-Logs from the com7 run of `scripts/diagnostics/pooled_student_check.py`.
+Run `scripts/diagnostics/pooled_student_check.py` on com7. **No log was saved.**
 
 ---
 
@@ -13095,7 +13095,7 @@ and steering badly; **it is doing both badly, and the goal is nearly useless to 
 enough to nothing that a teacher's ranking cannot be separated from it -- the perturbations Q1 ranks
 are perturbations of a policy that is not producing the command.
 
-Logs in `paste_from_com7.txt`.
+Run `scripts/diagnostics/pooled_student_check.py` on com7. **No log was saved.**
 
 ---
 
@@ -13138,6 +13138,182 @@ that the head is not the bottleneck.**
 reads 0.263 and 0.081 against the token grid's 0.847 and 0.778 -- is the run that decides the
 architecture, and it is outstanding. Allocentrically the gap between pooled and attention is only
 0.056, because allocentrically the pose is in the frame however it is read.
+
+---
+
+
+### F178. Attention is the right head and buys +0.08, not the tenfold the framing implied
+
+| egocentric, within condition | pooled | conv | **attention** |
+|---|---|---|---|
+| insect | 0.297 | 0.278 | **0.388** |
+| B1 | 0.127 | 0.054 | **0.205** |
+
+| overall R2 | pooled | conv | attention |
+|---|---|---|---|
+| insect | 0.325 | 0.306 | **0.412** |
+| B1 | 0.158 | 0.088 | **0.234** |
+
+**Attention wins on both bodies by about 0.08, and conv loses to pooling on both.** Hu et al.'s
+spatial inductive bias does not transfer as a convolution here, and the likely reason is that their
+CNN is trained end to end on pixels while this one convolves a frozen 16x16 grid of 1408-dim
+semantic tokens -- a representation a 3x3 kernel has no particular affinity for. **Conv is rejected
+by measurement, not by preference.**
+
+## The expectation was wrong and it was written down before the run
+
+The hoped-for reading was 0.081 to about 0.778 on the B1 -- "the B1 problem is solved, it was just
+the wrong head". **0.778 is the decoder handed the true `z`; the student gets `(tokens, goal)` and
+F176 measured the goal adding nothing.** The correction recorded before this run put the reachable
+figure near 0.27 from the tokens-only row of 0.117 and the 2.33x nonlinear factor. **It came back at
+0.234 overall, 0.205 within condition.**
+
+**The B1 is not solved.** It went from bad to less bad. At 0.205 the student accounts for a fifth of
+the within-condition variance, and every closed-loop expectation has to be set from that.
+
+## What did move, and it is not what the architecture argument predicted
+
+**The pooled baseline itself rose sharply once it was fitted properly:**
+
+| pooled, within condition | F175/F176 fit | this fit |
+|---|---|---|
+| insect | 0.263 / 0.294 | **0.297** |
+| B1 | 0.081 / 0.059 | **0.127** |
+
+**The B1's "0.081, architecturally dead" was substantially a property of the fitting procedure**, not
+of the architecture -- minibatch AdamW over 200 epochs against the earlier full-batch fit. **So the
+claim that pooling is architecturally fatal is withdrawn: the honest gap is 0.127 to 0.205, an
+architecture worth changing but not a rescue.**
+
+**The locked closed-loop bar moves with it.** 0.294 and 0.059 were the best measured at the time and
+are now superseded: **0.297 and 0.127 pooled, 0.388 and 0.205 with attention.** A student result is
+read against the bar for the head it actually uses.
+
+## F177 confirmed on the faster machine
+
+**com7's encoder: 51.3 ms per frame, 103% of a 50 ms step**, against this machine's 95.5. Every head
+is 0.05 to 0.17 ms, 0.1 to 0.3% of a step. **The ratio is 340x on the faster card and 20 Hz is still
+not reachable with a frozen V-JEPA2 in the loop.** Pooling bought nothing on either machine, so
+attention is chosen on accuracy alone and its cost is not a consideration.
+
+**The real budget problem is the encoder** and no head choice touches it. That is a separate
+question from the student's architecture and should not be folded into it.
+
+---
+
+
+### F179. Q1: the physics separates the candidates cleanly and the teacher still cannot rank them
+
+**The gate the whole egocentric direction was pointed at.** `teacher_label_quality.py` on
+`teacher_ego.pt` and the egocentric clone, held-out `c08f09t09`, goal clip `hexapod_ep100`
+(`speed_c7.1`, repeat 0, confirmed in the clone's own `val_paths`), head camera at fov 90 in the 8 m
+room, scene `medauroidea_c08f09t09.ttt`, fifteen branch points.
+
+| | egocentric | F145, allocentric |
+|---|---|---|
+| teacher's pick closer to the goal | **7/15 = 47%** | 4/12 = 33% |
+| a coin | 50% | 50% |
+| teacher kept the student's own action | 1/15 | 0/12 |
+| mean distance, student / teacher | **0.1360 / 0.1358** | 0.1299 / 0.1304 |
+
+**47% against a coin's 50%.** The teacher changed the action on fourteen of fifteen states and
+gained nothing measurable by it.
+
+## The control F145 lacked, and it rules out the explanation F145 offered
+
+| | |
+|---|---|
+| mean \|teacher - student\| per state | **0.0034** |
+| **the same action executed twice, four states** | **0.0000** |
+| signal over floor | **180x** |
+
+**The simulator repeated exactly**, so every difference above is real rather than jitter. F145's
+note -- "the physics barely separated them, 0.1304 against 0.1299, and a ranker cannot order what
+the outcome does not distinguish" -- **is not what is happening here.** The outcomes are
+distinguishable and reproducible. **The teacher simply cannot order them.**
+
+**My pre-registered prediction was half right and the wrong half is the important one.** It called
+near-chance, which is correct, and attributed it to the candidates being physically near-identical,
+which this rules out. Recorded as it was written: *"Q1 should be expected to come back near chance,
+and for reason (b) ... rather than (a)."* **Reason (b) is dead; the failure is the teacher.**
+
+## What that means for the direction
+
+**Egocentric did what it was predicted to do and it was not enough.** GATE C is real -- the forward
+model uses the action, 1.03 to 1.16 (F172) -- and it **did not** convert into the ability to order
+small perturbations. Those are different capabilities and this run is what separates them.
+
+**F145's conclusion survives with a corrected mechanism.** A scheme whose teacher must *choose among
+behaviours* has signal; one whose teacher must *refine within a behaviour* does not. Egocentric moved
+neither side of that. **F144 is therefore not half-reattributed to the student after all** on this
+body: the student's bound is real (0.297 pooled, 0.388 attention, F178) but the teacher is
+independently unable to label, and no student architecture repairs a label that is a coin flip.
+
+**The differences are small in absolute terms** -- 0.0034 on distances near 0.136, about 2.5% -- so
+what a ranker would have to resolve is a 2.5% effect. That is a hard task and it is not an impossible
+one, which is the distinction between this result and the one F145 reported.
+
+## The coarse arm, run after the cache bug was fixed
+
+**The first attempt scored zero states and printed `0% of 0 states`.** The cache was built for
+`c10f10t10` and every `c08f09t09` clip missed a `if p_ not in cache: continue`. **A percentage over
+zero states reads as a measured zero**, which is how a silent skip becomes a finding. The script now
+encodes missing clips and raises instead of printing that line. Re-run:
+
+| candidates are the twelve recorded conditions | |
+|---|---|
+| **egocentric, 120 states** | **52%** |
+| F145, allocentric | 55% |
+| chance | 33% |
+
+**Coarse survives and fine does not, and the two numbers barely moved from allocentric** -- 55% to
+52%, and 33% to 47% against a coin. **Egocentric changed neither.**
+
+## The finding, stated at its true strength
+
+**Egocentric fixed action-conditioning and did not fix ranking, and those are different
+capabilities.** GATE C measures whether the forward model's prediction *depends* on the action, and
+it improved from 1.03 to 1.16. Q1 measures whether the model can *order* two actions by outcome, and
+it did not move. **A model can attend to the action channel and still be unable to resolve a 2.5%
+difference in where that action leads.**
+
+**F145's coarse-versus-fine wall is reproduced under the new viewpoint, at both ends.** The teacher
+can tell walking from turning from strafing -- 52% against 33% -- and cannot tell a good walk from a
+slightly different one. **Every route that needed refinement within a behaviour is closed on this
+evidence, and the route that needs selection among behaviours is open at the same modest strength it
+had before.**
+
+Run `scripts/diagnostics/teacher_label_quality.py` here, CoppeliaSim on port 23000. **No log was saved.**
+
+---
+
+
+### Note. Four operational traps, carried over before `OVERNIGHT.md` was removed
+
+**The only content of that file not already in F43 and F44.** Its results -- the held-out R2 of
++0.87 / +0.90, the identity ablation reversing F39 at 1.03x / 1.04x against a random control of
+1.18x / 1.14x, the two-seed noise floor, and centring measured as doing nothing -- are all in F43
+and F44 already, which is why the file went. **These four are not, and each one cost real time.**
+
+**1. The encoder cache has no locking.** Three scripts wrote one cache path concurrently;
+last-writer-wins meant each clobbered the others, so every later run re-encoded every clip. **This
+is what made overnight jobs look like they had hung for nine hours.** Use a per-script cache path.
+**Still live, and more so now** -- the egocentric session added four scripts that all write
+`results/wm/cache/ego_hex.pt` and `fid_*.pt`.
+
+**2. `--encode_device cuda` cached tensors on the GPU** while the trained modules stayed on the
+CPU. Fixed in four scripts at the time.
+
+**3. `--checkpoint_every 2` at 60 epochs writes 30 snapshots and 11 GB**, which filled the disk to
+100%. Use 10 for long runs.
+
+**4. `pkill -f <pattern>` matches its own command line** and kills the shell issuing it. **Hit twice
+during the egocentric session**, both times returning exit 144 mid-task; the pattern has to exclude
+the caller or the job has to be addressed by PID.
+
+The rest of `OVERNIGHT.md` was a completed Codex handoff -- the 4-leg probe it specified was built
+(`scripts/diagnostics/fit_4leg_head.py`, `sweep_4leg_fewshot.py`, `results/wm/stage2/4leg_head/`)
+and written up as F44 -- plus a run-directory accident note now three weeks stale.
 
 ---
 
@@ -13213,7 +13389,6 @@ architecture, and it is outstanding. Allocentrically the gap between pooled and 
 - `scripts/diagnostics/z_identity_ablation.py` -- is the embodiment in the latent used, or only present (F39, F43)
 - `scripts/diagnostics/score_body.py` -- one checkpoint against several held-out bodies, no retraining (F43)
 - `scripts/dataset/write_run_log.py` -- regenerate `results/wm/RUNS.md` before deleting any checkpoint
-- `results/wm/OVERNIGHT.md` -- the clean Stage 2 results in one place, with what is withdrawn
 - `results/wm/cache/stage2_embeddings.pt` -- cached encoder pass behind F39, rebuilt on demand and
   gitignored: every patch token at full width is 2.9 GB
 - `scripts/figures/make_track_figures.py` -- the coverage, variance-share and probe-matrix figures

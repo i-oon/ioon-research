@@ -1,6 +1,6 @@
 """Average a stage-3 seed sweep over its late window, per arm, from the training log.
 
-    .venv/bin/python3 scripts/diagnostics/summarise_stage3_seeds.py paste_from_com7.md
+    .venv/bin/python3 scripts/diagnostics/summarise_stage3_seeds.py <run-log.txt>
 
 **Why a log and not the checkpoints.** `wm/adapt3.py` writes only the *final* `top1` and `family`
 into its checkpoint, and the final step is not the run: `family` wanders about four points between

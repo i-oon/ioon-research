@@ -65,8 +65,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--teacher", default="wm/runs/beh12_hex-b1_body3/stage3_hex_nce_s0.pt")
     ap.add_argument("--student", default="wm/runs/students/insect_taught.pt")
+    ap.add_argument("--data", default=DATA,
+                    help="**the clips the coarse arm draws its candidates from, and it must match "
+                         "the checkpoint's viewpoint.** The default is the allocentric set; running "
+                         "an egocentric teacher against it feeds every candidate through frames the "
+                         "model never saw, and the coarse number would measure that instead of "
+                         "ranking.")
     ap.add_argument("--goal_clip", default=f"{DATA}/hexapod_ep100.npz")
     ap.add_argument("--cache", default="results/wm/cache/hex_c10.pt")
+    ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--states", type=int, default=15, help="branch points for the local test")
     ap.add_argument("--samples", type=int, default=32)
     ap.add_argument("--sigma", type=float, default=0.5)
@@ -111,10 +118,11 @@ def main():
     print(f"goal {goal_cond} {np.round(goal, 4)} from {os.path.basename(args.goal_clip)}")
 
     cache = torch.load(os.path.join(ROOT, args.cache), map_location="cpu")
+    encoder, missed = None, []
 
     # ---- coarse: the twelve recorded conditions as candidates ---------------------------------
     cand, seen = {}, set()
-    for p_ in sorted(glob.glob(os.path.join(ROOT, DATA, "*.npz"))):
+    for p_ in sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz"))):
         with np.load(p_, allow_pickle=True) as z:
             c = str(z["condition"])
         if c not in seen:
@@ -124,9 +132,16 @@ def main():
                             dtype=torch.float32) for c in conds}
     hit = tot = 0
     with torch.no_grad():
-        for p_ in sorted(glob.glob(os.path.join(ROOT, DATA, "*.npz")))[:24]:
+        for p_ in sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz")))[:24]:
             if p_ not in cache:
-                continue
+                # **Encode it rather than skip it.** Skipping was silent, and a cache built for a
+                # different dataset made every clip miss -- which printed `0% of 0 states`, a line
+                # that reads like a measured zero rather than like nothing having been measured.
+                if encoder is None:
+                    encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+                with np.load(p_, allow_pickle=True) as z_:
+                    cache[p_] = encode_clip(encoder, np.asarray(z_["frames"]), args.chunk).half()
+                missed.append(os.path.basename(p_))
             e = cache[p_].float().to(device)
             for t in range(5, min(len(e) - args.horizon - 1, 50), 10):
                 a = torch.stack([acts[c][min(t, len(acts[c]) - 1)] for c in conds]).to(device)
@@ -142,8 +157,14 @@ def main():
                 hit += family(conds[int(err.argmin())]) == family(goal_cond)
                 tot += 1
     print(f"\ncoarse -- twelve recorded conditions, does the pick share the goal's family")
+    if tot == 0:
+        raise SystemExit("coarse arm scored ZERO states -- nothing was measured, and a percentage "
+                         "over zero would read as a result. Check --data and --cache.")
     print(f"  {hit / max(tot, 1):.0%} of {tot} states   (chance 33% for `speed`; F143 read 95% "
           f"inside adapt3)")
+    if missed:
+        print(f"  ({len(missed)} clips were not in {args.cache} and were encoded here)")
+        torch.save(cache, os.path.join(ROOT, args.cache))
     if args.coarse_only:
         return
 
