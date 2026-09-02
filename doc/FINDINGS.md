@@ -12722,6 +12722,108 @@ Control arms: `wm/refit_decoder.py` on `beh12_hex-b1_body3`, 60 epochs, hexapod 
 
 
 
+### F174. The refit clears the floor on both bodies -- and halves the cost egocentric was thought to carry
+
+**The gate teacher-student was waiting on, and it passes without argument.** `wm/refit_decoder.py`
+on `beh12_ego`, ITM frozen so `z` is the latent GATE C was measured on, decoder heads reinitialised
+and the backbone kept, split by clip in families -- the ridge's split, reproduced rather than
+re-invented.
+
+| | best test R2 | floor (F173) | of floor |
+|---|---|---|---|
+| insect | **0.847** | 0.608 | **139%** |
+| B1 | **0.778** | 0.334 | **233%** |
+
+**The B1 lands at 0.778 against an egocentric linear readout of 0.334.** That settles F172's open
+question in the strongest available form: **the val-motion 1.53 was a training failure and nothing
+else.** The information was in front of the head the whole time.
+
+## The correction this forces, and it is to something said an hour ago
+
+**"Egocentric helps the world model and costs the decoder" was measured through a linear ridge, and
+the ridge is the wrong instrument for the egocentric case.** With a head that can actually read the
+features, the cost is less than half what the ridge reported:
+
+| | insect | B1 |
+|---|---|---|
+| ego / allo, **linear ridge** | 0.65 | **0.42** |
+| ego / allo, **refitted decoder** | **0.86** | **0.86** |
+
+**0.863 and 0.855 -- the same number on two bodies with disjoint action spaces**, which is not what a
+coincidence usually looks like. **Egocentric costs the decoder about 14%, not the 35% and 58% the
+ridge implied.**
+
+**Why the ridge understates egocentric specifically.** It flattens 256 x 1408 patch tokens into one
+360,448-dim vector and fits a global linear map; the decoder runs cross-attention *over* those
+tokens. Allocentrically the command is visible as limb configuration, which survives flattening.
+Egocentrically it is in *where things sit in the frame* -- spatial, and attention reads it while a
+flat linear map does not. **That is a hypothesis for the mechanism, not a measurement**; what is
+measured is the 2.3x gap between the two readouts on the egocentric B1 against 1.15x allocentric.
+
+**So the allocentric-control arm earned its place twice.** It caught "ceiling" being the wrong word,
+and now it supplies the denominator that turns 0.778 from a number into a 14% cost.
+
+## What still is not clean
+
+**The head memorises.** Train sits at 0.99+ from epoch 20 while test plateaus at 0.84 / 0.77 by
+epoch 50 and moves no further over the next 250. `--wd 1e-2` did not remove it; the refit generalises
+well *enough* and the gap is not a blocker, but it is not a solved head and should not be described
+as one.
+
+## The decision this unblocks
+
+**Teacher-student opens.** The pre-registered stop -- a refit landing far under the floor, meaning
+the head was not the problem and something deeper was -- did not fire on either body.
+
+**Every student number is still read against its body's floor and never against 1.0**, and the
+refitted decoder now supplies a second, tighter reference: **0.847 insect and 0.778 B1** are what a
+head that sees the true `z` achieves, and a student that must produce its own `z` cannot be expected
+to beat them.
+
+Checkpoint `wm/runs/beh12_ego/md_refit.pt`; 300 epochs, best at roughly 50.
+
+---
+
+
+### Note. P3's allocentric control, and it moves the student's bar before the student exists
+
+**Run before the egocentric arm, because "what pooling costs" is only meaningful as a comparison.**
+`scripts/diagnostics/pooled_student_check.py` on `beh12_hex-b1_body3`, the same clip split as F173
+and F174.
+
+| | insect | B1 |
+|---|---|---|
+| ridge, every token | 0.773 | 0.166 |
+| ridge, pooled | 0.634 | 0.216 |
+| ridge, `[pooled, z]` | 0.921 | 0.761 |
+| MLP, `[pooled, z]` | **0.954** | **0.788** |
+| **MLP, pooled alone** | **0.800** | **0.250** |
+
+**Given `z`, pooling costs almost nothing** -- 0.954 against the cross-attention decoder's 0.982, and
+0.788 against 0.910. The spatial worry does not bite allocentrically. On the B1 pooling even *helps*
+the linear ridge, 0.216 against 0.166, because a global linear map over 360,448 dimensions is a poor
+regressor and 1,408 is not.
+
+## The row that actually bounds the student, which nothing had measured
+
+**`Student` is never handed `z`.** Its input is `(pooled(e_t), goal)`, and the goal is constant
+within an episode -- so inside one episode the policy must produce the command from the pooled frame
+alone. That row reads **0.800 on the insect and 0.250 on the B1**, allocentrically, with the
+student's own architecture.
+
+**0.250 is a bound on the B1 student that has nothing to do with egocentric, teachers or labels.**
+It is what the architecture can represent from what it is given, and it was in place for F144 and
+F145 without being measured. **The locked reading frame has to be corrected accordingly**: 0.847 and
+0.778 (F174) are what a head *handed the true `z`* achieves and remain the right reference for the
+decoder, but **they are not the student's bar** -- a student cannot be asked to beat a number
+measured on an input it does not receive.
+
+The egocentric arms are outstanding and are what decide whether pooling costs *more* egocentrically,
+which is F174's spatial hypothesis. **Until they read out, no student bar is final.**
+
+---
+
+
 ## Files
 
 - `sim/collect/collect_ik.py --gait cpg` -- joint-space oscillator giving the hexapod a second
