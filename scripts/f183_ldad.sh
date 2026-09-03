@@ -74,7 +74,7 @@ measure)
         --data "$HELD" --embodiment hexapod --cache results/wm/cache/ego_hex.pt
   done
   echo
-  echo "PASS  the `within cond` column on the dz row clears the baseline clearly. The 2.5% wall is"
+  echo "PASS  the within-cond column on the dz row clears the baseline clearly. The 2.5% wall is"
   echo "      gone, and teacher-student and an imagined actor become worth revisiting."
   echo "FAIL  dz reconstructs overall and not within a condition. LDAD fixed collapse and not the"
   echo "      periodicity-driven limit -- which is a locomotion-specific result Delta-JEPA's own"

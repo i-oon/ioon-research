@@ -50,6 +50,7 @@ from wm.adapt3 import gather  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
 from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
+from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from residual_structure import FAMILY, gram, ridge_r2  # noqa: E402
@@ -79,6 +80,7 @@ def main():
     ck = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     cfg = from_checkpoint(ck["config"])
     ftm = ForwardTransitionModel(cfg).to(device).eval(); ftm.load_state_dict(ck["ftm"])
+    itm = InverseTransitionModel(cfg).to(device).eval(); itm.load_state_dict(ck["itm"])
     proj = None
     saved = ck if "projector" in ck else (
         torch.load(os.path.join(ROOT, args.projector), map_location="cpu", weights_only=False)
@@ -98,17 +100,25 @@ def main():
     del encoder, cache
     torch.cuda.empty_cache()
 
-    D, E, A, cond_id, clip_id = [], [], [], [], []
+    # **Two differences, and only the second can move.** `e_t+1 - e_t` is built from the FROZEN
+    # encoder, so it is a property of V-JEPA2 on this data and is identical for every checkpoint --
+    # the first LDAD run reported it unchanged to three decimals across lambda 0, 10 and 50, which
+    # is what exposed the error rather than any argument. **The quantity LDAD actually trains is the
+    # PREDICTED difference**, `FTM(e_t, z) - e_t`, and that is the one a trained arm changes.
+    D, P, E, A, cond_id, clip_id = [], [], [], [], [], []
     for ci, c in enumerate(clips):
         e = c["e"].float()
         if len(e) < 4:
             continue
         for t in range(1, len(e) - 2, args.stride):
-            D.append((e[t + 1] - e[t]).flatten().half())   # the state difference: Delta-JEPA's dz
+            D.append((e[t + 1] - e[t]).flatten().half())   # encoder difference: fixed, a data property
+            with torch.no_grad():
+                z = itm(e[t:t + 1].to(device), e[t + 1:t + 2].to(device))
+                P.append((ftm(e[t:t + 1].to(device), z)[0].cpu() - e[t]).flatten().half())
             E.append(e[t].flatten().half())                 # the endpoint, for the contrast
             A.append(c["a"][t].flatten().float())
             cond_id.append(c["cond"]); clip_id.append(ci)
-    D = torch.stack(D); E = torch.stack(E); A = torch.stack(A)
+    D = torch.stack(D); P = torch.stack(P); E = torch.stack(E); A = torch.stack(A)
     cond_id = np.array(cond_id); clip_id = np.array(clip_id)
 
     order = collections.defaultdict(list)
@@ -126,10 +136,12 @@ def main():
     print(f"{tr.sum()} train / {te.sum()} test transitions, split by clip\n")
 
     K_d = gram(D, D, device).numpy(); K_d /= max(np.trace(K_d) / len(K_d), 1e-12)
+    K_p = gram(P, P, device).numpy(); K_p /= max(np.trace(K_p) / len(K_p), 1e-12)
     K_e = gram(E, E, device).numpy(); K_e /= max(np.trace(K_e) / len(K_e), 1e-12)
 
     print(f"  {'features':>44}{'action R2':>11}{'within cond':>13}")
-    for name, Kf in (("dz = e_t+1 - e_t   (LDAD's input)", K_d),
+    for name, Kf in (("dz_pred = FTM(e_t,z) - e_t   **LDAD's own target**", K_p),
+                     ("dz = e_t+1 - e_t   (encoder only -- CANNOT move)", K_d),
                      ("e_t alone   (the endpoint contrast)", K_e),
                      ("[e_t, dz]   (endpoints, F168's setting)", K_e + K_d)):
         r2, pred, _ = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
@@ -186,7 +198,10 @@ def main():
     print("  **Re-read this line after any LDAD arm**: moving toward 5.1x is the term helping and")
     print("  moving further below it is the term making the mis-proportion worse.")
 
-    print("\n  **`within cond` is the deciding column and `dz` has to clear it, not the first one.**")
+    print("\n  **Read `dz_pred`, not `dz`.** The encoder row is computed from frozen V-JEPA2")
+    print("  embeddings and is identical for every checkpoint by construction; it is a property of")
+    print("  the data and a reference, never a result. `dz_pred` is what the LDAD term trains.")
+    print("\n  **`within cond` is the deciding column and `dz_pred` has to clear it, not the first one.**")
     print("  Between behaviours the action is already recoverable and F145 reads 52% on it; the")
     print("  wall is inside one behaviour. **A dz that reconstructs the action overall and not")
     print("  within a condition is the same wall relocated**, which is the outcome Delta-JEPA's")
