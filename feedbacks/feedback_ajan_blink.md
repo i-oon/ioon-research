@@ -28,7 +28,9 @@ be read as a tracker rather than re-read as minutes.
 
 | **W14-1** | **Compare: world model from scratch vs supervised self-body perception (joint state + image) first** | **not run.** It is the same shape as the training-only allocentric-supervision idea (Role A) and it is now motivated by a measurement rather than a hunch -- the egocentric B1 student reads 0.205 within-condition (F178), which bounds what a controller can reach from the head camera alone |
 | **W14-2** | **Both views matter -- third-person to observe others, first-person for one's own task** | **conceded, and it sharpened into a measurement.** The spoiler is not a property of the third-person view as such: on the B1 a single allocentric frame predicts the command at only **0.166**, against the insect's **0.773** (F175, F178). His two-views framing survives; our "third-person spoils it" claim does not, unscoped |
-| **W14-3** | **The cloning demos do not show imitation -- and check whether sampling is trajectory- or snapshot-based** | **answered, and the answer is snapshot.** `Student` takes `(pooled(e_t), goal)` one frame at a time; the goal is constant inside an episode, so between-condition variance is most of what it fits (F176). The engineering question was the right one and the honest reply is that the policy has no trajectory context at all |
+| **W14-3a** | **The demos show no imitation from Reference to Clone to Teacher** | **explained, and his observation was the symptom of W14-3b.** Held-out cloning error 0.065 is **2.55 deg per joint per step** against a 9.99 deg command sd; over 66 steps that walks the robot into poses no clip contains. **The clone is accurate per frame and has nothing to pull it back once it drifts** |
+| **W14-3b** | **Say whether sampling is trajectory- or snapshot-based** | **answered: snapshot.** One frame through V-JEPA2, pooled to 1408-D, plus a 3-D goal held constant for the clip, into a 512-wide MLP, out as 18 joint commands, MSE on standardised targets. **No history, no RNN, no action chunk.** The question was the right one -- it names the mechanism behind W14-3a |
+| **W14-3c** | Re-run the demo after fixing the camera | **done, and it did not fix the teacher.** `null/real` 1.03 to 1.16, so the world model now uses the action -- **and the teacher still ranks at 47% against a coin's 50%** (F179). This time with the control F145 lacked: physics separates the candidates (0.0034 against a 0.0000 floor), so **the teacher cannot order them rather than the outcomes being identical** |
 | **W14-4** | The ego-centric pivot as the paper's contribution | **measured and scoped.** The world model does now use the action -- `null/real` 1.03 to 1.16 (F172) -- but the same pivot does **not** make it rank fine differences (F179, 47% against a coin) and the decoder's readability falls about 14% (F174). Both halves ship together |
 
 **The Week 11 Part 2 items are still open and they are the same request twice: show behaviour, not
@@ -288,8 +290,47 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 ---
 
 ### **5. ฟีดแบคด้านเดโมพฤติกรรมการกู้คืนคำสั่ง (Cloning Demos Critique)**
-*   **วิจารณ์ผลงานเดโมค้างคา:** อาจารย์บลิ๊งค์สังเกตเดโมควบคุมหุ่นสติ๊กอินเซกต์ทั้ง 3 ตัว (Reference Expert 100%, Cloning Student, และ World Model Teacher) และคอมเมนต์ตรงๆ ว่า **"ยังไม่เห็นความชัดเจนของการเลียนแบบพฤติกรรม (Imitation)"** จากตัว Reference ไปยังตัว Clone หรือตัว World Model Teacher เลย พฤติกรรมที่แสดงออกมายังแตกต่างกันมากเกินไป
-*   **คำเตือนเชิงวิศวกรรม:** อาจารย์เตือนว่าสิ่งที่เราจะเคลมว่าดีหรือไม่ดีนั้น ต้องผ่านการพิสูจน์ด้วยกระบวนการวิศวกรรมที่รัดกุมกว่านี้ เช่น การกลับไปเช็คว่าตอนที่เราทำ Imitation หรือการ Sample ข้อมูลมาสร้าง Policy นั้น เราเลือกใช้วิธีแบบดึงข้อมูลทั้งเส้นทาง (Trajectory-based) หรือดึงข้อมูลเป็นภาพจังหวะเดี่ยว (Snapshot-based) กันแน่
+
+**5.1 เดโม 3 วิดีโอที่นำเสนอ**
+ไออุ่นเปิดวิดีโอเปรียบเทียบการควบคุมหุ่นสติกอินเซกต์ 3 รูปแบบ เพื่อดูว่า World Model ช่วยปรับพฤติกรรมได้จริงไหม:
+*   **ซ้าย (Reference / Expert 100%):** การเดินต้นฉบับที่ถูกต้องสมบูรณ์
+*   **กลาง (Cloning Student):** เลียนแบบจากภาพโดยตรง ไม่มี World Model เกี่ยวข้องเลย
+*   **ขวา (Clone + World Model Teacher):** โคลนแล้วเพิ่ม World Model เข้ามาเป็นครูช่วยนำทาง
+*   ณ ตอนนั้นไออุ่นสรุปว่า World Model ยังไม่ได้ช่วยอะไรเลย เพราะระบบยังมีปัญหาละเลยแอคชัน
+
+**5.2 ข้อติติงจากอาจารย์บลิ๊งค์ — สองประเด็น**
+*   **ไม่เห็นการเลียนแบบที่ชัดเจน (No Clear Imitation Behavior):** อาจารย์เบรกสไลด์และชี้ว่า เมื่อดูที่**พฤติกรรมการขยับตัวและท่าเดินจริง** ไม่เห็นการเลียนแบบส่งต่อจาก Reference มายัง Clone และไม่เห็นเมื่อใส่ World Model Teacher เข้าไปเช่นกัน ท่าเดินในวิดีโอต่างกันเกินไป **อาจารย์จึงยังไม่ปักใจเชื่อเคลมว่าส่วนไหนดีหรือไม่ดี**
+*   **ขาดความรัดกุมเชิงวิศวกรรม (Lack of Engineering Rigor):** อาจารย์ถามจี้ว่า **"ในเชิงอัลกอริทึม กระบวนการโคลนและเลียนแบบพฤติกรรมทำอย่างไร?"** เพราะ Imitation Learning มีหลายแบบมาก และการสรุปผลลอยๆ โดยไม่มีรายละเอียดชี้วัดถือว่าไม่รัดกุม
+
+**5.3 การบ้าน: ต้องระบุ Data Sampling ให้ชัด**
+อาจารย์เน้นว่าต้องระบุให้ชัดว่าดึงข้อมูลมาสอน Policy แบบ **Trajectory-based** (ทั้งเส้นทาง) หรือ **Snapshot-based** (ทีละภาพจังหวะเดี่ยว) เพราะสองวิธีให้ผลเชิงฟิสิกส์ต่างกันอย่างมีนัยสำคัญ
+
+> **คำตอบหลังการประชุม — และคำตอบคือ Snapshot-based**
+>
+> `Student` รับ **ภาพเพียง 1 เฟรม** ผ่าน V-JEPA2 แล้วเฉลี่ยเป็นเวกเตอร์ 1408 มิติ **บวกเป้า 3 มิติ** (fwd, lat, yaw) ซึ่ง **คงที่ทั้งคลิป** แล้ว MLP สองชั้น 512 ทายออกมาเป็น **คำสั่งข้อต่อ 18 ตัวของ step นั้น** ฟิตด้วย MSE บนเป้าที่ standardise แล้ว **ไม่มี trajectory context ใดๆ ทั้งสิ้น ไม่มี RNN ไม่มี history ไม่มี action chunk**
+>
+> **และอาจารย์ถามถูกจุด** เพราะมันอธิบายสิ่งที่ท่านเห็นในวิดีโอพอดี: error บนคลิปที่กันไว้ = 0.065 ซึ่งแปลกลับเป็น **2.55° ต่อข้อต่อ ต่อ step** (sd ของคำสั่งจริง 9.99°) ฟังดูน้อย แต่พอปล่อยให้เดินเอง 66 step ความผิดพลาดพาหุ่นไปอยู่ในท่าที่ไม่มีในคลิปไหนเลย กล้องเห็นภาพที่ policy ไม่เคยเห็นตอนเทรน แล้วทายผิดหนักขึ้นเรื่อยๆ **ท่าเดินจึงต่างจาก Reference ตามที่อาจารย์สังเกต — ไม่ใช่เพราะโคลนไม่แม่น แต่เพราะโคลนแม่นทีละเฟรมและไม่มีอะไรดึงกลับเมื่อหลุด**
+>
+> **สิ่งที่วัดได้ กับสิ่งที่ยังไม่ได้วัด:** 2.55°/step และระยะทางที่เดินได้เป็นตัวเลขที่วัดแล้ว ส่วน **distribution shift เป็นการอนุมานจากสองตัวเลขนั้น ยังไม่ได้วัดโดยตรง**
+
+**5.4 ตัวเลขที่ควรอยู่คู่วิดีโอตั้งแต่แรก**
+บาร์ถูกตั้งก่อนเทรนอะไรทั้งสิ้น: เอาคลิปต้นฉบับเล่นซ้ำผ่านฟิสิกส์เดียวกันได้ **D_real = 0.6566 m** บาร์คือครึ่งหนึ่ง **0.3283 m** และต้องไม่ล้มตลอด 3 วินาที
+
+| | ระยะ | ของ D_real | ผล |
+|---|---|---|---|
+| Reference (เล่นซ้ำ) | 0.6566 m | 100% | — |
+| **Cloning Student** | 0.2349 m | **36%** | ตก |
+| **Clone + World Model Teacher** | 0.2042 m | **31%** | **ตก และแย่ลง** |
+
+**ทั้งคู่ไม่ล้ม เดินได้ แต่ไปได้แค่หนึ่งในสามของระยะ** และ **Clone อย่างเดียวคือตัวควบคุม** — ถ้าไม่มี 36% วางข้างๆ ตัวเลข 31% อ่านไม่ออกว่าแย่หรือดี
+
+**5.5 เหตุผลที่ครูทำให้แย่ลง — วัดแล้วหลังการประชุม**
+ครูคือ **World Model เอง** (ActionProjector → FTM roll 3 step → ITM → body head) ทุก step มันสร้าง 32 ตัวเลือกรอบคำสั่งของ student แล้ว**จินตนาการ**ว่าแต่ละตัวจะพาลำตัวไปทางไหน แล้วเลือกตัวที่ใกล้เป้าที่สุดเป็นเฉลย
+
+**F145 วัดว่าการจินตนาการนั้นเรียงลำดับได้ถูก 4 จาก 12 ครั้ง — โยนเหรียญได้ 6** ครูเปลี่ยนคำสั่งทุกครั้งแล้วสิ่งที่เปลี่ยนไม่ได้ดีกว่าเดิม **DAgger จึงสอน student ด้วย noise รอบตัวมันเอง** นั่นคือ 36% → 31%
+
+**5.6 สิ่งที่ทำไปแล้วตามคำแนะนำ**
+ไออุ่นยอมรับว่ายังไม่เข้าใจกระบวนการฝั่ง Cloning ดีพอ และรับปากจะกลับไปทำเดโมใหม่หลังแก้มุมกล้อง Ego-centric แล้ว **สถานะปัจจุบัน:** แก้มุมกล้องแล้วและ World Model หันมาใช้แอคชันจริง (`null/real` 1.03 → 1.16) **แต่การทดสอบซ้ำพบว่าครูยังเรียงลำดับไม่ได้ — 47% เทียบเหรียญ 50%** และคราวนี้มีตัวควบคุมพิสูจน์ว่าฟิสิกส์แยกตัวเลือกออกจริง (0.0034 เทียบพื้น 0.0000) **ครูเรียงไม่ได้เอง ไม่ใช่เพราะตัวเลือกเหมือนกันเกินไป**
 
 ---
 

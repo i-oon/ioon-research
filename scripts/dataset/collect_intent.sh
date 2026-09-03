@@ -89,15 +89,15 @@ $PY scripts/dataset/collect_beh12.py --separability "$OUT" || true
 
 echo
 echo "############ GAP, against F164's clean null: 0.729 single frame, +0.102 gap ############"
-$PY scripts/diagnostics/inverse_dynamics_r2.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
+$PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$OUT" --embodiment hexapod --cache results/wm/cache/intent2.pt --stride 2
 
 echo
 echo "############ INTENT -- the da row is the result ############"
-$PY scripts/diagnostics/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
+$PY scripts/diagnostics/objective_experiments/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$OUT" --embodiment hexapod --cache results/wm/cache/intent2.pt --stride 2
 echo "--- the same three targets on F164's CLEAN arm, so the da row has its own null"
-$PY scripts/diagnostics/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
+$PY scripts/diagnostics/objective_experiments/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$CLEAN" --embodiment hexapod \
     --cache results/wm/cache/sweepn00.pt --stride 2
 

@@ -371,7 +371,7 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     # follows leg length rather than the phase the oscillator asks for -- which is why the middle
     # legs' bars stayed short and broken through every phase and amplitude tried.
     #
-    # `scripts/diagnostics/tune_legs.py` solves two numbers per leg against the kinematics: a gain
+    # `scripts/tools/tune_legs.py` solves two numbers per leg against the kinematics: a gain
     # on the lift and extend amplitudes so every foot rises the same distance, and an offset on
     # the same joints so every stroke bottoms out at the same height. They close the two spreads
     # from 0.072 and 0.056 to under 0.0001. This is geometry, not tuning -- it is the correction
@@ -901,7 +901,7 @@ def main():
                          "the shipped setting, where both run from one signal and the foot path is "
                          "a circle. --gait cpg only")
     ap.add_argument("--legtune", default="",
-                    help="npz from scripts/diagnostics/tune_legs.py: per-leg gain and offset that "
+                    help="npz from scripts/tools/tune_legs.py: per-leg gain and offset that "
                          "make six unequal legs trace the same stroke. --gait cpg only")
     ap.add_argument("--head_kp", type=float, default=0.0,
                     help="proportional gain of a heading controller on the oscillator's own --spin. "

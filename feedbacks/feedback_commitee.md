@@ -35,11 +35,13 @@
 * **Internal Camera (On-body Camera):** อาจารย์แพรวเสนอไอเดียสนุกๆ สำหรับอนาคตว่า การติดกล้องไว้ที่ตัวหุ่น (First-person / Eye view) ภาพการสั่นสะเทือนและโมชันของกล้องขณะเคลื่อนที่ สามารถนำมาสกัดเป็น Latent Vector เพื่อประเมิน Body Attitude, Orientation, และความถี่การเคลื่อนที่ ซึ่งให้ข้อมูลมิติลึกกว่า IMU ปกติ.
 
 
-P'nine
-maybe clarifying whether it claims anything about learning time, or if the claim is the same as in the prior paper
-might be good to explain how it speeds up model learning or improves performance, specifically
-might be worth showing that the world model can explain the whole body and environment together, to predict good behavior overall.
+### **6. Feedback from P'nine**
+* Maybe clarifying whether it claims anything about learning time, or if the claim is the same as in the prior paper.
+* Might be good to explain how it speeds up model learning or improves performance, specifically.
+* Might be worth showing that the world model can explain the whole body and environment together, to predict good behavior overall.
 
-P'Hap
-Noted: the main point is about we used the bird eye views for the world model, while the tasks are too simplify.. i.e., walking on flat terrain.
-If the terrain is constrained that mean the world model only predict the joint angle of the robots. Committees address that the world model with external sensing should have more potential then these simple tasks. Thinking about this krub
+---
+
+### **7. Feedback from P'Hap**
+* **Noted:** the main point is about we used the bird eye views for the world model, while the tasks are too simplify.. i.e., walking on flat terrain.
+* If the terrain is constrained that mean the world model only predict the joint angle of the robots. Committees address that the world model with external sensing should have more potential then these simple tasks. Thinking about this krub.

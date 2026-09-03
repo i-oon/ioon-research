@@ -2583,7 +2583,7 @@ so neither is a straight-walking body.
 
 ### F49. Retrained on clean data: the mechanism strengthens, its accuracy gain shrinks, and coverage becomes the strongest result
 
-All five Stage 1 runs the deck cites, retrained by `scripts/retrain_stage1.sh` on data where every
+All five Stage 1 runs the deck cites, retrained by `scripts/run/retrain_stage1.sh` on data where every
 training body walks and at the corrected `action_lag 1`. `tib_ctrl` is included, so slide 3's
 named control exists for the first time. Scored with `scripts/diagnostics/score_body.py`; raw
 numbers in `results/wm/stage1_correct/measurements/heldout_scores.csv`.
@@ -7793,7 +7793,7 @@ a mean down; a median ignores them. Trimming those frames instead overshoots to 
 48-clip directory, so at seed 0 its nine adaptation clips included `b1_ep100` and `b1_ep1300` --
 two of the twelve clips `adapt3` uses as the **candidate library**, the set the planner picks from
 -- and three of its twelve validation clips. It now takes `--train_clips`, both sheets source the
-same 24-clip list from `scripts/b1_stage3_clips.sh`, and stage 1 draws its nine from those 24:
+same 24-clip list from `scripts/run/b1_stage3_clips.sh`, and stage 1 draws its nine from those 24:
 `b1_ep1002, 102, 1102, 1302, 2, 2201, 2302, 301, 302`, overlapping the candidates and the
 validation clips in nothing. Whether the deleted `adapted_b1_v2.pt` had the same contamination is
 **not in the logs** -- it recorded its `train_paths` inside the checkpoint, and the checkpoint was
@@ -8543,7 +8543,7 @@ hexapod its correlation (0.99 -> 0.74) and **flips the sign of its sideways pred
 about zero forward speed (-0.008) while the insect still travels +0.020 while strafing. A head shown
 only the quadruped learns "sideways means no forward motion" and carries that onto a body where it
 is false. **The shared coordinate holds only if the fit sees both robots**, which is exactly what
-the two-embodiment pretrain in `scripts/com7_pretrain_body3.sh` provides.
+the two-embodiment pretrain in `scripts/run/com7_pretrain_body3.sh` provides.
 
 **What this changes about the plan.** The 3-channel pretrain is still needed -- yaw and lateral are
 absent from the shared coordinate entirely, and one channel cannot separate turning from strafing
@@ -9175,7 +9175,7 @@ degrades from 0.710 at one step to worse than hold-still by five, so imagined ro
 **The lambda sweep is no longer a decision and becomes a refinement.** Its question was whether any
 lambda gives both; lambda 1 does. Running it would map whether an intermediate value keeps 0.476
 while recovering state toward 0.585, which is worth hours but decides nothing. The sheet is written
-(`scripts/com7_lambda_sweep.sh`) and does not need to run before anything else.
+(`scripts/run/com7_lambda_sweep.sh`) and does not need to run before anything else.
 
 **The lesson is the one this session keeps paying for.** F139 had the fact that decided its own
 verdict -- action sensitivity lives in the projector's region -- inside the same entry, and did not
@@ -9358,7 +9358,7 @@ on the projector path, held-out insect clips: state fidelity **0.757** at one st
 two -- inside the bar -- with `/mean-z` across clips at **0.966**. **The rollout is good and deaf**:
 a teacher whose prediction moves three percent when the action changes ranks noise. The quadruped
 side does not have this problem because it has had a contrastive stage 3 (0.476, F140), and
-`scripts/com7_stage3_hexapod.sh` applies the same term on the insect with the gate written into it.
+`scripts/run/com7_stage3_hexapod.sh` applies the same term on the insect with the gate written into it.
 
 **This entry stops here deliberately.** The bar, the reference and the control are recorded before
 the teacher exists, so the teacher's number cannot be graded against a bar chosen after seeing it.
@@ -9371,7 +9371,7 @@ Logs `/tmp/f142_*.log`; runs in `results/wm/closed_loop/f142_*`.
 ### F143. The insect teacher passes its gate on the body it will teach, and fails it on a body it will not
 
 **F142's teacher could not label** -- the insect-side pretrain rolled well and ignored the action,
-`/mean-z` 0.966 across clips. `scripts/com7_stage3_hexapod.sh` applied F119's contrastive term on the
+`/mean-z` 0.966 across clips. `scripts/run/com7_stage3_hexapod.sh` applied F119's contrastive term on the
 insect, 15,000 steps, 24 of the 48 `c10f10t10` clips, with the other 24 -- including
 `hexapod_ep100`, the clip F142 takes its goal and `D_real` from -- held out. **The gate was written
 into the sheet before the run.**
@@ -9413,7 +9413,7 @@ is a *cross-morphology* statement -- Stage 1's territory -- rather than a cross-
 is inside the region where the teacher is sound. **A teacher expected to generalise to an unseen
 body would need something this adaptation does not provide**, and nothing measured says the term can
 be tuned to give both -- that is the lambda sweep's question
-(`scripts/com7_lambda_sweep.sh`), now with a reason to run it that F140 had removed.
+(`scripts/run/com7_lambda_sweep.sh`), now with a reason to run it that F140 had removed.
 
 Log in `results/wm/`; the com7 run is `beh12_hex-b1_body3/stage3_hex_nce_s0.pt`, commit 3923cfa.
 
@@ -10027,7 +10027,7 @@ Logs `/tmp/f152_{A,B}.log`.
 **The objective is implemented and the run is handed to com7.** `wm/train.py` gained the two terms
 behind `lambda_hinge` and `lambda_readout`, both zero by default so every run before 2026-08-31
 reproduces unchanged. Smoke-tested end to end: one epoch on both embodiments starts, the config
-records every new field, nothing crashes. `scripts/com7_pretrain_actswm.sh`.
+records every new field, nothing crashes. `scripts/run/com7_pretrain_actswm.sh`.
 
 ## The settings, each with the measurement behind it
 
@@ -10226,7 +10226,7 @@ It is minutes on a cached checkpoint and it is the precondition the whole ActSWM
 
 **Both rows are the pre-rebuild checkpoint `beh12_hex-b1_body3`, which is what exists locally.** The
 rebuild `beh12_actswm` lives on com7 and has not been measured this way;
-`scripts/com7_action_necessity.sh` runs both checkpoints there. The conclusion is expected to hold
+`scripts/run/com7_action_necessity.sh` runs both checkpoints there. The conclusion is expected to hold
 because it is a property of the *task*, not of a set of weights -- but until that script has run,
 **the numbers above are the F138 model's and must be quoted as such.**
 
@@ -10297,7 +10297,7 @@ the prediction target itself rather than another objective.
 **No full pretrain, and no lambda tuning, until that short run reports.** Tuning a weight against a
 six-percent signal is what F153 already spent six hours proving does not work.
 
-*(Both tables are the F138 checkpoint; `beh12_actswm` is on com7 and `scripts/com7_action_necessity.sh`
+*(Both tables are the F138 checkpoint; `beh12_actswm` is on com7 and `scripts/run/com7_action_necessity.sh`
 now sweeps lags there too.)*
 
 ---
@@ -10310,7 +10310,7 @@ now sweeps lags there too.)*
 lag 1, so every lag-3 measurement is off-distribution for them and 1.078 is a **lower bound**. It
 cannot be used to reject lag 3. Training briefly at lag 3 removes that confound and nothing else.
 
-`scripts/com7_pretrain_lag3.sh`, run `wm/runs/beh12_lag3_nohinge`, about ninety minutes.
+`scripts/run/com7_pretrain_lag3.sh`, run `wm/runs/beh12_lag3_nohinge`, about ninety minutes.
 
 | setting | value | why |
 |---|---|---|
@@ -10566,7 +10566,7 @@ this run reports. **The narrower question, which is real and unmeasured**: does 
 *additionally* starve `z` of joint-level detail by shaping it into three coarse body-motion numbers,
 compounding the encoder limit?
 
-`scripts/com7_lambda_body0_control.sh`, run `wm/runs/beh12_lag3_nobody`, about ninety minutes.
+`scripts/run/com7_lambda_body0_control.sh`, run `wm/runs/beh12_lag3_nobody`, about ninety minutes.
 
 ## Held identical to `beh12_lag3_nohinge`, one variable changed
 
@@ -12395,7 +12395,7 @@ view and run on another** and must be switched to the head camera first.
 
 ## The sequence, as gates
 
-`scripts/step1_egocentric.sh {collect|train|measure}`
+`scripts/run/step1_egocentric.sh {collect|train|measure}`
 
 1. collect `c08f09t09` egocentric, paired seeds by slot → **GATE A**, appearance leak, exits non-zero
 2. train, `--sources` swapped, everything else identical to `com7_pretrain_body3.sh`
@@ -12603,7 +12603,7 @@ the command is readable. **It does mean the egocentric B1 arm has to be read aga
 stated more broadly than the evidence carries.
 
 The egocentric arms are outstanding; `wm/runs/beh12_ego` is on com7. Run sheet
-`scripts/step2_gate_projector.sh`.
+`scripts/run/step2_gate_projector.sh`.
 
 ---
 
@@ -12672,7 +12672,7 @@ student emitting joint commands from egocentric video can account for at most a 
 variance even with a perfect head**, and that is the number any teacher-student result has to be
 read against rather than discovered afterwards.
 
-Run `scripts/step2_gate_projector.sh` on com7, no log saved; projector at
+Run `scripts/run/step2_gate_projector.sh` on com7, no log saved; projector at
 `wm/runs/beh12_ego/projector_ego.pt`.
 
 ---
@@ -13567,7 +13567,7 @@ ratios is comparable; and 3.1x versus 5.1x is one measurement on one body at one
 Implementation: `wm/models/ldad.py` (three transformer layers, per-embodiment heads), `lambda_ldad`
 and `ldad_layers` in `wm/config.py`, the term in `wm/train.py` taken on the **prediction**
 `FTM(e_t, z) - e_t` rather than on two true frames, so the gradient reaches the forward model.
-Run sheet `scripts/f183_ldad.sh`; arms at lambda 10 and 50, 15 epochs, everything else identical to
+Run sheet `scripts/run/f183_ldad.sh`; arms at lambda 10 and 50, 15 epochs, everything else identical to
 `beh12_ego`.
 
 
@@ -13646,10 +13646,140 @@ without moving the wall.
 **No claim that LDAD works is made until ranking beats 47% *and* `null/real` survives.** The
 +59% on its own licenses nothing.
 
-Arms `wm/runs/beh12_ego_ldad{10,50}`, projectors fitted per arm against their own checkpoint; logs
-`results/f183/`. Gates: `bash scripts/f183_ldad.sh gate`, then the ranking test, which needs the
-simulator and therefore the local machine.
+## GATE 1 fails, and it does not merely fail -- it inverts
 
+**The pre-registered stop fired.** `null/real` on the held-out insect, against the 1.16 GATE C
+established:
+
+| lag | no LDAD (F172) | **lambda 10** | **lambda 50** |
+|---|---|---|---|
+| 1 | **1.161** | 0.999 | **0.993** |
+| 2 | **1.190** | 1.001 | **0.986** |
+| 3 | **1.171** | 1.004 | **0.986** |
+| 5 | **1.156** | 1.006 | **0.987** |
+| `real<null`, lag 1 | 86.8% | 43.7% | **34.7%** |
+| `real/hold`, lag 1 | 0.515 | 0.668 | **0.734** |
+
+**At lambda 10 the action buys exactly nothing -- 1.00, the value the whole failure chain sat at.
+At lambda 50 it is below 1.0**, which means the model predicts *better* when told nothing happened
+than when given the true action. The real action beats the null on **34.7%** of samples at lag 1 and
+**12-25%** on speed and turn at longer lags -- **worse than a coin, consistently, in the direction
+that says the action actively hurts.**
+
+**And prediction quality degraded too.** `real/hold` went 0.515 to 0.734: the model is now much
+closer to being beaten by a frozen frame than the egocentric baseline was.
+
+**Both effects scale with lambda.** That is the term doing it, not noise.
+
+## The mechanism, and it is a criticism of the method's own diagnostic
+
+**LDAD's objective is satisfiable without the prediction being right.** The term asks that
+`FTM(e_t, z) - e_t` be decodable to the action. The cheapest way to satisfy it is to write `z` into
+the prediction's residual in a linearly readable form -- **which requires nothing of the
+prediction's accuracy.** So the model learned to stamp the action into its output while getting the
+future more wrong, and every number LDAD is evaluated on improved:
+
+| | direction | what it measured |
+|---|---|---|
+| reconstruction from `dz_pred` | 0.338 to **0.537** | that `z` is written into the residual |
+| response ratio toward physics | 3.1x to **4.3x** | the same thing, in another coordinate |
+| **`null/real`** | 1.16 to **0.99** | **whether the action helps predict. It does not.** |
+
+**It is Context Collapse with the arrow reversed, and naming it that way is the clearest form.**
+
+| | the objective is satisfied by | while failing at |
+|---|---|---|
+| **Context Collapse** (ActSWM) | predicting well from the frame alone | **using the action** |
+| **the LDAD shortcut** (here) | making the action legible in the residual | **predicting well** |
+
+**Both are objectives a model can satisfy without doing the thing they were written to enforce**,
+and the second was found by measuring the first's own remedy.
+
+**So the criticism is of the evidence, not of their result.** Delta-JEPA reports
+displacement-reconstruction as evidence that the world model is action-sensitive. **This run is a
+counterexample: reconstruction rose from 0.338 to 0.537 while action-use collapsed from 1.16 to
+0.99 on the same checkpoints.** Displacement-reconstruction therefore **cannot establish that a
+world model uses the action** -- it separates *the action is legible* from *the model uses it*, and
+in periodic locomotion the shortcut between them is available. **Whether the same shortcut is
+reachable in manipulation is untested here and is not claimed.**
+
+## The verdict, at its true strength
+
+**The pre-registered reading is "LDAD made the world model worse, and the gains were bought with
+absolute sensitivity."** That is what happened. **GATE 2 is not run**, because the pre-registration
+says a broken GATE 1 stops the sequence, and ranking measured on a model whose action channel is
+inverted would measure nothing.
+
+**What is not claimed.** These are 15-epoch arms; a longer run might recover `null/real` while
+keeping the reconstruction gain, and that has not been tested. **What is claimed is narrower and
+survives that**: at both lambdas in Delta-JEPA's own useful range, the LDAD term traded away the one
+capability egocentric had bought.
+
+**And the session's central separation holds a third time.** Reconstruction, response ratio and
+`null/real` moved in opposite directions on the same checkpoints. **Numbers about how readable the
+action is are not numbers about whether the model uses it.**
+
+**The Delta-JEPA path is closed.** No further arms; the term is rejected at both lambdas its own
+authors recommend, on the ground that it removes the capability this project spent the session
+acquiring.
+
+Arms `wm/runs/beh12_ego_ldad{10,50}`, projectors fitted per arm against their own checkpoint; logs
+`results/f183/`.
+
+
+---
+
+
+### F184. The behavioural row: egocentric costs the policy nearly everything, and the allocentric clone passes
+
+**Every number egocentric improved was internal to the model. The row that was never filled in is the
+one that decides whether any of it matters**, and F144 only ever measured the *allocentric* clone, on
+a *different body*. Both arms were run here on the same day, **same body, same scene, same goal clip,
+same code, same pre-registered rule** -- only the camera differs.
+
+| | held-out cloning error | replayed reference | clone travelled | | |
+|---|---|---|---|---|---|
+| **allocentric**, `c08f09t09` | **0.0116** | 0.6927 m | **0.3756 m** | **54%** | **PASS** |
+| **egocentric**, `c08f09t09` | **0.6040** | 0.7151 m | **0.0426 m** | **6%** | **FAIL** |
+| *F144, allocentric, base body* | *0.065* | *0.6566 m* | *0.2349 m* | *36%* | *FAIL* |
+
+**Both stayed upright the whole three seconds.** Neither failure is a collapse; the egocentric one is
+a policy that barely travels.
+
+**The denominator was re-measured per arm rather than borrowed.** F142's 0.6566 m is the base body's
+replay; using it for `c08f09t09` would divide one body's distance by another's reference.
+
+## Two things this settles, and one it does not
+
+**Egocentric costs the policy, and the size of it is the finding.** 54% to 6%, with the clone's own
+fit 52 times worse -- 0.0116 against 0.6040. **This is the mechanism the project already measured
+predicting its own consequence**: a single egocentric frame states the command at 0.329 against
+allocentric's 0.779 (Q1), so the clone has far less to fit, fits far worse, and drifts far faster.
+**The internal gains were real and they were bought at this price.**
+
+**And the allocentric clone clears the F142 bar.** 54% against a required 50%, upright throughout --
+**the first policy in this project to pass it, and it uses no world model at all.** F144's premise
+was that cloning fails and so the teacher has room to add something; **on this body, with cloning
+done properly, it does not.** The comparison that licensed teacher-student was made on a body where
+the clone happened to fail.
+
+**What it does not settle: why the two allocentric clones differ.** 54% here against F144's 36% mixes
+a different body with a different training set, and the two cannot be separated from these runs.
+**The claim that survives is the one where only the camera changed.**
+
+## What it does to the direction
+
+**"Egocentric is necessary and not sufficient" was too kind.** The honest statement is that egocentric
+**bought action-conditioning and cost the policy its ability to walk**, and no behavioural measurement
+favours it. Every advantage on the ledger -- `null/real` 1.16, yaw 0.07 to 0.64, the null separating
+better -- is internal to the model.
+
+**And a plain behaviour-cloned policy on allocentric video now passes the bar the whole
+teacher-student apparatus was built to beat.** Any future claim that the world model contributes has
+to beat **54%**, not 36%.
+
+Runs `scripts/diagnostics/clone_walk_test.py`, CoppeliaSim on port 23000, students
+`wm/runs/students/insect_bc_{ego,allo_c08}.pt`.
 
 ---
 

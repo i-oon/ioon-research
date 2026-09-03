@@ -69,7 +69,7 @@ echo "############ ACTION R2 -- only meaningful where separability passed ######
 for N in $LEVELS; do
   TAG=$(echo "n$N" | tr -d '.')
   echo "--- cmd_noise $N"
-  $PY scripts/diagnostics/inverse_dynamics_r2.py --ckpt "$CKPT" \
+  $PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py --ckpt "$CKPT" \
       --data "data/allocentric/beh12_c10f10t10_sweep${TAG}_flat" --embodiment hexapod \
       --cache "results/wm/cache/sweep${TAG}.pt" --stride 2
 done

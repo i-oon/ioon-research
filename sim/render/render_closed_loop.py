@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "render"))
 from npz_to_video import write_mp4  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
-from diagnostics.score_closed_loop import channel_for, dominant, summarise  # noqa: E402
+from diagnostics.planning.score_closed_loop import channel_for, dominant, summarise  # noqa: E402
 
 INK = (16, 17, 20)
 WHITE, DIM = (245, 245, 245), (150, 152, 158)

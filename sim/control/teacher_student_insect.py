@@ -301,7 +301,7 @@ def improve(args, device):
                          dtype=torch.float32, device=device)
 
     # goals come from the clips stage 3 trained on; the evaluation goal is held out from both
-    train_names = set(os.popen(". scripts/hex_stage3_clips.sh; echo $HEX_CLIPS").read().split())
+    train_names = set(os.popen(". scripts/run/hex_stage3_clips.sh; echo $HEX_CLIPS").read().split())
     goals = []
     for p_ in sorted(glob.glob(os.path.join(ROOT, args.data, "*.npz"))):
         if os.path.basename(p_) not in train_names:

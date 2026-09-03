@@ -1,94 +1,47 @@
-# START HERE
+```
+You are resuming a long research project mid-stream. Read files in this order, then follow the working rules below. Do NOT start any experiment until you've read the state and confirmed it back to me.
 
-**Read this file first, then `direction_plan.md`.** Everything else is reference: `FINDINGS.md` is
-the evidence (F1-F117, append-only), `PROGRESS.md` is the narrative history (append-only),
-`OPEN_QUESTION.md` holds what is unresolved, `SIM_GUIDE.md` is how to run the simulators and collect
-data.
+═══ READ FIRST, IN THIS ORDER ═══
+1. This message (the state + rules below)
+2. direction_plan.md — the plan and contribution
+3. FINDINGS.md — the evidence. NOT append-only: findings are CORRECTED or WITHDRAWN when a later finding refutes them, or replaced when a new finding supersedes an old one. So FINDINGS reflects the CURRENT state of evidence, not a frozen log. Read the latest findings first, and note any withdrawal/correction annotations (e.g. "F126 withdrawn by F135") — a withdrawn finding must NOT be reused as if still valid.
+4. PROGRESS.md — narrative history (append-only)
+5. OPEN_QUESTION.md — what's unresolved
+6. SIM_GUIDE.md — how to run simulators and collect data
+7. YOUR MEMORIES — read all stored project memories; they hold locked decisions, corrected claims, and guards that must not be re-broken.
 
-## What the project is trying to do
+═══ WHAT THE PROJECT IS ═══
+Cross-embodiment locomotion from vision: learn a morphology-agnostic latent action / world model from egocentric video so a behaviour from one robot (18-DOF stick insect) can drive another (12-DOF Unitree B1 quadruped) via a shared body-motion coordinate (Froude-scaled forward/lateral/yaw), with NO kinematic model, NO demonstrations of the target, NO URDF. Bodies: insect (CoppeliaSim), B1 (MuJoCo).
 
-Learn a latent action from simulated video that **maps to a shared body-motion coordinate** (not a
-body-blind latent -- body identity is decodable from `z` at 0.974, F160), so that a behaviour recorded on
-one robot can drive a **different** robot with an incomparable body -- an 18-DOF six-legged stick
-insect and a 12-DOF Unitree B1 quadruped. No kinematic model, no retargeting, no shared joint space:
-the only thing the two robots share is what a camera sees.
+═══ WHERE IT STANDS, PRECISELY (as of the latest findings) ═══
+- CORE POSITIVE (proven): a shared body-motion coordinate transfers across bodies from video (F136). Correspondence-free (no pairing/alignment/retargeting — F170-ish, Check A), unlike Demo-JEPA which needs end-effector retargeting + GTCC.
+- THE VIEWPOINT FINDING (proven, the contribution): 3rd-person (allocentric) view makes the pose encode the action (single-frame action R² ~0.78), so forward prediction is phase-completion and the world model ignores the action — measured 6 ways (F153-F169). Egocentric view fixes this: GATE C, null/real 1.03→1.16 (first thing in the whole chain to move it), yaw cross-body 0.07→0.64. Egocentric BROKE the pose-redundancy that killed everything.
+- WHAT EGOCENTRIC DID NOT FIX (current wall): action-conditioning (GATE C, coarse, 1-step) ≠ action RANKING (fine) ≠ long-horizon ROLLOUT. Teacher ranks recorded behaviours (83%) but fine perturbations at coin-flip (47%, F179). Gradient through imagination fails at K=1 (F182). These are SEPARATE capabilities. The world model uses the action COARSELY but not precisely enough to rank fine (2.5%) differences or roll out far (reliable only ~3-5 steps).
+- STUDENT: pooled student is weak on B1 (within-cond 0.081→0.205 with attention); insect usable (~0.3). Clone-only allocentric passes the F142 walk bar (54%) WITHOUT the world model — any "world model helps" claim must beat 54%, not the old 36%.
+- METHODS TRIED, ALL HIT THE SAME WALL: candidate scoring/ranking (F145/F179), objective fixes (ActSWM F153, LDAD/Delta-JEPA F183 — LDAD actively BROKE null/real 1.16→0.99, rejected), gradient/Dreamer (F182), harder perturbations (F181 sweep — off-manifold). The wall is the world model, not the method.
+- LEADING HYPOTHESIS for the wall (UNCONFIRMED, still debugging): world model long-horizon
 
-The pipeline is LAC-WM ported to legged locomotion. A frozen V-JEPA2 encoder turns frames into
-embeddings; an inverse model reads a latent `z` out of a transition; a forward model predicts the
-next embedding from `(e_t, z)`; an action projector maps a robot's raw joint command into that same
-`z`, which is what lets the world model be driven at control time when the future frame is not
-available. Planning is candidate scoring: roll the forward model on each recorded behaviour's
-actions and keep the one whose prediction lands nearest the goal.
 
-## Where it stands, precisely, on 2026-08-29
+═══ LEARN THE REPO STRUCTURE (survey, don't assume) ═══
+Before running or creating anything, MAP the repo yourself and report back — I will NOT hand you the structure because it must match what actually exists, not my memory:
 
-**Two results are solid and neither is about the quadruped.**
+1. Run `ls` / tree on the repo root and key dirs. Report the layout: where do source modules live (wm/, sim/, etc.), where are scripts (scripts/, scripts/dataset/, scripts/diagnostics/), where is data (data/, data/egocentric/), where are runs/checkpoints (wm/runs/), where are results/caches (results/wm/cache/).
 
-| | |
-|---|---|
-| the encoder carries morphology | a ridge regression on frozen V-JEPA2 embeddings recovers an unseen body's segment scales; nothing supervises it (F20) |
-| the world model trained on top does not use it | body A's frame with body B's latent yields body B's commands; `lambda_cross` is the intervention that fixed it (F18-F24) |
+2. Identify the NAMING CONVENTIONS from existing files — do NOT invent your own:
+   - dataset naming (e.g. beh12_c10f10t10_flat, beh12_b1_flat, beh12_c08f09t09_ego_flat — what do the tokens mean: behaviour-count, body-id, ego/allo, flat?)
+   - checkpoint naming (e.g. best.pt, md_refit.pt, teacher_ego.pt, projector_ego.pt — which stage/component each is)
+   - script naming (e.g. f183_ldad.sh, com7_pretrain_*.sh, step2_*.sh — the f<N>_ prefix ties a script to a finding; com7_ means it runs on the com7 GPU box)
+   - cache naming (keyed by path — ego vs allo caches must not collide)
 
-**Every B1 number is withdrawn.** The quadruped's dataset had four defects, all found on 28-29
-August by watching preview videos rather than reading tables: the robot clipped by the image edge in
-61% of frames, an unpinned camera, a forward clip filed as the weakest turn level, and turns running
-opposite to the insect's. The data is now corrected; **all B1 checkpoints were deleted and stages 1,
-2 and 3 have to be rebuilt from `data/allocentric/beh12_b1_flat`.**
+3. Identify KEY ENTRY POINTS by reading, not guessing: the main train script (wm/train.py?), the diagnostic scripts (scripts/diagnostics/*), the sim/control code (sim/control/teacher_student_insect.py?), how a run is launched on com7 vs locally.
 
-**What the withdrawn runs pointed at, worth keeping as hypotheses:** forward selection works even
-when the forward model demonstrably ignores its action input, so forward is not evidence the world
-model works; turning is the only behaviour where a model that uses the action beats one that does
-not; sideways fails on every measurement.
+4. WHERE THINGS GO (confirm the convention, don't break it):
+   - new datasets → where? new checkpoints → wm/runs/<name>/? new diagnostic scripts → scripts/diagnostics/? logs → where?
+   - what runs LOCALLY (has GUI / small) vs on COM7 (the compute box, checkpoints live there)?
+   - CoppeliaSim (insect) needs a GUI + exactly ONE instance; MuJoCo (B1) doesn't.
 
-## The immediate next steps
+5. Report back a short map: "source here, scripts here, data here, checkpoints here, naming = X, entry points = Y, com7-vs-local = Z." I'll correct anything wrong before you touch the repo.
 
-1. Rebuild stage 1 (`wm/adapt.py`), stage 2 (`wm/fit_projector.py`), stage 3 (`wm/adapt3.py`) on
-   `data/allocentric/beh12_b1_flat`. About two and a half hours.
-2. Three seeds per stage-3 arm at one budget -- `scripts/com7_stage3_seeds.sh` -- because the
-   MSE-vs-contrastive ordering flipped between two budgets on single runs.
-3. Close the loop and re-measure. `sim/control/close_loop_b1_physics.py`, defaults already correct.
+Do NOT create files, rename anything, or launch runs until you've surveyed and I've confirmed your map. Follow existing conventions exactly — a new file in the wrong place or with an off-convention name breaks scripts that reference paths and makes results unauditable.
 
-## Things that will mislead you if nobody says them
-
-| | |
-|---|---|
-| **name the insect body, never "hexapod"** | `beh12_c10f10t10_flat` is pretrained on, `beh12_c08f09t09_flat` is held out. They turned opposite ways for a week because every table said "hexapod" (F117) |
-| **camera settings are part of the data** | `--cam_fov 24 --spawn 0 0 --floor_scale 3`. A loop that differs from its adaptation set in any static way measures that difference |
-| **behaviour-family accuracy cannot see direction** | a run that turns the wrong way scores identically to one that turns the right way. Report sign separately (F109) |
-| **chance is 33%, not 8%** | the twelve conditions hold unequal families. An unadapted model scores the chance rate exactly |
-| **MuJoCo repeats, CoppeliaSim does not** | rerunning a B1 configuration returns the identical number; spread must come from different goal clips. The insect is the other way round (F105) |
-| **a finding marked "fixed" may not be** | F75's sign flip was recorded as fixed and was not, and shaped four later findings before anyone re-measured (F115) |
-| **watch the videos** | six defects this project found were caught by looking; none by the tables that were passing at the time |
-
-## Where this sits in the literature
-
-| approach | what it needs on the new robot | generates or selects? |
-|---|---|---|
-| **LAC-WM**, STORM, World Action Planner | a pretrained, competent VLA to propose candidates | **selects** -- it reranks an existing policy's output |
-| **Li et al. 2020**, hexapod + quadruped latent planning | separate expert demonstrations per robot | generates, but as two separately trained latent spaces rather than one shared one |
-| **X-Morph** | a URDF and a kinematic retargeting stage | generates, by solving correspondence with a body model |
-| **QWM**, morphology-conditioned world model | morphology parameters | generates, zero-shot *within* the quadrupedal family; never crosses leg count |
-| **CAPE / CD-LAM** | -- | the precedent for this project's contrastive term: removing it makes the predictor ignore the action query |
-| **this project** | 24 recorded clips today; unlabelled interaction is the target | selects today, generates is the plan (teacher-student, Q16) |
-
-**The gap being claimed** is that no published method learns a shared latent action space that
-transfers across legged robots with **different leg counts** from video alone. Methods that avoid a
-kinematic tree stay inside one robot or one leg-count family; methods that span leg counts use
-explicit retargeting.
-
-**The contribution is three things, and they are not equally proven.**
-
-| | what it is | status |
-|---|---|---|
-| **1. joint targets, no kinematics** | the action space is raw joint commands -- 18-D and 12-D, disjoint, nothing commensurable between them -- and the correspondence is *learned* by the action projector rather than defined by a URDF or a shared task-space coordinate. **This is the axis that separates the work from everything else in the table**: X-Morph retargets kinematically, LAC-WM unifies quantities that already mean the same thing on both bodies (a fingertip at `(x,y,z)`), and morphology-agnostic proprioceptive control has to be handed the kinematic graph. A camera is handed nothing | implemented and runs end to end; its cross-embodiment evidence is withdrawn with the rest of the B1 numbers |
-| **2. a joint target crosses robots only with a body term** | within one robot the joint decoder works unsupervised (0.35 error); across robots it is -28.9 / -43.1 without the term and +0.61 / +0.57 with it (F82, F83). **The conditional is the finding**, not "joint targets work" | the A/B contrast survives its data's defects, since both arms carry them; **the figures do not** -- forward walking only, and a frame-rate mismatch (F74) |
-| **3. the adaptation objective** | MSE adaptation makes the forward model discard the action channel across morphology families; a contrastive term restores it. CAPE reports the same failure mode elsewhere, so what is new is that it appears across morphology families and is invisible in the loss curve -- **not** the technique | the most fragile of the three: the ordering flipped between budgets on single runs, and three seeds per arm is outstanding |
-
-**Claim 1 is the one to lead with** and the one the literature table is built around. The
-positioning is worked out in full in `report/update_slide.md`; `Q17_ANS.md`, which used to hold it,
-has been removed.
-
-**Two things are still overclaimed there and are flagged in that file**: "a camera is the only thing
-it needs" is untrue while the candidate library is 24 curated clips, and the shared-body-target
-result (F83) was measured on forward walking only and on data with a frame-rate defect, so its
-numbers cannot be quoted about current work.
+```

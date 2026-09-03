@@ -334,7 +334,7 @@ def build_models(cfg, device, heads=None, n_bodies=0):
         # fitted to imitate; freezing it at random weights would make that `z` arbitrary and break
         # every control-time path. This readout feeds nothing downstream -- its only job is to
         # route gradient into the forward model so transitions are genuinely separated.
-        from scripts.diagnostics.check_actswm_wiring import FrozenActionReadout
+        from scripts.diagnostics.objective_experiments.check_actswm_wiring import FrozenActionReadout
         # a ModuleDict, not a plain dict: `run_epoch` calls `.train()` and `.parameters()` on
         # every entry of `models`, and a bare dict has neither
         import torch.nn as nn

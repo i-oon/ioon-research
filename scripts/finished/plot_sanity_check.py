@@ -1,22 +1,13 @@
-"""Sanity-check figure: does frozen e_t contain useful locomotion information?
+"""Sanity check: does frozen e_t contain useful locomotion info?
 
-Three conditions, one classifier (logistic regression on e_t -> foot-contact
-pattern, top-8 patterns, macro-F1, 5-fold CV):
+Logistic-regression probe on e_t -> foot-contact pattern (top-8, macro-F1, 5-fold CV),
+within-body / shuffled-label / cross-body.
 
-  within-body  train and test on the SAME body      -> is contact decodable?
-  shuffle      same, but labels permuted             -> is it real signal?
-  cross-body   train on body A, test on body B        -> does it transfer?
-
-The story: contact is strongly decodable within a body, collapses to chance
-under shuffling (so it is real), and drops sharply across bodies (so the
-representation is body-specific -- which is exactly what the latent action is
-meant to fix).
-
-Pilot diagnostic, not final evaluation: contact threshold 0.5 N, gait is a
-wave/staggered pattern (not tripod), single session per body.
+Pilot diagnostic, not final evaluation: contact threshold 0.5 N, wave gait
+(not tripod), single session per body.
 
 Usage:
-  .venv/bin/python scripts/plot_sanity_check.py
+  .venv/bin/python3 scripts/finished/plot_sanity_check.py
 """
 import collections
 import warnings

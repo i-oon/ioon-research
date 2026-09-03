@@ -56,5 +56,5 @@ done
 echo
 echo "=== now look at them, then measure"
 echo "  $PY scripts/dataset/preview_clips.py --data data/allocentric/beh12_c10f10t10_rhythmnoisy_flat"
-echo "  $PY scripts/diagnostics/inverse_dynamics_r2.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \\"
+echo "  $PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \\"
 echo "      --data data/allocentric/beh12_c10f10t10_rhythm{clean,noisy}_flat --embodiment hexapod --cache <fresh>"

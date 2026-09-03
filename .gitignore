@@ -20,9 +20,6 @@ results/wm/cache/
 
 airl-insect-walking/
 
-# Generated figures are kept (report/*.png); scripts regenerate them.
-# If you want the reference PDFs out of git too, uncomment:
-# doc/*.pdf
 amp/
 report/
 !report/image/
@@ -33,9 +30,6 @@ data/ik_turn/
 data/ik_all/
 data/hexapod/
 data/_archive/
-
-wm/runs_original/*
-!wm/runs_original/README.md
 
 results/dataset/**/emb.npz
 

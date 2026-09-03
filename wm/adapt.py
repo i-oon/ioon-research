@@ -1,7 +1,7 @@
 """Adapt a pretrained ITM and forward model to a new robot, and save a checkpoint to plan with.
 
 **This is LAC-WM's stage 1, and until now it existed only as a diagnostic.**
-`scripts/diagnostics/finetune_ftm.py` adapts, scores and throws the weights away, which answers
+`scripts/diagnostics/cross_embodiment/finetune_ftm.py` adapts, scores and throws the weights away, which answers
 "how much does N clips buy" and leaves nothing to run a controller on. F96 needed exactly that: the
 cross-embodiment planner defaults instead of selecting, and the measurement located the cause in
 the forward model's ignorance of the target robot rather than in the action projector -- which is
@@ -33,7 +33,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
-from diagnostics.finetune_ftm import adapt, embeddings_for, rollout  # noqa: E402
+from diagnostics.cross_embodiment.finetune_ftm import adapt, embeddings_for, rollout  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402

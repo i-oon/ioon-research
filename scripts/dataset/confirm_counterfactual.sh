@@ -62,7 +62,7 @@ done
 
 echo
 echo "--- insect divergence after the branch, position AND heading"
-$PY scripts/diagnostics/branch_divergence.py --embodiment hexapod --branch $BRANCH \
+$PY scripts/diagnostics/egocentric_view/branch_divergence.py --embodiment hexapod --branch $BRANCH \
     --noise "$OUT/insect_forward.npz" "$OUT/insect_forward_repeat.npz" \
     --pair forward="$OUT/insect_forward.npz" turn="$OUT/insect_turn.npz" \
            side="$OUT/insect_side.npz" faster="$OUT/insect_faster.npz"
@@ -87,7 +87,7 @@ $PY sim/collect/branch_b1_mujoco.py --prefix 60 --branch_steps 30 \
 
 echo
 echo "--- B1 divergence after the branch, position AND heading"
-$PY scripts/diagnostics/branch_divergence.py --embodiment b1 --branch 60 \
+$PY scripts/diagnostics/egocentric_view/branch_divergence.py --embodiment b1 --branch 60 \
     --noise "$OUT/b1_forward.npz" "$OUT/b1_forward_repeat.npz" \
     --pair forward="$OUT/b1_forward.npz" turn="$OUT/b1_turn.npz" side="$OUT/b1_side.npz" \
     --horizons 1 3 5 10 15 25

@@ -163,7 +163,7 @@ number that can be compared anywhere, and against the joint ranges of a real rob
 
 ```
 .venv/bin/python3 -m wm.predict_actions --ckpt wm/runs/<run>/epoch010.pt --clips 3
-.venv/bin/python3 scripts/diagnostics/plot_action_trace.py --pred results/wm/predictions/<name>.npz
+.venv/bin/python3 scripts/diagnostics/decoder/plot_action_trace.py --pred results/wm/predictions/<name>.npz
 ```
 
 Add `--encode_device cpu` when the GPU is busy with a training run.
@@ -173,12 +173,12 @@ Add `--encode_device cpu` when the GPU is busy with a training run.
 
 | Question | Script |
 |---|---|
-| which joints failed | `scripts/diagnostics/plot_action_trace.py` |
-| does it read the body from the frame or the latent | `scripts/diagnostics/swap_pathway.py` |
-| is it copying one training body | `scripts/diagnostics/morphology_mix.py` |
-| where does each stage place the held-out body | `scripts/diagnostics/morphology_axis.py` |
+| which joints failed | `scripts/diagnostics/decoder/plot_action_trace.py` |
+| does it read the body from the frame or the latent | `scripts/diagnostics/decoder/swap_pathway.py` |
+| is it copying one training body | `scripts/diagnostics/decoder/morphology_mix.py` |
+| where does each stage place the held-out body | `scripts/diagnostics/decoder/morphology_axis.py` |
 | how does transfer change with training compute | `wm/sweep_checkpoints.py` |
-| does the command actually walk | `sim/render/render_wm_prediction.py` then `scripts/diagnostics/wm_gait_report.py` |
+| does the command actually walk | `sim/render/render_wm_prediction.py` then `scripts/diagnostics/planning/wm_gait_report.py` |
 
 ### Live view
 

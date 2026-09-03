@@ -1,6 +1,6 @@
 # Stage 1, retrained on clean data
 
-Landing zone for the retrain driven by `scripts/retrain_stage1.sh`. Kept apart from `stage1/`
+Landing zone for the retrain driven by `scripts/run/retrain_stage1.sh`. Kept apart from `stage1/`
 because **the runs reuse the same names** -- `m3d_cross`, `m3d_bracketed`, `tib_cross`,
 `tib_ctrl`, `bracket_cross` -- so every output filename collides exactly with its predecessor.
 One shared directory would silently overwrite the old numbers, and those are needed (see below).

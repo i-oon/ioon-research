@@ -8,12 +8,11 @@ root with `.venv/bin/python3`, never bare `python3`, matching `scripts/README.md
 sim/
   scene/         build or modify a .ttt scene: camera, floor, leg geometry, the B1 scene
   collect/       record a dataset: IK retargeting, the Step 0 pilot, MuJoCo/AIRL rollouts
+  control/       closed-loop control: IK/kinematic/B1-physics loops, teacher-student, planning
   render/        replay commands through physics, watch/export video, one gait diagnostic input
   diagnostics/   step_minus1_morphology_gap.py, predates scripts/diagnostics/
   env/           the .ttt scene files and heavy CSVs everything above reads and writes
   assets/        URDF/meshes (B1 description) and policy checkpoints scene-builders import
-  _archive/      superseded, not expected to run — includes coppeliasim_env.py, never imported
-                 by anything and unused since the initial commit
   SOURCES.md, environment.yml   reference docs, not scripts
 ```
 
@@ -40,12 +39,22 @@ sim/
 
 | | |
 |---|---|
-| `render_wm_prediction.py` | Drive the robot with world-model predicted joint commands next to the IK ground truth, open loop. Feeds `scripts/diagnostics/wm_gait_report.py`. |
+| `render_wm_prediction.py` | Drive the robot with world-model predicted joint commands next to the IK ground truth, open loop. Feeds `scripts/diagnostics/planning/wm_gait_report.py`. |
 | `render_b1_replay.py` | Render a native-MuJoCo B1 trajectory in CoppeliaSim (kinematic replay) to a dataset `.npz`. |
 | `play_ik.py` | Watch the IK-retargeted gait in the CoppeliaSim GUI, no recording. |
 | `npz_to_video.py` | Export recorded `.npz` episodes as watchable `.mp4` (+ a grid overview). |
 | `render_leg_loss_walk.py`, `render_leg_loss_preview.py` | Walking/preview renders of the 4-leg leg-loss variants (the Stage 2 held-out embodiment). |
 | `render_bumpy_morph_walk.py`, `render_terrain_morph_walk.py`, `render_original_uneven_morph_walk.py`, `render_uneven_scene_walk.py` | Terrain-robustness renders from an earlier, now-inactive branch of work. Kept because nothing has archived them yet — treat as lower-confidence than the rest of `render/`. |
+
+## control/
+
+| | |
+|---|---|
+| `close_loop_ik.py` | Closed-loop control of an insect body via IK. |
+| `close_loop_kinematic.py` | Closed-loop control via kinematic replay, no physics. |
+| `close_loop_b1_physics.py` | Closed-loop control of the B1 in physics. |
+| `teacher_student_insect.py` | Teacher-student distillation loop for the insect. |
+| `plan_without_library.py` | Planning without a recorded candidate library. |
 
 ## diagnostics/
 

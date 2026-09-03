@@ -69,7 +69,7 @@ class MotionDecoder(nn.Module):
 
         if self.mode == "probe":
             # no attention, no depth: the head sees the frame only as an average over patch
-            # tokens, which is the same input the ridge diagnostic in scripts/diagnostics/morphology_axis.py
+            # tokens, which is the same input the ridge diagnostic in scripts/diagnostics/decoder/morphology_axis.py
             # was fitted on
             self.width = cfg.token_dim + cfg.z_dim
         else:

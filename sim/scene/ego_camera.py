@@ -236,7 +236,7 @@ def _wall_texture(seed, n=512):
     third-person background drowning the robot; an egocentric wall *is* the signal, and the property
     it needs is that embedding distance grows with camera motion.
 
-    Measured directly (`scripts/diagnostics/texture_for_vjepa.py`, a texture panned past a 256 px
+    Measured directly (`scripts/diagnostics/egocentric_view/texture_for_vjepa.py`, a texture panned past a 256 px
     viewport through the same encoder), correlation between true pan distance and embedding
     distance:
 

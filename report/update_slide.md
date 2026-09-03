@@ -1047,64 +1047,88 @@ Demo-JEPA aligns embodiments by retargeting rather than by removing body-specifi
 
 # Part 5 — Where this stands
 
-## Slide 24 — The prediction was tested, and half of it held
+## Slide 24 — Egocentric fixed action-conditioning, and we expected it to fix more
 
 ```
-  pose determines the future  ⇒  action redundant  ⇒  world model collapses
+  pose determines the future  ⇒  action redundant  ⇒  model ignores the action
         │
         ▼  remove the body from view
-  ┌─────────────────────────────┬──────────────────────────────────┐
-  │  the model USES the action  │  the model still cannot RANK     │
-  │  null/real  1.03 → 1.16     │  teacher 47%, a coin is 50%      │
-  │  PREDICTED and CONFIRMED    │  NOT predicted                   │
-  └─────────────────────────────┴──────────────────────────────────┘
-        two different capabilities. The viewpoint fixes the first only.
+  ┌──────────────────────────────────────────────────────────────────┐
+  │  the model now USES the action                                   │
+  │  null/real 1.03 → 1.16   ← first thing in F153-F169 to move it   │
+  │  yaw readability 0.07 → 0.64                                     │
+  └──────────────────────────────────────────────────────────────────┘
+        but this is COARSE use, at one step:  real ≠ null
+        not yet precise enough to rank, or to roll far
 ```
 
-| | before | after egocentric |
-|---|---|---|
-| **does prediction depend on the action** | 1.03, unmoved by six interventions | **1.16 insect, 1.13 B1** |
-| **can the model order two similar actions** | 33% (a coin is 50%) | **47%** |
-| **can it order two different behaviours** | 55% (chance 33%) | 52% |
-| **can the command be read back from a frame** | 0.982 | **0.847**, a 14% cost |
+| | allocentric | egocentric | |
+|---|---|---|---|
+| **does prediction depend on the action** | 1.03, unmoved by six interventions | **1.16** insect · B1 1.08 at one step, 1.12–1.13 beyond | **fixed** |
+| **ego-motion readable in the shared coordinate** | yaw 0.07 | **yaw 0.64** | **fixed** |
+| can it order two similar actions | 33% | 47% — *a coin is 50%* | not yet |
+| can it order two different behaviours | 55% | 52% *(chance 33%)* | unchanged |
+| command readable from `(frame, z)` | 0.982 | 0.847 | −14% |
 
-**One sentence: the camera change bought action-conditioning and did not buy fine ranking, and the
-two were never the same thing.**
+**We expected the ranking row to move with the first two, and it did not.** The reasoning was that
+ranking failed *because* the model ignored the latent action, so making it use the action should fix
+ranking. **It did make the model use the action — coarsely.** Enough to tell one behaviour from
+another; not yet enough to separate two versions of the same one.
+
+**So "uses the action" and "uses it precisely" turned out to be different capabilities.** That
+separation is a result of this session rather than something assumed going in.
+
+> **The two ranking rows are not a controlled before/after** — different body, different student,
+> twelve to fifteen branch points. At that count they are one number. **They license "chance in
+> both", not "improved".**
 
 ---
 
-## Slide 25 — What we learned by trying to use it
-
-**Four things were built on the working world model. Each failed, and each failure named a different
-component.**
+## Slide 25 — Two capabilities that have not improved yet, kept separate
 
 ```
-  teacher ranks perturbations   47%  ─┐
-  gradient through imagination  fails ├─→  not the model's sensitivity
-  bigger perturbations          42%  ─┘         (it responds fine)
-                                              │
-  teacher ranks recorded gaits   83%  ────────┘   ← the model CAN rank
+  coarse action-use          ✓ fixed by egocentric   (one step, real ≠ null)
+        │
+        ├── rollout prediction accuracy   ── reliable ~3–5 steps, then degrades
+        │                                    (a known limit for video world models)
+        │
+        └── fine action ranking           ── recorded behaviours  83%  ✓
+                                             fine perturbations   47%  ✗
 ```
 
-| what was tried | result | what it ruled out |
+**Reported separately, because a fix for one need not touch the other.**
+
+| what we asked of it | result |
+|---|---|
+| rank whole recorded gaits | **83%**, p = 0.019 — **it ranks when the difference is large** |
+| rank 0.5-sd perturbations | 47%, a coin is 50% |
+| perturb harder (σ 1→4) | 50 / 42 / 58%, all chance — and 33–40% of joints leave the data range |
+| follow a gradient through imagination | does not beat a random step of the same size |
+
+**The model is not blind to a small change**: its predicted response moves **15%** when the action
+moves 0.5 sd. **What has not improved is turning that response into a correct ordering.** Whether the
+remaining gap is the pretraining objective, the rollout horizon, or something else is **still being
+debugged, and we are not attributing it to one cause yet.**
+
+### The behavioural row, filled in
+
+| | clone only | + world model |
 |---|---|---|
-| rank small perturbations | 47% vs coin | — |
-| **rank recorded behaviours** | **83%, p = 0.019** | **the model is not weak** |
-| perturb harder (σ 1→4) | 50 / 42 / 58% | **separation is not the fix**; 33-40% of joints leave the data range |
-| backprop through imagination | never beats a random step, **fails at K = 1** | not vanishing gradients, not compounding, not off-manifold |
+| `c08f09t09`, allocentric | **54% — PASS** | not run |
+| `c10f10t10`, allocentric | 37% | **27%** |
+| base body (F144) | 36% | 31% |
+| `c08f09t09`, egocentric | 6% | not run |
 
-**So the failure is not blindness.** Fix the frame, change the action slightly: the model's predicted
-response moves by **15%**. It sees the difference.
+**A plain behaviour-cloned policy passes the F142 bar on one body with no world model at all.** On
+the body where the teacher is validated, the taught policy travels less than the clone — **the same
+direction F144 found, now reproduced on a second body.**
 
-**It is mis-proportion.** In physics, a small change and a whole different gait separate by **5.1×**.
-In the model, **3.1×**. **The model over-weights small differences relative to the world**, so
-anything that follows its ordering — a ranker, a gradient — is confidently wrong.
+**Stated as status, not verdict: the world model has not yet been shown to add behavioural value
+above cloning.** The teacher it runs through ranks fine perturbations at chance, so this is the
+outcome the ranking row predicts; **whether a better-debugged world model changes it is open.**
 
-**What that closes:** candidate generation by Gaussian perturbation, at any magnitude. Teacher-student
-in refine-within-a-behaviour mode. An actor learned in imagination.
-
-**What it leaves open, and it is F137 again:** the model ranks recorded gaits at 83%. **Can such
-candidates be *generated* rather than pulled from a library?**
+**Any future claim that the world model helps has to beat the clone on the same body** — and on the
+best body that is **54%**, not 36%.
 
 ---
 
@@ -1114,31 +1138,32 @@ candidates be *generated* rather than pulled from a library?**
   closed by measurement          open, in order
   ├─ perturbation candidates     ├─ 1. candidate generator: in-range, gait-structured
   ├─ imagined-actor gradients    │      (F137, and the 83% says the ranker is ready for it)
-  └─ "ego fixes ranking"         ├─ 2. Delta-JEPA's LDAD — running, prediction pre-registered
-                                 └─ 3. supervised self-body first, then the world model
-                                        ← Ajan Blink's W14 challenge, now motivated by a number
+  ├─ "ego fixes ranking"         └─ 2. supervised self-body first, then the world model
+  └─ Delta-JEPA's LDAD                  ← Ajan Blink's W14 challenge, now backed by a number
 ```
+
+**How LDAD closed, because the way it closed is itself the finding.** Delta-JEPA's term lifted
+action-reconstruction from 0.338 to 0.537 and moved the response ratio toward physics -- **and
+`null/real` fell from 1.16 to 0.99, at both weights its authors recommend.** The objective is
+satisfiable by stamping the action legibly onto the prediction's residual, which demands no accuracy:
+**Context Collapse with the arrow reversed.** So displacement-reconstruction cannot establish that a
+world model *uses* the action, and we have the counterexample.
 
 **1. A candidate generator that stays inside the data.** The requirement is measured, not guessed:
 inside the recorded command range, carrying gait structure, and still separating outcomes. **The
 library meets it; nothing generated has.**
 
-**2. LDAD (Delta-JEPA), running now.** Its premise is action-insensitive collapse. **We measured that
-we do not have collapse** — `dz` already carries the action at 0.199 untrained, and the response to a
-fine action is 15%, not zero. **Pre-registered: it clears the general question and not the fine one.**
-Being wrong here is the best available outcome — it would reopen everything on this slide.
-
-**3. Supervised self-body perception first.** Ajan Blink's Week 14 challenge, and it is now backed by
+**2. Supervised self-body perception first.** Ajan Blink's Week 14 challenge, and it is now backed by
 a measurement rather than intuition: from the head camera alone the B1 policy accounts for **0.205**
 of the command it must produce.
 
 **The deliverable is unchanged: a behaviour recorded on the insect drives the B1 through the shared
 coordinate.**
 
-**And what ships if none of the three lands** is not nothing. It is a chain of pre-registered
+**And what ships if neither lands** is not nothing. It is a chain of pre-registered
 measurements of why locomotion world models collapse, a viewpoint fix that is **necessary and not
-sufficient**, and a mechanism — **mis-proportioned action response** — that no published
-anti-collapse objective addresses, because manipulation and navigation are not periodic.
+sufficient**, and **two objectives shown to be satisfiable without the goal they encode** — Context Collapse in
+both directions, the second measured here for the first time.
 
 ---
 
@@ -1149,13 +1174,13 @@ anti-collapse objective addresses, because manipulation and navigation are not p
 
 | claim | script |
 |---|---|
-| action readable from one frame vs a pair | `scripts/diagnostics/inverse_dynamics_r2.py` |
-| does prediction need the action (`null/real`) | `scripts/diagnostics/action_necessity.py` |
-| is the action-blind residual usable | `scripts/diagnostics/residual_structure.py` |
+| action readable from one frame vs a pair | `scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py` |
+| does prediction need the action (`null/real`) | `scripts/diagnostics/objective_experiments/action_necessity.py` |
+| is the action-blind residual usable | `scripts/diagnostics/objective_experiments/residual_structure.py` |
 | counterfactual futures, physical and in embedding | `branch_divergence.py`, `embedding_divergence.py` |
-| coordinate transfer across bodies | `scripts/diagnostics/motion_rep_check.py` |
-| gait removal | `scripts/diagnostics/degait_coordinate.py` |
-| which surface the encoder reads motion from | `scripts/diagnostics/texture_for_vjepa.py` |
+| coordinate transfer across bodies | `scripts/diagnostics/objective_experiments/motion_rep_check.py` |
+| gait removal | `scripts/diagnostics/egocentric_view/degait_coordinate.py` |
+| which surface the encoder reads motion from | `scripts/diagnostics/egocentric_view/texture_for_vjepa.py` |
 
 **Four guards run before results are read. Each was added after a specific failure.**
 

@@ -50,7 +50,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
-from diagnostics.check_actswm_wiring import FrozenActionReadout, stance_action  # noqa: E402
+from diagnostics.objective_experiments.check_actswm_wiring import FrozenActionReadout, stance_action  # noqa: E402
 
 from wm.adapt3 import gather  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402

@@ -92,7 +92,7 @@ class Config:
     # a directory and globs it, so without this every body is trained on and the only things
     # measurable are the latent's composition and a validation split of 67 B1 transitions.
     # Names must match the clip prefix, e.g. c08f09t09. Score them afterwards with
-    # scripts/diagnostics/score_body.py, which needs no retraining.
+    # scripts/diagnostics/decoder/score_body.py, which needs no retraining.
     heldout_bodies: tuple = ()
 
     # Cap clips per body, as "embodiment=N". Without it the hexapod brings 6 bodies x 27 clips

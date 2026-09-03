@@ -10,14 +10,21 @@ Add `--encode_device cpu` to anything that encodes frames when a training run ho
 ```
 scripts/
   vjepa2_encoder.py   the frozen encoder wrapper, imported by almost everything
-  *.sh                run sheets: retrain_stage1, com7_train, retrain_stage2_clean_adv
-  diagnostics/        what the model learned, and whether it works
+  run/                run sheets: retrain_stage1, com7_train, retrain_stage2_clean_adv, f183_ldad, ...
+  diagnostics/        what the model learned, and whether it works — grouped into subfolders below
+  tools/              CoppeliaSim scene/robot calibration utilities, not research-question diagnostics
   dataset/            build, audit and inspect the recorded data
   figures/            figures for the report that are not measurements
   finished/           answered questions, kept because the findings cite them
   amp/                the parked reinforcement-learning branch
-  _archive/           superseded; not expected to run
+  _archive/           umap_domain_check.py only — still cited by direction_plan.md §6
+                       (render-style-dominance risk); everything else superseded was removed
 ```
+
+`diagnostics/` is a Python package (`diagnostics/__init__.py`) so that scripts can import from each
+other (e.g. `from diagnostics.planning.score_closed_loop import channel_for`); each subfolder below
+carries its own empty `__init__.py` for the same reason. `tools/` is not a package — nothing imports
+from it, it is invoked by file path only.
 
 ## Do not redefine these
 
@@ -44,7 +51,7 @@ exception, and says so in the file: the broken bodies are its subject.
 
 ## diagnostics/
 
-**What the decoder uses**
+**`decoder/` — what the decoder uses**
 
 | | |
 |---|---|
@@ -53,8 +60,9 @@ exception, and says so in the file: the broken bodies are its subject.
 | `morphology_axis.py` | Where a held-out body lands between two training bodies, at each stage of the pipeline. |
 | `plot_action_trace.py` | Predicted against ground-truth joint commands, per joint. Aggregate error hides which joints failed. |
 | `score_body.py` | One checkpoint against several held-out bodies, with both constant baselines and R². Use instead of retraining per test body. |
+| `motion_decoder_ceiling.py` | The decoder's own ceiling, so a teacher-student number is read against what the decoder can supply, not against 1.0. |
 
-**What the latent contains**
+**`latent/` — what the latent contains**
 
 | | |
 |---|---|
@@ -67,7 +75,7 @@ exception, and says so in the file: the broken bodies are its subject.
 | `leg_contact_probe.py` | Does "is this leg loaded" read across embodiments? Needs no shared gait phase. |
 | `wm_umap.py`, `cross_embodiment_umap.py` | The encoder embedding beside the learned latent. |
 
-**Whether the forward model works**
+**`forward_model/` — whether the forward model works**
 
 | | |
 |---|---|
@@ -77,8 +85,9 @@ exception, and says so in the file: the broken bodies are its subject.
 | `aug_noise.py` | How much of the reconstruction target is augmentation noise rather than motion. |
 | `target_window_sweep.py` | Does shortening the window turn the motion target from a state into a change? |
 | `loss_gradient_balance.py` | Which loss term is actually pulling on the latent, measured as a gradient rather than a loss. |
+| `rollout_fidelity.py` | How far a rollout can be trusted before it drifts off what the model was fitted on. |
 
-**Whether the setting supports the claim**
+**`setting/` — whether the setting supports the claim**
 
 | | |
 |---|---|
@@ -92,31 +101,56 @@ exception, and says so in the file: the broken bodies are its subject.
 | `speed_variance_split.py` | Is body speed readable from one frame because of physics, or because we built the data badly? |
 | `pairing_taskspace.py` | Can a cross-embodiment pairing be built in task space, where the contact labels failed? |
 
-**The shared body target**
+**`shared_body_target/` — the shared body target**
 
 | | |
 |---|---|
-| `screen_behaviour_channels.py` | Which body-motion channels carry shared meaning, now that both robots vary in them. **Supersedes `_archive/channel_screen.py`**, which predates the corrected data. Run it against the checkpoint you are actually claiming about: on `beh12_hexonly` nothing transfers, because that run has one robot in it (F110). |
+| `screen_behaviour_channels.py` | Which body-motion channels carry shared meaning, now that both robots vary in them. **Supersedes `channel_screen.py`** (removed in the 2026-09-03 cleanup), which predated the corrected data. Run it against the checkpoint you are actually claiming about: on `beh12_hexonly` nothing transfers, because that run has one robot in it (F110). |
 | `body_head_ablation.py` | Does the body-motion term constrain the latent, or does the head read the frame instead? |
 | `body_motion_probe.py` | Does a body-level motion readout transfer between the two robots, where a leg-level one does not? |
 | `show_body_motion_edges.py` | See the edge artefact in the `lambda_body` target, next to the video it was computed from. |
+| `body_head_calibration.py` | Calibrates the body-motion head before a run is trusted, so the head's own scale isn't mistaken for a modelling result. |
 
-**Cross-embodiment transfer**
+**`cross_embodiment/` — cross-embodiment transfer**
 
 | | |
 |---|---|
 | `fit_4leg_head.py` | Fit a new output head on a held-out embodiment with the backbone frozen. |
 | `fit_b1_head.py` | The same on the B1, using a Stage 1 checkpoint so the quadruped is genuinely held out. `--stratify` matches velocities across the split; `--z_modes` ablates the latent, which is what showed the transfer travels entirely through `z` (F50). |
 | `sweep_4leg_fewshot.py` | The same, swept over how many clips the new head gets. |
+| `finetune_ftm.py` | Adapts the forward model to a target robot with a few clips; the source of the few-shot adaptation curve (F52). |
 
-**Does the command actually walk**
+**`objective_experiments/`** — is the action channel necessary, and can the model recover it at all,
+independent of the specific fix under test.
 
 | | |
 |---|---|
-| `wm_gait_report.py` | Gait diagram and side-by-side video, predicted commands against IK ground truth, driven through the same physics. |
+| `action_necessity.py` | Is the one-step prediction task easy enough to solve without reading the action at all? |
+| `check_actswm_wiring.py` | Three wiring checks before the ActSWM rebuild burns five hours of pretraining. |
+| `delta_action_decoding.py` | Delta-JEPA's LDAD, measured on what we already have before anything is retrained. |
+| `dreamer_gradient.py` | Does the gradient through the world model's imagined rollout point the right way in the real world? |
+| `intent_recoverability.py` | Is the signal a broken rhythm exposes intent, or only which behaviour this clip is? |
+| `inverse_dynamics_r2.py` | How much does the transition add over a single frame, for reading the action? |
+| `motion_rep_check.py` | De-risking Direction B: can a motion-organised representation be action-necessary and body-shared? |
+| `null_action.py` | Which "zero action" means do not move rather than fall over, on each robot. |
+| `null_separability.py` | Is `ITM(e_t, e_t)` still a different thing from a real transition, on this checkpoint's own data? |
+| `residual_structure.py` | Is what the null-action prediction misses structured by the action, or is it noise? |
 
-**Planning and the closed loop** — everything below scores *selection*, not prediction. A model that
-predicts the next frame well and ranks candidates badly passes every other table on this page.
+**`egocentric_view/`** — the Q1/Q2 thread: does the egocentric view fix action-conditioning, and
+what does it cost.
+
+| | |
+|---|---|
+| `branch_divergence.py` | After a shared prefix, do two actions produce separable futures — in position and heading? |
+| `check_appearance_leak.py` | Can heading be read off the room's colour? If so, Q1 measures a leak, not egocentric. |
+| `degait_coordinate.py` | Does removing the gait-locked component of an egocentric view improve the cross-body coordinate? |
+| `embedding_divergence.py` | Does the counterfactual divergence survive the encoder the world model actually sees through? |
+| `pooled_student_check.py` | Does the student's pooling throw away the thing that makes egocentric work? |
+| `student_head_arch.py` | Attention or convolution over the token grid — and does either fit the 20 Hz budget? |
+| `texture_for_vjepa.py` | Which wall texture does V-JEPA2 actually read motion from? |
+
+**`planning/`** — everything below scores *selection*, not prediction. A model that predicts the
+next frame well and ranks candidates badly passes every other table on this page.
 
 | | |
 |---|---|
@@ -132,6 +166,24 @@ predicts the next frame well and ranks candidates badly passes every other table
 | `hexapod_replay_fidelity.py` | Does replaying a recorded hexapod clip reproduce its speed, as F93 implies it must? |
 | `b1_replay_stability.py` | Does a recorded B1 action sequence keep the robot upright when replayed open loop? Answers whether a fall is the planner's fault or the clip's. |
 | `z_crosses_bodies.py` | Is the latent organised by behaviour or by body? **Its verdict has been backwards about the loop twice** — it ranks turning first and forward last, and the loop does the opposite (F107, F112). A pooled linear readout is not what the planner computes. |
+| `wm_gait_report.py` | Gait diagram and side-by-side video, predicted commands against IK ground truth, driven through the same physics. |
+| `score_by_body_motion.py` | Scores a closed-loop run by the shared body-motion coordinate rather than joint error. |
+| `summarise_stage3_seeds.py` | Averages a stage-3 seed sweep over its late window, per arm, from the training log — `wm/adapt3.py` writes only the final `top1`/`family`. |
+| `teacher_label_quality.py` | Can the teacher rank actions, and at which scale? The characterisation of F144's failure. |
+| `clone_walk_test.py` | Does the egocentric clone walk further than the allocentric one? The behavioural row F184 filled in. |
+
+---
+
+## tools/
+
+CoppeliaSim scene/robot calibration utilities — not diagnostics answering a research question, so
+kept out of the `diagnostics/` package (no cross-imports touch them).
+
+| | |
+|---|---|
+| `inspect_scene.py` | List what is inside a CoppeliaSim scene: joints, their order, and any attached scripts. |
+| `run_olaf_reference.py` | Run the lab's Olaf scene as it ships and record its gait, as the reference to compare against. |
+| `tune_legs.py` | Per-leg offsets and gains that make six unequal legs trace the same stroke. |
 
 ---
 

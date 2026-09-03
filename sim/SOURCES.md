@@ -16,7 +16,7 @@ state changing underneath it.
 | `env/medauroidea_stick_insect.ttt` | `airl-insect-walking/env/medauroidea_stick_insect.ttt` | Base CoppeliaSim stick insect model (*Medauroidea extradentata*). No camera/vision sensor — state-only in the original. Leg-length morphology variants (short/medium/long) don't exist yet and need to be created from this base. |
 | `env/main_script.py` | `airl-insect-walking/env/main_script.py` | The scene's embedded control script (drives the default gait replay). Required — the `.ttt` fails to load without it. **Modified on copy**: two hardcoded absolute paths (`/home/yuchen/airl-insect-walking/...`) rewritten to point at `sim/env/` locally. |
 | `env/ds_loopsm.csv` | `airl-insect-walking/env/ds_loopsm.csv` | Gait trajectory data `main_script.py` reads on init. Required alongside it. |
-| `coppeliasim_env.py` | `airl-insect-walking/common/normalized_env.py` | `CoppeliaSimEnv` class — ZMQ Remote API connection, `reset()`/`step()`. Renamed on copy for clarity in this repo. |
+| `coppeliasim_env.py` *(removed)* | `airl-insect-walking/common/normalized_env.py` | `CoppeliaSimEnv` class — ZMQ Remote API connection, `reset()`/`step()`. Renamed on copy for clarity in this repo. Never imported by anything; removed in the 2026-09-03 scripts/sim cleanup. |
 | `environment.yml` | `airl-insect-walking/environment.yml` | Known-working conda env for CoppeliaSim v4.10 + ZMQ, for reference. We did **not** install this as-is — it bundles an unrelated torch 2.7.1 that would've conflicted with the project's own torch in `.venv`. |
 
 ## Not migrated yet (available in `airl-insect-walking/` if needed later)

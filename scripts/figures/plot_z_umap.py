@@ -37,7 +37,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
-from diagnostics.body_motion_probe import gather, standardise  # noqa: E402
+from diagnostics.shared_body_target.body_motion_probe import gather, standardise  # noqa: E402
 
 
 def embodiment_auc(x, label, clip, seed=0):

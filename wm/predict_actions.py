@@ -66,7 +66,7 @@ def load_model(ckpt_path, device, embodiment="hexapod"):
 def identity_basis_for(itm, encoder, checkpoint, args, cfg, device, n_dirs=8):
     """The directions in `z` that carry embodiment identity, peeled off one at a time.
 
-    Same construction as `scripts/diagnostics/z_identity_ablation.py`: fit a linear probe for which
+    Same construction as `scripts/diagnostics/latent/z_identity_ablation.py`: fit a linear probe for which
     embodiment a latent came from, remove its direction, refit, repeat. Needs both embodiments
     present, so it encodes a few clips of each.
     """

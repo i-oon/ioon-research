@@ -1,0 +1,127 @@
+"""Is the B1's joint command as determined by one frame as the insect's is?
+
+F31 measured that for the insect, a single frame predicts the joint command at every
+horizon tested, because the data is one gait at one speed and the phase fixes everything
+after it. That is why the forward transition model has nothing to do.
+
+The B1 data is not one speed: fourteen clips, two gait policies, seven commanded forward
+speeds from 0.30 to 0.50 m/s. If speed is not readable from a still frame, then one frame
+should NOT determine the next command, the second frame should earn more than the 1.09x it
+earns on the insect, and the forward model has a job in Stage 2 worth keeping.
+
+Everything is measured the same way as the insect so the two are comparable: ridge from a
+single mean-pooled frame embedding, RMSE in degrees, reported against the commands' own
+spread.
+
+  .venv/bin/python3 scripts/b1_horizon.py
+"""
+import argparse
+import glob
+import os
+import sys
+
+import numpy as np
+import torch
+from sklearn.linear_model import Ridge
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+SCRIPTS = os.path.join(ROOT, "scripts")
+sys.path.insert(0, ROOT)
+sys.path.insert(0, SCRIPTS)
+from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
+
+from wm.evaluate import encode_clip  # noqa: E402
+
+
+def rmse(model, features, target):
+    return float(np.sqrt(((model.predict(features) - target) ** 2).mean()))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data_dir", default=os.path.join(ROOT, "data", "b1_framed"))
+    # The encoder ran on the CPU by default because the B1 set is 14 clips and that was tolerable.
+    # On the 140-clip insect directory the same default is 9,240 frames of ViT-g on the CPU, which
+    # had not finished after 38 minutes. Anything that encodes a whole directory belongs on the GPU.
+    ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--chunk", type=int, default=2)
+    ap.add_argument("--horizons", type=int, nargs="+", default=[0, 1, 2, 4, 8, 16, 32])
+    # Pooling every body inflates the command spread with between-body variance, which is a
+    # different question from "how much of one body's command does a frame fix". F31 measured one
+    # body; restrict here to reproduce that, leave the default to pool.
+    ap.add_argument("--pattern", default="*.npz")
+    args = ap.parse_args()
+
+    paths = sorted(glob.glob(os.path.join(args.data_dir, args.pattern)))
+    if not paths:
+        raise SystemExit(f"no clips in {args.data_dir}")
+    # hold out every third clip, so both policies and the whole speed range appear on both
+    # sides of the split
+    test_index = set(range(2, len(paths), 3))
+
+    encoder = VJEPA2FrameEncoder(device=args.device, dtype=torch.float32)
+    embeddings, actions, speeds = [], [], []
+    for path in paths:
+        clip = np.load(path, allow_pickle=True)
+        embeddings.append(encode_clip(encoder, clip["frames"], args.chunk).mean(1).cpu().numpy())
+        # the B1 stores its command under `action` and a commanded speed alongside it; the insect
+        # uses `actions` and walks one speed, so the same measurement runs on either by asking
+        # which of the two is present rather than assuming the quadruped
+        actions.append(np.degrees(clip["action" if "action" in clip.files else "actions"]))
+        speeds.append(float(clip["command"][0, 0]) if "command" in clip.files else float("nan"))
+
+    pooled = np.concatenate(actions)
+    steps = np.concatenate([np.diff(a, axis=0) for a in actions])
+    speed_note = (f", commanded speeds {min(speeds):.2f}-{max(speeds):.2f} m/s"
+                  if not np.isnan(speeds).any() else ", one commanded speed")
+    print(f"{len(paths)} clips, {len(paths) - len(test_index)} fitted / {len(test_index)} held "
+          f"out{speed_note}")
+    print(f"command spread {pooled.std(axis=0).mean():.2f} deg per joint | "
+          f"step a_t+1 - a_t: std {steps.std():.2f} deg\n")
+
+    def split(build_features, build_target):
+        halves = ([], []), ([], [])
+        for i, (e, a) in enumerate(zip(embeddings, actions)):
+            x, y = build_features(e), build_target(a)
+            n = min(len(x), len(y))
+            dest = halves[1] if i in test_index else halves[0]
+            dest[0].append(x[:n]); dest[1].append(y[:n])
+        return [[np.concatenate(v) for v in half] for half in halves]
+
+    print(f'{"predict from one frame":<26} {"RMSE deg":>9}')
+    for lag in args.horizons:
+        (xtr, ytr), (xte, yte) = split(lambda e: e[:len(e) - lag] if lag else e,
+                                       lambda a: a[lag:])
+        model = Ridge(alpha=1.0).fit(xtr, ytr)
+        print(f'{"a_t" if lag == 0 else f"a_t+{lag}":<26} {rmse(model, xte, yte):9.2f}')
+
+    one = lambda e: e[:-1]
+    two = lambda e: np.concatenate([e[:-1], e[1:]], axis=1)
+    print(f'\n{"predict":<26} {"1 frame":>9} {"2 frames":>10} {"gain":>7}')
+    for name, build in (("a_t+1, whole command", lambda a: a[1:]),
+                        ("a_t+1 - a_t, the change", lambda a: np.diff(a, axis=0))):
+        scores = []
+        for features in (one, two):
+            (xtr, ytr), (xte, yte) = split(features, build)
+            scores.append(rmse(Ridge(alpha=1.0).fit(xtr, ytr), xte, yte))
+        print(f'{name:<26} {scores[0]:9.2f} {scores[1]:10.2f} {scores[0]/scores[1]:6.2f}x')
+
+    # Can a single frame even tell how fast the robot was told to walk? Only askable where the
+    # commanded speed varies: the B1 clips sweep a range, the insect walks one speed per body, so
+    # regressing on a constant target is not a weaker version of this question but a different one.
+    if np.isnan(speeds).any():
+        print("\nskipping the commanded-speed readout: this dataset has one commanded speed, so "
+              "there is nothing to regress")
+    else:
+        per_clip_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i not in test_index])
+        per_clip_y = np.array([s for i, s in enumerate(speeds) if i not in test_index])
+        held_x = np.stack([e.mean(0) for i, e in enumerate(embeddings) if i in test_index])
+        held_y = np.array([s for i, s in enumerate(speeds) if i in test_index])
+        speed_model = Ridge(alpha=1.0).fit(per_clip_x, per_clip_y)
+        error = float(np.sqrt(((speed_model.predict(held_x) - held_y) ** 2).mean()))
+        print(f'\ncommanded speed recovered from a clip of frames: {error:.3f} m/s error, '
+              f'against a range of {max(speeds) - min(speeds):.2f} m/s')
+
+
+if __name__ == "__main__":
+    main()

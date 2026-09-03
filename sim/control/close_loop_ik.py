@@ -11,7 +11,7 @@ this is the one path that could actually run on a robot.
 
 **The goal is a demonstration clip.** At step `t` the planner is asked to reach the demonstration's
 frame `t + horizon`. Success is not "did it copy the demonstration's joint angles" -- it is
-`scripts/diagnostics/score_closed_loop.py`'s three criteria: achieved Froude within 15% of the
+`scripts/diagnostics/planning/score_closed_loop.py`'s three criteria: achieved Froude within 15% of the
 demonstrated one, the right behaviour class, and the body still up.
 
 **Why the driving loop is `collect_ik.drive_and_record` rather than a new one.** Scene loading,

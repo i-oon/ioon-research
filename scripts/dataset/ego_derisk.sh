@@ -79,8 +79,8 @@ echo "############ GUARD -- is heading readable from the room's colour? ########
 echo "Q1 is not to be read until this is at chance. A room that still works as a landmark hands"
 echo "back the single-frame pose readability the whole view change exists to remove, and Q1 would"
 echo "report that leak as a property of egocentric views. The fix is more seeds."
-$PY scripts/diagnostics/check_appearance_leak.py --data "$OUT/insect_flat" --embodiment hexapod
-[ -d "$OUT/b1_flat" ] && $PY scripts/diagnostics/check_appearance_leak.py --data "$OUT/b1_flat" \
+$PY scripts/diagnostics/egocentric_view/check_appearance_leak.py --data "$OUT/insect_flat" --embodiment hexapod
+[ -d "$OUT/b1_flat" ] && $PY scripts/diagnostics/egocentric_view/check_appearance_leak.py --data "$OUT/b1_flat" \
     --embodiment b1
 
 echo
@@ -88,7 +88,7 @@ echo "############ Q1 -- is the action still readable from ONE egocentric frame?
 echo "  third-person baseline, F159: insect 0.779 single frame, 0.887 pair"
 for SPEC in "hexapod $OUT/insect_flat ego_hex" "b1 $OUT/b1_flat ego_b1"; do
   set -- $SPEC
-  [ -d "$2" ] && $PY scripts/diagnostics/inverse_dynamics_r2.py \
+  [ -d "$2" ] && $PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py \
       --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data "$2" --embodiment "$1" \
       --cache "results/wm/cache/$3.pt" --target action
 done
@@ -96,7 +96,7 @@ done
 echo
 echo "############ Q2 -- does the shared coordinate still cross bodies? ############"
 echo "  read the 'B1 unrefitted' row; the 'insect held-out' row only says the fit worked at all"
-[ -d "$OUT/b1_flat" ] && $PY scripts/diagnostics/motion_rep_check.py \
+[ -d "$OUT/b1_flat" ] && $PY scripts/diagnostics/objective_experiments/motion_rep_check.py \
     --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --hex_data "$OUT/insect_flat" --b1_data "$OUT/b1_flat"
 
