@@ -26,6 +26,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=.venv/bin/python3
+# **Keep the terminal output.** The first run of this script printed to stdout alone and the log was
+# lost with the scrollback; `wm.train` writes its scalars to TensorBoard so nothing was
+# unrecoverable, but a diagnostic's output is not written anywhere and would have been gone.
+LOGDIR=results/f183
+mkdir -p "$LOGDIR"
+run() { echo "\$ $*" | tee -a "$LOG"; "$@" 2>&1 | tee -a "$LOG"; }
 HEX=data/egocentric/beh12_c10f10t10_ego_flat
 HELD=data/egocentric/beh12_c08f09t09_ego_flat
 B1=data/egocentric/beh12_b1_ego_flat
@@ -33,8 +39,9 @@ B1=data/egocentric/beh12_b1_ego_flat
 case "${1:-}" in
 
 baseline)
+  LOG="$LOGDIR/baseline.log"; : > "$LOG"
   # the untrained numbers the trained arms must beat; no GPU-hours, no retrain
-  $PY scripts/diagnostics/delta_action_decoding.py --ckpt wm/runs/beh12_ego/teacher_ego.pt \
+  run $PY scripts/diagnostics/delta_action_decoding.py --ckpt wm/runs/beh12_ego/teacher_ego.pt \
       --data "$HELD" --embodiment hexapod --cache results/wm/cache/ego_hex.pt
   ;;
 
@@ -43,7 +50,8 @@ train)
   # comparable with F172-F179 and with each other rather than with a differently-configured run.
   for LAM in 10 50; do
     [ -f "wm/runs/beh12_ego_ldad$LAM/best.pt" ] && { echo "skip lambda $LAM"; continue; }
-    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True $PY -u -m wm.train \
+    LOG="$LOGDIR/train_lambda$LAM.log"; : > "$LOG"
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True run $PY -u -m wm.train \
       --name "beh12_ego_ldad$LAM" \
       --sources hexapod="$HEX" b1="$B1" \
       --lambda_body 0.5 --body_dim 3 --body_channels 0 1 2 \
@@ -53,8 +61,9 @@ train)
 
 measure)
   for LAM in 10 50; do
-    echo "############ lambda_ldad $LAM ############"
-    $PY scripts/diagnostics/delta_action_decoding.py \
+    LOG="$LOGDIR/measure_lambda$LAM.log"; : > "$LOG"
+    echo "############ lambda_ldad $LAM ############" | tee -a "$LOG"
+    run $PY scripts/diagnostics/delta_action_decoding.py \
         --ckpt "wm/runs/beh12_ego_ldad$LAM/best.pt" \
         --data "$HELD" --embodiment hexapod --cache results/wm/cache/ego_hex.pt
   done
@@ -68,3 +77,6 @@ measure)
 
 *) echo "usage: $0 {baseline|train|measure}"; exit 2 ;;
 esac
+
+echo
+echo "log kept in $LOGDIR -- the numbers are also in wm/runs/*/summary as TensorBoard scalars."

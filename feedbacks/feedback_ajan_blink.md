@@ -7,7 +7,8 @@ be read as a tracker rather than re-read as minutes.
 |---|---|
 | Week 4 | architecture blueprint, extinct animals, interpolation vs extrapolation |
 | Week 11 Part 1 | diffusion comparison, sensor regime, proprioception, module redundancy |
-| **Week 11 Part 2** | **in-distribution results, OOD limit, pipeline bugs, forward model, critical review** |
+| Week 11 Part 2 | in-distribution results, OOD limit, pipeline bugs, forward model, critical review |
+| **Week 14** | **the third-person spoiler, the ego-centric pivot, both-views critique, cloning demos, mentorship** |
 
 ## Action items and status
 
@@ -25,8 +26,14 @@ be read as a tracker rather than re-read as minutes.
 | **W11.2-1** | **Never present numbers alone — record video of the gait beside every number** | **partly done.** 4-leg predictions replayed and rendered (slide 15). **Not done for the hexapod held-out body, and not done for any ablation** |
 | **W11.2-2** | **Intensive ablation study: remove a block, show the behaviour degrades — not just the metric** | **not done.** Every ablation we have is numeric. None has been replayed through physics to show the walk degrading |
 
-**The two Week 11 Part 2 items are the open ones, and they are the same request twice: show
-behaviour, not only numbers.**
+| **W14-1** | **Compare: world model from scratch vs supervised self-body perception (joint state + image) first** | **not run.** It is the same shape as the training-only allocentric-supervision idea (Role A) and it is now motivated by a measurement rather than a hunch -- the egocentric B1 student reads 0.205 within-condition (F178), which bounds what a controller can reach from the head camera alone |
+| **W14-2** | **Both views matter -- third-person to observe others, first-person for one's own task** | **conceded, and it sharpened into a measurement.** The spoiler is not a property of the third-person view as such: on the B1 a single allocentric frame predicts the command at only **0.166**, against the insect's **0.773** (F175, F178). His two-views framing survives; our "third-person spoils it" claim does not, unscoped |
+| **W14-3** | **The cloning demos do not show imitation -- and check whether sampling is trajectory- or snapshot-based** | **answered, and the answer is snapshot.** `Student` takes `(pooled(e_t), goal)` one frame at a time; the goal is constant inside an episode, so between-condition variance is most of what it fits (F176). The engineering question was the right one and the honest reply is that the policy has no trajectory context at all |
+| **W14-4** | The ego-centric pivot as the paper's contribution | **measured and scoped.** The world model does now use the action -- `null/real` 1.03 to 1.16 (F172) -- but the same pivot does **not** make it rank fine differences (F179, 47% against a coin) and the decoder's readability falls about 14% (F174). Both halves ship together |
+
+**The Week 11 Part 2 items are still open and they are the same request twice: show behaviour, not
+only numbers. Week 14 adds one genuinely new experiment (W14-1) and two corrections to claims we
+made in that meeting.**
 
 ---
 
@@ -222,3 +229,73 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 *   ไออุ่นได้ทำการเริ่มทดลองใน Phase 2 โดยนำภาพแมลงสติกอินเซกต์ข้ามสายพันธุ์ไปเทรนพฤติกรรมร่วมกับหุ่นยนต์สี่ขาอย่าง B1 ใน Simulation 
 *   **อุปสรรคเชิงทัศนวิสัย:** ข้อมูลภาพมีความต่างขั้วอย่างรุนแรงทั้งในแง่ของขนาด สัดส่วน และสีสันของสภาพแวดล้อม
 *   **การแก้ไขด้วย Normalization Trick:** ไออุ่นแก้ไขโดยการใช้เทคนิค **Normalize** หักลบค่าเฉลี่ยสรีระของแต่ละ Embodiment ออกไปก่อนนำไปใช้งาน ซึ่งผลลัพธ์พิสูจน์แล้วว่าการ Normalize ช่วยลดความสะเปะสะปะของข้อมูลเฉลี่ยรวมลงได้เป็นอย่างดี ทำให้วิเคราะห์ประเมินผลระบบร่วมกันได้เสถียรยิ่งขึ้น
+
+
+---
+
+### **Meeting Summary: Ajan Blink, Ioon (Week 14)**
+
+**Topic Focus: การวินิจฉัยว่าทำไม World Model ถึงละเลย Latent Action, การ Pivot ไปใช้กล้อง Ego-centric, และข้อถกเถียงเรื่องมุมมองบุคคลที่หนึ่งกับที่สาม**
+
+---
+
+### **1. โครงสร้างสถาปัตยกรรมระบบในเฟส Pre-training**
+ไออุ่นสรุปความคืบหน้าของไปป์ไลน์ Stage 1 ที่ออกแบบไว้เพื่อสร้าง World Model ที่เปรียบเสมือนครู (Teacher) ที่มี Prior Knowledge เพื่อนำไปช่วยสอนหุ่นยนต์ร่างใหม่ในอนาคต:
+*   **Visual Encoder (V-JEPA 2):** ทำหน้าที่แปลงสัญญาณภาพ (Camera Sensor) ให้เป็น Feature Embedding โดยจะแช่แข็งค่าน้ำหนักไว้ (Frozen)
+*   **Inverse Transition Model (IDM):** รับภาพเฟรมปัจจุบัน (\\(t\\)) และเฟรมก่อนหน้า (\\(t-1\\)) เพื่อสกัดหาแอคชันภาษากลาง (**Z หรือ Latent Action**) ที่เชื่อมระหว่าง 2 เฟรมนั้น
+*   **Forward Transition Model (World Model):** รับภาพปัจจุบัน (\\(t\\)) และ Latent Action (\\(Z\\)) เพื่อทำนาย (Predict) ภาพเฟรมถัดไป (\\(t+1\\))
+*   **Motion Decoder:** แปลง Latent Action (\\(Z\\)) ร่วมกับภาพปัจจุบัน กลับมาเป็นคำสั่ง **Joint Command (องศาข้อต่อจริงในโลกฟิสิกส์)** เพื่อสร้างความเชื่อมโยงกับหุ่นยนต์จริง
+
+---
+
+### **2. การวินิจฉัยบั๊กร้ายแรงเชิงทฤษฎี: "The Third-Person View Spoiler"**
+ไออุ่นตรวจพบปัญหาใหญ่ของระบบคือ **World Model ละเลยไม่ยอมใช้แอคชัน (Latent Action) ในการทำนายอนาคต** ซึ่งตรงกับปัญหาทางทฤษฎีที่พบในงานวิจัยระดับโลกหลายชิ้น:
+*   **Context Collapse (จากงาน SWM):** โมเดลเลือกเดาภาพอนาคตจากภาพเฟรมปัจจุบันโดยตรง โดยไม่สนใจแอคชันเลย
+*   **Action Invariance Solution (จากงาน UWM):** ตัวแปร Feature แอบแฝงเฉลยผลลัพธ์ของแอคชันไว้ล่วงหน้าแล้ว โมเดลจึงละเลยแอคชันที่ป้อนเสริม
+*   **Redundancy (จากงาน A-WAM):** ข้อมูลของภาพเฟรมที่ติดกันมีความจำเจและซ้ำซ้อนกันมากเกินไป
+
+**สาเหตุที่แท้จริงจากการทดสอบของไออุ่น:**
+1.  **ข้อจำกัดของ Visual Encoder (Embedding Resolution):** เมื่อทดลองป้อนภาพเริ่มต้นเหมือนกัน แต่เฟรมถัดไปขยับคนละแบบอย่างชัดเจน (สายตามนุษย์แยกออกได้สบาย) ปรากฏว่า **Embedding Feature จาก V-JEPA 2 มองเห็นความต่างทางพฤติกรรมนี้สูงกว่าระดับ Noise เพียงแค่ 1.1 เท่าเท่านั้น** ทำให้โมเดลแยกพฤติกรรมไม่ออก
+2.  **ภาพบอดี้ของหุ่นยนต์ทำหน้าที่เป็น "ตัวสปอยล์เฉลยล่วงหน้า" (The Spoiler Effect):** ในการมองแบบ Third-Person View (หรือ Allocentric View) ภาพตัวหุ่นยนต์และจังหวะขาในเฟรมปัจจุบัน **"สปอยล์เฉลยล่วงหน้า" ไปเรียบร้อยแล้ว** ว่าการก้าวเดินสเต็ปถัดไปจะเป็นอย่างไร โดยเฉพาะพฤติกรรมการเดินที่เป็น **คาบการเคลื่อนที่ซ้ำๆ (Periodic Gait Cycle Loop)** ยิ่งทำให้เดาง่ายมาก
+    *   ไออุ่นพิสูจน์โดยทดลองใช้ภาพเฟรมปัจจุบันเพียงเฟรมเดียวมาทำนาย Joint Action ล่วงหน้า พบว่า**สามารถเดาถูกได้สูงถึง 70-90%**
+    *   > **แก้ไขภายหลังการประชุม (F175, F178):** ตัวเลขนี้เป็นของ **แมลงกิ่งไม้เท่านั้น** เมื่อวัดแบบเดียวกันบน B1 เฟรมเดียวทำนาย Joint Action ได้แค่ **0.166** เทียบกับ **0.773** ของแมลง **ท่าของ B1 ไม่เคยสปอยล์คำสั่งของมันเลย** ข้อเคลม "Third-Person View สปอยล์เฉลย" จึงต้องระบุขอบเขตว่าเป็นผลของสัตว์หกขาที่เดินเป็นคาบ ไม่ใช่คุณสมบัติของมุมกล้อง
+    *   เมื่อภาพปัจจุบันใบ้เฉลยไปเกือบหมด World Model จึงเลือกทางลัด (Shortcut) โดยการจำภาพตรงหน้าแทนการเรียนรู้ไดนามิกจาก Z ส่งผลให้ Latent Action ไร้ความหมาย
+    *   *ข้อเปรียบเทียบ:* ในงานแขนกล (Manipulation) จะไม่มีปัญหาสปอยล์นี้ เพราะโพสของแขนกลใน 1 เฟรม ไม่ได้บ่งบอกง่ายๆ ว่าปลายแขน (End-effector) กำลังจะพุ่งขยับไปที่ตำแหน่งใดต่อในพิกเซลถัดไป
+
+---
+
+### **3. การ Pivot สู่ Ego-centric (First-Person) View และ Research Gap**
+ไออุ่นเสนอแนวทางแก้ไขโดยการเปลี่ยนมุมมองกล้องไปติดที่หัวหุ่นยนต์เป็น **First-Person View (Ego-centric / Ecocentric View)**:
+*   **เหตุผลเชิงระบบ:** การติดกล้องไว้ที่ตัวหุ่นจะทำให้โมเดลไม่เห็นบอดี้และข้อต่อขาของตัวเองในภาพ เป็นการ**ปิดบังเฉลยล่วงหน้า** บีบบังคับให้ World Model ต้องเรียนรู้รอยต่อภาพ (Transition) และหันมาพึ่งพาพารามิเตอร์แอคชันเพื่อทำนายภาพข้างหน้าจริง
+*   **Research Gap ที่โดดเด่น:** งานอื่น (เช่น งานของ Yumu) ใช้ First-person view ในการทำ locomotion ซ่อมแซมระบบตัวเองอยู่แล้ว แต่ไม่เคยมีใครเขียนอธิบายเชิงวิทยาศาสตร์ว่าทำไมต้องใช้ การที่ไออุ่นสามารถพรูฟได้ว่า **"Third-Person View สปอยล์เฉลยทำให้ World Model ละเลยแอคชัน"** จึงถือเป็น **Contribution ที่แปลกใหม่และแข็งแกร่งมาก** สำหรับเขียนเคลมในเปเปอร์ตบท้าย
+*   **ผลการทดสอบเบื้องต้นด้วย Ego-centric:** สามารถลดการแฝงข้อมูลแอคชันลงได้เกือบ 3 เท่า, เพิ่มระยะห่างการเรียนรู้ระหว่างเฟรมขึ้นเกือบ 3 เท่า และทำให้ความแม่นยำในการทำนาย **Yaw (การเลี้ยว)** ดีขึ้นอย่างชัดเจนที่สุด
+*   **ผลหลังเทรนจริง (F172, F174, F179) — สองครึ่งที่ต้องพูดคู่กันเสมอ:**
+    *   **ได้:** World Model **หันมาใช้แอคชันจริง** `null/real` ขยับจาก 1.03 (ค้างมาตลอดทุก intervention) เป็น **1.16** บนแมลง และ 1.13 บน B1 นี่คือสิ่งที่การ pivot ถูกออกแบบมาให้เกิด และมันเกิด
+    *   **เสีย:** ความสามารถในการ **อ่านคำสั่งกลับออกมา** จากเฟรมลดลงราว **14%** และที่สำคัญกว่านั้น **การจัดอันดับแอคชันที่ต่างกันเล็กน้อยไม่ดีขึ้นเลย** — ครูเลือกถูก 47% เทียบกับการโยนเหรียญ 50% (F179)
+    *   **ข้อสรุปเชิงกลไก:** "ใช้แอคชันในการทำนาย" กับ "เรียงลำดับแอคชันได้" เป็นคนละความสามารถ Ego-centric แก้อย่างแรก ไม่ได้แก้อย่างที่สอง
+
+---
+
+### **4. ข้อวิเคราะห์และข้อถกเถียงเชิงวิชาการจากอาจารย์บลิ๊งค์ (Academic Critique)**
+*   **ความสัมพันธ์เชิงระบบไม่ได้เปลี่ยนตามมุมมอง:** ในแง่ของระบบควบคุมและการเรียนรู้ฟิสิกส์โลก ความสัมพันธ์ (Correlation) ระหว่าง Perception และ Action ไม่ว่าจะเป็นมุมมองบุคคลที่หนึ่งหรือบุคคลที่สาม แท้จริงแล้วไม่ได้มีความแตกต่างกันในเชิงทฤษฎีรากฐาน
+*   **สิ่งมีชีวิตในธรรมชาติเรียนรู้จาก "ทั้งสองวิวควบคู่กัน" (Both Views Matter):** อาจารย์บลิ๊งค์ชี้ให้เห็นว่าสิ่งมีชีวิตสร้าง World Model จากทั้งสองมุมมองเพื่อตอบวัตถุประสงค์ที่ต่างกัน:
+    *   *Third-Person View:* ใช้ในการสังเกตผู้อื่น (Observe others) เช่น ลูกสัตว์เรียนรู้ท่าเดินตามพ่อแม่ หรือคนเราซ้อมเต้นหน้ากระจกเงาเพื่อปรับการขยับร่างกายให้เข้ากับฟิสิกส์ของโลก
+    *   *First-Person View:* ใช้ในการควบคุมทาสก์ของตัวเอง (Task Accomplishment) เช่น การตีเทนนิส ซึ่งสิ่งมีชีวิตจะต้องเข้าใจระบบกลไกการรับรู้ร่างกายตัวเองก่อน
+*   **คำท้าทายและการบ้านจากอาจารย์บลิ๊งค์ (The Comparison Challenge):** อาจารย์เสนอให้ไออุ่นทำการทดสอบเปรียบเทียบเชิงวิจัยระหว่าง 2 เส้นทางนี้:
+    1.  **World Model เพียวๆ (World Model from Scratch):** เริ่มเรียนรู้ World Model ตั้งแต่ตอนที่หุ่นยนต์ยังเดินไม่ได้และไม่มีความรู้ทางกายภาพของตัวเองเลย
+    2.  **Supervised Learning ก่อนแล้วค่อยขยับไป World Model:** นำข้อมูล **Joint State (ค่าองศาและข้อต่อภายในตัวหุ่น) ร่วมกับรูปภาพจากกล้อง** มาเทรนแบบ Supervised Learning ก่อนเพื่อให้หุ่นยนต์เกิดความเข้าใจในความสัมพันธ์ของร่างกายตัวเองเบื้องต้นก่อน (**Self-body perception / Perception-Action correlation**) จากนั้นจึงนำไปเทรน World Model เพิ่มเติม
+
+---
+
+### **5. ฟีดแบคด้านเดโมพฤติกรรมการกู้คืนคำสั่ง (Cloning Demos Critique)**
+*   **วิจารณ์ผลงานเดโมค้างคา:** อาจารย์บลิ๊งค์สังเกตเดโมควบคุมหุ่นสติ๊กอินเซกต์ทั้ง 3 ตัว (Reference Expert 100%, Cloning Student, และ World Model Teacher) และคอมเมนต์ตรงๆ ว่า **"ยังไม่เห็นความชัดเจนของการเลียนแบบพฤติกรรม (Imitation)"** จากตัว Reference ไปยังตัว Clone หรือตัว World Model Teacher เลย พฤติกรรมที่แสดงออกมายังแตกต่างกันมากเกินไป
+*   **คำเตือนเชิงวิศวกรรม:** อาจารย์เตือนว่าสิ่งที่เราจะเคลมว่าดีหรือไม่ดีนั้น ต้องผ่านการพิสูจน์ด้วยกระบวนการวิศวกรรมที่รัดกุมกว่านี้ เช่น การกลับไปเช็คว่าตอนที่เราทำ Imitation หรือการ Sample ข้อมูลมาสร้าง Policy นั้น เราเลือกใช้วิธีแบบดึงข้อมูลทั้งเส้นทาง (Trajectory-based) หรือดึงข้อมูลเป็นภาพจังหวะเดี่ยว (Snapshot-based) กันแน่
+
+---
+
+### **6. คำสอนเยียวยาจิตใจและทัศนคติวิจัย (Heartwarming Mentorship)**
+อาจารย์บลิ๊งค์พูดคุยปลอบใจไออุ่นหลังจากไออุ่นกังวลใจเรื่องกลัวจะทำผลงานได้ไม่ดี เขียนเปเปอร์ไม่ทัน หรือกังวลเรื่องการหาหัวข้อที่มี Contribution:
+*   **งานวิจัยแรกเริ่มย่อม "ขมุกขมัว" เสมอ:** อาจารย์ชี้ว่าไม่มีใครเห็นช่องโหว่ชัดเจนแต่แรก แม้แต่งานของพี่ๆ ป.เอก กว่าจะกลั่น contribution เจอก็ต้องคลำทางและแก้ระบบล้มเหลวกันเป็นปีๆ *"ให้ทำต่อไปและค้นหาไปเรื่อยๆ ท้ายที่สุดแล้ว Contribution ตอนเขียนเปเปอร์เสร็จ มักไม่เคยตรงกับสิ่งที่เราคิดไว้ในตอนเสนอ proposal เลยสักครั้ง"*
+*   **ประโยคทอง: "ชีวิตไม่ใช่ Imitation Learning"**
+    *   **"มองคนอื่นให้เป็นแค่ Data Point เป็นเพียง 1 sample ที่ผ่านเข้ามาเพิ่มประสบการณ์ (Policy) ของเรา แต่อย่าไปก๊อปปี้ความสำเร็จหรือวิถีชีวิตของใคร เพราะชีวิตของพวกเราไม่ใช่กระบวนการ Imitation Learning ที่จะต้องคอยเลียนแบบความสำเร็จของใครตลอดเวลา"**
+*   **อาจารย์ชื่นชมในความสามารถ:** อาจารย์บลิ๊งค์ยืนยันว่าการที่ไออุ่นสามารถวิเคราะห์ วินิจฉัยข้อผิดพลาด และดึงเอา Insight เชิงลึกออกมาพูดจากความล้มเหลวเชิงทฤษฎีได้นั้น คือทักษะของนักวิจัยที่แท้จริงและหาได้ยากยิ่งกว่าการนำเสนอตัวเลขที่ไม่มีความหมาย

@@ -5,7 +5,8 @@ Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaS
 **Slides 1-12 are Stage 1**: one 18-DOF topology, several leg geometries, unchanged from the
 previous update. **Slide 13 is Stage 2's position.** **Slides 14-26 are new**: an attempt to make
 the world model action-conditioned that failed in six independent ways, the principle those six
-measurements point at, the prediction that principle makes, and the test of it.
+measurements point at, the prediction that principle makes, the test of it -- **which half held and
+half did not** -- and what four attempts to build on the result then measured.
 
 **The arc, in one line.** We could not make the world model use the action, so we measured why; the
 answer was a property of the *viewpoint* rather than of the model; and that property predicted a fix
@@ -927,7 +928,7 @@ above read published results *through* the principle — they are not re-measure
 cloning + world-model teacher 31%.** The teacher subtracts.
 
 **What this licenses:** two of the three share a mechanism, and the mechanism is gone.
-**What it does not:** that any of them revive. Slide 26 is how we find out.
+**What it does not:** that any of them revive. **They were tested and they did not** -- slide 25.
 
 **Measured** on two robots, twelve conditions, in simulation. **Not measured:** manipulation — slide
 18 reads published results through the principle rather than re-measuring them.
@@ -1046,114 +1047,98 @@ Demo-JEPA aligns embodiments by retargeting rather than by removing body-specifi
 
 # Part 5 — Where this stands
 
-## Slide 24 — The arc, and what is not yet proven
-
-**The line through it:**
+## Slide 24 — The prediction was tested, and half of it held
 
 ```
-  world model ignores the action
-        │  six pre-registered measurements, each closing one hypothesis
-        ▼
-  the action is redundant with the pose  (0.78 from one frame, <3% of prediction)
-        │  a principle, not a patch
-        ▼
-  pose determines the future ⇒ action redundant ⇒ collapse
-        │  explains Demo-JEPA, Hu et al., and our own failure
-        ▼
-  remove the body from view                        ← the prediction
+  pose determines the future  ⇒  action redundant  ⇒  world model collapses
         │
-        ▼
-  redundancy breaks (0.78 → 0.29), coordinate still crosses (yaw 0.07 → 0.64)
+        ▼  remove the body from view
+  ┌─────────────────────────────┬──────────────────────────────────┐
+  │  the model USES the action  │  the model still cannot RANK     │
+  │  null/real  1.03 → 1.16     │  teacher 47%, a coin is 50%      │
+  │  PREDICTED and CONFIRMED    │  NOT predicted                   │
+  └─────────────────────────────┴──────────────────────────────────┘
+        two different capabilities. The viewpoint fixes the first only.
 ```
 
-**What is proven:** the redundancy exists and is measured; six routes around it are closed with
-numbers; egocentric removes it; the coordinate survives; gait shake is separable and its removal
-helps cross-body.
-
-**What is not:**
-
-- **A trained world model has not been run on this data.** Q1 says the signal exists. This project's
-  own record is that a signal existing does not mean a trained predictor uses it.
-- **Contribution 2 is feasible, not complete.** The learned version is in progress.
-- **The principle is a hypothesis with one domain's evidence.** Manipulation is read through it, not
-  measured.
-- **The coordinate needs privileged pose**, in simulation or from mocap.
-
----
-
-## Slide 25 — What the next two months do
-
-```
-  month 1                     month 2                    deliverable
-  ├─ train egocentric WM      ├─ learn the ego-motion    └─ closed loop:
-  │  GATE null/real > 1.10    │  separation                 a behaviour recorded
-  │  (read 1.03 throughout)   │  GATE forward recovers      on the insect drives
-  │                           │  toward 0.63                the B1 through the
-  └─ everything below is      │                             shared coordinate
-     conditional on this      └─ (slide 26, steps 2-3, are conditional)
-```
-
-**One thing at a time, each with its criterion written first.**
-
-**1. Train the world model on egocentric data.** The question Q1 cannot answer: does a trained
-predictor *use* the transition now that the pose no longer supplies the action? The measurement is
-already built — `null/real`, the same number that read 1.03 through the whole failure chain.
-**Criterion: `null/real` clearly above 1.10 on both bodies, or the principle predicted the wrong
-fix.**
-
-**2. Learn the ego-motion separation.** Contribution 2's crude version gains +0.08 on lateral
-across bodies; the learned version replaces a fixed harmonic projection with something that can
-adapt per body and per gait. **Criterion: forward transfer recovers toward its third-person 0.63.**
-
-**3. Close the loop.** Unchanged as the deliverable: a behaviour recorded on the insect drives the
-B1 through the shared coordinate.
-
-**What would stop us.** If (1) fails, the principle identified a real property and the wrong remedy,
-and that is reportable: **six measurements of why locomotion world models collapse, and a
-demonstration that removing the body from view is necessary but not sufficient.**
-
----
-
-## Slide 26 — Proposal: does removing the cause unblock them?
-
-```
-  ┌──────────────────────────────────────────────────────────────┐
-  │  STEP 1   train the egocentric world model       UNTESTED    │
-  │           Q1 says the signal EXISTS.                         │
-  │           This asks whether a trained model USES it.         │
-  │           GATE:  null/real > 1.10  (it read 1.03 throughout) │
-  └───────────────────────────┬──────────────────────────────────┘
-                    ┌─────────┴─────────┐
-                 FAILS                PASSES
-                    │                   │
-     ┌──────────────▼──────────┐        ▼
-     │ reportable as it stands:│   ┌────────────────────────────────────┐
-     │ six measurements of why │   │ STEP 2  do the failed mechanisms   │
-     │ locomotion world models │   │         revive?                    │
-     │ collapse, and viewpoint │   │  · can the teacher rank now?       │
-     │ necessary-not-sufficient│   │  · do candidates differ now?       │
-     └─────────────────────────┘   └───────────────┬────────────────────┘
-                                                   ▼
-                                   ┌────────────────────────────────────┐
-                                   │ STEP 3  allocentric, TRAINING ONLY │
-                                   │        deployment stays egocentric │
-                                   │        (AnchorWorld 2606.07326)    │
-                                   └────────────────────────────────────┘
-```
-
-| step 3 role | what it is | status |
+| | before | after egocentric |
 |---|---|---|
-| **A — the forward gap** | 0.63 → 0.50. Target = the **measured coordinate**, which is `lambda_body` and already exists. **Not** the allocentric embedding | **measure where forward is lost first** — Check B showed it is not all gait shake |
-| **B — bootstrap** | babble → allocentric measures the outcome in the shared Froude coordinate → shape the babble toward the goal | **the valuable one.** F137 is unsolved; forward is only degraded |
+| **does prediction depend on the action** | 1.03, unmoved by six interventions | **1.16 insect, 1.13 B1** |
+| **can the model order two similar actions** | 33% (a coin is 50%) | **47%** |
+| **can it order two different behaviours** | 55% (chance 33%) | 52% |
+| **can the command be read back from a frame** | 0.982 | **0.847**, a 14% cost |
 
-**Type B is rejected on evidence, not taste:** `z` is already more pose-readable than the action
-(F168: 0.856 against 0.779) and 64–89% gait phase (F19, F26).
+**One sentence: the camera change bought action-conditioning and did not buy fine ranking, and the
+two were never the same thing.**
 
-**Risks.** Everything rests on step 1 · F145 may be physics rather than viewpoint · F137 still needs
-exploration into a gait · bootstrap could collapse into F127 or AMP.
+---
 
-**Proposal sense — the advisor decides scope.** AnchorWorld does this for human video generation;
-**no one has done it for locomotion cross-embodiment.**
+## Slide 25 — What we learned by trying to use it
+
+**Four things were built on the working world model. Each failed, and each failure named a different
+component.**
+
+```
+  teacher ranks perturbations   47%  ─┐
+  gradient through imagination  fails ├─→  not the model's sensitivity
+  bigger perturbations          42%  ─┘         (it responds fine)
+                                              │
+  teacher ranks recorded gaits   83%  ────────┘   ← the model CAN rank
+```
+
+| what was tried | result | what it ruled out |
+|---|---|---|
+| rank small perturbations | 47% vs coin | — |
+| **rank recorded behaviours** | **83%, p = 0.019** | **the model is not weak** |
+| perturb harder (σ 1→4) | 50 / 42 / 58% | **separation is not the fix**; 33-40% of joints leave the data range |
+| backprop through imagination | never beats a random step, **fails at K = 1** | not vanishing gradients, not compounding, not off-manifold |
+
+**So the failure is not blindness.** Fix the frame, change the action slightly: the model's predicted
+response moves by **15%**. It sees the difference.
+
+**It is mis-proportion.** In physics, a small change and a whole different gait separate by **5.1×**.
+In the model, **3.1×**. **The model over-weights small differences relative to the world**, so
+anything that follows its ordering — a ranker, a gradient — is confidently wrong.
+
+**What that closes:** candidate generation by Gaussian perturbation, at any magnitude. Teacher-student
+in refine-within-a-behaviour mode. An actor learned in imagination.
+
+**What it leaves open, and it is F137 again:** the model ranks recorded gaits at 83%. **Can such
+candidates be *generated* rather than pulled from a library?**
+
+---
+
+## Slide 26 — What the next two months do
+
+```
+  closed by measurement          open, in order
+  ├─ perturbation candidates     ├─ 1. candidate generator: in-range, gait-structured
+  ├─ imagined-actor gradients    │      (F137, and the 83% says the ranker is ready for it)
+  └─ "ego fixes ranking"         ├─ 2. Delta-JEPA's LDAD — running, prediction pre-registered
+                                 └─ 3. supervised self-body first, then the world model
+                                        ← Ajan Blink's W14 challenge, now motivated by a number
+```
+
+**1. A candidate generator that stays inside the data.** The requirement is measured, not guessed:
+inside the recorded command range, carrying gait structure, and still separating outcomes. **The
+library meets it; nothing generated has.**
+
+**2. LDAD (Delta-JEPA), running now.** Its premise is action-insensitive collapse. **We measured that
+we do not have collapse** — `dz` already carries the action at 0.199 untrained, and the response to a
+fine action is 15%, not zero. **Pre-registered: it clears the general question and not the fine one.**
+Being wrong here is the best available outcome — it would reopen everything on this slide.
+
+**3. Supervised self-body perception first.** Ajan Blink's Week 14 challenge, and it is now backed by
+a measurement rather than intuition: from the head camera alone the B1 policy accounts for **0.205**
+of the command it must produce.
+
+**The deliverable is unchanged: a behaviour recorded on the insect drives the B1 through the shared
+coordinate.**
+
+**And what ships if none of the three lands** is not nothing. It is a chain of pre-registered
+measurements of why locomotion world models collapse, a viewpoint fix that is **necessary and not
+sufficient**, and a mechanism — **mis-proportioned action response** — that no published
+anti-collapse objective addresses, because manipulation and navigation are not periodic.
 
 ---
 

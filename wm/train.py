@@ -207,16 +207,23 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     loss, parts = compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
                                  adv_logits, morph_id, probe_logits, cross_pred, cross_target,
                                  body_pred, body_target)
+    # **`parts["total"]` is set inside `compute_losses`, before anything below is added.** So the
+    # printed total has never included the hinge, the readout or the LDAD term, and reading a run's
+    # arithmetic as evidence that one of them is inactive is a mistake this comment exists to stop.
+    # Each addition now updates it.
     if hinge is not None:
         loss = loss + cfg.lambda_hinge * hinge
         parts["hinge"] = float(hinge.detach())
+        parts["total"] = float(loss.detach())
         parts["separation"] = float(seps[-1].detach())
     if readout_loss is not None:
         loss = loss + cfg.lambda_readout * readout_loss
         parts["readout"] = float(readout_loss.detach())
+        parts["total"] = float(loss.detach())
     if ldad_loss is not None:
         loss = loss + cfg.lambda_ldad * ldad_loss
         parts["ldad"] = float(ldad_loss.detach())
+        parts["total"] = float(loss.detach())
     return loss, parts
 
 
@@ -595,6 +602,11 @@ def main():
                if "hinge" in train_metrics else "")
             + (f" | readout {train_metrics['readout']:.4f}"
                if "readout" in train_metrics else "")
+            # **The rule two lines below, obeyed.** `lambda_ldad` was added without this and the
+            # first arm ran eleven epochs before the arithmetic -- total minus recon, motion and
+            # body landing on zero to four decimals -- showed the term was contributing nothing.
+            + (f" | ldad {train_metrics['ldad']:.4f}"
+               if "ldad" in train_metrics else "")
             # Printed because it was not. `lambda_body 0.5` ran for 60 epochs contributing 0.002
             # of a 6.0 total, and the line above showed only recon and motion, so the term looked
             # absent rather than negligible. Any term that enters the loss has to enter this line.
