@@ -13570,6 +13570,87 @@ and `ldad_layers` in `wm/config.py`, the term in `wm/train.py` taken on the **pr
 Run sheet `scripts/f183_ldad.sh`; arms at lambda 10 and 50, 15 epochs, everything else identical to
 `beh12_ego`.
 
+
+## The result: the prediction was wrong, and that is the good outcome
+
+| | `dz_pred` R2 | **`dz_pred` within cond** | response ratio | of physics 5.1x |
+|---|---|---|---|---|
+| baseline, lambda 0 | 0.363 | **0.338** | 3.1x | 0.61 |
+| **lambda 10** | 0.537 | **0.518** | 4.0x | 0.78 |
+| **lambda 50** | **0.555** | **0.537** | **4.3x** | **0.84** |
+
+**Both columns move, monotonically in lambda, and the within-condition column is the one that was
+pre-registered as deciding.** 0.338 to 0.537 is a 59% relative lift on exactly the quantity F145,
+F179 and F182 could not touch.
+
+**And the response ratio moves toward physics** -- 3.1x to 4.3x against a target of 5.1x. The
+mis-proportion diagnosed above is **reduced by the term I argued would not address it.**
+
+**My pre-registration said LDAD would clear the general question and fail the fine one. It cleared
+both.** That was written down before the arms ran precisely so it could be scored, and it scores as
+wrong.
+
+**The arms had less training, not more.** Fifteen epochs against the baseline's fifty, everything
+else identical. **A shorter run beating a longer one on the deciding column is a stronger result
+than a like-for-like comparison would have been**, not a weaker one.
+
+## The bar I locked was the wrong row, and the run exposed it
+
+**`dz = e_t+1 - e_t` is built from the frozen encoder.** It is a property of V-JEPA2 on this data and
+**cannot change with any objective**; it read 0.199 / 0.166 identically at lambda 0, 10 and 50. The
+pre-registered bar of 0.167 was that row. **The quantity LDAD trains is the predicted difference**
+`FTM(e_t, z) - e_t`, which is checkpoint-dependent, and the correct baseline is its lambda-0 value
+of 0.338.
+
+**Three identical numbers across three checkpoints is what exposed it**, not any argument, and the
+diagnostic now labels the encoder row `CANNOT move` so it cannot be read as a result again.
+
+## What this does NOT yet show, and it is the whole point of the session
+
+**Reconstruction is not ranking.** This session's central result is that those are different
+capabilities: GATE C moved from 1.03 to 1.16 and the teacher still ranked at 47% (F172, F179).
+**LDAD has now moved a reconstruction number and a response ratio. Neither is the wall.**
+
+**The wall is F179's 47%, and it has not been re-measured on these checkpoints.**
+
+**One reading is required before the ranking test.** Both responses shrank about five-fold --
+fine 0.147 to 0.030, coarse 0.461 to 0.119. The *ratio* improved because fine shrank further, but
+**the model's absolute action-sensitivity fell**, and `null/real` on the LDAD arms is unmeasured.
+**A model with a better ratio and a collapsed GATE C would be worse, not better**, and that has to
+be checked in the same pass as the ranking.
+
+## Pre-registered before the gates, and both must pass
+
+**Written now so neither outcome can be reinterpreted afterwards, and in this order because the
+first can void the second.**
+
+**GATE 1 -- `null/real` on the LDAD arm, against the 1.16 that GATE C established.** Both responses
+shrank about fivefold and the ratio improved only because the fine one shrank further. **If absolute
+action-sensitivity went with it, LDAD traded away the thing egocentric bought.** A model with a
+prettier ratio and a broken GATE C is worse than the one it replaced, and the reconstruction gain is
+then hollow. **This reading is a stop.**
+
+**GATE 2 -- ranking in the simulator, against F179's 47%.** Only if GATE 1 holds. **Reconstruction
+is not ranking**: this session measured GATE C rising from 1.03 to 1.16 while the teacher stayed at
+47%, and a 59% reconstruction gain is evidence about the same kind of quantity that already moved
+without moving the wall.
+
+**Three outcomes, named in advance.**
+
+| | reading |
+|---|---|
+| `null/real` breaks | **LDAD made the world model worse.** The reconstruction and ratio gains were bought with absolute sensitivity, and the number that looked better was the wrong number |
+| `null/real` holds, ranking clearly above 47% | **LDAD fixes the actual wall.** Teacher-student and an imagined actor reopen, and the pre-registration in this finding is wrong twice over |
+| `null/real` holds, ranking still near 47% | **reconstruction improved and ranking did not** -- the session's central separation confirmed a third time, and LDAD is insufficient rather than harmful |
+
+**No claim that LDAD works is made until ranking beats 47% *and* `null/real` survives.** The
++59% on its own licenses nothing.
+
+Arms `wm/runs/beh12_ego_ldad{10,50}`, projectors fitted per arm against their own checkpoint; logs
+`results/f183/`. Gates: `bash scripts/f183_ldad.sh gate`, then the ranking test, which needs the
+simulator and therefore the local machine.
+
+
 ---
 
 

@@ -81,7 +81,33 @@ measure)
   echo "      evidence could not have found, and is the contribution rather than a defeat."
   ;;
 
-*) echo "usage: $0 {baseline|train|measure}"; exit 2 ;;
+gate)
+  # **Reconstruction is not ranking, and this session's whole result is that they are different.**
+  # LDAD moved a reconstruction number and a response ratio; neither is F179's 47%. Two things get
+  # checked here and the first can invalidate the second: `null/real`, because both responses shrank
+  # fivefold and a better ratio with a collapsed GATE C is worse rather than better, and then the
+  # ranking itself, on the simulator, against 47% and the physics separation.
+  for LAM in 10 50; do
+    LOG="$LOGDIR/gate_lambda$LAM.log"; : > "$LOG"
+    RUN=wm/runs/beh12_ego_ldad$LAM
+    [ -f "$RUN/teacher.pt" ] || run $PY -m wm.assemble_teacher --base "$RUN/best.pt" \
+        --projector "$RUN/projector.pt" --out "$RUN/teacher.pt"
+    echo "---- GATE C: does it still USE the action? baseline 1.16 insect ----" | tee -a "$LOG"
+    run $PY scripts/diagnostics/action_necessity.py --ckpt "$RUN/best.pt" \
+        --data "$HELD" --embodiment hexapod --lags 1 2 3 5 \
+        --cache results/wm/cache/ego_hex.pt
+  done
+  echo
+  echo "If null/real held, run the ranking test -- it needs CoppeliaSim and is the deciding one:"
+  echo "  $PY scripts/diagnostics/teacher_label_quality.py \\"
+  echo "     --teacher wm/runs/beh12_ego_ldad50/teacher.pt \\"
+  echo "     --student wm/runs/students/insect_bc_ego.pt --data $HELD \\"
+  echo "     --goal_clip $HELD/hexapod_ep100.npz --cache results/wm/cache/ego_hex.pt \\"
+  echo "     --scene medauroidea_c08f09t09.ttt --ego --ego_seed 0 --repeat_control 4"
+  echo "  against F179: teacher closer 47%, a coin 50%, separation 2.5%."
+  ;;
+
+*) echo "usage: $0 {baseline|train|measure|gate}"; exit 2 ;;
 esac
 
 echo
