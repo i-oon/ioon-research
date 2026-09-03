@@ -63,6 +63,12 @@ def main():
     ap.add_argument("--cache", default="")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=3)
+    ap.add_argument("--projector", default="",
+                    help="**a stage-1 pretrain carries no projector**, so an arm's `best.pt` cannot "
+                         "supply one and the response-separation rows need it. Point this at a "
+                         "projector fitted against THIS checkpoint -- fitted against another one it "
+                         "is a different latent space, which is the F160 trap. Omit it and the "
+                         "reconstruction rows still run; only the ratio is skipped.")
     ap.add_argument("--sigma", type=float, default=0.5,
                     help="the fine perturbation, in units of each joint's own sd. **0.5 is the one "
                          "F144 ranked and F179 measured at 2.5% outcome separation**, so the "
@@ -73,8 +79,13 @@ def main():
     ck = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     cfg = from_checkpoint(ck["config"])
     ftm = ForwardTransitionModel(cfg).to(device).eval(); ftm.load_state_dict(ck["ftm"])
-    proj = ActionProjector(cfg, action_dims_from(ck)).to(device).eval()
-    proj.load_state_dict(ck["projector"])
+    proj = None
+    saved = ck if "projector" in ck else (
+        torch.load(os.path.join(ROOT, args.projector), map_location="cpu", weights_only=False)
+        if args.projector else None)
+    if saved is not None:
+        proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
+        proj.load_state_dict(saved.get("projector", saved))
 
     cache_path = os.path.join(ROOT, args.cache or f"results/wm/cache/fid_{args.embodiment}.pt")
     cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
@@ -127,6 +138,13 @@ def main():
         print(f"  {name:>44}{r2:>11.3f}{within:>13.3f}")
 
     # ---- Delta-JEPA figure 6: are the model's responses to different actions distinguishable? ----
+    if proj is None:
+        print("\n  **response separation SKIPPED -- no projector.** This checkpoint carries none and")
+        print("  `--projector` was not given, so one of the three numbers this run is supposed to")
+        print("  report is missing. Fit one against THIS checkpoint with `wm.fit_projector` rather")
+        print("  than borrowing another arm's: a projector from a different checkpoint lives in a")
+        print("  different latent space and the ratio would be meaningless rather than absent.")
+        return
     print(f"\n  response separation, `FTM(e_t, proj(a)) - e_t`, relative to the response's own size")
     sd = A[tr].std(0).to(device)
     idx = torch.nonzero(torch.tensor(te)).flatten()[:200]

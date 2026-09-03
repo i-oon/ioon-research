@@ -63,8 +63,14 @@ measure)
   for LAM in 10 50; do
     LOG="$LOGDIR/measure_lambda$LAM.log"; : > "$LOG"
     echo "############ lambda_ldad $LAM ############" | tee -a "$LOG"
+    # **A projector per arm, fitted against that arm.** A stage-1 pretrain carries none, and
+    # borrowing one from another checkpoint compares two different latent spaces -- the F160 trap.
+    # Without it the response ratio, one of the three numbers this gate reports, is missing.
+    PROJ="wm/runs/beh12_ego_ldad$LAM/projector.pt"
+    [ -f "$PROJ" ] || run $PY -m wm.fit_projector --ckpt "wm/runs/beh12_ego_ldad$LAM/best.pt" \
+        --hex_dir "$HEX" --b1_dir "$B1" --cache "results/wm/cache/ldad$LAM.pt" --out "$PROJ"
     run $PY scripts/diagnostics/delta_action_decoding.py \
-        --ckpt "wm/runs/beh12_ego_ldad$LAM/best.pt" \
+        --ckpt "wm/runs/beh12_ego_ldad$LAM/best.pt" --projector "$PROJ" \
         --data "$HELD" --embodiment hexapod --cache results/wm/cache/ego_hex.pt
   done
   echo
