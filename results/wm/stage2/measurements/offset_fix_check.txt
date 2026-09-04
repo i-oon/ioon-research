@@ -1,0 +1,21 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+wm/runs/beh12_ego/teacher_ego.pt
+2012 transitions, chance 0.501
+
+  LEAK -- embodiment accuracy, held-out clips, offset fit on train only
+    raw pooled delta          : 0.961
+    offset-corrected          : 0.464
+    z (reference)             : 1.000
+
+  SIGNAL -- Delta-state ridge R2, [pooled delta, z], held-out clips
+/home/aria/ioon-research/.venv/lib/python3.10/site-packages/sklearn/linear_model/_ridge.py:250: LinAlgWarning: Ill-conditioned matrix (rcond=5.99733e-09): result may not be accurate.
+  dual_coef = linalg.solve(K, y, assume_a="pos", overwrite_a=False)
+/home/aria/ioon-research/.venv/lib/python3.10/site-packages/sklearn/linear_model/_ridge.py:250: LinAlgWarning: Ill-conditioned matrix (rcond=3.90137e-08): result may not be accurate.
+  dual_coef = linalg.solve(K, y, assume_a="pos", overwrite_a=False)
+                     raw: R2 0.852  (alpha 10)
+        offset-corrected: R2 0.852  (alpha 10)
+
+  READ: leak should fall toward chance (0.501) for 'offset-corrected'; SIGNAL should
+  stay close between 'raw' and 'offset-corrected'. Both holding -> the fix is targeted.

@@ -44,6 +44,8 @@ LEGACY_DEFAULTS = {
     "lambda_hinge": 0.0,
     "lambda_readout": 0.0,
     "lambda_ldad": 0.0,
+    "lambda_state": 0.0,
+    "state_hidden": 256,
     "hinge_margin": 0.1,
     "hinge_K": 3,
     "readout_hidden": 512,
@@ -251,6 +253,13 @@ class Config:
     hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F151)
     hinge_K: int = 3              # **3, not their 12** -- our rollout is reliable to about here
     readout_hidden: int = 512
+    # Decode body motion from the FTM's predicted CHANGE (`FTM(e_t,z) - e_t`), not from z alone.
+    # `lambda_body` supervises z directly and drowns under lambda_recon's 360,448-dim target
+    # (z-alone ridge R2 0.005 on the embedding against 0.359 on body motion, same z, same session);
+    # this reads the state off the world model's own rollout instead of bypassing it. Zero by
+    # default: every run before this existed reproduces unchanged.
+    lambda_state: float = 0.0
+    state_hidden: int = 256
     body_dim: int = 1            # must equal len(body_channels)
     # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
     # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise

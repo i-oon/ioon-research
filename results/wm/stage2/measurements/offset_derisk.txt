@@ -1,0 +1,35 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+wm/runs/beh12_ego/teacher_ego.pt
+stratified split: hexapod 34tr/14te, b1 34tr/14te
+
+[1] BASE checkpoint, STRATIFIED split (this script's own methodology)
+    leak with frozen offset: 0.704
+
+[1b] BASE checkpoint, JOINT-SHUFFLE split (offset_fix_check.py's methodology)
+    test-clip embodiment composition: hexapod: 315te/689tr, b1: 273te/735tr
+    leak with frozen offset: 0.513  (offset_fix_check.py reported 0.464)
+
+[2] Training L_recon-only FTM, 2000 steps (reproduces the control arm)
+    step     0  loss 3.24432  (0.30s/step)
+    step   500  loss 3.12829  (0.12s/step)
+    step  1000  loss 3.05601  (0.12s/step)
+    step  1500  loss 2.72196  (0.12s/step)
+    step  1999  loss 2.60040  (0.12s/step)
+
+[2a] FINE-TUNED FTM, stale offset (fit on base checkpoint)
+    leak: 0.954  (state_head_transfer_confirm.py reported ~0.95)
+
+[2b] FINE-TUNED FTM, FRESH offset (re-fit on train clips of the moved model)
+    leak: 0.750  (chance ~0.50-0.51)
+
+[3] How far did the offset move?
+       hexapod: cosine(old,new) -0.026   ||new-old||/||old|| 1.030   |old| 2.719  |new| 0.599
+            b1: cosine(old,new) 0.148   ||new-old||/||old|| 0.998   |old| 2.769  |new| 0.785
+
+  READ:
+  fresh offset drops leak near chance -> periodic recompute is the fix, low risk.
+  fresh offset stays high -> per-body-mean is the wrong model of the leak now;
+  cosine near 1 with small ||new-old|| -> slow drift (recompute should track it);
+  cosine far from 1 or large relative change -> restructuring, not drift.

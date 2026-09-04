@@ -1,0 +1,15 @@
+wm/runs/beh12_ego/teacher_ego.pt
+train 1523 transitions, test 383, body channels [0, 1, 2]
+
+  building Gram matrices
+                        features   R2 embedding   R2 delta-state
+   e_t alone  (= mean-z control)          0.079            0.358
+                         z alone          0.005            0.359
+                        [e_t, z]          0.078            0.404
+
+  action contribution (with z minus without z)
+    embedding target  : -0.001   share -0.9%
+    delta-state target: +0.046   share 11.4%
+
+  trained body head, z -> delta-state (held out)
+    real z +0.374   mean z -0.055   gap +0.430

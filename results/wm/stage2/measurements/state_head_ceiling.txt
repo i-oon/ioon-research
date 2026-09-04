@@ -1,0 +1,37 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+  fitting offsets (predicted-delta and true-delta variants)
+
+  ARM predicted-delta (reproduces the earlier treatment run)
+/home/aria/ioon-research/scripts/diagnostics/objective_experiments/state_head_ceiling.py:203: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:822.)
+  print(f"    [{tag}] step {step:5d}  recon {float(recon_loss):.5f}  "
+    [predicted] step     0  recon 3.24432  state 0.07826  (0.25s/step)
+    [predicted] step   400  recon 3.15801  state 0.00039  (0.12s/step)
+    [predicted] step   800  recon 2.89439  state 0.00029  (0.12s/step)
+    [predicted] step  1200  recon 3.02877  state 0.00022  (0.12s/step)
+    [predicted] step  1600  recon 2.72504  state 0.00041  (0.12s/step)
+    [predicted] step  1999  recon 2.59226  state 0.00014  (0.12s/step)
+
+  ARM oracle (state head fed the TRUE delta, not FTM's prediction)
+    [oracle] step     0  recon 0.00000  state 0.14156  (0.02s/step)
+    [oracle] step   400  recon 0.00000  state 0.00093  (0.02s/step)
+    [oracle] step   800  recon 0.00000  state 0.00026  (0.02s/step)
+    [oracle] step  1200  recon 0.00000  state 0.00021  (0.02s/step)
+    [oracle] step  1600  recon 0.00000  state 0.00074  (0.02s/step)
+    [oracle] step  1999  recon 0.00000  state 0.00035  (0.02s/step)
+
+  LOSS TRAJECTORY -- state-loss mean of first vs last 200 steps
+     predicted: 0.0125 -> 0.0001  (still falling)
+        oracle: 0.0293 -> 0.0004  (still falling)
+
+  RESULT -- held-out Delta-state R2
+    embodiment   predicted-delta   oracle (true delta)
+       hexapod            +0.057                +0.056
+            b1            +0.095                +0.104
+
+  READ: oracle >> predicted -> the head is fine, it inherits the FTM's weak prediction
+  (this session's +0.055 problem, now shown to reach the state head too). Oracle ALSO
+  weak -> the head/hyperparameters cap out regardless of input quality -- structural,
+  not inherited. Either combined with 'still falling' above means more steps may still help.

@@ -1,0 +1,20 @@
+wm/runs/beh12_ego/teacher_ego.pt
+48 clips from data/egocentric/beh12_c08f09t09_ego_flat, 1514.0 transitions
+
+  median displacement ratio  d_pred/d_true : 0.717
+  mean                                     : 0.715  (sd 0.044)
+  fraction of transitions with ratio < 1   : 100.0%
+  median cosine(pred-e_t, true-e_t)        : 0.690
+
+  optimal rescaling of the model's own displacement
+    alpha* = 0.971   (1.0 = already calibrated; >1 = moves less than MSE wants)
+
+  by size of the true transition, 5 equal-count bins
+            d_true range    ratio   cosine      n
+           1147.0-1415.9    0.712    0.629    303
+           1415.9-1484.2    0.688    0.666    303
+           1484.2-1566.0    0.694    0.689    302
+           1566.0-1646.1    0.728    0.730    303
+           1646.1-1766.6    0.741    0.750    303
+
+  correlation(d_true, ratio) = +0.160   ratio rises with transition size

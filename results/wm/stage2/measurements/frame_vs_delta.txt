@@ -1,0 +1,19 @@
+  hexapod: 48 clips, 1004 transitions
+  b1: 48 clips, 1008 transitions
+
+wm/runs/beh12_ego/teacher_ego.pt
+2012 transitions across 2 embodiments
+
+  building Gram matrices
+                      target            features       R2    alpha
+                 body motion[e_t, z]  (raw frame)    0.782        1
+                 body motion[delta, z]  (proposed)    0.785        1
+                 body motionz alone  (reference)    0.826     0.01
+     embodiment id (one-hot)[e_t, z]  (raw frame)   -0.057      0.1
+     embodiment id (one-hot)[delta, z]  (proposed)   -0.079     0.01
+     embodiment id (one-hot)z alone  (reference)   -0.070    0.001
+
+  READ: body-motion R2 should be close for [e_t,z] and [delta,z] (both carry state).
+  embodiment-id R2 should be LOW for [delta,z] and can be high for [e_t,z] -- that gap
+  is F64's leak. If [delta,z] also identifies embodiment well, the delta does not close
+  the leak and the design needs rethinking before com7.

@@ -1,0 +1,27 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+  fitting per-embodiment offset from TRAIN clips, base checkpoint
+    hexapod: norm 2.719
+    b1: norm 2.769
+  hexapod: 710 train / 294 test transitions
+  b1: 714 train / 294 test transitions
+
+  reproducing the treatment arm (same seed as state_head_transfer_confirm.py)
+    step     0  loss 3.33966  (0.26s/step)
+    step   400  loss 3.15976  (0.12s/step)
+    step   800  loss 2.89590  (0.12s/step)
+    step  1200  loss 3.02940  (0.12s/step)
+    step  1600  loss 2.72525  (0.12s/step)
+    step  1999  loss 2.59870  (0.12s/step)
+
+  RESULT -- Delta-state R2, correct vs swapped embodiment id at inference
+        data   offset used       R2
+     hexapod own (correct)   +0.059
+     hexapod    b1 (WRONG)   +0.059
+          b1 own (correct)   +0.099
+          b1hexapod (WRONG)   +0.100
+
+  READ: if 'WRONG' R2 is close to 'correct' R2, the offset/identity correction is not
+  load-bearing for the prediction -- the leak is cosmetic. If 'WRONG' collapses sharply
+  (strongly negative, F64-shape), the correction matters and the leak is fatal.

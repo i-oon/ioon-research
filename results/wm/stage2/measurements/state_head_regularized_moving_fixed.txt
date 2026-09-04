@@ -1,0 +1,32 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  91%|█████████ | 767/843 [00:00<00:00, 7650.75it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7707.80it/s]
+  hexapod: 48 clips -> 28 fit / 6 val / 14 test
+  b1: 48 clips -> 28 fit / 6 val / 14 test
+
+  fitting per-embodiment offset (un-augmented, FIT clips only)
+  target standardisation (fit clips only): mu [ 0.08791148 -0.00775193  0.00864859], sd [0.0761215  0.06928039 0.02219749]
+
+  training regularised LINEAR head, wd_head=0.1, 800 steps
+    step     0  recon 3.13625  state(train) 0.94171  state(val) 0.63232  (20.99s/step)  <- best so far
+    step   100  recon 3.12664  state(train) 0.20722  state(val) 0.21512  (1.52s/step)  <- best so far
+    step   200  recon 3.21542  state(train) 0.07087  state(val) 0.20027  (1.42s/step)  <- best so far
+    step   300  recon 3.31052  state(train) 0.36719  state(val) 0.16464  (1.39s/step)  <- best so far
+    step   400  recon 3.14151  state(train) 0.08933  state(val) 0.16751  (1.37s/step)
+    step   500  recon 3.24399  state(train) 0.30914  state(val) 0.14994  (1.37s/step)  <- best so far
+    step   600  recon 3.31723  state(train) 0.12020  state(val) 0.21666  (1.36s/step)
+    step   700  recon 3.27714  state(train) 0.17580  state(val) 0.15675  (1.36s/step)
+    step   799  recon 3.05640  state(train) 0.12826  state(val) 0.12721  (1.35s/step)  <- best so far
+
+  best validation snapshot: step 799, val state-loss 0.12721
+
+  held-out TEST R2, best-validation snapshot (never touched by early stopping)
+       hexapod  R2 +0.811
+            b1  R2 +0.853
+
+  for reference: unregularised MLP (no aug) hexapod +0.057 b1 +0.095
+                 unregularised MLP (aug)    hexapod +0.063 b1 +0.150
+                 offline ridge oracle        0.852 (different validation split)
+
+  READ: climbing toward 0.852 -> Delta-state alive, regularised design for com7.
+  staying ~0.06-0.15 -> ridge's number does not reproduce under a trained, early-
+  stopped model here -- Delta-state is capped on this data regardless of head shape.

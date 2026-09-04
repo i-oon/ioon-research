@@ -84,6 +84,44 @@ def embedding_offsets(encoder, dataset, cfg, device):
     return offsets
 
 
+@torch.no_grad()
+def state_offsets(models, encoder, dataset, cfg, device, batch=8):
+    """Per-embodiment mean of the FTM's predicted change, pooled over patch tokens.
+
+    The state head reads `FTM(e_t, z).mean(1) - offset_<embodiment>` -- see `wm/models/state_head.py`
+    for why the offset exists (an additive per-embodiment identity signature in the pooled delta,
+    confirmed cosmetic to Delta-state prediction quality but confirmed present) and why it must be
+    fit on the SAME (ITM, FTM) the run trains from, on un-augmented TRAIN frames only, never on an
+    evaluation batch. Computed once here, before the training loop starts -- after `--init_ckpt`
+    loading if any, so a warm-started run fits the offset on the checkpoint it actually begins
+    from, not on a randomly initialised one. `models["itm"]` and `models["ftm"]` are used exactly
+    as they stand at this point and are not otherwise touched by this function.
+    """
+    offsets = {}
+    for name, indices in dataset.embodiment_indices().items():
+        step = max(1, len(indices) // cfg.center_frames)
+        picked = indices[::step][:cfg.center_frames]
+        total, count = None, 0
+        for start in range(0, len(picked), batch):
+            chunk = picked[start:start + batch]
+            frames = []
+            for i in chunk:
+                clip_idx, t = dataset.index[i]
+                clip = dataset.clips[clip_idx]
+                frames.extend([clip["frames"][t], clip["frames"][t + dataset.frame_stride]])
+            e = encoder.encode(frames).float()
+            e = e.view(len(chunk), 2, *e.shape[1:])
+            e_t, e_next = e[:, 0], e[:, 1]
+            z = models["itm"](e_t, e_next)
+            d = (models["ftm"](e_t, z) - e_t).mean(1)
+            batch_sum = d.sum(0)
+            total = batch_sum if total is None else total + batch_sum
+            count += len(chunk)
+        offsets[name] = (total / max(count, 1)).to(device)
+        print(f"  {name}: mean over {len(picked)} pairs, norm {offsets[name].norm().item():.3f}")
+    return offsets
+
+
 def write_run_config(run_dir, cfg, name, train_set, val_set, cross_embodiment):
     """Write `config.yaml` beside the checkpoints, at startup.
 
@@ -160,6 +198,15 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         body_pred = models["md"].body(views["view1_t"], z)
         body_target = batch["body_motion"].to(device)
 
+    state_pred = state_target = None
+    if "state" in models and "body_motion" in batch:
+        # the FTM's own predicted change, not the frame -- see wm/models/state_head.py. Computed
+        # from the same (view2_t, pred_next) pair L_recon already scores, so this reads a second
+        # quantity off a rollout that already exists rather than adding a second forward pass.
+        delta = pred_next - views["view2_t"]
+        state_pred = models["state"](delta, z, embodiment)
+        state_target = batch["body_motion"].to(device)
+
     # --- ActSWM terms (F146, F151, F152). Off unless `lambda_hinge` or `lambda_readout` is set,
     # so every earlier run reproduces byte for byte.
     hinge = readout_loss = None
@@ -206,7 +253,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
             probe_logits = models["probe"](z)
     loss, parts = compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
                                  adv_logits, morph_id, probe_logits, cross_pred, cross_target,
-                                 body_pred, body_target)
+                                 body_pred, body_target, state_pred, state_target)
     # **`parts["total"]` is set inside `compute_losses`, before anything below is added.** So the
     # printed total has never included the hinge, the readout or the LDAD term, and reading a run's
     # arithmetic as evidence that one of them is inactive is a mistake this comment exists to stop.
@@ -348,6 +395,10 @@ def build_models(cfg, device, heads=None, n_bodies=0):
         from wm.models.ldad import LatentDifferenceDecoder
         models["ldad"] = LatentDifferenceDecoder(
             cfg, dict(heads or {}), layers=cfg.ldad_layers).to(device)
+    if cfg.lambda_state > 0:
+        from wm.models.state_head import StateHead
+        names = tuple(spec.split("=", 1)[0] for spec in cfg.sources) or ("default",)
+        models["state"] = StateHead(cfg, cfg.body_dim, names).to(device)
     return models
 
 
@@ -406,13 +457,24 @@ def parse_args(cfg):
                         help="continue from a run's last.pt. 'auto' looks in the run directory. "
                              "The epoch count must match the interrupted run, since the cosine "
                              "schedule anneals over the total.")
+    parser.add_argument("--init_ckpt", type=str, default="",
+                        help="**warm start, not resume.** Loads itm/ftm/md/projector weights from "
+                             "this checkpoint before training starts -- fresh optimiser, fresh "
+                             "schedule, fresh epoch count, and `strict=False` so a newly added "
+                             "module (e.g. the state head) is simply left at its random init. Every "
+                             "run in wm/runs/ so far has trained from scratch; this is for "
+                             "continuing training under a NEW loss term on an ALREADY-CONVERGED "
+                             "checkpoint, which is the only configuration measured before this run "
+                             "-- see doc/FINDINGS.md's state-head chain. Ignored if --resume finds "
+                             "a run to continue.")
     return parser.parse_args()
 
 
 def main():
     args = parse_args(Config())
-    # --name and --resume are how the run is invoked, not part of what it is
-    cfg = Config(**{k: v for k, v in vars(args).items() if k not in ("name", "resume")})
+    # --name, --resume and --init_ckpt are how the run is invoked, not part of what it is
+    cfg = Config(**{k: v for k, v in vars(args).items()
+                    if k not in ("name", "resume", "init_ckpt")})
     cfg.train_morphs = tuple(cfg.train_morphs)
 
     torch.manual_seed(cfg.seed)
@@ -458,6 +520,21 @@ def main():
     encoder = VJEPA2FrameEncoder(device=str(device))
     n_bodies = len(getattr(train_set, "morphs", []) or [])
     models = build_models(cfg, device, heads=heads, n_bodies=n_bodies)
+    resuming = bool(args.resume) and os.path.exists(
+        os.path.join(ROOT, cfg.out_dir, args.name, "last.pt") if args.resume == "auto"
+        else args.resume)
+    if args.init_ckpt and not resuming:
+        # strict=False: a checkpoint from before this run's new modules existed (e.g. no "state"
+        # key) must not fail to load the ones it does have. A checkpoint with an incompatible
+        # SHAPE for a shared key -- the actual danger -- still raises, which is correct.
+        init = torch.load(os.path.join(ROOT, args.init_ckpt), map_location=device,
+                          weights_only=False)
+        for name, model in models.items():
+            if name in init:
+                missing, unexpected = model.load_state_dict(init[name], strict=False)
+                print(f"init_ckpt: {name} <- {args.init_ckpt} "
+                      f"(missing {len(missing)}, unexpected {len(unexpected)})")
+        print(f"warm-started from {args.init_ckpt}; optimiser, schedule and epoch count are fresh")
     if "adv" in models:
         print(f"adversary on z: {n_bodies} bodies {train_set.morphs}, lambda_adv {cfg.lambda_adv}")
     parameters = [p for model in models.values() for p in model.parameters()]
@@ -488,6 +565,30 @@ def main():
                              "and centring it removes a constant that changes nothing")
         print("per-embodiment appearance offset, subtracted before anything is trained on it:")
         offsets = embedding_offsets(encoder, train_set, cfg, device)
+
+    if cfg.lambda_state > 0:
+        if not cross_embodiment:
+            raise SystemExit("lambda_state needs --sources: the offset it subtracts is defined "
+                             "per embodiment")
+        print("state-head offset: per-embodiment mean of the FTM's predicted change:")
+        for name, off in state_offsets(models, encoder, train_set, cfg, device).items():
+            models["state"].set_offset(name, off)
+        # a one-time check, not a per-step one: this is exactly the failure that cost a full day
+        # of diagnosis earlier -- state_target silently on the wrong scale, discovered only when
+        # R2 was computed hours later. `body_motion` is standardised by `train_set.body_stats`
+        # before it ever reaches the batch (wm/data/dataset.py), so this should already hold; the
+        # assertion exists so a future change to that pipeline fails loudly here, not silently at
+        # evaluation time.
+        probe = next(iter(train_loader))
+        if "body_motion" in probe:
+            bm = probe["body_motion"]
+            bm_std = bm.float().std().item()
+            assert 0.1 < bm_std < 10.0, (
+                f"state_target std is {bm_std:.4g}, not order-1 -- body_motion is not "
+                f"standardised the way the state head expects. Check train_set.body_stats before "
+                f"training on this: this is the exact bug that produced R2 ~0.05 instead of ~0.85 "
+                f"for hours before it was caught.")
+            print(f"  state_target scale check: std {bm_std:.3f} (expect order 1) -- OK")
 
     def checkpoint(epoch):
         state = {
@@ -525,6 +626,13 @@ def main():
     # tracked separately: total is ~99% reconstruction, so selecting on it alone would
     # ignore the motion term that grounds the latent in real joint commands
     best = {"selection": float("inf"), "total": float("inf"), "motion": float("inf")}
+    if cfg.lambda_state > 0:
+        # its own checkpoint, not folded into `selection` -- for the same reason `lambda_body`
+        # is not: `selection` has to mean the same thing whether or not this run's experimental
+        # term is on, or a matched pair checkpoints at different epochs (wm/losses.py:53-63). The
+        # state head can still be *worst* at the epoch `best.pt` picks; `best_state.pt` is the
+        # epoch to audit it at.
+        best["state"] = float("inf")
     start_epoch = 1
     resume_path = os.path.join(run_dir, "last.pt") if args.resume == "auto" else args.resume
     if resume_path and os.path.exists(resume_path):
@@ -612,6 +720,8 @@ def main():
             # absent rather than negligible. Any term that enters the loss has to enter this line.
             + (f" | body {train_metrics['body']:.4f}"
                if "body" in train_metrics else "")
+            + (f" | state {train_metrics['state']:.4f}"
+               if "state" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"
@@ -621,7 +731,10 @@ def main():
         # `selection`, not `total` -- see wm/losses.py. `total` includes whichever experimental
         # term this run enables, so selecting on it checkpoints the arms of a matched pair at
         # different epochs and every comparison downstream inherits the mismatch.
-        for key, filename in (("selection", "best.pt"), ("motion", "best_motion.pt")):
+        criteria = [("selection", "best.pt"), ("motion", "best_motion.pt")]
+        if "state" in best:
+            criteria.append(("state", "best_state.pt"))
+        for key, filename in criteria:
             if val_metrics[key] < best[key]:
                 best[key] = val_metrics[key]
                 torch.save(checkpoint(epoch), os.path.join(run_dir, filename))

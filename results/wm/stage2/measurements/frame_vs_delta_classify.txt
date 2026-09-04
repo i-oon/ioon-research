@@ -1,0 +1,21 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+wm/runs/beh12_ego/teacher_ego.pt
+1532 transitions, classes [764 768]
+
+                            features   embodiment accuracy
+                      e_t, top 8 PCs                 0.793
+                    delta, top 8 PCs                 0.552
+                     e_t, top 32 PCs                 0.933
+                   delta, top 32 PCs                 0.608
+                    e_t, top 128 PCs                 0.975
+                  delta, top 128 PCs                 0.712
+          z  (reference, known ~1.0)                 0.992
+
+  chance: 0.501
+
+  READ: z should read near 1.0, matching identity_linearity.py -- if it does not, this
+  script's probe is also insensitive and the whole check needs a different method.
+  If e_t reads high and delta reads near chance, the delta design closes the leak.
+  If delta ALSO reads high, delta does not close it -- rethink before com7.

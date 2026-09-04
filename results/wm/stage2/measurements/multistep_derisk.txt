@@ -1,0 +1,38 @@
+wm/runs/beh12_ego/teacher_ego.pt
+train 48 clips (2954 triples) from data/egocentric/beh12_c10f10t10_ego_flat
+test  48 clips from data/egocentric/beh12_c08f09t09_ego_flat
+
+  BEFORE (the checkpoint as it stands)
+    stamp: action R2 from FTM output 0.452   from true e_t+1 0.311
+    mse 1-step 3.3249  2-step 3.6688  hold-still 6.4657
+
+  ARM 1step
+    step     0  loss 3.23110  (0.19s/step)
+    step   400  loss 3.13489  (0.14s/step)
+    step   800  loss 3.06931  (0.14s/step)
+    step  1200  loss 3.12521  (0.14s/step)
+    step  1600  loss 3.01584  (0.14s/step)
+    step  1999  loss 2.97721  (0.14s/step)
+    stamp: action R2 from FTM output 0.437   from true e_t+1 0.311
+    mse 1-step 3.3348  2-step 3.7555
+
+  ARM 2step
+    step     0  loss 6.86408  (0.23s/step)
+    step   400  loss 6.48268  (0.24s/step)
+    step   800  loss 6.40971  (0.24s/step)
+    step  1200  loss 6.49166  (0.24s/step)
+    step  1600  loss 6.19295  (0.24s/step)
+    step  1999  loss 6.29042  (0.24s/step)
+    stamp: action R2 from FTM output 0.440   from true e_t+1 0.311
+    mse 1-step 3.2905  2-step 3.5710
+
+  SUMMARY -- the stamp is `action R2 from the FTM output`; the target it should approach is
+  the true next frame's own value.
+         arm    stamp  vs before  gap to gt  mse 1step  mse 2step
+      before    0.452     +0.000     +0.141     3.3249     3.6688
+       1step    0.437     -0.015     +0.126     3.3348     3.7555
+       2step    0.440     -0.012     +0.129     3.2905     3.5710
+
+  2step moved the stamp -0.012, 1step -0.015; the term's own effect is +0.003
+  **Read that difference, not the 2step column alone.** A drop both arms share is fine-tuning
+  on un-augmented cached embeddings, which is not the term under test.

@@ -1,0 +1,28 @@
+wm/runs/beh12_ego/teacher_ego.pt
+train 1523 transitions, test 383
+FTM held-out direction cosine: 0.689
+
+  building Gram matrices
+
+                          ridge from  held-out   train-val     alpha
+                           e_t alone     0.266       0.225       0.1
+                [e_t, z]  z at 4 PCs     0.271       0.233       0.1
+                [e_t, z]  z at 8 PCs     0.272       0.231       0.1
+               [e_t, z]  z at 16 PCs     0.271       0.233       0.1
+               [e_t, z]  z at 32 PCs     0.271       0.231       0.1
+               z alone  (top 64 PCs)     0.042       0.054      0.01
+               [e_t, z]  z at 64 PCs     0.272       0.231       0.1
+
+  the FTM gets 0.689 from the same inputs.
+
+=== control added 2026-09-04: does the FTM's direction skill use z at all? ===
+(383 held-out transitions, same subset)
+FTM direction cosine, real z     : 0.689
+FTM direction cosine, mean z     : 0.634
+FTM direction cosine, shuffled z : 0.612
+
+=== allocentric comparison, 2026-09-04: the action lever across viewpoints ===
+(held-out body c08f09t09 in both, stride 8, median cosine of the predicted vs true
+ transition direction)
+    EGOCENTRIC   n=383  real 0.689  mean-z 0.634  shuffled 0.612  LEVER +0.055
+    ALLOCENTRIC  n=381  real 0.523  mean-z 0.495  shuffled 0.473  LEVER +0.029

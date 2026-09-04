@@ -76,7 +76,9 @@ frozen V-JEPA2  ─→  e_t
 ```
 
 `L = λ_recon·L_recon + λ_motion·L_motion + λ_body·L_body`, where **`L_body` is the only term that
-asks the same `z` to decode the same way on both robots**.
+asks the same `z` to decode the same way on both robots**. As trained: `1.0 / 1.0 / 0.5`, with the
+body head supervising forward, lateral and yaw. Full breakdown, sizes and every hyperparameter in
+[doc/MODEL_CONFIG.md](doc/MODEL_CONFIG.md).
 
 ## Documentation
 
@@ -85,10 +87,11 @@ Each document has one role and does not repeat another.
 | | |
 |---|---|
 | [doc/direction_plan.md](doc/direction_plan.md) | **the plan as it stands today.** Edited in place, never stacked — read this first |
-| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered `F1`…`F81`, with the trap each one avoids. Cited from everywhere else |
+| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered `F1`…`F184`, with the trap each one avoids. Cited from everywhere else. **Not append-only** — a finding is corrected or withdrawn when a later one refutes it |
 | [doc/OPEN_QUESTION.md](doc/OPEN_QUESTION.md) | only what is still undecided. A settled question moves to FINDINGS and leaves one line here |
 | [doc/PROGRESS.md](doc/PROGRESS.md) | the dated engineering log, including what was tried and failed. Thai and English |
 | [doc/SIM_GUIDE.md](doc/SIM_GUIDE.md) | how to actually run anything described above |
+| [doc/MODEL_CONFIG.md](doc/MODEL_CONFIG.md) | one-page reference: architecture, loss terms and λ weights, hyperparameters, with `file:line` for each |
 | [wm/README.md](wm/README.md) | the world model: lifecycle, modules, and how to read a training log |
 | [scripts/README.md](scripts/README.md) | every diagnostic, the question it answers, the trap it avoids |
 | [sim/README.md](sim/README.md) | building scenes, recording data, rendering |
@@ -100,13 +103,23 @@ DreamerV3, and the latent-action locomotion line. `F67` reads LAC-WM against our
 ## Layout
 
 ```
-wm/        the world model         models, pretraining, finetuning
-sim/       recording data          scene/ collect/ render/
-scripts/   measurement             diagnostics/ dataset/ figures/
-data/      collected clips         frames + joint commands + contact + body pose
+wm/        the world model      models/ data/ policy/ · train.py, losses.py, config.py
+sim/       recording data       scene/ collect/ control/ render/ diagnostics/ env/ assets/
+scripts/   measurement          diagnostics/ dataset/ figures/ finished/ run/ tools/ render/
+data/      collected clips      frames + joint commands + contact + body pose
 results/   figures and metrics
 doc/       documentation and reference papers
 ```
+
+`scripts/diagnostics/` is grouped by the question each script answers:
+
+```
+decoder/  latent/  forward_model/  setting/  shared_body_target/
+cross_embodiment/  planning/  objective_experiments/  egocentric_view/
+```
+
+`scripts/run/` holds the shell run sheets (one per experiment); `scripts/tools/` holds simulator
+calibration utilities that answer no research question.
 
 ## Running anything
 

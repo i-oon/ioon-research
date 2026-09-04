@@ -1,0 +1,56 @@
+where_action_lives.py -- 2026-09-04 -- diagnosis for the F179 fine-ranking wall
+Q: is the action stamped by the FTM, already in the frame, or carried by z?
+
+=========== EGOCENTRIC: teacher_ego.pt, held-out ego c08f09t09 ===========
+wm/runs/beh12_ego/teacher_ego.pt
+48 clips of hexapod from data/egocentric/beh12_c08f09t09_ego_flat
+499 train / 499 test transitions, split by clip, action width 18, z width 64, embedding dimension 360448
+
+  MEASUREMENT 1 & 2 -- decoding the ACTION
+                            features  action R2    alpha
+                  e_t  (frame alone)      0.329      0.1
+                 e_t+1  GROUND TRUTH      0.310        1
+              FTM(e_t, z)  PREDICTED      0.452      0.1
+          FTM(e_t, z) - e_t  (delta)      0.365     0.01
+                 z = ITM(e_t, e_t+1)      0.612     0.01
+  [e_t, z]  ceiling for the prediction      0.606      0.1
+
+  MEASUREMENT 2b -- is z itself readable from one frame  (F168 asked this)
+                            features       z R2    alpha
+                  e_t  (frame alone)      0.407      0.1
+                 e_t+1  GROUND TRUTH      0.501      0.1
+
+  per family, action R2 on held-out clips
+      family         e_t    e_t+1 gt    FTM pred           z      n
+        side       0.061       0.083       0.149       0.204    168
+       speed       0.447       0.409       0.558       0.827    163
+        turn       0.494       0.449       0.664       0.827    168
+
+  prediction - ground truth: +0.142   prediction - its own ceiling: -0.154
+
+=========== ALLOCENTRIC control: beh12_hex-b1_body3/best.pt, allo c08f09t09 ===========
+wm/runs/beh12_hex-b1_body3/best.pt
+48 clips of hexapod from data/allocentric/beh12_c08f09t09_flat
+499 train / 498 test transitions, split by clip, action width 18, z width 64, embedding dimension 360448
+
+  MEASUREMENT 1 & 2 -- decoding the ACTION
+                            features  action R2    alpha
+                  e_t  (frame alone)      0.773     0.01
+                 e_t+1  GROUND TRUTH      0.861     0.01
+              FTM(e_t, z)  PREDICTED      0.874     0.01
+          FTM(e_t, z) - e_t  (delta)      0.844     0.01
+                 z = ITM(e_t, e_t+1)      0.902     0.01
+  [e_t, z]  ceiling for the prediction      0.937     0.01
+
+  MEASUREMENT 2b -- is z itself readable from one frame  (F168 asked this)
+                            features       z R2    alpha
+                  e_t  (frame alone)      0.854     0.01
+                 e_t+1  GROUND TRUTH      0.886     0.01
+
+  per family, action R2 on held-out clips
+      family         e_t    e_t+1 gt    FTM pred           z      n
+        side       0.605       0.816       0.800       0.876    168
+       speed       0.801       0.839       0.870       0.908    162
+        turn       0.927       0.931       0.959       0.923    168
+
+  prediction - ground truth: +0.013   prediction - its own ceiling: -0.062

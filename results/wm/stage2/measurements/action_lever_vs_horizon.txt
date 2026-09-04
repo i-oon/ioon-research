@@ -1,0 +1,13 @@
+wm/runs/beh12_ego/teacher_ego.pt
+48 clips, 12 conditions, from data/egocentric/beh12_c08f09t09_ego_flat
+
+     k  steps (ms)  within-cond  between-cond   DATA gap   real z   mean z  MODEL gap
+     1          50        0.002         0.000      0.002    0.687    0.633      0.054
+     2         100        0.002         0.000      0.002    0.701    0.638      0.062
+     5         250        0.003         0.001      0.002    0.675    0.634      0.042
+    10         500        0.005         0.001      0.004    0.664    0.638      0.026
+
+  DATA gap = how much sharing a behaviour makes two transitions point the same way,
+  with no model involved. If it grows with k, the action shapes longer intervals more
+  and the training interval is the lever. If it stays flat, it does not.
+  MODEL gap is out of distribution for k > 1 (this FTM was trained at stride 1).

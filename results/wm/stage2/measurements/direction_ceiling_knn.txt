@@ -1,0 +1,21 @@
+wm/runs/beh12_ego/teacher_ego.pt
+train 1523 transitions, test 383
+FTM held-out direction cosine: 0.689
+
+  retrieval sanity -- mean cosine between unrelated e_t
+    raw       0.5040   (near 1 means every frame looks like every other, so raw-cosine k-NN is arbitrary)
+    centred   0.0080
+
+  centred; computing similarities
+  best-match ceiling -- the single closest direction anywhere in the training library
+    median 0.090   mean 0.121   (the FTM gets 0.689)
+
+      k    k-NN oracle cosine    neighbour spread   query vs nbrs
+      1                 0.055                 nan           0.078
+      5                 0.053               0.025           0.040
+     20                 0.059               0.009           0.020
+     50                 0.073               0.004           0.013
+
+  neighbour spread is the mean pairwise cosine among the k neighbours' own directions:
+  high means near-identical states move the same way (signal present, predictor is the
+  gap); low means they move differently (the latent does not determine the direction).

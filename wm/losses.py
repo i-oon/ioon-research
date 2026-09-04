@@ -11,7 +11,8 @@ import torch.nn.functional as F
 def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
                    adv_logits=None, morph_id=None, probe_logits=None,
                    cross_action=None, cross_target=None,
-                   body_pred=None, body_target=None):
+                   body_pred=None, body_target=None,
+                   state_pred=None, state_target=None):
     recon = F.mse_loss(pred_next, target_next)
     # **Checked, not assumed.** `F.mse_loss` broadcasts, so a (batch, chunk, dim) prediction
     # against a (batch, dim) target returns a finite, plausible number computed over the wrong
@@ -39,6 +40,16 @@ def compute_losses(pred_next, target_next, pred_action, target_action, cfg,
         body = F.mse_loss(body_pred, body_target)
         total = total + cfg.lambda_body * body
         parts["body"] = body.item()
+
+    if state_pred is not None and state_target is not None and cfg.lambda_state > 0:
+        # reads body motion off the FTM's own predicted change rather than off z alone -- see
+        # wm/models/state_head.py. Weighted separately from lambda_body: a 3-dim target competing
+        # against lambda_recon's 360,448-dim one needs its own weight, not the same 0.5 that
+        # already loses to recon on the embedding path (this project's own measurement, z-alone
+        # ridge R2 0.005 on the embedding against 0.359 on body motion).
+        state = F.mse_loss(state_pred, state_target)
+        total = total + cfg.lambda_state * state
+        parts["state"] = state.item()
 
     if adv_logits is not None and morph_id is not None and cfg.lambda_adv > 0:
         adv = F.cross_entropy(adv_logits, morph_id)

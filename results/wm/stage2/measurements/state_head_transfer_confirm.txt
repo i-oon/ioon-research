@@ -1,0 +1,42 @@
+  hexapod: 48 clips
+  b1: 48 clips
+
+  fitting per-embodiment offset from TRAIN clips, base checkpoint
+    hexapod: norm 2.719
+    b1: norm 2.769
+  hexapod: 710 train / 294 test transitions
+  b1: 714 train / 294 test transitions
+
+  BEFORE any fine-tune (base checkpoint's own state head, offset just fit)
+    leak on offset-corrected pooled delta (pre-fine-tune FTM): 0.704
+
+  ARM control (no state head, L_recon only)
+    [control] step     0  loss 3.24432  (0.28s/step)
+    [control] step   400  loss 3.15842  (0.12s/step)
+    [control] step   800  loss 2.89977  (0.12s/step)
+    [control] step  1200  loss 3.03650  (0.12s/step)
+    [control] step  1600  loss 2.72509  (0.12s/step)
+    [control] step  1999  loss 2.60040  (0.12s/step)
+    leak with the STATIC offset applied to this L_recon-only FTM: 0.954  -- isolates whether L_recon alone already staled the offset
+
+  ARM treatment (+ StateHead, offset-corrected, L_state)
+    [treatment] step     0  loss 3.68582  (0.16s/step)
+    [treatment] step   400  loss 3.16262  (0.12s/step)
+    [treatment] step   800  loss 2.90195  (0.12s/step)
+    [treatment] step  1200  loss 3.03552  (0.13s/step)
+    [treatment] step  1600  loss 2.73258  (0.13s/step)
+    [treatment] step  1999  loss 2.59936  (0.13s/step)
+
+  COMPARISON -- does L_recon alone explain the drift, or does L_state add to it?
+    leak, control  (L_recon only)   : 0.954
+    leak, treatment (+ L_state)     : 0.940
+
+  RESULT -- treatment arm, held-out per embodiment
+       hexapod  Delta-state R2 +0.057
+            b1  Delta-state R2 +0.091
+    leak on trained head's own pooled-delta input: 0.940  (pre-fine-tune 0.704; un-corrected pooled delta was 0.961-0.977; chance is the majority class fraction, ~0.50-0.51 with balanced embodiments)
+
+  READ: F64's collapse was -10.5/-57.2 -- catastrophically negative, not merely lower.
+  Both R2 well above 0 and comparable across embodiments, with leak still near chance,
+  means transfer held under real gradient pressure. Either R2 deeply negative or leak
+  reopening (rising back toward the un-corrected 0.977-0.961) means it did not.

@@ -1,0 +1,16 @@
+wm/runs/beh12_ego/teacher_ego.pt
+train 48 clips / 764 transitions from data/egocentric/beh12_c10f10t10_ego_flat
+test  48 clips / 760 transitions from data/egocentric/beh12_c08f09t09_ego_flat
+
+         predictor of the transition direction   cosine
+               FTM, held-out body  (the 0.690)    0.687
+                            FTM, TRAINING body    0.699
+          constant: mean training displacement    0.003
+                              k-NN on e_t, k=1    0.038
+                              k-NN on e_t, k=5    0.042
+                             k-NN on e_t, k=20    0.052
+                         k-NN on [e_t, z], k=1    0.036
+                         k-NN on [e_t, z], k=5    0.042
+                        k-NN on [e_t, z], k=20    0.040
+
+  train - held-out gap for the FTM: +0.012

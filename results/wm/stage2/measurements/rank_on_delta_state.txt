@@ -1,0 +1,16 @@
+wm/runs/beh12_ego/teacher_ego.pt
+48 clips, 12 conditions, channels [0, 1, 2]
+
+  COARSE -- pick the condition whose recorded body motion matches the goal
+      scoring path     exact    family       n
+            direct       42%       86%     864
+              f179       13%       42%     864
+            chance        8%       33%
+
+  FINE -- how far apart the paths place 0.5 sd perturbations (separation, not accuracy)
+      scoring path   perturbations   conditions    ratio
+            direct          0.3559       0.7250    0.491
+              f179          0.1693       0.2173    0.779
+
+  ratio is perturbation spread over condition spread, in standardised body-motion
+  units. A path near zero cannot rank these however good its accuracy is elsewhere.

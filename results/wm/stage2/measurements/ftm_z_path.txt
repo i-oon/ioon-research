@@ -1,0 +1,12 @@
+wm/runs/beh12_ego/teacher_ego.pt
+48 clips from data/egocentric/beh12_c08f09t09_ego_flat, 8 FTM blocks, z_tokens 1
+499 train / 499 test transitions
+
+          z fed as the batch mean at  action R2   vs none
+            none  (the real forward)      0.452    +0.000
+                last block only  (7)      0.453    +0.001
+                     last two  (6,7)      0.456    +0.004
+                 second half  (4..7)      0.465    +0.013
+                  first half  (0..3)      0.425    -0.027
+    every block  (mean z throughout)      0.348    -0.104
+                  e_t+1 ground truth      0.310

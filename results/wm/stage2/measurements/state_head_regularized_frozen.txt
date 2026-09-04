@@ -1,0 +1,31 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  84%|████████▍ | 707/843 [00:00<00:00, 7016.23it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6955.22it/s]
+  hexapod: 48 clips -> 28 fit / 6 val / 14 test
+  b1: 48 clips -> 28 fit / 6 val / 14 test
+
+  fitting per-embodiment offset (un-augmented, FIT clips only)
+
+  training regularised LINEAR head, wd_head=0.1, 800 steps
+    step     0  recon 3.13625  state(train) 0.12769  state(val) 0.08086  (21.65s/step)  <- best so far
+    step   100  recon 3.12721  state(train) 0.00610  state(val) 0.00548  (1.52s/step)  <- best so far
+    step   200  recon 3.25997  state(train) 0.00299  state(val) 0.00518  (1.41s/step)  <- best so far
+    step   300  recon 3.32479  state(train) 0.00639  state(val) 0.00357  (1.37s/step)  <- best so far
+    step   400  recon 3.15712  state(train) 0.00431  state(val) 0.00392  (1.35s/step)
+    step   500  recon 3.31668  state(train) 0.00455  state(val) 0.00511  (1.34s/step)
+    step   600  recon 3.33989  state(train) 0.00901  state(val) 0.00573  (1.33s/step)
+    step   700  recon 3.29654  state(train) 0.00514  state(val) 0.00390  (1.33s/step)
+    step   799  recon 3.09292  state(train) 0.00491  state(val) 0.00589  (1.32s/step)
+
+  best validation snapshot: step 300, val state-loss 0.00357
+
+  held-out TEST R2, best-validation snapshot (never touched by early stopping)
+       hexapod  R2 +0.028
+            b1  R2 +0.072
+
+  for reference: unregularised MLP (no aug) hexapod +0.057 b1 +0.095
+                 unregularised MLP (aug)    hexapod +0.063 b1 +0.150
+                 offline ridge oracle        0.852 (different validation split)
+
+  READ: climbing toward 0.852 -> Delta-state alive, regularised design for com7.
+  staying ~0.06-0.15 -> ridge's number does not reproduce under a trained, early-
+  stopped model here -- Delta-state is capped on this data regardless of head shape.

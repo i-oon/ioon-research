@@ -1,0 +1,430 @@
+  fitting ridge: building Gram matrices
+  ridge fit: alpha 1, held-out-clip R2 0.745 (target_action_share.py measured 0.404 with a different validation split)
+
+goal speed_c5.8 [ 0.1311  0.0267 -0.0002]
+
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  36%|███▌      | 303/843 [00:00<00:00, 3000.13it/s]Loading weights:  72%|███████▏  | 604/843 [00:00<00:00, 2843.89it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2923.16it/s]
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t=  6  f179:W(0.109)  direct:W(0.110)  ridge:.(0.122)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t=  9  f179:W(0.134)  direct:.(0.143)  ridge:W(0.133)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 12  f179:.(0.098)  direct:W(0.093)  ridge:.(0.106)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 15  f179:W(0.118)  direct:.(0.120)  ridge:.(0.123)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 18  f179:W(0.111)  direct:.(0.116)  ridge:.(0.124)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 21  f179:.(0.143)  direct:.(0.146)  ridge:W(0.135)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 24  f179:W(0.107)  direct:.(0.116)  ridge:.(0.118)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 28  f179:W(0.117)  direct:.(0.124)  ridge:.(0.127)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 31  f179:.(0.129)  direct:.(0.136)  ridge:.(0.139)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 34  f179:W(0.130)  direct:W(0.127)  ridge:.(0.137)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 37  f179:.(0.132)  direct:.(0.131)  ridge:.(0.132)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 40  f179:W(0.105)  direct:.(0.116)  ridge:W(0.107)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 43  f179:.(0.151)  direct:W(0.141)  ridge:W(0.134)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 46  f179:.(0.121)  direct:.(0.125)  ridge:W(0.113)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+    floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+    ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
+    built 5 walls, 8.0 m box, 3.0 m high, tile 0.0 m
+    fov 90.0 deg (asked 90)
+  t= 50  f179:.(0.136)  direct:.(0.132)  ridge:W(0.118)
+
+    scorer    wins    rate  kept student  mean d_teacher
+   student                                        0.1212
+      f179       8     53%             0          0.1228
+    direct       4     27%             0          0.1251
+     ridge       6     40%             1          0.1245
+
+simulator noise floor (same action twice, 4 states): 0.0013
+  f179: mean(student-teacher) -0.0015, signal/floor -1.14x
+  direct: mean(student-teacher) -0.0038, signal/floor -2.88x
+  ridge: mean(student-teacher) -0.0033, signal/floor -2.47x
+
+a coin is 50%. F179 measured f179-scorer at 47% under this exact protocol before.
