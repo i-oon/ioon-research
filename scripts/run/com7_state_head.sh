@@ -30,7 +30,7 @@
 #   * state-head scorer ~= f179/coin, even with R2 0.81-0.85 offline -> the wall is between
 #     reconstruction accuracy and ranking, not the target; report that as the finding
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 PY=python3
 RUN=wm/runs/beh12_state
 BASE=wm/runs/beh12_ego/teacher_ego.pt
