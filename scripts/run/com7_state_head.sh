@@ -31,7 +31,7 @@
 #     reconstruction accuracy and ranking, not the target; report that as the finding
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PY=.venv/bin/python3
+PY=python3
 RUN=wm/runs/beh12_state
 BASE=wm/runs/beh12_ego/teacher_ego.pt
 
