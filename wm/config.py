@@ -46,6 +46,7 @@ LEGACY_DEFAULTS = {
     "lambda_ldad": 0.0,
     "lambda_state": 0.0,
     "state_hidden": 256,
+    "lambda_rollout": 0.0,
     "hinge_margin": 0.1,
     "hinge_K": 3,
     "readout_hidden": 512,
@@ -250,6 +251,15 @@ class Config:
     ldad_layers: int = 3          # their decoder depth
     lambda_hinge: float = 0.0     # separation between the real-action and null-action rollouts
     lambda_readout: float = 0.0   # the frozen readout must recover the action from the prediction
+    # **Auto-regressive 2-step consistency**, Demo-JEPA's `sloss` shape: FTM(FTM(e_t,z1),z2) against
+    # the true e_t+2, z2 = ITM(e_t+1, e_t+2) from real frames (never from the FTM's own prediction,
+    # so a bad step 1 cannot relabel what z2 means). `multistep_derisk.py` tested a version of this
+    # on cached embeddings, ITM frozen, no cross-augmentation, and found no effect distinguishable
+    # from fine-tuning noise -- this is the same question asked on the real loader instead, which
+    # needs a third view per sample (`rollout_k=2` on `MultiEmbodimentPairs`) and is the reason this
+    # is a separate flag rather than folded into an existing one. 0.0 reproduces every run before
+    # 2026-09-05.
+    lambda_rollout: float = 0.0
     hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F151)
     hinge_K: int = 3              # **3, not their 12** -- our rollout is reliable to about here
     readout_hidden: int = 512

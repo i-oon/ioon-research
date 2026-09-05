@@ -13783,6 +13783,175 @@ Runs `scripts/diagnostics/clone_walk_test.py`, CoppeliaSim on port 23000, studen
 
 ---
 
+### F185. Delta-state is learnable and still cannot rank -- the wall was never the target
+
+**Two separable questions, and today closes exactly one of them.** `target_action_share.py`
+measured the mechanism directly: the reconstruction target buries the action (`z` reads body motion
+at ridge R2 0.359, the embedding at 0.005). The fix tested here is a `StateHead` reading
+`FTM(e_t,z) - e_t` and predicting body motion directly, trained end to end
+(`scripts/run/com7_state_head.sh`, warm-started from `teacher_ego.pt`, `lambda_state 1.5`, 50
+epochs) rather than inferred offline. Offline, it holds: R2 0.81-0.85 against the retrained
+checkpoint, both frozen and joint FTM, matching the closed-form ridge oracle -- the same number
+`target_action_share.py`'s ridge control found, now produced by a trained network instead of a
+linear fit. **The target-representation problem is solved.**
+
+Closed loop is the other question, and it is F179's own protocol, unmodified: held-out `c08f09t09`,
+goal clip `hexapod_ep100` (`speed_c7.1`), n=40 branch points, `--repeat_control 4`, CoppeliaSim port
+23000. Four scorers, same branch points, same perturbation draw, same realizability checks -- only
+the scorer differs. `ridge` is a closed-form linear stand-in fit on `[e_t, z]`, included as a lower
+bound on what the trained network should do; `state` is the trained network itself, read on a
+single `FTM` application to match both its training regime and how `ridge` is evaluated here (an
+earlier pass fed it a 3-step-rolled delta by mistake -- out of its training distribution -- and
+produced a false -2.06x; corrected below).
+
+| scorer | run 1 (signal/floor) | run 2 (signal/floor) | run 3 (signal/floor) |
+|---|---|---|---|
+| f179 (embedding rollout, the standing baseline) | -0.40x | -0.37x | +0.31x |
+| direct (state-blind control) | -0.03x | -0.68x | +0.48x |
+| ridge (Delta-state lower bound) | +1.90x | -0.28x | +0.89x |
+| state (the trained network) | not run | -2.06x *(wiring bug)* | -0.44x |
+
+**No scorer clears the noise floor reproducibly.** `ridge` looked real once (1.90x) and did not
+repeat (-0.28x, then 0.89x); `f179` and `direct` bounce around zero the same way. `state`, correctly
+wired, sits at 50% win rate -- coin flip -- with a small negative gap, not a win and not the
+pathological failure the bug produced. Read as one number each, all four sit near the floor; none
+is a reproducible win. **This is the outcome the launch config's own pre-registered pass bar
+named in advance**: *"state-head scorer ~= f179/coin, even with R2 0.81-0.85 offline -> the wall is
+between reconstruction accuracy and ranking, not the target."*
+
+**Why not the target: F181 already measured what the wall is.** Larger separation does not rank
+better -- sigma 2.0 reaches 10.0% separation, most of the way to the recorded library's 12.8%, and
+ranks at 42%, below a coin, because 33.3% of its joints fall outside the range the dataset ever
+used. The candidates fail by being off the manifold the model was fitted on, not by being too
+similar to each other. That failure mode sits entirely upstream of what any scorer reads off a
+candidate: **a target fix cannot rank candidates that do not separate on-manifold, because it was
+never aimed at how candidates are generated.**
+
+**The two threads, stated at the strength each earned:**
+
+    target representation      solved      Delta-state is learnable, R2 0.81-0.85, holds under retrain
+    candidate separation       standing    F179/F181's wall, untouched by this fix, because it
+                                            is a generation problem, not a representation problem
+
+**What this does not do.** It does not reopen F181's sigma sweep -- larger sigma was already tested
+there and fails the other way (off-manifold, not under-separated), and re-running it here would
+re-litigate a closed question rather than test a new one. The candidate-generation problem F181
+left open is the next real question and is not attempted here.
+
+Runs `wm/runs/beh12_state/{best_state.pt,teacher_state.pt}`,
+`scripts/diagnostics/planning/rank_fine_three_ways.py` (extended with the `state` arm),
+CoppeliaSim on port 23000, held-out `c08f09t09`.
+
+---
+
+### F186. The ceiling test resolves F185's fork: Delta-state ranks when candidates separate
+
+**F185 left one thing open on purpose: `state` had an offline number (R2 0.81-0.85) and a
+closed-loop number (coin flip on Gaussian perturbations), and nothing yet said which one `state`
+"really" was.** Two stories were consistent with a coin flip -- the scorer cannot rank at all, or
+the scorer is fine and the candidates never separated -- and only a scorer given candidates that
+*do* separate, on-manifold, decides between them. `rank_fine_three_ways.py` was extended with
+`--candidates conditions`: same four scorers, same 40 branch points, same goal, same protocol as
+F185 -- only the candidate pool changes, from 32 Gaussian nudges to the twelve recorded conditions
+from `--train_data` (in-distribution, the checkpoint's own training body, not the held-out one --
+the same trap `--exclude` guards against in `wm.fit_projector`).
+
+| scorer | perturb (F185), signal/floor | conditions (this run), signal/floor | win rate on conditions |
+|---|---|---|---|
+| f179 (embedding rollout) | -0.40x / -0.37x / +0.31x | **0.73x** | 60% |
+| direct (state-blind) | -0.03x / -0.68x / +0.48x | **4.64x** | 70% |
+| ridge (Delta-state lower bound) | +1.90x / -0.28x / +0.89x | **4.46x** | 62% |
+| **state (the trained network)** | -0.44x (n=1, corrected) | **3.95x** | **68%** |
+
+**`state` clears the ceiling decisively.** 3.95x is not a borderline number -- it is the same order
+of magnitude as `direct` and `ridge`, and none of the three sit anywhere near the noise floor the
+way every scorer did under `perturb`. **The offline R2 does convert to real, physically-verified
+ranking ability.** The fork in F185 is resolved on its first branch: the wall was candidate
+separation, not the scorer, and not the target.
+
+**One number that does not fit the tidy story, named rather than smoothed over: `f179` stays weak
+even here (0.73x, the only one of the four still below 1x).** The old embedding-rollout scorer that
+defined F179's original 47% does not benefit from easy candidates the way the three redesigned
+scorers do. That is a second, separate result: whatever F179's scorer's problem is, it is not fully
+explained by candidate separation alone, since three other scorers reading the same on-manifold
+candidates rank them cleanly while it does not.
+
+**`direct` -- the state-blind scorer -- is nominally the best of the four here, not `state`.** At
+this scale of separation (twelve whole, physically distinct behaviours), the action alone
+determines the outcome closely enough that reading the current state barely helps. That is not a
+contradiction of the Delta-state story; state-awareness should matter most exactly where separation
+is small, which is the regime `perturb` tests and `conditions` does not.
+
+**A caveat on the number, not the conclusion.** This is not the same measurement as F143's 85-90%:
+F143's coarse arm scores whether the pick shares the goal's *family* (chance 33%), while this scores
+win-rate against the student's own executed action with the noise floor as the read (chance 50%).
+The two percentages are not comparable to each other. What is comparable, because it is the same
+protocol run twice with only the candidate source changed, is `perturb` against `conditions` in the
+table above -- and that comparison is what the fork rested on.
+
+**What this does to the direction.** Approach (2) -- world model as rollout predictor rather than
+candidate selector -- is not triggered; the selector paradigm works when given candidates that
+separate. The open problem stays exactly where F185 left it: a candidate generator that is both
+fine-grained (unlike the recorded library, which only offers twelve whole behaviours) and
+on-manifold (unlike Gaussian noise past sigma 0.5). That generator does not exist yet and is the
+next real question.
+
+Runs `scripts/diagnostics/planning/rank_fine_three_ways.py --candidates conditions`,
+`wm/runs/beh12_state/teacher_state.pt`, CoppeliaSim on port 23000, library from
+`data/egocentric/beh12_c10f10t10_ego_flat`, goal held-out `c08f09t09`.
+
+---
+
+### F187. F186 corrected: two layers, not one, and the scorer's own layer is magnitude, not direction
+
+**F186 overclaimed "resolves cleanly."** 68% win rate on recorded conditions is not near the ~100%
+a scorer with no error of its own should get once candidates are already 4x above the noise floor
+apart. Two layers were tangled in every number so far: `perturb` stacks candidate-similarity *and*
+scorer-inaccuracy; `conditions` isolates scorer-inaccuracy alone, because the candidates are no
+longer the limiting factor. This measures that second layer directly, with no new simulator
+executions beyond reaching each branch point once -- ground truth for "which condition is actually
+best" is each condition's own recorded whole-clip-average motion, the same quantity `body_goal`
+uses to define the goal itself, so no rollout is needed to know the right answer.
+
+| scorer | exact accuracy | mean true-rank of pick (0=best, 11=worst) | wrong picks in the *same family* |
+|---|---|---|---|
+| f179 | 2% | 6.40 -- indistinguishable from random among twelve | 11/39 = 28% |
+| direct | 20% | 2.67 | 31/32 = 97% |
+| ridge | 22% | 2.48 | 29/31 = 94% |
+| state | 28% | 2.33 | 25/29 = 86% |
+
+**The scorer's own error is not noise and not a direction failure -- it is magnitude discrimination
+within one family.** `direct`/`ridge`/`state` almost never cross families (86-97% of their mistakes
+stay inside "speed"); the true best (`speed_c5.8`, true dist 0.390) gets swapped for an adjacent
+recorded speed (`c7.1`/`c8.8`/`c8.15`, dist 0.59-0.92), never for a turn or a side-step. Decomposed
+into direction and magnitude: when wrong, these three scorers still point close to the true
+direction (cosine 0.86-0.87 against the true best) and the error sits almost entirely in magnitude
+(mean gap 0.71-0.76 standardised units). `f179` fails a different and worse way -- cosine 0.17,
+near-orthogonal, consistent with its 6.40 mean-rank: it is not finely wrong, it has no real signal.
+
+**`state`'s state-awareness does not earn its keep on the hard pairs.** Cosine 0.867 / magnitude gap
+0.714 for `state` is statistically indistinguishable from `direct` (0.860 / 0.755) and `ridge`
+(0.866 / 0.728) -- the same condition pairs, the same branch points. Reading the current pose
+(`state`'s whole design over `direct`) buys nothing measurable on exactly the pairs that are hard.
+Whatever is limiting fine discrimination here, it is not fixed by adding state-awareness to the
+scorer.
+
+**This reframes the two-workstream split, rather than confirming it as two independent problems.**
+Gaussian perturbation (F179/F181/F185) also only ever varies magnitude/fine detail around one
+behaviour -- it never crosses families. So the wall the perturbation test hit and the wall this
+ceiling test isolates may be the *same* underlying limitation approached from two directions: **this
+model family discriminates behaviour categories well and discriminates magnitude within a category
+poorly**, whether the fine variation comes from noise around a guess or from real, recorded, nearby
+speeds. Candidate generation (Workstream 2) and scorer accuracy (Workstream 1) may not be separable
+fixes if both are downstream of the same magnitude-discrimination limit.
+
+Runs `scripts/diagnostics/planning/condition_confusion.py`,
+`wm/runs/beh12_state/teacher_state.pt`, CoppeliaSim on port 23000, library and ground truth both
+from `data/egocentric/beh12_c10f10t10_ego_flat`, goal held-out `c08f09t09`. Diagnosis only --
+trains and tunes nothing.
+
+---
+
 
 ## Files
 

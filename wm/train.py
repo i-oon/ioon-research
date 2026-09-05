@@ -41,18 +41,20 @@ from wm.models.adversary import MorphAdversary, MorphProbe  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
 VIEW_KEYS = ("view1_t", "view1_next", "view2_t", "view2_next")
+ROLLOUT_VIEW_KEYS = ("view1_next2", "view2_next2")
 
 
-def encode_batch(encoder, batch, offset=None):
+def encode_batch(encoder, batch, offset=None, extra_keys=()):
+    keys = VIEW_KEYS + tuple(extra_keys)
     frames = []
-    for key in VIEW_KEYS:
+    for key in keys:
         frames.extend(list(batch[key].numpy()))
     embeddings = encoder.encode(frames).float()
     if offset is not None:
         # broadcast over batch and patch tokens: one 1408-vector removed from every token, so the
         # appearance offset goes and the spatial arrangement of the robot stays
         embeddings = embeddings - offset
-    return dict(zip(VIEW_KEYS, embeddings.chunk(len(VIEW_KEYS))))
+    return dict(zip(keys, embeddings.chunk(len(keys))))
 
 
 @torch.no_grad()
@@ -172,7 +174,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     # batches are single-embodiment by construction, so one head and one offset serve the batch
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
     offset = offsets.get(embodiment) if offsets else None
-    views = encode_batch(encoder, batch, offset)
+    extra = ROLLOUT_VIEW_KEYS if (cfg.lambda_rollout > 0 and "view1_next2" in batch) else ()
+    views = encode_batch(encoder, batch, offset, extra_keys=extra)
     action = batch["action"].to(device)
 
     z = models["itm"](views["view1_t"], views["view1_next"])
@@ -244,6 +247,16 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
                                action.reshape(len(action), -1)[:, :models["ldad"].heads[
                                    embodiment].out_features])
 
+    # --- auto-regressive 2-step consistency, Demo-JEPA's `sloss` shape. Off unless `lambda_rollout`
+    # is set, so every earlier run reproduces unchanged. z2 comes from real frames only
+    # (`view1_next`, `view1_next2`), never from `pred_next`, so an inaccurate step 1 cannot
+    # relabel what the second action means; only the FTM's own rollout input is auto-regressive.
+    rollout_loss = None
+    if "view1_next2" in views:
+        z2 = models["itm"](views["view1_next"], views["view1_next2"])
+        pred_next2 = models["ftm"](pred_next, z2, embodiment)
+        rollout_loss = F.mse_loss(pred_next2, views["view2_next2"])
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -270,6 +283,10 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     if ldad_loss is not None:
         loss = loss + cfg.lambda_ldad * ldad_loss
         parts["ldad"] = float(ldad_loss.detach())
+        parts["total"] = float(loss.detach())
+    if rollout_loss is not None:
+        loss = loss + cfg.lambda_rollout * rollout_loss
+        parts["rollout"] = float(rollout_loss.detach())
         parts["total"] = float(loss.detach())
     return loss, parts
 
@@ -408,17 +425,18 @@ def build_cross_embodiment(cfg, root):
     train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
                                                   heldout_bodies=tuple(cfg.heldout_bodies),
                                                   clips_per_body=tuple(cfg.clips_per_body))
+    rollout_k = 2 if cfg.lambda_rollout > 0 else 1
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                      body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                     action_chunk=chunk_of(cfg))
+                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k)
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                    body_stats=train_set.body_stats,
                                    body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                   action_chunk=chunk_of(cfg))
+                                   action_chunk=chunk_of(cfg), rollout_k=rollout_k)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -457,6 +475,14 @@ def parse_args(cfg):
                         help="continue from a run's last.pt. 'auto' looks in the run directory. "
                              "The epoch count must match the interrupted run, since the cosine "
                              "schedule anneals over the total.")
+    parser.add_argument("--allow_shape_mismatch", type=_bool, default=False,
+                        help="**opt-in escape hatch for --init_ckpt, off by default.** The normal "
+                             "path deliberately crashes on a shape mismatch -- that is the real "
+                             "danger a warm start should catch, e.g. loading the wrong architecture "
+                             "by accident. This flag exists for the one case where a shape change is "
+                             "the whole point (e.g. widening z_tokens or ftm_blocks to test whether "
+                             "more injection surface moves the action lever): mismatched tensors are "
+                             "dropped, loudly, and everything else still loads and is still checked.")
     parser.add_argument("--init_ckpt", type=str, default="",
                         help="**warm start, not resume.** Loads itm/ftm/md/projector weights from "
                              "this checkpoint before training starts -- fresh optimiser, fresh "
@@ -474,7 +500,7 @@ def main():
     args = parse_args(Config())
     # --name, --resume and --init_ckpt are how the run is invoked, not part of what it is
     cfg = Config(**{k: v for k, v in vars(args).items()
-                    if k not in ("name", "resume", "init_ckpt")})
+                    if k not in ("name", "resume", "init_ckpt", "allow_shape_mismatch")})
     cfg.train_morphs = tuple(cfg.train_morphs)
 
     torch.manual_seed(cfg.seed)
@@ -531,7 +557,17 @@ def main():
                           weights_only=False)
         for name, model in models.items():
             if name in init:
-                missing, unexpected = model.load_state_dict(init[name], strict=False)
+                state = init[name]
+                if args.allow_shape_mismatch:
+                    own = model.state_dict()
+                    dropped = [k for k in state
+                              if k in own and tuple(own[k].shape) != tuple(state[k].shape)]
+                    for k in dropped:
+                        print(f"  init_ckpt: dropping {name}.{k} (checkpoint "
+                              f"{tuple(state[k].shape)} -> this run {tuple(own[k].shape)})")
+                    if dropped:
+                        state = {k: v for k, v in state.items() if k not in dropped}
+                missing, unexpected = model.load_state_dict(state, strict=False)
                 print(f"init_ckpt: {name} <- {args.init_ckpt} "
                       f"(missing {len(missing)}, unexpected {len(unexpected)})")
         print(f"warm-started from {args.init_ckpt}; optimiser, schedule and epoch count are fresh")
@@ -722,6 +758,8 @@ def main():
                if "body" in train_metrics else "")
             + (f" | state {train_metrics['state']:.4f}"
                if "state" in train_metrics else "")
+            + (f" | rollout {train_metrics['rollout']:.4f}"
+               if "rollout" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"

@@ -329,7 +329,8 @@ class MultiEmbodimentPairs(Dataset):
     """
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
-                 body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1, action_chunk=1):
+                 body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1, action_chunk=1,
+                 rollout_k=1):
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
@@ -376,7 +377,12 @@ class MultiEmbodimentPairs(Dataset):
         # past the end
         self.frame_stride = max(1, int(frame_stride))
         self.action_chunk = max(1, int(action_chunk))
-        reach = max(self.frame_stride, action_lag + self.action_chunk - 1)
+        # **`rollout_k` widens `reach`, which shrinks the usable index range slightly** -- gated so
+        # every run with the default `rollout_k=1` sees exactly the same pairs as before this
+        # existed. `rollout_k=2` needs a frame at t+2*frame_stride to exist for the auto-regressive
+        # 2-step term (`lambda_rollout`, wm/train.py).
+        self.rollout_k = max(1, int(rollout_k))
+        reach = max(self.rollout_k * self.frame_stride, action_lag + self.action_chunk - 1)
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
@@ -424,7 +430,7 @@ class MultiEmbodimentPairs(Dataset):
             a1 = a2 = identity_params(height, width)
 
         mean, std = self.stats[clip["embodiment"]]
-        return {
+        sample = {
             "view1_t": apply(frame_t, a1),
             "view1_next": apply(frame_next, a1),
             "view2_t": apply(frame_t, a2),
@@ -437,6 +443,15 @@ class MultiEmbodimentPairs(Dataset):
                                 / self.body_stats[1]).astype(np.float32)}
                if self.body_stats is not None else {}),
         }
+        if self.rollout_k >= 2:
+            # a third timestep, same view families as the pair above: `view1_next2` pairs with
+            # `view1_next` for z2 = ITM(e_t+1, e_t+2) (real frames only -- never the FTM's own
+            # prediction, so a bad step 1 cannot relabel what z2 means); `view2_next2` is the
+            # auto-regressive rollout's target, same family as `view2_next`'s recon target.
+            frame_next2 = clip["frames"][t + 2 * self.frame_stride]
+            sample["view1_next2"] = apply(frame_next2, a1)
+            sample["view2_next2"] = apply(frame_next2, a2)
+        return sample
 
 
 class EmbodimentBatchSampler(Sampler):

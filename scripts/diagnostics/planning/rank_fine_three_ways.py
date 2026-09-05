@@ -49,6 +49,7 @@ from teacher_student_insect import Student, body_goal, load_teacher, pooled  # n
 from wm.adapt3 import gather  # noqa: E402
 from wm.data.embodiment import REGISTRY, body_velocity, load, yaw_rate  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
+from wm.models.state_head import StateHead  # noqa: E402
 
 ALPHAS = (1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1e3)
 
@@ -164,6 +165,15 @@ def main():
     ap.add_argument("--states", type=int, default=15)
     ap.add_argument("--samples", type=int, default=32)
     ap.add_argument("--sigma", type=float, default=0.5)
+    ap.add_argument("--candidates", choices=("perturb", "conditions"), default="perturb",
+                    help="**the ceiling check.** `perturb` is F179's setting -- Gaussian noise "
+                         "around the student's guess, 2.5% separation, none of the four scorers "
+                         "beat a coin on it (F185). `conditions` swaps in the twelve recorded "
+                         "behaviours from --train_data as candidates instead: on-manifold, large "
+                         "separation, F143 read the old f179-style scorer at 85-90% on this. If a "
+                         "scorer can't clear this either, it cannot rank at all, independent of "
+                         "candidate generation; if it clears this but not `perturb`, the wall really "
+                         "is separation, not the scorer.")
     ap.add_argument("--repeat_control", type=int, default=4)
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--scene", default="medauroidea_c08f09t09.ttt")
@@ -179,9 +189,39 @@ def main():
 
     fitted = fit_ridge(ck, cfg, itm, channels, args.train_data, args.cache, 2, device)
 
+    # **The fourth, real arm.** `f179`/`direct`/`ridge` above predate `StateHead` -- none of them
+    # calls it, so a checkpoint that has one was never actually put through this test. `ridge` is
+    # explicitly a lower bound on what a trained network could do (see module docstring); this is
+    # the trained network itself. Same z, same horizon-rolled `delta` the f179 arm already computes,
+    # so the only thing that differs from f179 is how body motion gets read off it.
+    state_model = None
+    if "state" in ck:
+        names = tuple(s.split("=", 1)[0] for s in cfg.sources) or ("default",)
+        state_model = StateHead(cfg, len(channels), names).to(device).eval()
+        state_model.load_state_dict(ck["state"])
+        print("state head loaded from checkpoint -- scoring with it too\n")
+    else:
+        print("checkpoint has no state head -- skipping that arm\n")
+
     st = torch.load(os.path.join(ROOT, args.student), map_location="cpu", weights_only=False)
     student = Student(st["token_dim"], st["goal_dim"], st["action_dim"]).to(device).eval()
     student.load_state_dict(st["student"])
+
+    # **The ceiling pool.** `--train_data`, not the held-out `--data` -- the twelve conditions have
+    # to come from the body the checkpoint actually trained on, or a bad score here would measure
+    # an unseen body instead of a scorer's ceiling (the same trap `--exclude` guards against in
+    # `wm.fit_projector`).
+    conds_acts = {}
+    if args.candidates == "conditions":
+        cand, seen = {}, set()
+        for p_ in sorted(glob.glob(os.path.join(ROOT, args.train_data, "*.npz"))):
+            with np.load(p_, allow_pickle=True) as z_:
+                c = str(z_["condition"])
+            if c not in seen:
+                seen.add(c); cand[c] = p_
+        conds_acts = {c: torch.tensor(np.asarray(load(cand[c], REGISTRY["hexapod"])["actions"]),
+                                      dtype=torch.float32) for c in sorted(cand)}
+        print(f"ceiling pool: {len(conds_acts)} recorded conditions from {args.train_data}\n")
 
     goal = body_goal(os.path.join(ROOT, args.goal_clip), "hexapod", channels)
     goal_std = torch.tensor((goal - mean_s) / std_s, dtype=torch.float32, device=device)
@@ -211,7 +251,7 @@ def main():
     joint_sd = torch.tensor(allacts.std(0), dtype=torch.float32, device=device)
 
     g = torch.Generator(device="cpu").manual_seed(args.seed)
-    scorers = ("f179", "direct", "ridge")
+    scorers = ("f179", "direct", "ridge") + (("state",) if state_model is not None else ())
     stats = {s: dict(wins=0, ties=0, rows=[]) for s in scorers}
     repeats = []
 
@@ -222,9 +262,16 @@ def main():
             e_full = encode_clip(encoder, np.asarray(obs)[None], 1).float().to(device)
             g_t = torch.tensor(goal, dtype=torch.float32, device=device).unsqueeze(0)
             base = student.act(pooled(e_full), g_t)
-            pert = base + (args.sigma * student.std.to(device)) * torch.randn(
-                args.samples, base.shape[-1], generator=g).to(device)
-            allc = torch.cat([base, pert])
+            if args.candidates == "conditions":
+                # index 0 stays the student's own action, so `pick == 0` keeps its meaning in
+                # both modes -- only what fills the rest of the pool changes
+                pool = torch.stack([conds_acts[c][min(int(bt), len(conds_acts[c]) - 1)]
+                                    for c in conds_acts]).to(device)
+                allc = torch.cat([base, pool])
+            else:
+                pert = base + (args.sigma * student.std.to(device)) * torch.randn(
+                    args.samples, base.shape[-1], generator=g).to(device)
+                allc = torch.cat([base, pert])
             z = proj(allc, "hexapod")
 
             roll = e_full.expand(len(allc), -1, -1)
@@ -233,9 +280,17 @@ def main():
             m_f179 = md.body(None, itm(e_full.expand(len(allc), -1, -1), roll))
             m_direct = md.body(None, z)
             m_ridge = score_ridge(fitted, e_full[0], z, device)
+            scored = [("f179", m_f179), ("direct", m_direct), ("ridge", m_ridge)]
+            if state_model is not None:
+                # single FTM application, matching both StateHead's training regime (one-step
+                # delta) and how `ridge` itself is evaluated here -- not the horizon-rolled `roll`
+                # f179 uses, which would hand the head a 3x-compounded delta it never trained on
+                one_step = ftm(e_full.expand(len(allc), -1, -1), z)
+                delta = one_step - e_full.expand(len(allc), -1, -1)
+                scored.append(("state", state_model(delta, z, "hexapod")))
 
             picks = {}
-            for name, m in (("f179", m_f179), ("direct", m_direct), ("ridge", m_ridge)):
+            for name, m in scored:
                 if m.dim() == 1:
                     m = m.unsqueeze(-1)
                 k = min(m.shape[-1], len(channels))
