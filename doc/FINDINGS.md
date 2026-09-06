@@ -13952,6 +13952,307 @@ trains and tunes nothing.
 
 ---
 
+### F188. Two architecture fixes for the action lever, both flat -- and one of them still helped something else
+
+**F187 left the action-lever metric exactly where it was**: real-z vs mean-z cosine on the FTM's
+own predicted direction, flat-to-decaying with horizon (0.054 / 0.062 / 0.042 / 0.026 at k=1/2/5/10,
+`action_lever_vs_horizon.py` on `teacher_ego.pt`). Two independent fixes were tried, each a cheap
+5-epoch warm-started de-risk from `teacher_ego.pt`, before committing to a full pretrain of either.
+
+**Fix 1: auto-regressive 2-step rollout supervision, copying Demo-JEPA's own working recipe rather
+than guessing** -- `K=2` (one teacher-forced step, one step fed on the model's own prediction),
+unweighted sum with the one-step loss (`app/vjepa_2_1_ac/train.py:159,482-489,501-503`, confirmed by
+reading their code, not their paper). Implemented as `lambda_rollout` in `wm/train.py`, needing a
+third view per sample (`MultiEmbodimentPairs.rollout_k`, `wm/data/dataset.py`).
+
+**Fix 2: wider injection surface** -- `z_tokens` 1 -> 4, `ftm_blocks` 8 -> 12 ("deep injection"),
+the cheap literal version of Demo-JEPA's 24-layer per-frame-token design, sized down for a dataset
+two to three orders of magnitude smaller than anything either external repo's recipe was tuned on.
+Needed a new escape hatch (`--allow_shape_mismatch`) to warm-start everything except the one
+resized layer (`ftm.latent_proj`) without weakening the checkpoint-shape safety check for every
+other run.
+
+| k | baseline | rollout-trained | deep-injection |
+|---|---|---|---|
+| 1 | 0.054 | 0.060 | 0.059 |
+| 2 | 0.062 | 0.060 | 0.061 |
+| 5 | 0.042 | 0.042 | 0.044 |
+| 10 | 0.026 | 0.026 | 0.024 |
+
+**Both flat, within noise, at every horizon.** Neither the training recipe nor the injection
+architecture moves the lever.
+
+**Not a wash, though: the rollout term measurably improved something else.** Auto-regressive
+rollout accuracy (fed on its own output, not the single-shot synthetic-z probe
+`action_lever_vs_horizon.py` uses) improved at exactly the horizons the term targets --
+model-MSE-over-copy-forward ratio 0.517->0.511 at k=1 (untargeted, flat as expected) but
+0.496->0.465 at k=3 and 0.518->0.471 at k=5 (`rollout_horizon_accuracy.py`, new script). The model
+got better at predicting what happens next; it did not get better at using the action to do so.
+Those are separable questions and this is the first measurement to split them.
+
+**What this rules out, and what it points at.** Two structurally different interventions -- one
+training-recipe, one architecture -- landed on the identical flat result. That symmetry is itself
+evidence: it is consistent with the limit sitting upstream of both, in the frozen V-JEPA2 encoder's
+own representation geometry, which no downstream training of the FTM can add action-relevant
+directions to if they are not already there. This is the same conclusion `cosine_ceiling.py`
+reached from a different angle (FTM direction-prediction plateaus near 0.690, looking like a
+property of the latent geometry rather than of the objective). Of the architecture-side options
+only the full sequence-structure rewrite (multi-frame, frame-causal, Demo-JEPA's actual paradigm)
+remains untested -- and two flat results in a row are reason to weigh the frozen-encoder ceiling as
+the more likely explanation before spending that rewrite.
+
+Runs `wm/runs/derisk_rollout5`, `wm/runs/derisk_deepinject5`,
+`scripts/diagnostics/objective_experiments/{action_lever_vs_horizon,rollout_horizon_accuracy}.py`,
+held-out `c08f09t09`. Both training runs local, 5 epochs, not the full pretrain.
+
+---
+
+### F189. The reference body's own turn sign is not reproducible from scratch, on the current scene -- caught before it trained on wrong data
+
+**Collecting 5x more clips of the training body's 12 conditions** (F187's untested lever: more
+data, same behaviours) to retrain the state head on -- `speed` and `side` families verified clean
+against the reference immediately. **`turn` did not**: yaw sign was consistently negative
+(-0.007 to -0.081 across all four levels) against the established positive reference (+0.007 to
++0.077, F117/F118, and confirmed still positive on the existing 48-clip dataset by the same
+measurement code run again here -- not a stale number).
+
+**Three explanations ruled out before accepting the fourth.** Not a comparison-path artifact:
+`--separability` (the same function, unchanged) reads positive on the old data and negative on the
+new, in the same session. Not session-level physics noise (F105's "the simulator does not repeat"
+was the live hypothesis): killed and restarted `CoppeliaSim_b` from nothing, reproduced the
+identical negative sign to two decimals (-0.0808 vs the first batch's -0.081) -- a fresh session
+does not get a fresh answer, so this is deterministic, not noise. Not egocentric-specific: the same
+fresh instance collecting **allocentric** (no `--view egocentric` at all) also reads negative
+(-0.086), so it is not an artifact of the camera mode either.
+
+**The fix, verified before trusting it**: `--spin_sign -1` -- the exact mechanism F117 built,
+previously understood to be needed only for the *non-reference* bodies (`c08f09t09`, `b1`) to match
+`c10f10t10`. Applied to `c10f10t10` itself, it reproduces the positive reference almost exactly
+(+0.070 against the reference's +0.073 to +0.077). **The root cause is not identified.** F117/F118
+established the positive sign on `c10f10t10` from two independent measurements; something in the
+scene file or the CPG code has since made the identical nominal command produce the opposite result,
+on the current codebase, regardless of session or camera mode. What changed is unknown -- only that
+something did, and that the reference body's own sign can no longer be assumed correct without
+re-checking it.
+
+**Consequence for anything collected on this body from here on**: `c10f10t10` needs `--spin_sign`
+re-verified before being trusted as the reference again, the same way `--verify`/`--separability`
+already have to be for every non-reference body. The corrected 240-clip set
+(`data/egocentric/beh12_c10f10t10_more_ego_flat`) passes `--separability` cleanly on all twelve
+conditions, including the one pre-existing quirk (`speed_c8.8` marginally weaker than `speed_c8.15`)
+already present and accepted in the original 48-clip dataset -- nothing new or worse, once turn was
+fixed.
+
+> The F117 lesson holds again: a comparison that is not run is not "fine", it is "not checked".
+> Re-verifying the reference body cost twenty minutes; training the state head on a mislabelled
+> turn family and finding out later would have cost the whole retrain.
+
+Runs `scripts/dataset/collect_beh12.py --spin_sign -1`, `CoppeliaSim_b` on port 23001, scene
+`medauroidea_c10f10t10.ttt`. See also [[b1-mujoco-deterministic]] (project memory) for why this
+data-sparsity fix does not carry over to B1 the same way.
+
+---
+
+### F190. The fine speed signal IS in the raw latent -- F188's ceiling framing was wrong
+
+**A more direct test than anything that led to it.** F188 read two architecture fixes landing
+flat (multi-step rollout supervision, wider injection surface) as evidence the limit sits in the
+frozen V-JEPA2 encoder's own geometry -- that no downstream training could create action-relevant
+directions not already there. That was an inference from two indirect results. This tests the claim
+itself: take the raw, frozen embedding delta `e_t+1 - e_t` -- no ITM, no FTM, no trained head of any
+kind -- for the four speed conditions (forward 0.124/0.152/0.186/0.192, `--separability`-verified
+real and monotonic) and ask whether an off-the-shelf probe can read the magnitude off it at all.
+
+**It can, clearly, by every probe tried.** Four-way classification (chance 25%): kNN at k=5 and
+k=15, on raw 1408-D features and on a 50-component PCA, and an MLP classifier, all land at
+**49-51% held-out** -- twice chance, not marginal, and consistent across every probe variant.
+Continuous regression on each transition's own achieved forward speed (not the four discrete bins):
+kNN k=15 reads **R2 +0.403, Spearman rho +0.560** -- a real, substantial fit. The confusion matrix
+carries the signature of a genuinely ordered quantity: errors concentrate on adjacent speeds
+(`c5.8`<->`c7.1`: 206 of the errors) and fall off for distant ones (`c5.8`<->`c8.8`: 80) -- the same
+shape F187 found in the *trained* pipeline's mistakes, here reproduced by an untrained kNN on the
+untouched encoder output.
+
+**One probe was noisy and does not weaken the result.** The MLP regressor's R2 was badly negative
+(-0.932, an unstable fit with ~3800 training points in 1408-D and no real hyperparameter search) but
+its rank correlation was still positive (+0.213) -- a miscalibrated fit, not a null one, and the
+three kNN variants plus both classifiers already agree without it.
+
+**Why not 100%, and it is not a weakness in the result.** An oracle given the exact TRUE
+per-transition forward speed -- no embedding, no model at all -- classifies the same four
+conditions at only **39.0%** and hits an R2 ceiling of **0.289**, both *below* the embedding-based
+kNN's 50.3% / 0.403. Instantaneous speed genuinely overlaps between adjacent conditions from one
+50 ms step to the next (gait-phase oscillation), so no probe, however strong, reaches 100% on a
+per-transition read -- that ceiling was never 100% to begin with. **The embedding-based probe beats
+the exact-value oracle**, which means the raw latent is not just encoding instantaneous speed; it
+carries additional condition-specific structure (plausibly gait posture/rhythm) that disambiguates
+cases where the raw velocity momentarily ties. The right reading is not "50% is a low ceiling" but
+"50% already exceeds what the physical quantity alone would allow."
+
+**Averaging over a whole clip instead of one transition confirms the noise is exactly gait-cycle
+oscillation, and localises the one genuine exception.** The same true-speed oracle, one number per
+clip instead of one per 50 ms transition: accuracy **39.0% -> 83.8%**, R2 **0.289 -> 0.987**.
+`speed_c5.8` and `speed_c7.1` become perfectly separable (20/20 each); every remaining error is
+`speed_c8.15` against `speed_c8.8` specifically -- their true clip-averaged means are 0.1842 and
+0.1862, a gap smaller than the clip-to-clip spread itself. That is not fixable by averaging, more
+data, or a better probe -- **those two conditions are genuinely almost the same achieved speed in
+this recipe**, the same pre-existing quirk `--separability` has flagged since the original 48-clip
+dataset (`speed_c8.8` marginally weaker than `speed_c8.15`).
+
+**This also recalibrates how F186's 68% should be read.** The ranking test decides once per branch
+point from a single snapshot, not a whole-clip average -- its noise regime is the per-transition one
+(39% oracle), not the clip-averaged one (83.8%). Measured against the ceiling the test actually
+operates under, 68% is well above what perfect knowledge of the instantaneous physics alone would
+give you (39%) -- the same pattern as the embedding beating the oracle above, one level up the
+pipeline. F186's gap to "100%" was never a gap to a real, reachable number.
+
+**This overturns F188's inference, not its measurements.** The two architecture fixes are still
+correctly reported as flat -- that part stands. What was wrong was reading "two fixes to the FTM
+both failed" as evidence the encoder lacks the signal. It has the signal, in a form a five-line kNN
+finds without any training at all. **The wall is the trained pipeline not extracting/calibrating
+what is already present** -- consistent with F187's data-sparsity diagnosis (4 clips per condition
+is not enough to calibrate a precise magnitude read-out, even though the read-out target is real
+and recoverable) and inconsistent with needing an encoder-level fix. The com7 retrain on 5x more
+clips (F189's corrected dataset) is testing exactly the right lever, not a fallback after the
+architecture options ran out.
+
+Runs `scripts/diagnostics/objective_experiments/embedding_speed_ceiling.py`,
+`data/egocentric/beh12_c10f10t10_more_ego_flat`, held-out by clip (5 of 20 per condition), raw
+frozen `VJEPA2FrameEncoder`, no checkpoint involved. Diagnosis only.
+
+---
+
+### F191. Neither the ITM's bottleneck nor the projector loses the signal -- the wall is fully relocated to calibration
+
+**F190 ruled out the encoder. This checks the next two links**, with the same probes on the same
+data so the numbers read side by side: `real z = ITM(e_t, e_t+1)` from true observed transitions
+(does the 64-D bottleneck discard fine magnitude the raw delta still has), and `projected z =
+proj(action)` from the recorded action alone (what ranking actually consumes at test time, since
+the next frame is the thing being decided -- the one link nothing in this chain had touched).
+
+| stage | best accuracy (chance 25%) | R2 | rho |
+|---|---|---|---|
+| raw embedding delta (F190) | 50.3% | 0.403 | 0.560 |
+| real z, ITM on true transitions | 80.0% | 0.781 | 0.836 |
+| projected z, action alone | 97.7% | 0.791 | 0.879 |
+
+**All three carry the signal clearly; nothing here reads as absent.** `real_z` scoring well above
+the raw delta rules out the ITM's bottleneck -- it is not discarding fine magnitude, if anything it
+concentrates it. `proj_z` scoring highest of all was pre-registered in this file's own script as
+"the projector is not the bottleneck either," and that reading needs a correction stated plainly
+rather than left in: **97.7% is close to tautological, not a strong result.** `proj_z` is classified
+from the recorded action COMMAND itself, and different speed conditions use systematically different
+`--cycles` values by construction -- telling apart which command was sent is a far easier task than
+telling apart which condition a noisy observed OUTCOME belongs to, and reading it as "the projector
+preserves more signal than the ITM" would overclaim what a near-100% score on that particular task
+can support. What it does support, correctly: `proj_z` does not collapse distinct actions into
+indistinguishable representations. Absence-of-information is ruled out at this stage too.
+
+**What is not tested here, and is the honest remaining gap: calibration.** Carrying the information
+is not the same as the FTM-and-state-head path using it correctly -- whether `proj(action)`, fed
+through the FTM the state head reads, produces a prediction correctly ORDERED against physical
+reality. That is what F186/F187's actual ranking test measures (68%, now read against the 39%
+per-transition noise ceiling as a real but imperfect result), not this diagnostic.
+
+**The candidate list this closes out.** Of the four candidates named for "what's left if more data
+doesn't fix it": #1 (projector) and #4 (ITM bottleneck) are downgraded from candidate bottlenecks to
+ruled-out-as-information-loss. What remains is #3 (the state head's own readout/calibration) and
+data sparsity (F187) -- and they are the same question from two ends: the readout may be
+imprecisely calibrated *because* it was fit on 4-20 clips per condition. The com7 recollection
+(F189's corrected 240-clip set) tests both at once. **If it lifts the 68%, calibration was
+data-limited and this closes clean. If it does not, the state head's own readout (its architecture
+or loss, not the encoder, not z) is the next and considerably narrower target** -- cheaper than
+anything chased this session, since encoder, ITM and projector are now all cleared.
+
+Runs `scripts/diagnostics/objective_experiments/pipeline_speed_ceiling.py`,
+`wm/runs/beh12_ego/teacher_ego.pt`, same data and split as F190. Diagnosis only.
+
+---
+
+### F192. Combining delta into the state head's readout makes fine-magnitude prediction WORSE, not better
+
+**F191 left calibration as the one remaining candidate.** The state head's forward pass is
+`head(pool(delta - offset) + z_proj(z))` (`wm/models/state_head.py`) -- three design choices, each
+tested offline here with the same kNN probe and held-out-by-clip split as F190/F191, predicting
+forward speed (the exact channel F187 found confused between adjacent conditions).
+
+| feature | R2 | rho |
+|---|---|---|
+| `z` alone | **+0.781** | +0.836 |
+| mean-pooled delta, raw | +0.403 | +0.560 |
+| mean-pooled delta, offset-subtracted | +0.403 | +0.560 |
+| std-pooled delta (spatial variance) | +0.275 | +0.365 |
+| `z` + mean-pooled delta | +0.625 | +0.733 |
+| `z` + std-pooled delta | +0.556 | +0.627 |
+
+**Combining hurts.** `z` alone (0.781) beats `z` concatenated with pooled delta (0.625) by a wide
+margin -- adding the delta term does not add information on top of `z`, it dilutes what `z` already
+has. This is a direct, measured answer to why the trained state head (F187: 68% win rate, low
+exact-pair accuracy) underperforms what `z` alone already supports (F191: 80%, R2 0.78): the
+current architecture's own combination rule is working against the signal it has, independent of
+how much data trains it.
+
+**The offset is confirmed a true no-op, not just "cosmetic" for coarse accuracy.** Raw vs.
+offset-subtracted mean-pool read identical to three decimals (0.403 both). F187's "cosmetic for
+family accuracy" finding now holds for fine-grained regression too -- neither helping nor hurting.
+
+**Variance-preserving pooling does not rescue it, at least this way.** `std_pool` (spatial variance
+across patch tokens, instead of the mean) is worse than mean-pooling alone (0.275 vs 0.403) and
+worse combined with `z` too (0.556 vs 0.625). The extra signal is not sitting in cross-token
+variance; this does not rule out a learned alternative (attention-pooling, which chooses which
+tokens matter rather than a fixed summary statistic), only this specific fixed one.
+
+**The concrete, cheap fix this points at, independent of the com7 result:** stop combining
+`pool(delta)` into the fine-magnitude read-out, or weight `z` far more heavily than the current
+additive, equal-footing combination does. This is a small architecture change to the state head
+alone -- not the encoder, not the ITM, not the projector, all cleared by F190/F191 -- and it is
+backed by a direct measurement, not a guess. Worth trying regardless of whether more hexapod data
+lifts F187's 68%, since the two fixes are not mutually exclusive: data sparsity and a
+counterproductive combination rule can both be true at once, and this measurement shows the second
+one is.
+
+Runs `scripts/diagnostics/objective_experiments/state_head_readout_ablation.py`,
+`wm/runs/beh12_ego/teacher_ego.pt`, offset from `wm/runs/beh12_state/best_state.pt`, same data and
+split as F190/F191. Diagnosis only.
+
+**Confirmed on the deployment-relevant z, not just the oracle.** F192's `real_z` (ITM on true
+transitions) is unavailable at ranking time; `proj_z = proj(action)` is what is actually used. The
+same ablation on `proj_z`: alone, R2 **+0.791**; combined with the same offset-corrected mean-pooled
+delta, R2 drops to **+0.537** -- a larger relative drop than the oracle's (0.781 -> 0.625). The fix
+(state head's input becomes `z` alone, not `z + pool(delta)`) is confirmed on the path that is
+actually deployed, not only on an oracle unreachable at test time.
+
+Runs `scripts/diagnostics/objective_experiments/proj_z_delta_ablation.py`, same teacher, offset and
+split.
+
+**The real retrain does not confirm the offline result -- reported as a null, not spun.** Built
+`state_use_delta=False` into `StateHead`/`wm.train` and retrained the full 50-epoch recipe on the
+identical dataset `beh12_state` (the z+delta control) used, same warm start, same everything else.
+`condition_confusion.py`, same protocol as F187:
+
+| metric | z+delta (control, F187) | z-only (this retrain) |
+|---|---|---|
+| exact accuracy | 28% | 22% |
+| mean true-rank (0=best) | 2.33 | 2.60 |
+| cosine(picked, true-best) | 0.867 | 0.864 |
+| mean magnitude gap | 0.714 | 0.770 |
+
+**Slightly worse on every metric, not better.** The gaps are small enough at n=40 to plausibly be
+noise (the same order of run-to-run bounce `ridge` showed across F185/F186/F191, 60%/50%/62%), but
+this is clearly not the decisive win the offline kNN comparison predicted (R2 0.781 vs 0.625). A
+static kNN probe on frozen features cannot adapt the way a real trained MLP can -- the trained
+network may already partially down-weight the noisy delta term on its own during backprop, closing
+most of the gap the offline test measured in isolation. **Conclusion held at true strength: the
+real retrain does not confirm the fix works.** Not confirmed-worse either -- genuinely inconclusive
+against this control, and that is what goes in the record, not the hoped-for direction.
+
+Runs `wm/runs/beh12_state_zonly/{best_state.pt,teacher_zonly.pt}`, trained on
+`data/egocentric/beh12_c10f10t10_ego_flat` (NOT the enlarged "more" set -- this is the same-data
+control for the architecture question, independent of the com7 data-sparsity run), CoppeliaSim on
+port 23000.
+
+---
+
 
 ## Files
 

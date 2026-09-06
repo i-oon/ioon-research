@@ -415,7 +415,8 @@ def build_models(cfg, device, heads=None, n_bodies=0):
     if cfg.lambda_state > 0:
         from wm.models.state_head import StateHead
         names = tuple(spec.split("=", 1)[0] for spec in cfg.sources) or ("default",)
-        models["state"] = StateHead(cfg, cfg.body_dim, names).to(device)
+        models["state"] = StateHead(cfg, cfg.body_dim, names,
+                                    use_delta=cfg.state_use_delta).to(device)
     return models
 
 
@@ -606,9 +607,13 @@ def main():
         if not cross_embodiment:
             raise SystemExit("lambda_state needs --sources: the offset it subtracts is defined "
                              "per embodiment")
-        print("state-head offset: per-embodiment mean of the FTM's predicted change:")
-        for name, off in state_offsets(models, encoder, train_set, cfg, device).items():
-            models["state"].set_offset(name, off)
+        if cfg.state_use_delta:
+            print("state-head offset: per-embodiment mean of the FTM's predicted change:")
+            for name, off in state_offsets(models, encoder, train_set, cfg, device).items():
+                models["state"].set_offset(name, off)
+        else:
+            print("state_use_delta=False (F192): state head reads z_proj(z) alone, "
+                  "no pool/offset to fit")
         # a one-time check, not a per-step one: this is exactly the failure that cost a full day
         # of diagnosis earlier -- state_target silently on the wrong scale, discovered only when
         # R2 was computed hours later. `body_motion` is standardised by `train_set.body_stats`

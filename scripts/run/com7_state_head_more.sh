@@ -59,8 +59,13 @@ echo "=== fit a fresh projector against the retrained checkpoint  $(date '+%F %T
 # the ITM frames it never trained on if left unset (caught the hard way on the first state-head
 # run: rollout gap read fine on the mismatched fit and had to be redone).
 if [ -f "$RUN/projector_more.pt" ]; then echo "skip $RUN/projector_more.pt"; else
+  # fresh cache, not the shared default: the default (results/wm/cache/beh12_embeddings.pt) had
+  # grown to 13GB from every past run that used it, and loading that PLUS this run's own ~14GB of
+  # new embeddings (240 hexapod clips, 5x the usual) OOM-killed the process on com7's 31GB box --
+  # not a CUDA OOM, no traceback, just a bare "Killed". A dedicated cache avoids the 13GB baseline.
   $PY -u -m wm.fit_projector --ckpt "$RUN/best_state.pt" \
     --hex_dir "$HEX" --b1_dir "$B1" \
+    --cache results/wm/cache/beh12_state_more_embeddings.pt \
     --out "$RUN/projector_more.pt"
 fi
 echo "  read the rollout-gap ratio above against the first run's 0.339 (hexapod) / 0.206 (b1)"

@@ -25,32 +25,46 @@ dict and a reloaded model silently used the wrong ones.
 keep training under `L_recon`; a long run risks the fixed offset drifting stale as the pair it was
 computed from changes. Fine for a short confirm fine-tune (`multistep_derisk.py`-scale); a full
 retrain may need periodic re-estimation from training clips only, not yet implemented here.
+
+**`use_delta=False` (F192).** Offline probes on frozen features found `z` alone predicts forward
+speed better than `z` combined with pooled delta -- R2 0.781 vs 0.625 on the oracle ITM `z`, 0.791
+vs 0.537 on `proj(action)`, the z ranking actually deploys. Combining does not add information on
+top of `z`, it dilutes it. `use_delta=False` drops `pool`/the offset entirely and reads `z_proj(z)`
+alone -- a smaller network, not a larger one, and the fix this docstring's own finding pointed at.
+`use_delta=True` (the default) reproduces every run before this flag existed, unchanged.
 """
 import torch
 import torch.nn as nn
 
 
 class StateHead(nn.Module):
-    def __init__(self, cfg, state_dim, embodiments, hidden=None):
+    def __init__(self, cfg, state_dim, embodiments, hidden=None, use_delta=True):
         super().__init__()
         hidden = hidden or cfg.state_hidden
-        self.pool = nn.Sequential(nn.LayerNorm(cfg.token_dim), nn.Linear(cfg.token_dim, hidden),
-                                  nn.GELU())
+        self.use_delta = use_delta
+        if use_delta:
+            self.pool = nn.Sequential(nn.LayerNorm(cfg.token_dim), nn.Linear(cfg.token_dim, hidden),
+                                      nn.GELU())
+            for name in embodiments:
+                # zero until `set_offset` fits it; a state head built before the offset is computed
+                # (e.g. for a shape check) is then the un-corrected version, not a broken one
+                self.register_buffer(f"offset_{name}", torch.zeros(cfg.token_dim))
         self.z_proj = nn.Linear(cfg.z_dim, hidden)
         self.head = nn.Sequential(nn.LayerNorm(hidden), nn.GELU(), nn.Linear(hidden, state_dim))
-        for name in embodiments:
-            # zero until `set_offset` fits it; a state head built before the offset is computed
-            # (e.g. for a shape check) is then the un-corrected version, not a broken one
-            self.register_buffer(f"offset_{name}", torch.zeros(cfg.token_dim))
 
     def set_offset(self, embodiment, mean):
         """Fix this embodiment's offset. Call once, from training clips, before training -- never
-        from an evaluation batch."""
+        from an evaluation batch. No-op when `use_delta=False`: nothing to correct in an input the
+        head does not read."""
+        if not self.use_delta:
+            return
         with torch.no_grad():
             getattr(self, f"offset_{embodiment}").copy_(
                 torch.as_tensor(mean, dtype=torch.float32))
 
     def forward(self, delta, z, embodiment="default"):
+        if not self.use_delta:
+            return self.head(self.z_proj(z))
         d = delta.mean(1) if delta.dim() == 3 else delta      # mean over patch tokens
         d = d - getattr(self, f"offset_{embodiment}")         # AttributeError on an unknown name,
         return self.head(self.pool(d) + self.z_proj(z))       # not a silent skip of the correction

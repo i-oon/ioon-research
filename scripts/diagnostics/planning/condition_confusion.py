@@ -154,7 +154,8 @@ def main():
     fitted = fit_ridge(ck, cfg, itm, channels, args.train_data, args.cache, 2, device)
 
     names = tuple(s.split("=", 1)[0] for s in cfg.sources) or ("default",)
-    state_model = StateHead(cfg, len(channels), names).to(device).eval()
+    state_model = StateHead(cfg, len(channels), names,
+                            use_delta=getattr(cfg, "state_use_delta", True)).to(device).eval()
     state_model.load_state_dict(ck["state"])
 
     goal = body_goal(os.path.join(ROOT, args.goal_clip), "hexapod", channels)

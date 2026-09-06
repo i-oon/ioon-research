@@ -46,6 +46,7 @@ LEGACY_DEFAULTS = {
     "lambda_ldad": 0.0,
     "lambda_state": 0.0,
     "state_hidden": 256,
+    "state_use_delta": True,
     "lambda_rollout": 0.0,
     "hinge_margin": 0.1,
     "hinge_K": 3,
@@ -270,6 +271,12 @@ class Config:
     # default: every run before this existed reproduces unchanged.
     lambda_state: float = 0.0
     state_hidden: int = 256
+    # **F192, control this flag decides.** Offline probes found z alone predicts forward speed
+    # better than z combined with the FTM's pooled predicted change (R2 0.781 vs 0.625 oracle,
+    # 0.791 vs 0.537 on proj(action), the z ranking deploys) -- combining dilutes z rather than
+    # adding to it. False drops `pool`/the offset from StateHead entirely, reading z_proj(z) alone.
+    # True (default) reproduces every run before this flag existed, unchanged.
+    state_use_delta: bool = True
     body_dim: int = 1            # must equal len(body_channels)
     # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
     # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise

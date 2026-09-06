@@ -120,6 +120,17 @@ def main():
     ap.add_argument("--warmup", type=int, default=25, help="hold DEFAULT pose (settle) before policy")
     ap.add_argument("--policy_warmup", type=int, default=45,
                     help="run the policy UNLOGGED first, so the initial spawn->walk jump is cropped")
+    ap.add_argument("--cmd_noise", type=float, default=0.0,
+                    help="correlated noise added to the joint TARGET (post action-scale), the "
+                         "same injection point and shape as collect_ik.py's --cmd_noise for the "
+                         "hexapod. 0.0137 is hexapod's proven 0.02 rad rescaled by the ratio of "
+                         "the two bodies' own joint-target std (0.110 b1 / 0.161 hexapod) -- a "
+                         "starting point for a pilot sweep, not a value to trust unverified.")
+    ap.add_argument("--noise_tau", type=float, default=5.0,
+                    help="correlation time in policy steps (20 Hz after DECIMATION). White noise "
+                         "(tau 1) would be filtered out by the joint controller before it reaches "
+                         "the pose, same reasoning as the hexapod collector.")
+    ap.add_argument("--noise_seed", type=int, default=0)
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -139,6 +150,8 @@ def main():
     plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
         if args.schedule else None
     last = np.zeros(12, np.float32); step_i = 0; heading_target = None; yaw_int = 0.0
+    _noise = np.zeros(12, np.float64)
+    _rng = np.random.default_rng(args.noise_seed)
     L = {k: [] for k in ("base_pos", "base_quat", "joint_pos", "joint_vel",
                          "action", "command", "foot_contact")}
     for _i in range(args.policy_warmup + args.steps):
@@ -183,6 +196,13 @@ def main():
             action = actor(torch.from_numpy(obs)).numpy()
         last = action
         target = il_to_sdk(DEFAULT_IL + ACTION_SCALE * action)
+        if args.cmd_noise > 0.0:
+            # correlated, added after the policy's own target -- same shape as collect_ik.py's
+            # --cmd_noise for the hexapod, so a fresh run of the identical command produces a
+            # genuinely different trajectory instead of MuJoCo's usual bit-exact repeat.
+            _noise = (_noise * (1.0 - 1.0 / args.noise_tau)
+                     + args.cmd_noise * np.sqrt(2.0 / args.noise_tau) * _rng.standard_normal(12))
+            target = (np.asarray(target, np.float64) + _noise).astype(np.float32)
         d.ctrl[:] = np.clip(target, m.actuator_ctrlrange[:, 0], m.actuator_ctrlrange[:, 1])
         for _ in range(DECIMATION):
             mujoco.mj_step(m, d)
