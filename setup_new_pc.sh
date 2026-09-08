@@ -51,6 +51,17 @@ if command -v apt-get >/dev/null 2>&1; then
     SUDO=""
     [ "$(id -u)" -ne 0 ] && SUDO="sudo"
 
+    # Ubuntu 24.04 (noble) and newer dropped python3.10 from the default repos (it ships 3.12) --
+    # confirmed on BIAS-2 2026-09-08: `apt-get install python3.10-venv` fails with "Unable to
+    # locate package". The deadsnakes PPA is the standard source for older Python versions on
+    # newer Ubuntu; only add it if the venv package isn't already reachable.
+    if ! apt-cache show python3.10-venv >/dev/null 2>&1; then
+        log "python3.10-venv not in default repos (Ubuntu 24.04+) -- adding deadsnakes PPA"
+        $SUDO apt-get install -y software-properties-common
+        $SUDO add-apt-repository -y ppa:deadsnakes/ppa
+        $SUDO apt-get update
+    fi
+
     log "Installing system packages (Python toolchain + CoppeliaSim's runtime libraries)"
     # Python 3.10 per doc/SIM_GUIDE.md section 1. The library list below is the standard set
     # CoppeliaSim's Qt5/X11 stack needs at runtime on a minimal (non-desktop) Ubuntu install --
