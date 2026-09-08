@@ -66,8 +66,18 @@ def main():
             p.requires_grad_(False)
 
     cache = torch.load(os.path.join(ROOT, args.cache), map_location="cpu", mmap=True)
-    clips = gather(os.path.join(ROOT, args.data), args.embodiment, None, ck, cache, 2,
+    # a real encoder, not None: gather() only needs None when every clip in --data is already in
+    # the cache. B1 sets have never been cached under this script's default cache path.
+    from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
+    encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+    before = len(cache)
+    clips = gather(os.path.join(ROOT, args.data), args.embodiment, encoder, ck, cache, 2,
                    max(1, cfg.action_lag), device)
+    if len(cache) > before:
+        full_path = os.path.join(ROOT, args.cache)
+        tmp_path = full_path + ".tmp"
+        torch.save(cache, tmp_path)
+        os.replace(tmp_path, full_path)
     conds = [c["cond"] for c in clips]
     print(f"{args.ckpt}\n{len(clips)} clips, {len(set(conds))} conditions, "
           f"from {args.data}\n", flush=True)

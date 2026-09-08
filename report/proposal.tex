@@ -53,6 +53,13 @@
 \usepackage{float}
 \usepackage{array}
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash\hyphenpenalty=10000\exhyphenpenalty=10000}p{#1}}
+\usepackage{tabularx}
+% Y: a stretchy version of P, used with tabularx so every multi-column table fills the full text
+% width automatically instead of being sized by hand-summed column widths (which is where every
+% earlier "too narrow" / overfull-hbox mistake in this document came from). Per-column relative
+% width is set with the standard tabularx idiom >{\hsize=<n>\hsize}Y, chosen so the factors in one
+% row sum to the column count.
+\newcolumntype{Y}{>{\raggedright\arraybackslash\hyphenpenalty=10000\exhyphenpenalty=10000}X}
 \usepackage{indentfirst}
 \usepackage{enumitem}
 \setlist{topsep=0pt, itemsep=0pt, parsep=0pt, partopsep=0pt}
@@ -153,11 +160,11 @@
 \begin{document}
 
 % ############################################################################
-% #  FRONT MATTER — lowercase roman numerals, top-right  [p.12]               #
+% #  FRONT MATTER - lowercase roman numerals, top-right  [p.12]               #
 % ############################################################################
 \pagenumbering{roman}
 
-% ---- Title page (outer cover) — 12 pt, ALL CAPS, not bold [p.27] ------------
+% ---- Title page (outer cover) - 12 pt, ALL CAPS, not bold [p.27] ------------
 \thispagestyle{empty}
 {\fontsize{12}{20}\selectfont
 \begin{center}
@@ -181,7 +188,7 @@
 }
 \clearpage
 
-% ---- Approval page [p.29] — not numbered -----------------------------------
+% ---- Approval page [p.29] - not numbered -----------------------------------
 \thispagestyle{empty}
 \begin{center}
   {\fontsize{12}{20}\selectfont
@@ -212,7 +219,7 @@
 \begin{center}Copyright reserved\end{center}
 \clearpage
 
-% ---- Abstract (Thai) — renders under XeLaTeX/LuaLaTeX only ------------------
+% ---- Abstract (Thai) - renders under XeLaTeX/LuaLaTeX only ------------------
 \thispagestyle{fancy}
 \addcontentsline{toc}{frontmatter}{ABSTRACT (THAI)}
 \ifThai
@@ -280,12 +287,12 @@ Academic Year             & 2026\\
 \vspace{1mm}
 
 \noindent Reinforcement-learning controllers for legged locomotion are tightly coupled to the body they were
-trained on, and every existing route around this hands the model privileged information about the new body -- a
+trained on, and every existing route around this hands the model privileged information about the new body: a
 CAD/URDF description, a kinematic tree, a fitted per-robot adapter, or demonstrations of the target. This research
 tests whether a behaviour recorded on one robot can instead drive a \emph{structurally different} robot from
 egocentric video alone, through a \textbf{shared body-motion coordinate} (Froude-scaled forward, lateral, and yaw
-velocity) with no kinematic model, no URDF, and no demonstrations of the target. The two bodies -- an 18-DOF stick
-insect (\emph{Medauroidea extradentata}) in CoppeliaSim and a 12-DOF Unitree B1 quadruped in MuJoCo -- share no
+velocity) with no kinematic model, no URDF, and no demonstrations of the target. The two bodies, an 18-DOF stick
+insect (\emph{Medauroidea extradentata}) in CoppeliaSim and a 12-DOF Unitree B1 quadruped in MuJoCo, share no
 joint dimension or correspondence; a frozen V-JEPA2 encoder feeds an Inverse Transition Model, a Forward
 Transition Model, and a Motion Decoder, adapting the latent-action world-model architecture from manipulation to
 legged locomotion. Results to date show the coordinate transfers can be \emph{correspondence-free}, with no frame
@@ -360,7 +367,7 @@ AEP/PEP & Anterior / Posterior Extreme Position\\
 \end{tabular}
 
 % ############################################################################
-% #  BODY — arabic numerals, top-right; no number on a chapter's first page    #
+% #  BODY - arabic numerals, top-right; no number on a chapter's first page    #
 % ############################################################################
 \clearpage
 \pagenumbering{arabic}
@@ -369,6 +376,18 @@ AEP/PEP & Anterior / Posterior Extreme Position\\
 \chapter{INTRODUCTION}
 
 \section{Background and Significance}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{image/fig_concept_draft.png}
+\caption{The transfer this thesis studies, in one line: a hexapod's recorded walking (left) is observed only as
+video; the Unitree B1 relates that observation to its own body through the shared, Froude-scaled body-motion
+coordinate of Section 2.3 (centre); and the B1 then executes the matching behaviour (right), with no frame
+pairing, no retargeting, and no kinematic model of either body. The two Froude values (0.209, 0.206) are the same
+recorded clip and the same trained coordinate reported in Section 4.2.}
+\label{fig:concept}
+\end{figure}
+
 Legged robots are typically controlled by policies learned through reinforcement learning (RL). A persistent and
 expensive limitation of this approach is \textbf{morphology specificity}: a policy learned for one body does not
 generalize to another. If a robot's legs are lengthened or shortened, its mass distribution changes, or its
@@ -380,10 +399,11 @@ representation of \emph{movement} is possible.
 The precise analogy for what this thesis attempts already has a name in psychology: \textbf{vicarious learning}
 (Bandura, 1977), the acquisition of a behaviour by observing another agent perform it, with no direct instruction,
 no first-hand demonstration of the observer's own body doing the task, and no requirement that the observed model
-resemble the observer. That is exactly the transfer under test here: the quadruped's controller is informed by
-video of a stick insect walking, a body it does not resemble and has never itself performed that behaviour on, with
-no direct instruction and no kinematic account of either body supplied to bridge them. The behaviour crosses
-through what is observed, not through anything told to the model about the bodies involved.
+resemble the observer. That is exactly the transfer under test here: a held-out body's controller, with no prior
+knowledge of the behaviour required of it, is informed by video of a different body's behaviour, one it does
+not resemble and has never itself performed, with no direct instruction and no kinematic account of either body
+supplied to bridge them. The behaviour crosses through what is observed, not through anything told to the model
+about the bodies involved.
 
 \textbf{Every existing route around this hands the model privileged information about the new body.} The
 strategies differ mainly in where that information comes from: a CAD or URDF description read directly from the
@@ -392,7 +412,7 @@ transformer-based universal controllers); an observation encoder and action deco
 robot's own proprioception and foot force (L3P); a task space such as end-effector pose that already means the
 same thing on every body in the corpus (LAC-WM); or demonstrations of the same task paired across both bodies
 (Demo-JEPA). Each is reasonable, and each assumes access to something about the target body that the motivating
-scenario -- an animal, a damaged robot, or hardware acquired without published kinematics -- does not provide.
+scenario (an animal, a damaged robot, or hardware acquired without published kinematics) does not provide.
 
 \textbf{One result shows the requirement can be dropped entirely, and it is the starting point for this thesis.}
 Hu, Chen, and Lipson (2025) learn a task-agnostic visual self-model for a legged robot from a single egocentric
@@ -406,7 +426,7 @@ attempts}, and it is the step nobody in this literature has taken.
 \textbf{Why this cannot be answered on bodies that share one skeleton.} An earlier phase of this project asked
 whether the same idea transfers to legged locomotion using three instances of one stick-insect body differing only
 in leg length. That setting is useful as a controlled first step (Section 1.5, Stage 1) but it cannot, on its own,
-establish that \emph{vision} is doing something proprioception could not: three leg lengths share an identical
+establish that \emph{vision} is doing something proprioception could not: several leg-geometry variants share an identical
 18-dimensional joint space, so a proprioceptive model could in principle be shared across them too, and vision's
 advantage there is convenience, not necessity. Answering the harder question, whether a vision-only latent action
 can unify locomotion across bodies where \emph{proprioception has no shared coordinate to begin with}, requires a
@@ -426,13 +446,13 @@ do (coarse, single-step action-conditioning) from what it cannot yet do reliably
 multi-step rollout), and the measured mechanism behind that gap.
 
 \textbf{Pursuing that second problem exposed something the prior work never had to confront, and it is the
-scientific contribution of this thesis.} Hu et al.\ adopt an egocentric camera for practical reasons -- one
-onboard sensor, portability, ground texture supplying motion cues -- and never compare it against a third-person
+scientific contribution of this thesis.} Hu et al.\ adopt an egocentric camera for practical reasons: one
+onboard sensor, portability, ground texture supplying motion cues, and never compare it against a third-person
 view; no method surveyed in Chapter 2 asks whether the viewpoint matters at all. It does, and structurally.
 Locomotion is periodic, so an external view of a walking body shows a pose that is itself a function of gait
 phase, which makes the command largely readable from the body's own posture. A world model trained on such video
 can therefore satisfy its prediction objective by continuing the gait cycle it can already see, without ever
-learning what the action does -- and this thesis measures that it does exactly this. An egocentric view removes
+learning what the action does, and this thesis measures that it does exactly this. An egocentric view removes
 most of that redundancy and restores measurable action-conditioning. The viewpoint from which a locomotion world
 model is built is therefore not a free setup choice but a precondition for the model to use its action at all,
 which matters here because in cross-embodiment transfer the action is precisely what has to cross.
@@ -453,8 +473,8 @@ requiring that body's engineering specification.
   morphology label, no kinematic model or URDF for either body, and no frame-level correspondence assumed between
   them, by adapting the Latent Action World Model pipeline (frozen visual encoder $\to$ Inverse Transition Model
   $\to$ Forward Transition Model $\to$ Motion Decoder) from manipulation to locomotion.
-\item To demonstrate that this coordinate transfers \textbf{correspondence-free} across the two embodiments --
-  that a goal observed on one robot's video can be used to select or drive behaviour on the other -- and to show
+\item To demonstrate that this coordinate transfers \textbf{correspondence-free} across the two embodiments, in that
+  a goal observed on one robot's video can be used to select or drive behaviour on the other, and to show
   under which training objective this transfer succeeds and under which it silently fails (a reconstruction-only
   objective is shown to discard the action channel across embodiment families; a discriminative objective is
   required to recover it).
@@ -474,7 +494,7 @@ requiring that body's engineering specification.
   using only egocentric video and each body's own auto-logged motion.
 \item A reusable diagnostic methodology for distinguishing whether a video world model's inferred action is
   \emph{legible} (decodable by some readout) from whether it is \emph{used} (changes the model's own
-  prediction) -- a distinction this thesis shows does not hold in general, and which prior displacement-based
+  prediction): a distinction this thesis shows does not hold in general, and which prior displacement-based
   evidence for action-sensitivity does not by itself establish.
 \item A stated and measured account of what a candidate-scoring deployment strategy requires of an ``unseen''
   robot (a pre-existing policy able to produce the candidate behaviours), why that requirement is circular for
@@ -486,10 +506,10 @@ requiring that body's engineering specification.
 \begin{enumerate}[label=\arabic*.]
 \item The study is conducted \textbf{entirely in simulation}: the hexapod in CoppeliaSim (Bullet physics engine)
   and the Unitree B1 quadruped in MuJoCo. No physical-robot or sim-to-real deployment is in scope.
-\item \textbf{Two stages, two different questions.} Stage 1 instantiates one hexapod body as three leg-length
+\item \textbf{Two stages, two different questions.} Stage 1 instantiates one hexapod body as several leg-geometry
   variants sharing an identical 18-dimensional joint space (Section 3.5), and establishes that a learned latent
-  action can beat a raw-joint-command baseline and transfer to a held-out leg length -- a controlled result, but
-  one that cannot by itself show vision succeeds where proprioception could not, because the three variants share
+  action can beat a raw-joint-command baseline and transfer to a held-out leg length. That is a controlled result,
+  but one that cannot by itself show vision succeeds where proprioception could not, because the three variants share
   a joint space proprioception could in principle share too. Stage 2 adds the Unitree B1 quadruped (12 actuated
   joints, MuJoCo), whose action space shares no dimension and no correspondence with the hexapod's, and is the
   setting in which the central claim is tested: a shared body-motion coordinate, inferred from egocentric video
@@ -497,47 +517,45 @@ requiring that body's engineering specification.
   kinematic model of both bodies.
 \item The camera is \textbf{egocentric} (mounted on the body, first-person view), not the third-person /
   allocentric view used in the project's earlier phase. This choice is itself a measured methodological finding
-  (Section 3.2) rather than an arbitrary setup detail: an allocentric camera lets the robot's own visible pose
+  (Section 3.2.3) rather than an arbitrary setup detail: an allocentric camera lets the robot's own visible pose
   encode the command being executed (because locomotion is periodic), which lets a video world model satisfy its
   prediction objective by completing the observed gait cycle without ever reading the inferred action. An
   egocentric camera removes most of this pose-driven redundancy and is the setting in which the model is shown
   to measurably use the action at all.
 \item The behaviours studied are drawn from a curated library of recorded conditions spanning forward, turning,
-  and (on the hexapod) sideways locomotion at several speeds, not from an unconstrained action space; Section 3.6
+  and (on the hexapod) sideways locomotion at several speeds, not from an unconstrained action space; Section 3.6.4
   states plainly what this library assumes about the target robot and why removing that assumption (via random
   motor babbling) is future work rather than a completed experiment.
 \item The visual encoder (V-JEPA2) is used \textbf{frozen} throughout both stages; training it is out of scope.
 \end{enumerate}
 
-\noindent\textbf{Explicitly not claimed.} To set expectations precisely, the following are outside the claims of
-this thesis: real-robot or animal transfer (the study is entirely in simulation); zero-shot cross-embodiment
-transfer of the forward model without any target-robot adaptation (Section 3.6.3 shows this fails, and reports
-cheap few-shot adaptation instead as the honest claim); reliable multi-step closed-loop control purely from the
-learned action (Section 3.7 shows action-conditioning holds coarsely and at one step, but not for fine-grained
-ranking or for rollouts beyond a few steps); a scaling law across many pretraining embodiments in the manner LAC-WM
-reports (only two embodiments exist in this study, which is a stated limitation, not a result); and the claim that
-a camera is the only information this pipeline needs about a new robot (the current deployment mechanism still
-draws on a curated library of that robot's own recorded behaviours, and Section 3.6.4 states why that is a
-real, unresolved limitation rather than a detail).
+\noindent\textbf{Explicitly not claimed.}
+\begin{itemize}[label=--]
+\item Real-robot or animal transfer.
+\item Zero-shot cross-embodiment transfer (Section 4.2).
+\item Reliable multi-step closed-loop control (Section 4.3).
+\item A scaling law over many pretraining embodiments, in the manner LAC-WM reports.
+\item That a camera is the only information this pipeline needs about a new robot (Section 3.6.4).
+\end{itemize}
 
 \section{Research Procedure}
 The project follows a staged, milestone-gated procedure in which each stage's result constrains the design of the
 next (this component-by-component validation strategy was set by the lab advisor):
 \begin{enumerate}[label=\arabic*.]
-\item \textbf{Stage 1 -- cross-morphology (prerequisite).} Confirm the pipeline on three leg-length variants of one
-  hexapod body: that identical commands produce measurably different behaviour across leg lengths, that the frozen
+\item \textbf{Stage 1: cross-morphology (prerequisite).} Confirm the pipeline on several leg-geometry variants of one
+  hexapod body: that identical commands produce measurably different behaviour across leg geometries, that the frozen
   visual encoder carries the behaviour signal needed downstream, and that a trained latent action beats a
   raw-joint-command baseline and transfers to a held-out leg length. This stage establishes that the pipeline
   works and that a latent action is better than the alternative; it does not establish that vision succeeds where
   proprioception could not, because all three bodies share one joint space (Section 1.1).
-\item \textbf{Stage 2 -- cross-embodiment.} Add the Unitree B1 quadruped, whose 12-dimensional action space shares
+\item \textbf{Stage 2: cross-embodiment.} Add the Unitree B1 quadruped, whose 12-dimensional action space shares
   no correspondence with the hexapod's 18. Train a shared visual world-model trunk with per-embodiment decoder
   heads, and test whether a body-motion coordinate learned this way transfers correspondence-free between the two
   robots, and under which training objective (Section 3.4).
-\item \textbf{Closed-loop diagnostic.} Build a candidate-scoring control loop -- the world model ranks a library
-  of recorded target-robot behaviours against a goal clip -- as a test harness for the world model's
+\item \textbf{Closed-loop diagnostic.} Build a candidate-scoring control loop, in which the world model ranks a
+  library of recorded target-robot behaviours against a goal clip, as a test harness for the world model's
   action-selection ability, while explicitly flagging why candidate scoring cannot itself be the final deployment
-  mechanism for a genuinely unseen robot (Section 3.6.4).
+  mechanism for a genuinely unseen robot (Sections 3.6.4 and 4.2).
 \item \textbf{Root-cause diagnosis.} Where the closed loop's behaviour does not match what the offline metrics
   predicted, isolate the mechanism through targeted ablations (camera viewpoint, gait periodicity, objective
   choice) rather than accepting the aggregate closed-loop number as the final word.
@@ -551,15 +569,15 @@ next (this component-by-component validation strategy was set by the lab advisor
 \chapter{LITERATURE REVIEW}
 
 This chapter builds toward a single question. Section 2.1 introduces only the machinery the rest of
-the thesis actually uses. Section 2.2 organises the cross-embodiment literature on one axis --
-\emph{what each method must be told about a robot before it can control it} -- because that is the
+the thesis actually uses. Section 2.2 organises the cross-embodiment literature on one axis,
+\emph{what each method must be told about a robot before it can control it}, because that is the
 axis this thesis's claim lives on. Section 2.3 then states what crossing between two
 \emph{structurally different} legged robots additionally requires beyond that axis: a coordinate
 that is not joint space. Section 2.4 covers the one result that removes the body-description
 requirement entirely, for a single robot, and is the closest precedent to this work. Section 2.5 is
 the pivot the rest of the thesis is built on: it asks whether a video world model conditioned on such
 a coordinate actually \emph{uses} it, shows that the literature has not established this for
-locomotion, and states the two-part question -- viewpoint, then precision -- that Chapter 3 answers.
+locomotion, and states the two-part question, viewpoint and then precision, that Chapter 3 answers.
 Section 2.6 states the resulting gap and the claim of this thesis.
 
 % ============================================================================
@@ -578,7 +596,7 @@ single agent with one hyperparameter setting mastered more than 150 tasks this w
 established learned latent dynamics as a general tool.
 
 Two properties matter here. First, the representation the model learns is the object a downstream
-policy consumes, so any property that representation has -- including independence from the body --
+policy consumes, so any property that representation has, including independence from the body,
 is inherited by everything built on it. Second, and central to this thesis, a world model must answer
 ``given this state and this action, what happens next?'', which makes its prediction objective an
 operational \emph{test} of whether a proposed action representation carries meaningful information
@@ -591,15 +609,15 @@ rollouts than to use that test.
 \caption{The DreamerV3 world model and actor-critic (Hafner et al., 2023). Observations are encoded
 into a compact latent state whose evolution a sequence model predicts from actions; the actor and
 critic then learn on trajectories \emph{imagined} inside the model. Predictions are conditioned on the
-agent's \emph{native} action -- the body-specific signal this thesis replaces.}
+agent's \emph{native} action: the body-specific signal this thesis replaces.}
 \label{fig:dreamer}
 \end{figure}
 
 The limitation that motivates everything after this is that DreamerV3 and its relatives learn a
 separate model per domain and condition on the robot's own motor command. Nothing is shared across
 bodies, and the native command is assumed to be the meaningful conditioning signal. When the same
-command means something different on a different body -- or when two bodies have no command in
-common at all -- that assumption fails.
+command means something different on a different body, or when two bodies have no command in
+common at all, that assumption fails.
 
 \subsection{Predicting representations rather than pixels}
 To apply a world model to images, one needs features. This work uses V-JEPA~2 (Assran et al., 2025), a
@@ -612,7 +630,7 @@ detail and pushes it toward features that capture how things move and change (Fi
 Two aspects are directly relevant. The accompanying V-JEPA~2-AC variant uses the pretrained encoder as
 a \textbf{frozen per-frame image encoder} feeding a lightweight downstream predictor, which is the
 precedent for how the encoder is used here (Section 3.3). And V-JEPA~2 was trained on real-world video
-only, so its behaviour under a rendering domain gap is uncharacterised -- which is why this project
+only, so its behaviour under a rendering domain gap is uncharacterised, which is why this project
 verifies empirically that the frozen features carry the required locomotion signal before relying on
 them.
 
@@ -679,7 +697,7 @@ longer matches the target. This project inherits the mechanism.
 LAC-WM reports that its unified latent transfers across embodiments better than an explicit-action
 baseline, and that performance \emph{scales} with embodiment diversity. Its premise, however, is that
 the embodiments differ in action format while still decoding into a coordinate that means the same
-thing on all of them -- end-effector pose. Section 2.3 takes up why that premise does not survive the
+thing on all of them: end-effector pose. Section 2.3 takes up why that premise does not survive the
 move to legged bodies with different leg counts.
 
 \subsection{Measuring what a representation contains}
@@ -695,7 +713,7 @@ A probe measures presence but not dominance: a property can be decodable while c
 nothing to how the representation is organised. The \textbf{silhouette score} and between-class
 variance measure that second question. Reporting only one of the two gives the wrong answer, and both
 are used throughout Chapters 3 and 4. Where the question is not what a representation contains but
-whether a \emph{model} uses a quantity, presence-style metrics are insufficient on their own -- a
+whether a \emph{model} uses a quantity, presence-style metrics are insufficient on their own; a
 sharper instrument for exactly that question is what Section 2.5 develops.
 
 % ============================================================================
@@ -712,18 +730,18 @@ Introducing a latent action does not by itself change this. Li et al.\ (2021) pl
 \emph{learned latent action space} for legged locomotion and demonstrate it on both a hexapod and a
 quadruped, but their framework is re-instantiated and trained \emph{separately per robot}: no latent
 space or dynamics model is shared or transferred between them. It establishes that latent actions
-suit legged control without making the latent space itself the thing that transfers -- the cost of
+suit legged control without making the latent space itself the thing that transfers; the cost of
 Section 2.1.1 persists even once the action representation is learned rather than native. This is the
 reference against which every sample-efficiency claim in this thesis is measured.
 
 \subsection{Explicit morphology conditioning}
 A second group avoids retraining by being handed a description of the body's structure. QWM
-(Danesh et al., 2026) conditions a world model on physical parameters -- limb lengths, masses, torque
-limits -- read from each robot's CAD/USD description, and generalises zero-shot to unseen quadruped
+(Danesh et al., 2026) conditions a world model on physical parameters, limb lengths, masses, and torque
+limits, read from each robot's CAD/USD description, and generalises zero-shot to unseen quadruped
 morphologies (Figure~\ref{fig:qwm}). It is the strongest cross-morphology transfer result in this
 area and the clearest contrast to this thesis: the morphology is \emph{supplied}, not inferred, and
 its observation channel is proprioception. Notably, QWM routes what it calls ``unmodeled real-world
-residuals'' through a separate dynamic latent -- an implicit concession that the design file does not
+residuals'' through a separate dynamic latent, an implicit concession that the design file does not
 fully describe the physical body.
 
 \begin{figure}[ht]
@@ -731,8 +749,8 @@ fully describe the physical body.
 \includegraphics[width=\textwidth]{image/QWM.png}
 \caption{QWM (Danesh et al., 2026). A Physical Morphology Encoder derives an embedding from each
 robot's USD design file and conditions the world model on it; a policy is then learned in imagination
-and deployed by injecting that morphology's embedding. The morphology is supplied from a design file
--- exactly the privileged input this thesis removes.}
+and deployed by injecting that morphology's embedding. The morphology is supplied from a design file,
+exactly the privileged input this thesis removes.}
 \label{fig:qwm}
 \end{figure}
 
@@ -773,7 +791,7 @@ data with an alignment objective. Demo-JEPA (He et al., 2026) reframes a demonst
 a future \emph{goal state} rather than actions to copy, and translates source demonstrations into
 target-compatible latent goals that the target realises through its own world model. It requires
 neither a shared action space nor action-level retargeting, but the translation is fitted from the
-target robot's own interaction experience on trajectories paired with the source -- by retargeted
+target robot's own interaction experience on trajectories paired with the source: by retargeted
 end-effector replay in simulation, and by Global Temporal Cycle Consistency alignment on real data.
 
 \begin{figure}[ht]
@@ -806,7 +824,7 @@ spaces'' asks whether the bodies unified share no dimension or correspondence wi
 ``transfers across bodies'' asks whether a single trained model is reused on a new body without
 per-body retraining from scratch.}
 \label{tab:positioning}
-\begin{tabular}{P{1.9cm}P{1.8cm}P{1.9cm}P{1.8cm}P{1.7cm}P{1.9cm}P{1.5cm}}
+\begin{tabularx}{\textwidth}{>{\hsize=1.07\hsize}Y>{\hsize=1.02\hsize}Y>{\hsize=1.07\hsize}Y>{\hsize=1.02\hsize}Y>{\hsize=0.96\hsize}Y>{\hsize=1.07\hsize}Y>{\hsize=0.85\hsize}Y}
 \hline
 \textbf{Method} & \textbf{Observation} & \textbf{Morphology info.\ from} & \textbf{Action representation} & \textbf{Disjoint action spaces?} & \textbf{Transfers across bodies?} & \textbf{Domain}\\
 \hline
@@ -822,7 +840,7 @@ Demo-JEPA (2026) & vision & paired target demos & latent goal state & not needed
 Hu et al.\ (2025) & vision (egocentric) & none needed & image-space model & n/a (one robot) & no (per robot) & legged locomotion\\
 \textbf{This work} & \textbf{vision (egocentric)} & \textbf{never supplied} & \textbf{shared body-motion coord.} & \textbf{yes (18 vs.\ 12 DOF)} & \textbf{cheap adapt., not zero-shot} & \textbf{legged locomotion}\\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 % ============================================================================
@@ -830,7 +848,7 @@ Hu et al.\ (2025) & vision (egocentric) & none needed & image-space model & n/a 
 Every method in Section 2.2 resolves the correspondence problem by being handed a mapping from
 outside: a kinematic tree, a fitted adapter, or paired demonstrations. This section states what a
 method that is handed nothing must find instead, before Section 2.4 asks how much of the remaining
-requirement -- knowledge of the body's own structure -- can be dropped as well.
+requirement, knowledge of the body's own structure, can be dropped as well.
 
 \subsection{A shared coordinate that is not joint space}
 An 18-joint hexapod and a 12-joint quadruped have action spaces that share no dimension and no
@@ -842,8 +860,8 @@ thing on both bodies and use it as the shared interface.
 Task-space foot trajectories are the obvious candidate and are rejected here for two independent
 reasons. Computing them requires a kinematic model and inverse kinematics for every robot, which is
 the cost this work exists to avoid and which fails immediately on a body whose kinematics are unknown.
-And empirically, a foot's motion decomposes into the part that is body motion rewritten -- adding
-nothing not already available -- and the gait itself, which is exactly the part that does not
+And empirically, a foot's motion decomposes into the part that is body motion rewritten, adding
+nothing not already available, and the gait itself, which is exactly the part that does not
 correspond across a six-legged wave and a four-legged trot.
 
 What a hexapod and a quadruped genuinely share is at the level of the \textbf{body}, not the leg: how
@@ -855,9 +873,17 @@ model, and are what this thesis uses as the shared coordinate.
 Comparing those quantities across bodies of different size requires normalising them. The
 dynamic-similarity hypothesis (Alexander and Jayes, 1983) formalises this for animal gaits:
 geometrically similar bodies of different scale move equivalently only when compared at matched
-dimensionless speed, the Froude number $Fr = v^2/(gL)$, where $L$ is a characteristic length. A
-normalised forward speed $v/\sqrt{gL}$ is therefore the scale-free version of ``how fast this body is
-walking'', and the same reasoning gives dimensionless lateral speed and yaw rate. This is why the
+dimensionless speed, the Froude number
+\[
+Fr = \frac{v^2}{gL},
+\]
+where $v$ is forward speed, $g$ is gravitational acceleration, and $L$ is a characteristic length (here, leg
+length). A normalised forward speed
+\[
+\tilde{v} = \frac{v}{\sqrt{gL}}
+\]
+is therefore the scale-free version of ``how fast this body is walking'', and the same reasoning gives
+dimensionless lateral speed and yaw rate. This is why the
 shared coordinate in this thesis is Froude-scaled rather than expressed in metres per second: without
 it, a large quadruped and a small insect walking equivalently would read as different behaviours, and
 the coordinate would encode body size rather than behaviour.
@@ -866,7 +892,7 @@ the coordinate would encode body size rather than behaviour.
 This thesis pairs a simulated stick insect (\emph{Medauroidea extradentata}, source) with a Unitree B1
 quadruped (target, MuJoCo). The pair is chosen deliberately, not inherited from prior work: the two
 share no joint correspondence, no leg count, no gait family, and no simulator, so nothing but the
-body-level coordinate of Section 2.3.1 can carry information between them -- which is what makes the
+body-level coordinate of Section 2.3.1 can carry information between them, which is what makes the
 pair a genuine test of that coordinate rather than a convenient one. The insect side is additionally
 chosen because a validated simulation model of the exact species already exists (Larsen et al., 2023)
 and its walking is exceptionally well characterised: coordination arises from decentralised local
@@ -880,22 +906,22 @@ convenient to simulate.
 \section{Dropping the Body Description Entirely}
 Section 2.3 defined what a shared interface between two disjoint bodies must look like. A separate
 question is whether a controller needs to be told anything about a body's structure at all, and one
-result removes that requirement entirely -- the closest precedent to this thesis.
+result removes that requirement entirely: the closest precedent to this thesis.
 
-Hu, Chen, and Lipson (2025) show that a task-agnostic \emph{visual self-model} -- a forward model
-mapping the current egocentric view and a motor action to the next egocentric view -- can be learned
+Hu, Chen, and Lipson (2025) show that a task-agnostic \emph{visual self-model}, a forward model
+mapping the current egocentric view and a motor action to the next egocentric view, can be learned
 for a legged robot from a single first-person camera and \textbf{random motor babbling}, with no prior
 knowledge of the robot's morphology, kinematics, or task.
 
 Their argument runs as follows. Legged robots have historically been ``blind'', relying on
 proprioception, with vision reserved for high-level planning; the authors challenge the assumption
 that vision is too slow and too indirect to model a body's own dynamics. A self-model learned from
-vision needs none of the infrastructure its alternatives need -- no CAD model or explicit equations,
-no IMU, no external optical tracker, no morphology prior -- which makes it portable in a way that
+vision needs none of the infrastructure its alternatives need: no CAD model or explicit equations,
+no IMU, no external optical tracker, no morphology prior, which makes it portable in a way that
 matters when a robot must adapt in place. They then widen that claim in stages: basic locomotion
 (forward, backward, turning) planned entirely in the visual self-model; robustness to unseen textures
 and slippery ground; the same method repeated across several quadrupeds and a humanoid; and finally,
-as the capstone, \textbf{autonomous damage detection and recovery} -- the robot notices that its
+as the capstone, \textbf{autonomous damage detection and recovery}, where the robot notices that its
 predictions no longer match what happens, re-babbles, and retrains its self-model, without being told
 what broke. Each step widens the same claim: the body description was never necessary.
 
@@ -910,14 +936,14 @@ model rather than transfer \emph{between} two. Extending the premise across embo
 what this thesis attempts.
 
 \textbf{Second, the egocentric viewpoint is adopted but never justified against the alternative.} The
-reasons given are practical -- one onboard sensor, portability, and ground texture supplying motion
-cues -- and no comparison against a third-person view is run. For a self-model of a single body that
+reasons given are practical: one onboard sensor, portability, and ground texture supplying motion
+cues, and no comparison against a third-person view is run. For a self-model of a single body that
 is a reasonable and sufficient basis for the choice. Section 2.5 is why, for a \emph{cross-embodiment}
 world model, it is not.
 
 % ============================================================================
 \section{Does a Video World Model Use the Action?}
-Everything so far establishes \emph{what} a cross-embodiment method must be given -- a shared
+Everything so far establishes \emph{what} a cross-embodiment method must be given: a shared
 coordinate (Section 2.3) that can, following Hu et al.\ (Section 2.4), be inferred with no morphology
 description at all. None of it establishes that a world model conditioned on such a coordinate
 actually \emph{depends} on it when predicting. That turns out not to be safe to assume, and it is the
@@ -928,7 +954,7 @@ shows that neither has been asked in this form before.
 
 \subsection{Three partial views of the same failure}
 Three recent results, from three different angles, establish that a video world model can appear
-action-sensitive by an offline metric while its prediction does not actually depend on the action --
+action-sensitive by an offline metric while its prediction does not actually depend on the action,
 without any of them measuring how severe this becomes in a periodic domain such as locomotion, or
 what causes it (Table~\ref{tab:action-relevance}).
 
@@ -947,8 +973,8 @@ let a model succeed by reading per-frame appearance in place of genuine temporal
 UWM-JEPA (Radha and Goktas, 2026) identifies the corresponding pathology in the training objective.
 Because the target frame under teacher-forcing is fixed by the trajectory that actually occurred, a
 model can predict it well without its prediction depending on the action it was given. The paper
-states the consequence directly -- ``action sensitivity itself requires training against counterfactual
-rather than teacher-forced targets'' -- and proposes counterfactual targets as the remedy.
+states the consequence directly: ``action sensitivity itself requires training against counterfactual
+rather than teacher-forced targets,'' and proposes counterfactual targets as the remedy.
 
 \begin{table}[H]
 \centering
@@ -957,7 +983,7 @@ rather than teacher-forced targets'' -- and proposes counterfactual targets as t
 \caption{What each action-relevance result establishes, and what this thesis measures on the same
 question.}
 \label{tab:action-relevance}
-\begin{tabular}{P{2.0cm}P{5.4cm}P{5.4cm}}
+\begin{tabularx}{\textwidth}{>{\hsize=0.47\hsize}Y>{\hsize=1.27\hsize}Y>{\hsize=1.27\hsize}Y}
 \hline
 \textbf{Work} & \textbf{What it establishes} & \textbf{What this thesis adds}\\
 \hline
@@ -971,14 +997,14 @@ UWM-JEPA (2026) & Teacher-forced targets let a model satisfy its objective witho
   action; proposes counterfactual targets. & Examines a domain where the action-independent prediction
   is already near the achievable ceiling, so the proposed remedy has little remaining gap to close.\\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsection{The unexamined variable: camera viewpoint}
 None of the three results above asks the question this thesis is forced to confront: \textbf{how
 severe the redundancy becomes when the observation is periodic, and whether the camera viewpoint
 determines it.} Locomotion is periodic by construction, and an external, third-person view of a
-walking body shows a pose that is itself a function of gait phase -- the body's own posture can stand
+walking body shows a pose that is itself a function of gait phase: the body's own posture can stand
 in for the command that produced it. Whether that makes the action redundant, and whether an
 egocentric view removes the redundancy, is measured in this thesis (Chapter 3) rather than assumed.
 It is also the question Hu et al.\ (Section 2.4) never had to ask, because a self-model of one's own
@@ -986,31 +1012,30 @@ body has no allocentric alternative to compare against, and no method surveyed i
 the question at all.
 
 \subsection{Legibility is not use, and use is not precision}
-Even where an offline metric shows an inferred action is legible, Section 2.5.1 established that this
-does not show a world model \emph{uses} it -- a distinction this thesis measures directly, showing a
-model's output can become \emph{more} legible in exactly the way an offline metric rewards while the
-model's actual dependence on the action falls. Establishing that a world model uses the action \emph{at
-all}, at a single prediction step, is therefore only the first of two questions this thesis's
-diagnostic chapter answers, and answering it does not settle the second: whether that dependence is
-\emph{precise} enough to rank similar candidate actions against each other, or stable enough to remain
-informative over many steps of rollout rather than only one. Coarse, single-step conditioning and
-fine-grained, multi-step usability are separate capabilities, and no method reviewed in this chapter
-distinguishes them -- each is evaluated, at most, on whichever single capability its own benchmark
-happens to test. This chapter's synthesis (Section 2.6) states the gap this two-part diagnostic
-question exposes; Chapter 3 reports which of the two capabilities this thesis's own world model has,
-and which it does not yet have.
+Section 2.5.1 established that an offline metric showing an inferred action is legible does not show a
+world model \emph{uses} it: a model's output can become \emph{more} legible in exactly the way such a
+metric rewards while its actual dependence on the action falls. None of the three results in Section
+2.5.1, or any other method reviewed in this chapter, treats ``the model uses the action at all,''
+``the model uses it precisely enough to rank similar candidates,'' and ``the model uses it reliably
+over many steps of rollout'' as separate claims requiring separate evidence. Each is evaluated, at
+most, on whichever single one of these its own benchmark happens to test, and success on one is
+routinely read as evidence for the others. That conflation, treating action-sensitivity as a single
+property rather than as (at least) three, is itself a gap in how this literature evaluates
+action-conditioned video world models, independent of any particular domain or method.
 
 % ============================================================================
 \section{Research Gap and the Claim of This Thesis}
 Section 2.2 established that every cross-embodiment method must be told something about the new body:
 a design file, a kinematic tree, a fitted adapter, or demonstrations paired on the target. Section 2.3
-established what a method that is told nothing must find instead -- a shared coordinate that is not
+established what a method that is told nothing must find instead: a shared coordinate that is not
 joint space, Froude-scaled so it encodes behaviour rather than body size. Section 2.4 established that
 the remaining requirement, knowledge of a body's own structure, can also be dropped entirely, for a
 single robot, and that nobody has extended that to a second. Section 2.5 established that even once
 both of those are granted, a further and largely unexamined question remains: whether the resulting
-world model genuinely uses the coordinate it is given, at a single step and with enough precision to
-be useful, and that the influence of camera viewpoint on this is unexamined in the literature.
+world model genuinely uses the coordinate it is given at all, uses it precisely enough to rank similar
+candidates, and uses it reliably over more than one step: three separate claims the literature does
+not treat as separate, and the influence of camera viewpoint on the first of these is
+unexamined altogether.
 
 The gap is the conjunction, and no surveyed method occupies it: \textbf{vision-only observation, no
 kinematic model or design file for either body, genuinely disjoint action spaces (18 against 12
@@ -1018,8 +1043,8 @@ joints, six legs against four), and evaluation through closed-loop control rathe
 number alone.}
 
 \noindent\textbf{The claim this thesis makes.} A behaviour recorded on one robot can drive a
-structurally different robot from egocentric video alone -- with no URDF, no kinematic model, and no
-demonstrations of the target body -- through a Froude-scaled body-motion coordinate; and the viewpoint
+structurally different robot from egocentric video alone, with no URDF, no kinematic model, and no
+demonstrations of the target body, through a Froude-scaled body-motion coordinate; and the viewpoint
 from which that world model is built is not a free choice, because in periodic locomotion an external
 view lets the body's own pose stand in for the command and the world model never learns to use the
 action.
@@ -1038,12 +1063,12 @@ out of scope (Section 1.4); the contribution is the controlled demonstration of 
 cross, and why.
 
 \noindent\textbf{On the observation modality.} It is worth stating plainly why vision rather than
-proprioception, since the answer differs between the two stages of this work. Across three leg-length
+proprioception, since the answer differs between the two stages of this work. Across several leg-geometry
 variants of one hexapod (Stage 1), the three bodies share an 18-dimensional joint space, so
 proprioception could in principle be shared too and vision is the harder demonstration rather than a
 necessity. Across the hexapod and the quadruped (Stage 2), there is no proprioceptive coordinate to
-share without first constructing a joint correspondence from outside -- exactly the privileged
-information this thesis withholds -- while one camera describes both bodies in the same pixel array.
+share without first constructing a joint correspondence from outside, exactly the privileged
+information this thesis withholds, while one camera describes both bodies in the same pixel array.
 The strongest version of the argument is not that proprioception is incapable: morphology-agnostic
 proprioceptive control exists, treating joints as a token set over the kinematic graph. It is that
 those methods must be handed the graph, and a camera has to be handed nothing. That distinction also
@@ -1054,405 +1079,877 @@ external view is not the preferred channel but the only remaining one.
 \chapter{RESEARCH METHODOLOGY}
 
 \section{System Overview}
-The system comprises four learned/parameterized components on top of a fixed perceptual front-end, trained
-end-to-end except for the frozen encoder:
+The system comprises five learned/parameterised components on top of a fixed perceptual front-end, trained
+end-to-end except for the frozen encoder, and shared across both embodiments with two exceptions noted below:
 
 \begin{figure}[H]
 \centering
 \IfFileExists{image/pipeline.png}%
   {\includegraphics[width=\textwidth]{image/pipeline.png}}%
   {\includegraphics[width=\textwidth]{image/pipeline.pdf}}
-\caption{System pipeline. A frozen V-JEPA2 encoder maps each RGB frame to an embedding $e_t$; the Inverse
-Transition Model infers the latent action $z_t$ from $(e_t, e_{t+1})$; the Forward Transition Model predicts
-$\hat{e}_{t+1}$ from $(e_t, z_t)$ (loss $\mathcal{L}_{\text{recon}}$); and the Motion Decoder maps $z_t$ back to a
-body-specific joint command $\hat{a}_t$ (loss $\mathcal{L}_{\text{motion}}$).}
+\caption{Core recon/motion loop, shared by both embodiments. A frozen V-JEPA2 encoder maps each RGB frame to an
+embedding $e_t$; the Inverse Transition Model infers the latent action $z_t$ from $(e_t, e_{t+1})$; the Forward
+Transition Model predicts $\hat{e}_{t+1}$ from $(e_t, z_t)$ (loss $\mathcal{L}_{\text{recon}}$); and the Motion
+Decoder maps $z_t$ back to a body-specific joint command $\hat{a}_t$ (loss $\mathcal{L}_{\text{motion}}$) through a
+per-embodiment head. Not pictured: the shared body-motion head trained alongside this loop (Section 3.4.4), which
+is what actually carries the cross-embodiment claim.}
 \label{fig:pipeline}
 \end{figure}
 
-Input/output specification of each block (units stated, per the advisors' requirement):
+Input/output specification of every block (units stated, per the advisors' requirement):
 
 \begin{table}[H]
 \centering
-\small
-\caption{Input/output specification of each block in the pipeline.}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Input/output specification of each block in the pipeline. Per-embodiment blocks give hexapod / B1 shapes.}
 \label{tab:io}
-\begin{tabular}{P{3.0cm}P{3.4cm}P{3.4cm}P{3.2cm}}
+\begin{tabularx}{\textwidth}{>{\hsize=0.91\hsize}Y>{\hsize=1.12\hsize}Y>{\hsize=1.12\hsize}Y>{\hsize=0.84\hsize}Y}
 \hline
 \textbf{Block} & \textbf{Input} & \textbf{Output} & \textbf{Trained?}\\
 \hline
 V-JEPA2 encoder & RGB frame, $256\times256\times3$ (uint8) & $e_t \in \mathbb{R}^{256\times1408}$ patch tokens & No (frozen)\\
 Inverse Transition Model & $[e_t, e_{t+1}]$ (512 tokens) & $z_t \in \mathbb{R}^{64}$ (latent action) & Yes\\
 Forward Transition Model & $[e_t, z_t]$ & $\hat{e}_{t+1} \in \mathbb{R}^{1408}$ & Yes\\
-Motion Decoder & ($e_t$ as context, $z_t$ as query) & $\hat{a}_t \in \mathbb{R}^{18}$ (joint targets, rad) & Yes (weights retained for downstream use)\\
+Motion Decoder (per-embodiment head) & ($e_t$ as context, $z_t$ as query) & $\hat{a}_t \in \mathbb{R}^{18}$ /
+  $\mathbb{R}^{12}$ (joint targets, rad) & Yes\\
+Body-motion head (shared, frame-blind) & $z_t$ only & $\hat{v}_t \in \mathbb{R}^3$ (forward, lateral, yaw;
+  Froude-scaled, dimensionless) & Yes\\
+Action projector (per-embodiment) & $a_t$ (control time, no future frame available) & $z_t \in \mathbb{R}^{64}$ & Yes\\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-Losses: $\mathcal{L} = \lambda_{\text{recon}}\,\mathcal{L}_{\text{recon}} +
-\lambda_{\text{motion}}\,\mathcal{L}_{\text{motion}}$, where $\mathcal{L}_{\text{recon}} =
-\lVert \hat{e}_{t+1} - e_{t+1}\rVert^2$ is computed in embedding space (no pixel decoder required) and
-$\mathcal{L}_{\text{motion}} = \lVert \hat{a}_t - a_t\rVert^2$. \textbf{Cross-augmentation} is applied: two
-independent augmentations of each frame pair are encoded, one feeding the ITM and the other the FTM target, which
-prevents the ITM from smuggling raw future-frame content into $z_t$ as a shortcut.
+The training loss is
+\[
+\mathcal{L} = \lambda_{\text{recon}}\,\mathcal{L}_{\text{recon}} + \lambda_{\text{motion}}\,\mathcal{L}_{\text{motion}}
+  + \lambda_{\text{body}}\,\mathcal{L}_{\text{body}},
+\]
+with the three terms
+\begin{align}
+\mathcal{L}_{\text{recon}}  &= \lVert \hat{e}_{t+1} - e_{t+1} \rVert^2, \label{eq:recon}\\
+\mathcal{L}_{\text{motion}} &= \lVert \hat{a}_t - a_t \rVert^2, \label{eq:motion}\\
+\mathcal{L}_{\text{body}}   &= \lVert \hat{v}_t - v_t \rVert^2, \label{eq:body}
+\end{align}
+and $(\lambda_{\text{recon}}, \lambda_{\text{motion}}, \lambda_{\text{body}}) = (1.0, 1.0, 0.5)$ in every run this
+thesis reports results for. Equation~\eqref{eq:recon} is computed in embedding space, so no pixel decoder is
+required; Equation~\eqref{eq:motion} is supervised through the per-embodiment head; Equation~\eqref{eq:body} is
+supervised through the \emph{shared} head, the only term that asks the same $z_t$ to decode the same way on both
+robots (Section 3.4.4). This weighting, every other hyperparameter, and the full parameter count of every module
+are given in full in Appendix A.
+\textbf{Cross-augmentation} is applied throughout: two independent augmentations of each frame pair are encoded,
+one feeding the ITM and the other the FTM's reconstruction target, which prevents the ITM from smuggling raw
+future-frame content into $z_t$ as a shortcut. One sampled augmentation is applied identically to \emph{both}
+frames of a pair, so the transition itself carries no augmentation difference; a second, independently sampled
+augmentation gives the reconstruction target its own view. Each augmentation is a random square crop (side length
+uniform in $[0.85, 1.0]\times$ the frame's shorter side, resized back to $256\times256$) combined with an
+independent random brightness shift ($\pm0.2$) and contrast scale ($\times[0.8, 1.2]$). A horizontal flip is
+deliberately excluded: mirroring the image would swap the robot's left and right legs while the supervised joint
+command keeps its original leg ordering, which would make the Motion Decoder's target inconsistent with what the
+frame shows.
 
-\section{Simulation Environment and Morphology Variants}
+\textbf{What is confirmed as load-bearing, and what is not.} This chapter describes the architecture and protocol
+that Chapter 4 shows actually carries the cross-embodiment claim: the shared body-motion head. A further module,
+a \textbf{state head} reading body motion off the Forward Transition Model's own predicted change rather than off
+$z_t$ directly, was built and evaluated during this project as a candidate fix for a problem Chapter 4 documents
+(Section 4.3); its offline evaluation is promising but its effect on the capability it was meant to fix did not
+confirm under a real retrain. It is reported in Chapter 4 as an investigated direction, not included here as
+settled architecture, so that this chapter states only what the evidence supports.
 
-\subsection{Simulator and model}
-CoppeliaSim v4.10 (Bullet 2.78 engine, 20~Hz timestep). The robot is the \emph{Medauroidea extradentata} model
-(six legs, three actuated joints each: ThC/CTr/FTi), adopted from Larsen et al. (2023), with an 18-dimensional
-joint-position-target action space.
+\section{Simulation Environment and Embodiments}
 
-\subsection{Leg-length variants}
-Three scenes are generated by scaling the coxa/femur/tibia segments of all six legs by a uniform factor and
-repositioning downstream joints accordingly: \textbf{long $1.0\times$ (base), medium $0.75\times$, short
-$0.5\times$}. Scaling is verified numerically (measured foot-reach ratio matches the target factor for all six
-legs).
+\subsection{Simulators and models}
+Two simulators host the two embodiments. The \textbf{hexapod} is the \emph{Medauroidea extradentata} model (six
+legs, three actuated joints each: ThC/CTr/FTi), with an 18-dimensional joint-position-target action space,
+simulated in CoppeliaSim v4.10 (Bullet 2.78 engine, 20~Hz timestep). The CoppeliaSim model itself (topology and
+mesh, not the controller or the learning method) is adapted from an existing lab asset built for a separate,
+unpublished project (\texttt{airl-insect-walking}); the biomechanical validation of this species and the
+reference gait data this thesis builds on (Section 3.5.1) are a separate contribution, from the same lab, that is
+cited on its own terms (Larsen et al., 2023, Section 2.3.3). The
+\textbf{Unitree B1} is a quadruped with a 12-dimensional joint-position-target action space, simulated in MuJoCo.
+The two share no simulator, no joint count, no joint convention, and no gait family (Section 2.3.3); nothing but
+the shared body-motion coordinate of Section 3.4.4 is available to connect them.
 
-\subsection{Observation capture}
-A single fixed vision sensor ($256\times256$, side view, ${\sim}40^\circ$ elevation) is added programmatically so
-that its pose relative to the robot is \emph{identical across all morphologies by construction}. The floor uses a
-matte, mildly-textured, non-repeating surface (a controlled choice: both a stark checkerboard and a blank surface
-were found to corrupt the visual features). The camera tracks the robot's planar position at fixed height and
-orientation, keeping apparent size constant.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{image/fig_body_closeup_draft.png}
+\caption{Close-up renders of both simulated bodies, cropped from an allocentric frame of each. The hexapod's six
+legs (18 actuated joints) and the B1's four legs (12 actuated joints) share no joint count, no joint convention,
+and no topology: the two bodies are visibly incomparable at the joint level, which is the premise this thesis's
+shared body-motion coordinate (Section 3.4.4) is built to work around.}
+\label{fig:body-closeup}
+\end{figure}
+
+\subsection{Two embodiments, and the leg-geometry variants as Stage-1 substrate}
+The hexapod is additionally instantiated as \textbf{multiple leg-geometry variants}, scaling the coxa, femur, and
+tibia segments of all six legs \emph{independently} (each segment's own factor, verified numerically per leg by
+measured foot-reach) rather than by one uniform leg-length factor. Morphology is therefore a three-dimensional
+volume of possible bodies, not points along a single long/medium/short axis, and a held-out body can be a
+combination of segment scales no training body used. Different Stage-1 milestones (Section 4.1) draw different
+numbers of bodies from this space: the base transfer test trains on four bodies (varying coxa while holding
+femur equal to tibia) and holds out one interpolated combination; the training-diversity test compares four
+bodies that all tie femur length to tibia length against six that decouple them, holding out several
+combinations spanning a range of femur/tibia ratios to test both interpolation and extrapolation. This
+\textbf{multi-body} substrate is \textbf{Stage 1}: a controlled, same-topology testbed used to validate the
+pipeline and the value of a latent action over a raw command before the harder, disjoint-action-space claim is
+attempted (Section 3.7). It is not the thesis's headline result and is not revisited outside that section.
+\textbf{Stage 2} pairs the hexapod (base geometry) with the Unitree B1 and is the setting every result in
+Chapter 4 beyond Experiment 1 is measured on.
+
+\subsection{Egocentric observation capture}
+The camera is mounted on the body (first-person, egocentric) for both embodiments, not the third-person
+(allocentric) view used in this project's earlier phase. This is not an arbitrary setup choice: Section 2.5.2
+argues, and Chapter 4 (Section 4.3) measures, that an allocentric view of a periodic gait lets the body's own
+pose stand in for the command, which is fatal to whether a world model can be shown to use the action at all. The
+floor uses a matte, mildly-textured, non-repeating surface (a controlled choice: both a stark checkerboard and a
+blank surface were found to corrupt the visual features). Camera intrinsics and mounting pose are held fixed
+within each embodiment so that only the viewpoint category (ego/allo), not incidental camera differences,
+distinguishes the comparison in Section 4.3.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{image/fig_filmstrip_combined_draft.png}
+\caption{Representative clips from the curated behaviour library (Section 3.6.4), sampled at five evenly-spaced
+timesteps, allocentric (left) and egocentric (right). Columns pair a hexapod condition with its Froude-matched B1
+condition (Section 2.3.2, Section 3.4.4): forward, hexapod \texttt{speed\_c8.8} against B1 \texttt{speed\_vx0.50}
+(body-motion 0.209 vs.\ 0.206); turn, hexapod \texttt{turn\_s0.56} against B1 \texttt{turn\_w0.075} (yaw-rate 0.081
+vs.\ 0.084); strafe, hexapod \texttt{side\_L\_lvl1} against B1 \texttt{side\_L\_lvl1} (lateral 0.189 vs.\ 0.153).
+Every pair is the strongest available condition on each behaviour axis, not the weakest chosen for visual
+convenience, and both members of a pair are within 24\% of each other on the dimensionless quantity the shared
+body-motion head is trained against.}
+\label{fig:filmstrip}
+\end{figure}
+
+The two viewpoints capture visibly different motion regimes even before any model sees them. Mean frame-to-frame
+pixel difference (grayscale, matched forward condition above) is roughly nine times larger egocentrically than
+allocentrically on both bodies (hexapod 6.10 against 0.68, B1 4.16 against 0.56), and the egocentric peak-to-mean
+ratio (1.60--1.65) is higher than the allocentric one (1.23--1.25), consistent with a periodic, gait-locked camera
+oscillation rather than incidental noise. Figure~\ref{fig:motion-energy} plots this directly, and
+Figure~\ref{fig:ego-overlay} shows what it looks like in the frames themselves: nine real egocentric frames per
+body, sampled evenly across the clip, overlaid by taking the per-pixel maximum of each frame's edge map after
+tinting it by its position in time (early frames blue, late frames red). Where the camera holds a steady pose
+across the clip, edges from different times land on the same pixels and the overlay reads as a tight, single-
+coloured trace; where it does not, the same physical edge appears at different pixel locations at different times
+and the overlay fans out into visibly separated colours. The hexapod's overlay fans out considerably more than the
+B1's, which is the direct visual counterpart of its larger, and less steady, frame-to-frame pixel difference.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{image/fig_motion_energy_draft.png}
+\caption{Mean absolute frame-to-frame pixel difference over time, allocentric (left) and egocentric (right), same
+matched forward condition as Figure~\ref{fig:filmstrip} (hexapod \texttt{speed\_c8.8}, B1 \texttt{speed\_vx0.50}).
+Shared $y$-axis across both panels.}
+\label{fig:motion-energy}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{image/fig_ego_overlay_draft.png}
+\caption{Time-coded overlay of nine real egocentric frames (blue = earliest, red = latest) from the same clips as
+Figure~\ref{fig:motion-energy}, built by taking the per-pixel maximum of each frame's edge map after tinting by
+time. Tight, single-coloured edges indicate a steady camera pose across the sampled frames; spread, multi-coloured
+edges indicate the camera pose changing between them.}
+\label{fig:ego-overlay}
+\end{figure}
 
 \section{Visual Encoder (Frozen V-JEPA2)}
-The encoder is \texttt{facebook/vjepa2-vitg-fpc64-256} (ViT-g/16, ${\sim}1$B parameters), used frozen. Because
-this checkpoint is natively a 64-frame \emph{video} encoder with 2-frame tubelets, feeding a real clip would let
-each frame attend to other timesteps and contaminate its embedding. To obtain an independent per-frame embedding,
-each frame is \textbf{duplicated into the minimal 2-frame tubelet} and encoded alone, yielding 256 patch tokens of
-dimension 1408 per frame. This usage has direct precedent in V-JEPA~2-AC.
+The encoder is \texttt{facebook/vjepa2-vitg-fpc64-256} (ViT-g/16, ${\sim}1$B parameters), used frozen for both
+embodiments. Because this checkpoint is natively a 64-frame \emph{video} encoder with 2-frame tubelets, feeding a
+real clip would let each frame attend to other timesteps and contaminate its embedding. To obtain an independent
+per-frame embedding, each frame is \textbf{duplicated into the minimal 2-frame tubelet} and encoded alone,
+yielding 256 patch tokens of dimension 1408 per frame. This usage has direct precedent in V-JEPA~2-AC.
 
 \section{Latent Action Model}
-The two learned transition models below are instances of the inverse and forward
-dynamics models described in Section 2.1.3: the ITM infers the latent action from a state transition, and the FTM
-predicts the next state from the current state and that latent. This project refers to them as \textbf{Transition
-Models} rather than \emph{dynamics} models deliberately. They operate entirely
-on \textbf{transitions between visual embeddings} produced by the frozen encoder. ``Transition Model'' names
-precisely what the module computes (a mapping over embedding transitions) and avoids implying that the model
-estimates the body's physical dynamics, which it does not. The underlying technique is identical to the
-inverse/forward dynamics models of the literature; only the name is chosen for descriptive accuracy in the
-visual-embedding setting.
+The two learned transition models below are instances of the inverse and forward dynamics models described in
+Section 2.1.3: the ITM infers the latent action from a state transition, and the FTM predicts the next state from
+the current state and that latent. This project refers to them as \textbf{Transition Models} rather than
+\emph{dynamics} models deliberately: the name states precisely what the module computes (a mapping over embedding
+transitions) without implying that it estimates the body's physical dynamics, which it does not.
 
 \subsection{Inverse Transition Model (ITM)}
 Attention-based (causal self-attention blocks with a learned query token) mapping the pair $[e_t, e_{t+1}]$ to the
 latent action $z_t \in \mathbb{R}^{64}$. The causal structure frames $z_t$ as ``what happened between $t$ and
 $t+1$.'' This is the inverse dynamics model of Section 2.1.3, computing $z_t$ from a transition instead of a
-native action.
+native action, and it is shared, unmodified, across both embodiments: there is exactly one ITM.
 
 \subsection{Forward Transition Model (FTM)}
 Attention-based, predicting the next visual embedding $\hat{e}_{t+1}$ from $[e_t, z_t]$; supervised by
-$\mathcal{L}_{\text{recon}}$ in embedding space.
+$\mathcal{L}_{\text{recon}}$ in embedding space. Like the ITM, there is one FTM shared across both embodiments; it
+is the module Chapter 4's diagnostic chain (Section 4.3) tests for whether its dependence on $z_t$ is precise
+enough to rank similar actions, not only present.
 
 \subsection{Motion Decoder (MD)}
-Cross-attention with $z_t$ as query over the current visual context, producing $\hat{a}_t$; supervised by
-$\mathcal{L}_{\text{motion}}$ against the auto-logged joint command $a_t$. This is the only place ground-truth
-action is used, and the decoder is \textbf{not part of the Phase 1 evaluation}, though its weights are retained.
-Its role during pretraining is to anchor $z_t$ to real motion so the latent cannot collapse into a trivial
-identity. Beyond this thesis it has a second role: it is the only module that maps a latent action back into
-executable joint commands, so any downstream policy emitting $z_t$ would require it. This also answers a standing
-question about the design, namely why a latent is introduced at all when the robot ultimately needs joint
-commands: the policy operates in the latent space because that is the part expected to transfer across bodies,
-while the decoder performs the body-specific conversion. The conversion separates what transfers from what does
-not.
+Cross-attention with $z_t$ as query over the current visual context, producing $\hat{a}_t$ through a
+\textbf{per-embodiment} head; supervised by $\mathcal{L}_{\text{motion}}$ against each body's own auto-logged
+joint command. Its role during pretraining is to anchor $z_t$ to real motion so the latent cannot collapse into a
+trivial identity. Because its heads are per-embodiment and its targets (18-D and 12-D joint commands) have no
+correspondence with each other, $\mathcal{L}_{\text{motion}}$ alone cannot force $z_t$ to mean the same thing on
+both bodies: nothing prevents the shared trunk from partitioning by embodiment underneath two separately-fitted
+heads. That is exactly the job of the next module.
+
+\subsection{Body-Motion Head: the module that carries the cross-embodiment claim}
+A single head, shared by both embodiments and given no access to the frame, maps $z_t$ alone to the Froude-scaled
+body-motion coordinate of Section 2.3 (forward, lateral, yaw), supervised by $\mathcal{L}_{\text{body}}$. Being
+frame-blind is deliberate: a head that could see the frame could identify which robot it is looking at and learn
+a de facto per-embodiment mapping underneath a nominally shared head, which an earlier ablation of this design
+confirmed happens when the frame is made available. Being the \emph{only} term supervised through a head shared,
+unmodified, across both robots is what makes $\mathcal{L}_{\text{body}}$, not $\mathcal{L}_{\text{motion}}$, not
+$\mathcal{L}_{\text{recon}}$, the term that can actually force $z_t$ to carry a cross-embodiment meaning, and
+Chapter 4 (Section 4.2) reports the result of training with it.
+
+\subsection{Action Projector}
+A small per-embodiment MLP mapping a body's own logged command $a_t$ to a latent $z_t$, used only where the ITM's
+required future frame $e_{t+1}$ is unavailable: at control time, when only the current observation exists. It
+is fitted to reproduce, from the command alone, the latent the ITM would have inferred from the corresponding
+transition, and it is what lets a recorded command be converted into a query against the shared latent space
+during the closed-loop evaluation of Chapter 4.
 
 \subsection{Dimensions and hyperparameters}
-$z_t$ is 64-dimensional (per LAC-WM \S4.2). The $\lambda$ weights, learning rate, and optimizer are to be
-determined by ablation (the base paper does not report them). Training uses mixed precision on a single GPU
-(RTX~2080~Ti, 11~GB), with small batch size and gradient accumulation to fit the frozen 1B-parameter encoder in
-the training loop (cross-augmentation prevents offline embedding caching).
+$z_t$ is 64-dimensional (per LAC-WM \S4.2). Training uses mixed precision (fp16 autocast) on a single GPU, with a
+small batch size to fit the frozen 1B-parameter encoder in the training loop (cross-augmentation prevents offline
+embedding caching). The full parameter count of every module, the complete loss weighting above, and every other
+hyperparameter are given in Appendix A.
 
 \section{Data Collection}
 
-\subsection{Pilot dataset (reference-gait replay)}
-The preliminary results of Section 3.7 were obtained on a pilot dataset in which each morphology is driven by a
-single fixed reference gait (replayed real-animal joint trajectories from one \emph{Medauroidea} individual),
-capturing per timestep the RGB frame, the 18-dimensional joint command $a_t$, the body pose, and the per-foot
-contact force. Reloading the scene between episodes provides genuine variation, because the contact-rich dynamics
-are chaotic and each reload yields a different trajectory, while within an episode the simulation is
-deterministic. Behaviour is labelled by the \textbf{6-bit foot-contact state} (which of the six feet are
-planted), a body-pose label preferable to a time-based phase label for the reason given in Section 3.7.3.
+\subsection{Stage 1: pilot dataset and its insufficiency}
+The Stage-1 substrate check of Section 3.7 uses a pilot dataset in which each hexapod leg-geometry variant is driven
+by a single fixed reference gait (replayed real-animal joint trajectories from one \emph{Medauroidea} individual).
+The \emph{same} joint-command sequence is applied to all three variants, exactly what makes the morphology-gap
+test of Section 3.7 valid (identical input, different outcome), but this property is fatal for training a
+latent action model on: if the command is already body-independent, the target carries no morphology information
+and there is nothing to \emph{retarget}. Stage 1's main training set instead redefines each behaviour as a
+\textbf{task-space foot trajectory}; inverse kinematics is solved separately per leg length to obtain
+per-body joint commands that place each body's feet on the same shared path, so the command differs per body while
+the intended behaviour is held constant. The source of the shared foot trajectories is a mature logged expert
+dataset from Larsen et al. (2023) (\texttt{expert\_66k\_aug3c\_fcontact}, 66{,}000 timesteps).
 
-\subsection{Why the pilot dataset is not sufficient for the main experiment}
-In the pilot, the \emph{same} joint-command sequence is applied to all three bodies (this is exactly what makes
-the morphology-gap test of Section 3.7.1 valid: identical input, different outcome). Verification confirms the
-commands are bit-identical across bodies (maximum pairwise difference is zero to machine precision). This
-property, correct for the gap test, is fatal for training the latent action model. The Motion Decoder is grounded
-by $\mathcal{L}_{\text{motion}} = \lVert \hat{a}_t - a_t\rVert^2$; if $a_t$ is identical across bodies, the target
-carries no morphology information, the decoder has no reason to condition on the body, and there is nothing to
-\emph{retarget}. The latent action $z_t$ would then be describable as a body-independent action simply because the
-\emph{command} was already body-independent, which is a vacuous form of the property this thesis claims to
-demonstrate. The main experiment therefore requires a dataset in which the \emph{behaviour} is shared across
-bodies but the \emph{command} differs per body.
-
-\subsection{Dataset redesign (inverse-kinematics retargeting)}
-The redesign defines each behaviour not as a joint trajectory but as a \textbf{task-space foot trajectory} (a
-Cartesian path for each foot). Given a shared foot trajectory, inverse kinematics is solved \emph{separately for
-each morphology} to obtain the joint commands that place that body's feet on the shared path:
-$a_t^{\text{body}} = \mathrm{IK}(\text{foot trajectory}, \text{body})$. Because foot position depends on both joint
-angle and link length, the same foot target yields different joint angles on a long leg and a short leg, so the
-resulting commands differ per body while the intended behaviour is held constant. This is the precise condition
-the Motion Decoder must learn to recover: a body-independent intent (the latent action) mapped to body-specific
-joint commands. The source of the shared foot trajectories is a mature logged expert dataset from Larsen et al. (2023)
-(\texttt{expert\_66k\_aug3c\_fcontact}, 66{,}000 timesteps) that records foot trajectories and the simulator's own
-binary contact labels directly, so the trajectories need not be re-derived and the contact labels do not depend on
-a hand-chosen force threshold. IK is a closed-form solve requiring no additional training, and it is introduced as
-an \emph{addition} to the pipeline rather than a change to the model architecture. A single successful IK pipeline
-also supplies the multiple behaviours (walk, turn, and stop) as additional foot trajectories,
-which the latent-space validation of Section 3.6.2 requires.
-\newpage
-\draftnote{LIMITATION}{IK produces comparable task-space objectives but does not guarantee identical contact
-dynamics across morphologies, and the anticipated objection that ``learning the Motion Decoder is merely learning
-IK'' is answered by the claim under test, namely that the model recovers this body-specific retargeting from
-\emph{observation alone}, without being given the kinematics.}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{image/fig_same_command.png}
-\caption{A single timestep with a bit-identical joint command across the three bodies. The left-middle foot
-carries 5.7~N on the long body and 9.3~N on the short body but only 0.3~N on the medium body, where it is still
-airborne. The command cannot distinguish the bodies; the difference exists only in the resulting physical state.}
-\label{fig:same-command}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{image/fig_ik_intuition.png}
-\caption{Why per-body commands are needed. Left: identical joint angles place the foot in different positions on a
-long versus a short leg. Right: inverse kinematics inverts the constraint, so a shared foot target is reached by
-different joint angles per body, which is the body-specific command the Motion Decoder must learn to produce.}
-\label{fig:ik-intuition}
-\end{figure}
+\subsection{Stage 2: hexapod and B1, egocentric}
+Stage 2's hexapod clips reuse the IK-retargeted foot trajectories above, re-collected with the egocentric camera
+of Section 3.2.3, spanning walking, turning, and (on the hexapod) sideways behaviours at several speeds. The B1's
+clips come from MuJoCo rollouts under its own trained locomotion policy, similarly re-collected egocentrically, and
+replayed through the same recording pipeline so that both embodiments' clips carry the same fields (frame, joint
+command, body pose) in a common format. Both bodies' recordings are organised into the same curated library of
+twelve behavioural conditions (forward at several speeds, two turn directions, two strafe directions on the
+hexapod) that Section 3.6.4 uses as the candidate set for closed-loop evaluation; Section 4.3 states plainly what
+depending on this curated library, rather than an unconstrained action space, costs the claim.
 
 \section{Evaluation Protocol}
 
 \subsection{Metrics}
-Two complementary measures are reported for every latent-structure claim, since reporting only one can mislead.
-The first is \textbf{linear-probe accuracy}: can a simple classifier decode a label (behaviour or morphology)
-from the representation? This measures the \emph{presence} of information. The second is the \textbf{silhouette
-score together with between-class variance}, which measure \emph{dominance}, that is, whether that information is
-the main axis of variation. Cross-morphology \textbf{transfer} is measured by training a probe on two morphologies
-and testing on the held-out one.
+Two complementary measures are reported for every latent-structure claim, since reporting only one can mislead:
+one for whether information is \emph{present}, one for whether it \emph{dominates} the representation.
+Cross-embodiment transfer and the mismatch control that must fail alongside it are measured the same way in both
+stages.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Metrics used throughout Chapters 3 and 4.}
+\label{tab:metrics}
+\begin{tabularx}{\textwidth}{>{\hsize=0.85\hsize}Y>{\hsize=1.15\hsize}Y>{\hsize=1.00\hsize}Y}
+\hline
+\textbf{Metric} & \textbf{Question it answers} & \textbf{What it measures}\\
+\hline
+Linear-probe accuracy & Can a simple classifier decode a label (behaviour or embodiment) from the
+  representation? & \emph{Presence} of information\\
+Silhouette score, between-class variance & Is that information the main axis of variation, or a minor one? &
+  \emph{Dominance} of information\\
+Cross-embodiment transfer & Does a probe fitted on one embodiment work on the other? & Transfer, always paired
+  with a mismatch control that must fail where the real comparison succeeds (Section 4.2)\\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Open-loop and closed-loop evaluation, defined}
+Both terms recur throughout this chapter and Chapter 4, and are given a precise meaning here rather than used
+loosely. An \textbf{open-loop} evaluation selects or replays a sequence of actions (or latents) without reading
+the body's actual state as the sequence unfolds. Offline selection among recorded conditions (Section 4.1--4.2)
+is open-loop in this sense: the video being evaluated already exists, and nothing about the test changes what
+happens next in it. A \textbf{closed-loop} evaluation reads the body's actual current state at every step, uses
+it to choose the next action, executes that action in the simulator, and repeats on the resulting new state:
+\[
+\footnotesize
+e_t \,\text{(state)} \to \text{selector} \to z_t \to \text{Motion Decoder} \to a_t \to \text{body} \to e_{t+1} \to \cdots
+\]
+The distinction matters because open-loop replay of a fixed latent sequence desynchronises on a body whose timing
+differs from the one the sequence was recorded on: $z_t$ is a \emph{local} transition, so a demo's $z_t$ (say,
+mid-swing) can land on the new body's actual $e_t$ (say, still in stance), an $(e_t, z_t)$ combination the Motion
+Decoder never saw during training, producing an unstable command; because gait is cyclic, this drift compounds
+rather than self-correcting. Reading the body's real state every step, as the closed loop does, prevents this by
+construction. Every result in this chapter states which regime it was measured under.
 
 \subsection{Milestone gates}
 \begin{itemize}[label=--]
-\item \emph{Morphology gap:} pass if the three variants travel measurably different distances under identical
-  commands.
-\item \emph{Encoder sanity:} pass if behaviour (foot-contact state) is decodable from $e_t$ above a noise floor.
-\item \emph{Latent validation:} pass if $z_t$ lowers morphology decodability and raises cross-morphology behaviour
-  transfer relative to the raw encoder baseline.
-\item \emph{Transfer:} pass if the pretrained world model reaches the same $\mathcal{L}_{\text{recon}}$ on the
-  unseen morphology with significantly fewer episodes than a from-scratch model.
+\item \emph{Stage 1, morphology gap:} pass if the leg-geometry variants travel measurably different distances
+  under identical commands.
+\item \emph{Stage 1, encoder sanity:} pass if behaviour (foot-contact state) is decodable from $e_t$ above a noise
+  floor.
+\item \emph{Stage 2, shared-coordinate transfer:} pass if a goal observed on one embodiment's video selects the
+  matching behaviour on the other, against chance and against a mismatched-goal control.
+\item \emph{Stage 2, action-conditioning:} pass if the trained forward model's prediction depends measurably more
+  on the true action than on a null (no-op) action, the gate viewpoint (Section 3.2.3) is tested against.
+\item \emph{Stage 2, ranking:} pass if the model can order two similar candidate actions by their real outcome,
+  not only distinguish grossly different behaviours (reported in Chapter 4 as not yet met).
 \end{itemize}
 
 \subsection{Primary evidence and the value-over-raw-command check}
-The \textbf{primary evidence} for the thesis is the latent-space validation: does $z_t$ raise cross-morphology behaviour transfer and lower morphology decodability
-relative to the raw encoder $e_t$, both at once. This test is clean because it examines $z_t$ on its own: it
-needs only the held-out body's video, and it does not compare against the native command.
+The \textbf{primary evidence} for the thesis is the shared body-motion head's transfer: does a goal observed on
+one embodiment's video, read through $z_t$ and the shared head, select or drive the matching behaviour on the
+other. This test is clean because it examines the shared coordinate on its own, needs only the held-out
+embodiment's video, and does not depend on a comparison against the native command.
 
-\noindent\textbf{Does the latent add value over the raw command?} This is answered by two measures. The value of
-the latent is therefore assessed by:
-\begin{enumerate}[label=\arabic*.]
-\item \textbf{Adaptation efficiency (the primary usefulness metric, per the lab advisor).} Starting from the
-  pretrained world model, adapt to the held-out body and measure the number of training episodes needed to reach a
-  target reconstruction error, against a \textbf{from-scratch} model and against a model \textbf{pretrained with
-  the raw command} instead of the latent. This measures \emph{how quickly} the representation transfers, which is
-  fair because every model is actually trained/adapted, and it is the metric the lab advisor identified as the
-  main test of whether the world model is useful. The observation-only start (no action) is included to isolate
-  what the action representation contributes.
-\newpage
-\item \textbf{The availability argument.} The raw command $a_t$ is a \emph{privileged} input: obtaining the
-  correct command for a new body requires that body's kinematics (through the inverse-kinematics retargeting of
-  Section 3.5.3), which the motivating scenario assumes is unavailable. The latent $z_t$ is inferred from
-  observation and needs no kinematics. A latent that \emph{matches} what the privileged command achieves is
-  therefore already a substantive result, because it recovers from vision alone what otherwise requires the body's
-  internal description.
-\end{enumerate}
+\noindent\textbf{Does the coordinate add value over what a policy can do without it?} This is the discipline
+Chapter 4 applies before crediting the world model with anything: a plain behaviour-cloned policy, trained on the
+same recorded clips with no world model at all, is measured as a baseline (Section 4.3), and any claim that the
+world model contributes must beat that baseline, not an arbitrary or a hoped-for one. The raw joint command is a
+further, stricter comparison where applicable: obtaining it for a new body requires that body's kinematics, which
+the motivating scenario assumes is unavailable, so a latent that matches what the privileged command achieves is
+already a substantive result.
 
-A further contrast, where applicable, is an explicit morphology-conditioned model in the spirit of QWM, comparing
-explicit and implicit morphology handling.
+\subsection{Candidate generation and the separation-and-manifold constraint}
+Every closed-loop evaluation in Chapter 4 that requires ranking or selecting among actions draws its candidates
+from the curated twelve-condition library of Section 3.5.2, not from an unconstrained action space, and this is a
+methodological constraint stated here so its consequences can be reported honestly rather than discovered
+implicitly in the results. Two properties of a candidate set determine whether ranking is even testable, and
+neither is guaranteed by simply having candidates:
 
-\section{Preliminary Validation of the Method}
-The first two milestones of Section 1.5 have been executed on a \textbf{pilot dataset} (the reference-gait replay
-of Section 3.5), and their outcomes justify the design choices above. These are diagnostic results whose purpose
-is to establish that the methodology is sound before the main training begins; they are \textbf{not} the thesis's
-final measurements. They will be regenerated on the redesigned IK dataset (Section 3.5), and the exact values are
-expected to shift. Every figure below is reproducible from the recorded data. Full results belong in the results
-chapter of the completed thesis.
-
-\subsection{The morphology gap is measurable and statistically decisive}
-All three variants were driven with a bit-identical 18-dimensional command sequence, and the body's world-frame
-position was read directly from the simulator. Two distance measures are reported: \emph{path length} (the
-distance actually walked) and \emph{net displacement} (straight-line progress), because the open-loop gait has no
-heading correction and its side-to-side body oscillation must not be mistaken for a locomotion difference.
-
-\begin{table}[H]
-\centering
-\small
-\caption{Distance travelled under an identical command sequence, five episodes per morphology.}
-\label{tab:gap}
-\begin{tabular}{lcc}
-\hline
-\textbf{Morphology} & \textbf{Path length ($n=5$)} & \textbf{Net displacement ($n=5$)}\\
-\hline
-Long, $1.0\times$   & $5.217 \pm 0.069$~m & $4.404 \pm 0.187$~m\\
-Medium, $0.75\times$ & $4.149 \pm 0.019$~m & $3.569 \pm 0.010$~m\\
-Short, $0.5\times$  & $3.228 \pm 0.011$~m & $2.729 \pm 0.011$~m\\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{image/fig_step_minus1.png}
-\caption{Left: top-down body trajectories (five episodes per morphology) under an identical command sequence,
-aligned to a common start and heading and drawn at true aspect ratio. Right: per-episode path length and net
-displacement with mean $\pm$ standard deviation; the three morphologies do not overlap.}
-\label{fig:gap}
-\end{figure}
-
-A two-sided Mann-Whitney U test rejects the null hypothesis of equal outcomes for every pair of morphologies at
-$p = 0.0079$, with Cliff's $\delta = 1.00$ (complete separation: every episode of a longer-legged body exceeds
-every episode of the shorter one; the worst long-leg net displacement, 4.032~m, still exceeds the best short-leg
-value, 2.746~m). At $n = 5$ per group, $p = 0.0079$ is the smallest value the test can return, i.e. the strongest
-statement this sample size permits. The relationship is not a simple rescaling: walking speed falls with roughly
-the 0.69 power of leg length rather than the 1.0 that naive geometric scaling would predict. This confirms that
-identical commands yield genuinely different motion, which is the premise of the whole study.
-
-\subsection{The frozen encoder carries the required behaviour signal, entangled with body shape}
-Using a linear probe (logistic regression with standardisation) on the mean-pooled 1408-dimensional embedding,
-foot-contact state (which feet are planted, top-8 patterns) is decodable \textbf{within a body} at a mean
-macro-F1 of 0.84 (long 0.83, medium 0.95, short 0.78; per-body variance is high, $\pm0.18$ on the long body,
-because only five episodes are collected), against a shuffled-label control at chance (macro-F1 $\approx 0.12$,
-chance $= 0.125$). The Inverse Transition Model therefore has a usable behaviour signal to extract. The same probe
-\textbf{across bodies} (train on one morphology, test on another) collapses to a mean macro-F1 of 0.16: the
-behaviour information is present but \textbf{entangled with body shape}, and transfer degrades as the leg-length
-gap widens. Morphology itself is separately decodable from the raw embedding at approximately 100 percent (holding
-under episode-grouped cross-validation, so it is not frame memorisation), and its leading principal component
-orders the three bodies by leg length with no labels supplied. This is the expected and desirable baseline: the
-encoder plainly sees that the bodies differ, and removing that difference while keeping the behaviour signal is
-precisely the job of the latent action model. \textbf{Two caveats define the pilot status of these numbers:} each
-morphology was recorded in a single session, so morphology and recording session (lighting, background) are
-perfectly confounded and cannot be separated on this data; and the top-8 contact patterns cover only 43 percent
-of frames because the replayed gait is a phase-staggered wave rather than a clean tripod, so the within-body
-figure is measured on the cleaner, more frequent half of the data and is likely optimistic. The multi-session
-control needed to attribute the morphology signal to leg length rather than session is scheduled with the dataset
-redesign.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{image/fig_morphology_evidence.png}
-\caption{Morphology is strongly and ordinally encoded in the frozen embedding. (a) A supervised linear probe
-reaches ${\sim}100$ percent and holds under episode-grouped cross-validation. (b) Unsupervised PCA, given no
-labels, orders the three bodies by leg length along its leading component. (c) A UMAP projection, shown for
-illustration only. Leg length and recording session are confounded in this pilot.}
-\label{fig:morph-evidence}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{image/fig_sanity_check.png}
-\caption{Foot-contact behaviour is decodable within a body (mean macro-F1 0.84) but collapses across bodies (mean
-0.16), and a shuffled-label control sits at the chance floor. The behaviour information is present but entangled
-with body shape, the signal the latent action must preserve while making it body-independent.}
-\label{fig:sanity}
-\end{figure}
-
-\subsection{Two methodological findings that shaped the protocol}
-First, a representation can \emph{contain} a signal without that signal \emph{dominating} it, so a single metric
-can mislead. Behaviour is decodable from the raw embedding (probe macro-F1 0.84 within a body), yet morphology is
-the dominant axis of variation (morphology silhouette $+0.0835$ against a much weaker behaviour signal, with
-morphology decodable at ${\sim}100$ percent). A linear probe measures presence; the silhouette score and
-between-class variance measure dominance. Section 3.6.1 therefore requires both, and additionally reports balanced
-accuracy / macro-F1 because the contact-pattern classes are strongly imbalanced. Second, an early time-based
-behaviour label (step index modulo a hand-chosen gait length) was abandoned: identical commands do not place
-different bodies in the same pose, so a time index is not a body-independent behaviour label, and it was found to
-be an artefact of the chosen trim window rather than a physical gait state. A pose-based label (foot-contact
-state, read from force sensors) is used from this point forward, and Section 3.5 records its residual limitations.
-
-\section{Remaining Work and Next Steps}
-The two preliminary milestones of Section 3.7 establish that the morphology gap is real and that the frozen
-encoder carries a usable, morphology-entangled behaviour signal. This section states, concretely and in order,
-every step that remains, so that the scope of the committed work is explicit. Each step names what it produces and
-the condition under which it is considered complete.
-
-\newpage
-\noindent\textbf{Step A: Dataset redesign (inverse-kinematics retargeting).} Build the IK pipeline of Section
-3.5.3: take the shared task-space foot trajectories from the mature expert log of Larsen et al. (2023)
-(\texttt{expert\_66k\_aug3c\_fcontact}), solve \texttt{simIK} separately per morphology to obtain per-body joint
-commands, and drive each body with its own command while recording, per timestep, the RGB frame, the joint command
-$a_t$, the body pose, and the simulator's binary foot-contact labels. \emph{Produces:} a dataset in which
-behaviour is shared across bodies but the command differs per body. \emph{Gate:} $a_t$ is verified to differ
-across bodies (variance well above machine precision), removing the pilot's shared-command limitation of Section
-3.5.2.
 \begin{itemize}[label=--]
-\item \emph{Sub-step A1 (confound control).} Record each morphology across \textbf{several sessions} with varied
-  lighting and background, so that a probe trained on one session can be tested on another. This is the control
-  needed to attribute the morphology signal of Section 3.7.2 to leg length rather than to recording session.
-\item \emph{Sub-step A2 (behaviours).} Generate the walk, turn, and stop trajectories as task-space foot paths
-  (Section 1.4); the latent validation of Step D uses more than one behaviour.
+\item \textbf{Separation.} Two candidates must produce genuinely different, reproducible outcomes for a ranking
+  test to mean anything; if the simulator's own execution noise exceeds the gap between two candidates' outcomes,
+  no ranker, however good, can be shown to distinguish them.
+\item \textbf{On-manifold.} What must stay in-distribution is the \emph{behaviour} a candidate produces, in the
+  Froude-scaled body-motion coordinate of Section 2.3, not the raw numbers of any one body's own action
+  convention -- action space cannot be the shared invariant because it is exactly the thing that is not shared
+  across embodiments (Section 2.3.1). Because every candidate here is drawn from one body's own recorded action
+  library, staying within that body's recorded action range is the practical proxy used to enforce this; a
+  perturbation large enough to be trivially separable can leave the trained behavioural distribution well before it
+  leaves the action range, at which point a failure to rank it correctly is a failure of generalisation to
+  unseen behaviour, not evidence about ranking within the model's competence.
 \end{itemize}
 
-\noindent\textbf{Step B: Regenerate the preliminary analyses on the redesigned dataset.} Re-run the
-morphology-gap and encoder-sanity analyses of Section 3.7 on the IK dataset, using the corrected evaluation of
-Section 3.6.1 (macro-F1 / balanced accuracy for the imbalanced contact classes, episode-grouped cross-validation,
-and the multi-session probe from A1). \emph{Produces:} the final baseline values for $e_t$ against which $z_t$
-will be compared. \emph{Gate:} the qualitative conclusions of Section 3.7 hold on the clean dataset; the
-morphology-versus-session attribution is resolved.
+These two properties trade against each other: a larger perturbation is easier to separate and more likely to
+leave the trained behavioural distribution, and Chapter 4 (Section 4.3) reports where, on this project's data,
+that trade-off leaves no setting at which a perturbation is simultaneously separable and on-manifold. This is
+stated here as a property of the evaluation protocol that any ranking claim must be read against, independent of
+which model is being tested.
 
-\noindent\textbf{Step C: Train the latent action model (ITM + FTM + Motion Decoder).} Train the three modules of
-Section 3.4 jointly with the combined loss and cross-augmentation, on the two training morphologies (short and
-long). \emph{Produces:} the learned latent action $z_t$ and the trained transition and decoding modules.
-\emph{Gate:} both losses converge and $z_t$ does not collapse (the Motion Decoder reconstruction stays
-informative).
+\section{Stage 1: Prerequisite Substrate Check}
+Before Stage 2 was attempted, five milestones were run on the Stage-1 leg-length substrate (Section 3.5.1) to
+confirm the pipeline had something to work with: the morphology gap, encoder sanity, the two-sided latent
+validation, transfer to a held-out leg length, and the effect of training-body diversity. Full results, read
+against an explicit hypothesis for each, are reported as Experiment 1 in Chapter 4 (Section 4.1) rather than
+here, so that this chapter states method and Chapter 4 states evidence without the two being interleaved. The
+one-line summary needed to motivate what follows: the pipeline works and a trained latent beats the raw command
+on a shared joint space, but this alone cannot show vision succeeds where proprioception structurally could not,
+because all leg-geometry variants still share one 18-dimensional joint space (Section 1.1), which is
+exactly the question Stage 2, on the disjoint-action-space pair, is designed to answer.
 
-\noindent\textbf{Step D: Latent-space validation (the two-sided criterion).} Probe $z_t$ for behaviour transfer
-and for morphology decodability, and cluster $z_t$ by behaviour across bodies. \emph{Gate:} $z_t$ lowers
-morphology decodability relative to $e_t$ \textbf{and} raises cross-morphology behaviour transfer relative to
-$e_t$, measured together (Sections 2.6.4, 3.6.1).
+\section{Remaining Work}
+Chapter 4 reports what is confirmed and what is not; this section states, concretely, what would be required to
+close the gap between them.
 
-\noindent\textbf{Step E: The decisive ablation (run early, not last).} Compare a latent-conditioned forward
-model, $F(e_t, z_t)$, against a raw-joint-conditioned one, $F(e_t, a_t)$, and an observation-only one,
-$F(e_t, 0)$, under an identical encoder, capacity, dataset, and budget (Sections 2.6.3, 3.6.3). \emph{Gate:}
-whether the latent improves held-out prediction over the raw command is the central question; this step is
-scheduled before the transfer experiment so that a negative answer is discovered early.
+\noindent\textbf{Counterfactual-target training.} Section 2.5.1 (UWM-JEPA) argues that a world model trained under
+standard teacher-forcing can satisfy its prediction objective without the prediction depending on the action, and
+proposes training against counterfactual targets, targets that could not be explained without the true action,
+as the remedy. Section 4.3 shows this project's own wall (coarse conditioning that does not extend to fine
+ranking) is consistent with exactly this pathology. Whether a counterfactual-target objective closes that specific
+gap, on a periodic-locomotion domain where the untrained prediction is already close to the achievable ceiling
+(Section 2.5.1), is untested and is the most direct next step.
 
-\newpage
-\noindent\textbf{Step F: Transfer to the unseen morphology.} Adapt the pretrained model to the held-out medium
-body and measure the number of episodes needed to reach a target reconstruction error, against a from-scratch
-baseline. \emph{Gate:} the pretrained model reaches the target with significantly fewer episodes (the
-sample-efficiency claim of Section 3.6.3), or the result is reported as negative.
+\noindent\textbf{The candidate-separation problem.} Section 3.6.4 states the constraint; Section 4.3 measures that
+no perturbation size tested is both separable and on-manifold. Two directions follow: a wider, more behaviourally
+diverse recorded library (more conditions, not larger perturbations of the existing twelve), and random motor
+babbling in the manner of Hu et al.\ (Section 2.4) as a way to generate a candidate distribution that does not
+depend on a person having already decided what the behaviours are.
 
-\noindent\textbf{Step G: Analysis, writing, and scoped extensions.} Consolidate results. Extensions that the
-pipeline makes cheap but that are not part of the core claim: an out-of-range (extrapolation) morphology beyond
-the $0.5\times$ to $1.0\times$ training range, and an explicit cross-embodiment alignment objective in the manner
-of UniSkill (Section 2.2.4). These are stated as directions, not commitments.
+\noindent\textbf{Removing the candidate-scoring circularity.} Section 4.3 states why scoring among a curated
+library presupposes a policy that can already produce the library's behaviours, which is circular for a genuinely
+unseen robot. The proposed resolution is a trained policy (teacher-student) that needs only the ability to actuate the
+robot, not a pre-existing behaviour set; this thesis has not yet demonstrated that such a policy, trained through
+the current world model, out-performs the plain behaviour-cloned baseline of Section 4.3.4.
+
+\noindent\textbf{A third embodiment.} The scaling claim LAC-WM leads with, performance rising with the number of
+pretraining embodiments, cannot be tested with two bodies. A third, topologically distinct body would let this
+be measured for the first time in this line of work.
 
 \section{Work Plan}
-The timeline follows the steps of Section 3.8. The simulation setup and both preliminary milestones (Section 3.7)
-are complete; the remaining steps span August to November, with the decisive ablation (Step E) scheduled early so
-a negative answer would surface before the transfer experiment.
+The Stage-1 substrate check and the full diagnostic chain of Chapter 4 are complete. What remains is the four
+items above, ordered by how directly each bears on the thesis's central open question: whether the world model
+can be made to rank actions precisely, not only condition on them coarsely.
 
 \begin{table}[H]
 \centering
 \small
-\caption{Work plan. The core experiments (through Step F) target completion by the end of October, leaving
-November for analysis and writing.}
+\caption{Remaining work plan.}
 \label{tab:plan}
-\begin{tabular}{P{1.4cm}P{7.4cm}cccc}
+\begin{tabularx}{\textwidth}{>{\hsize=0.9\hsize}Y>{\hsize=1.7\hsize}Y>{\hsize=0.4\hsize\centering\arraybackslash}Y}
 \hline
-\textbf{Step} & \textbf{Activity} & \textbf{Aug} & \textbf{Sep} & \textbf{Oct} & \textbf{Nov}\\
+\textbf{Item} & \textbf{Activity} & \textbf{Priority}\\
 \hline
-(setup) & Simulation setup, morphology variants, vision capture, preliminary milestones (\S3.7) & done & & &\\
-A & Dataset redesign: IK retargeting, multi-session capture (A1), behaviours (A2) & \checkmark & & &\\
-B & Regenerate the preliminary analyses on the IK dataset (final $e_t$ baselines) & \checkmark & \checkmark & &\\
-C & Train the latent action model (ITM + FTM + Motion Decoder) & & \checkmark & &\\
-E & Decisive ablation: latent vs raw-command vs observation-only (run early) & & \checkmark & &\\
-D & Latent-space validation (two-sided: behaviour up, morphology down) & & \checkmark & \checkmark &\\
-F & Transfer to the held-out medium body; sample-efficiency vs from-scratch & & & \checkmark &\\
-G & Analysis, thesis writing, scoped extensions & & & \checkmark & \checkmark\\
+Counterfactual-target training & Rebuild the forward-model objective against counterfactual rather than
+  teacher-forced targets; re-run the ranking test of Section 4.3 & highest\\
+Candidate-separation & Broaden the recorded behaviour library; scope a motor-babbling data-collection pass &
+  high\\
+Teacher-student policy & Train a policy through the current world model; compare against the behaviour-cloned
+  baseline (Section 4.3.4) & high\\
+Third embodiment & Identify and integrate a topologically distinct third body for the scaling claim & medium\\
+Analysis and writing & Consolidate Chapters 4--5 for the final thesis & ongoing\\
+\hline
+\end{tabularx}
+\end{table}
+
+\chapter{EXPERIMENTS AND RESULTS}
+
+This chapter reports three experiments, each stated as a question, a hypothesis chain (what was believed, in
+order, before the measurement), a setup, and a result read at its true strength, with confirmed positives separated
+from every intervention that came back null. This structure is chosen deliberately over reporting results by
+topic: the sequence of what was tried and what each result forced the next question to be \emph{is} the finding
+in Experiment 3, not incidental narration around it.
+
+% ============================================================================
+\section{Experiment 1: Does the Latent Action Beat the Raw Command on a Shared Joint Space?}
+
+\subsection{Question}
+Given multiple leg-geometry variants of one hexapod that share an identical 18-dimensional joint space, does a
+trained latent action organise by behaviour rather than by body, and does conditioning a world model on it
+outperform conditioning on the raw joint command?
+
+\subsection{Hypothesis chain}
+\begin{enumerate}[label=\arabic*.]
+\item Identical commands should produce different motion on different leg geometries, or the transfer question is
+  vacuous.
+\item The frozen encoder should carry the behaviour signal needed downstream, before any training.
+\item A trained latent, unlike the raw command, should let behaviour transfer across leg geometries while
+  morphology becomes \emph{harder} to decode from it (the two-sided criterion, Section 3.6.1).
+\item If the pipeline works, it should generalise better as more training-body diversity is added.
+\end{enumerate}
+
+\subsection{Setup}
+Multiple leg-geometry variants of one hexapod body, coxa/femur/tibia scaled independently rather than by one
+uniform leg-length factor (Section 3.2.2), identical topology and 18-D joint-position action space. Behaviour is
+a shared task-space foot trajectory, inverse-kinematics retargeted per body (Section 3.5.1) so the intended
+behaviour is held constant while the resulting joint command differs per body. Architecture and objective as in
+Section 3.4, with $\lambda_{\text{cross}}$ (Section 3.4.3) as the Stage-1-specific mechanism that supervises one
+body's latent
+against a different body's frame.
+
+\subsection{Results}
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Experiment 1 results, in the order the hypothesis chain predicts them.}
+\label{tab:exp1-results}
+\begin{tabular}{P{3.6cm}P{7.4cm}P{2.2cm}}
+\hline
+\textbf{Hypothesis} & \textbf{Measured} & \textbf{Verdict}\\
+\hline
+1. Morphology gap & Mann-Whitney $p=0.0079$, Cliff's $\delta=1.00$; speed $\propto$ (leg length)$^{0.69}$ &
+  Confirmed\\
+2. Encoder carries the signal & macro-F1 0.886 (within-body 85.1\%, across-body 55.2\%); morphology decodable
+  $\approx$100\% & Confirmed\\
+3. Two-sided criterion & behaviour transfer $+0.11$ to $+0.22$ macro-F1; morphology decodability
+  $\approx$99\% (unchanged) & \textbf{Half confirmed}\\
+4. Diversity helps generalisation & 4 tied bodies: 12.67$^\circ$, $R^2=-0.78$; 6 decoupled bodies: 3.27$^\circ$,
+  $R^2=+0.89$ & Confirmed\\
 \hline
 \end{tabular}
 \end{table}
+
+A direct transfer test on a held-out leg geometry gives a further, smaller confirmation: a latent-conditioned
+decoder reaches 3.44$^\circ$ ($R^2=+0.81$) against a raw-command-conditioned control's 3.67$^\circ$ ($R^2=+0.79$).
+Reading Table~\ref{tab:exp1-results} against the hypotheses of Section 4.1.2: hypothesis 1 confirms with the
+strongest statistic this sample size permits ($p=0.0079$ is the smallest value attainable at five episodes per
+leg geometry), and the sub-linear speed exponent (0.69 rather than the 1.0 naive geometric scaling would predict)
+is consistent with the dynamic-similarity argument of Section 2.3.2. Hypothesis 3 is only half confirmed:
+behaviour transfer does improve with a trained latent, but morphology does not become harder to decode from it,
+so the two-sided criterion of Section 3.6.1 is not fully satisfied on this substrate. Hypothesis 4 has the
+largest margin of the four and, unlike the direct transfer test above, crosses from a negative to a positive
+$R^2$, the clearest single piece of evidence that the pipeline is not merely memorising training bodies.
+
+\subsection{Conclusion}
+Three of four hypotheses confirm outright; the third confirms only half. The pipeline works, a trained latent
+adds real value over the raw command on a shared joint space, and training-body diversity matters more than any
+single architectural change tried at this stage. \textbf{What this experiment does not do, and was never
+designed to do, is reach a closed loop.} Every result above is an offline probe or an open-loop transfer score;
+no controller was ever asked to drive a body toward a goal using this latent. That gap, proving the
+representation is right without ever testing whether it can be \emph{used}, is exactly what motivated closing
+the loop in Experiment 3, on the harder pair where the joint space no longer offers a shortcut.
+
+% ============================================================================
+\section{Experiment 2: Does a Froude-Scaled Body-Motion Coordinate Transfer Across Disjoint Embodiments?}
+
+\subsection{Question}
+The hexapod and the Unitree B1 share no joint dimension or convention. Is there a shared, Froude-scaled
+body-motion coordinate (Section 2.3) that a goal observed on one embodiment's video can be read through to
+select or drive the matching behaviour on the other, with no frame pairing, no retargeting, and no kinematic
+model of either body?
+
+\subsection{Hypothesis chain}
+\begin{enumerate}[label=\arabic*.]
+\item If forward/lateral/yaw velocity, Froude-scaled, is genuinely the shared quantity between the two bodies,
+  a goal clip's coordinate should select the matching behaviour on the other embodiment well above chance.
+\item A wider coordinate (three channels instead of one) should transfer more than a narrower one, because it
+  captures more of what the two bodies actually share.
+\item A mismatched goal should fail where a matched one succeeds, or the selection number is not trustworthy.
+\item If the coordinate is real, adapting the world model to the unseen embodiment should be cheap relative to
+  training it from scratch, even if not free.
+\end{enumerate}
+
+\subsection{Setup}
+The shared body-motion head of Section 3.4.4, trained with $\lambda_{\text{body}}=0.5$ across both embodiments,
+supervises $z_t$ against Froude-scaled forward/lateral/yaw velocity through a single head with no per-embodiment
+parameters and no access to the frame. Selection is tested by reading a goal clip from one embodiment through
+the trunk and the shared head, then choosing whichever of the target embodiment's own twelve recorded conditions
+the resulting coordinate matches best (Section 3.6.4), against a 28\% pooled chance rate and a mismatched-goal
+control.
+
+\subsection{Results}
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Experiment 2 results.}
+\label{tab:exp2-results}
+\begin{tabular}{P{3.6cm}P{7.4cm}P{2.2cm}}
+\hline
+\textbf{Hypothesis} & \textbf{Measured} & \textbf{Verdict}\\
+\hline
+1. Selects above chance & pooled selection 70\% vs.\ 28\% chance (reading target-embodiment frames directly) &
+  Confirmed\\
+2. Wider coordinate transfers more & pooled selection 33--41\% (forward-only) $\to$ 68--70\% (all three
+  channels); lateral family 86--100\% vs.\ 17\% chance & Confirmed\\
+3. Mismatch control fails & mismatched-goal selection 18--21\% (below its own chance rate) & Confirmed\\
+4. Cheap adaptation & frozen transfer 0.57--0.71$\times$ in-distribution; 9 target clips clear every horizon
+  vs.\ $\sim$7$\times$ as many from scratch & Confirmed\\
+\hline
+\end{tabular}
+\end{table}
+
+One result was not hypothesised and is reported because it was measured: rolling the forward model forward on
+the candidate side, rather than reading the target embodiment's recorded frames directly, gives 33--44\% pooled
+selection, with the turning family falling below its own chance rate. Reading Table~\ref{tab:exp2-results}
+against the hypotheses of Section 4.2.2: hypothesis 2 has the largest effect measured in this experiment,
+widening the coordinate from one channel to three roughly doubles pooled selection, and the lateral family, weak
+on the narrower coordinate, becomes the strongest of the three. Hypothesis 4 confirms adaptation is cheap rather
+than free: a frozen model does not transfer well, but a small number of target-embodiment clips closes most of
+the gap. The rollout result above was not part of the hypothesis chain; it shows the shared coordinate itself is
+what transfers, and that the multi-step rollout currently subtracts from that signal rather than adding to it.
+
+\subsection{Conclusion}
+All four hypotheses confirm. The central claim of this thesis is supported here: a Froude-scaled body-motion
+coordinate, trained with no privileged information about either body, is a genuine shared interface between an
+18-DOF hexapod and a 12-DOF quadruped, transferring correspondence-free. The honest qualifier is adaptation, not
+zero-shot, consistent with the source method this thesis adapts, whose own cross-embodiment result is a staged
+fine-tune, not a zero-shot claim either (Section 2.1.4). This experiment, like Experiment 1, is offline: selection
+among recorded conditions, not a closed loop. Experiment 3 is where a loop is actually closed, on this same pair.
+
+% ============================================================================
+\section{Experiment 3: Can an Egocentric Visual World Model Rank Actions Finely Enough to Control Locomotion?}
+
+\subsection{Question}
+Given the frozen encoder and the latent-action world model of Section 3.4, can the system discriminate fine
+action magnitude, \emph{which speed}, not only \emph{which behaviour family}, well enough to rank candidate
+actions and drive a closed loop, on a body it was not shown that goal on?
+
+\subsection{Hypothesis chain}
+\begin{enumerate}[label=\arabic*.]
+\item An allocentric (third-person) view fails because the body's own pose leaks the command, so the world
+  model can predict without ever reading the action (Section 2.5.2).
+\item An egocentric view removes that leak, so the world model will be shown to use the action.
+\item If it uses the action, it should be able to rank two similar candidate actions by their real outcome, not
+  only tell grossly different behaviours apart.
+\item Any residual ranking failure should be fixable by a cheap objective, architecture, or data intervention.
+\end{enumerate}
+
+\subsection{Setup}
+Encoder: frozen V-JEPA2, egocentric camera on both embodiments (Section 3.2.3). Pipeline: ITM ($e_t, e_{t+1} \to
+z_t$) $\to$ FTM ($e_t, z_t \to \hat{e}_{t+1}$) $\to$ a body-motion readout tested in two forms, $z_t$ alone and a
+state head reading the FTM's own predicted change (Section 3.4.4, below). Training is
+teacher-forced throughout: the FTM is always shown the true next frame, never its own prior prediction, except
+where explicitly noted as an intervention. Shared coordinate: Froude-scaled forward/lateral/yaw (Experiment 2).
+Evaluation: candidates are scored against a goal by predicted-outcome distance, under two candidate regimes:
+Gaussian perturbations of a recorded action (\emph{perturb}), and the twelve recorded conditions themselves
+(\emph{conditions}), with a fine-magnitude probe ($R^2$, Spearman $\rho$) run alongside the closed-loop ranking
+test to separate \emph{is the signal present} from \emph{can the model rank with it}. Every candidate-scoring
+loop here is a test harness, not a proposed deployment mechanism (Section 2.4): scoring among recorded conditions
+presupposes a controller that can already produce them, which is exactly the capability an unseen robot would
+lack.
+
+\subsection{The behavioural cost of the viewpoint choice}
+Before crediting egocentric video with anything, Section 3.6.3's discipline requires a baseline that uses no
+world model at all: a policy trained by plain behaviour cloning on the same recorded clips. On a held-out body,
+the two camera viewpoints give sharply different baselines, and both are reported here rather than only the one
+that favours the thesis:
+
+\begin{table}[H]
+\centering
+\small
+\caption{Behaviour-cloned baseline, no world model, same held-out body and goal clip in both rows.}
+\label{tab:clone-baseline}
+\begin{tabularx}{\textwidth}{>{\hsize=1.10\hsize}Y>{\hsize=1.10\hsize}Y>{\hsize=1.10\hsize}Y>{\hsize=0.93\hsize}Y>{\hsize=0.76\hsize}Y}
+\hline
+\textbf{Viewpoint} & \textbf{Cloning error} & \textbf{Replayed reference} & \textbf{Clone travelled} &
+  \textbf{Result}\\
+\hline
+Allocentric & \textbf{0.012} & 0.693~m & \textbf{0.376~m} & \textbf{54\%, passes}\\
+Egocentric & 0.604 & 0.715~m & 0.043~m & 6\%, fails\\
+\hline
+\end{tabularx}
+\end{table}
+
+The allocentric clone, with no world model and no latent action, already reaches 54\% of the reference distance and
+stays upright throughout, so any claim that the world model contributes something must beat 54\%, not zero. The
+egocentric clone barely moves: a single egocentric frame states the executed command far more weakly than a
+single allocentric frame does, so the egocentric clone has far less signal to fit. \textbf{This is the direct
+behavioural cost of the same viewpoint choice the rest of this experiment shows is necessary for the world model
+to use the action at all}, and it is not resolved here: the camera that lets the world model condition on the
+action is the camera under which plain cloning nearly fails.
+
+\subsection{Results: confirmed}
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Experiment 3, measured quantities. All figures are held-out unless noted otherwise.}
+\label{tab:exp3-confirmed}
+\begin{tabularx}{\textwidth}{>{\hsize=1.9\hsize}Y>{\hsize=0.60\hsize}Y>{\hsize=0.50\hsize}Y}
+\hline
+\textbf{Quantity} & \textbf{Allocentric} & \textbf{Egocentric}\\
+\hline
+Command recoverable from a single frame, insect ($R^2$) & 0.779 & \textbf{0.293}\\
+Command recoverable from a frame pair, insect ($R^2$) & 0.887 & \textbf{0.578}\\
+Command recoverable from a single frame, B1 ($R^2$) & 0.161 & \textbf{0.097}\\
+Command recoverable from a frame pair, B1 ($R^2$) & 0.328 & \textbf{0.259}\\
+null/real prediction ratio, insect (all horizons) & 1.03 & \textbf{1.16}\\
+null/real prediction ratio, B1, one step & 1.03 & \textbf{1.08}\\
+null/real prediction ratio, B1, beyond one step & 1.03 & \textbf{1.12--1.13}\\
+Fine-magnitude signal, raw frozen-embedding delta ($R^2$) & \multicolumn{2}{c}{0.40}\\
+Fine-magnitude signal, ITM's $z_t$ on true transitions ($R^2$) & \multicolumn{2}{c}{0.78}\\
+Fine-magnitude signal, deployed projected latent ($R^2$) & \multicolumn{2}{c}{0.79}\\
+Yaw transfer, insect-fitted probe on B1, no refit & 0.07 & \textbf{0.64}\\
+Forward transfer, same comparison & \textbf{0.63} & 0.50\\
+Lateral transfer, same comparison & \textbf{0.43} & 0.39\\
+Command readable from $(e_t, z_t)$ & 0.982 & \textbf{0.847}\\
+Ranking win-rate, twelve recorded conditions (50\% floor) & 68\%\footnotemark[1] & 68\%\\
+Ranking win-rate, Gaussian perturbations of one action (50\% coin) & 47\%\footnotemark[1] & 47\%\\
+Wrong picks staying within the true best's behaviour family & \multicolumn{2}{c}{86\%}\\
+Direction cosine to the true best, on wrong picks & \multicolumn{2}{c}{0.86--0.87}\\
+Magnitude error, on wrong picks (standardised units) & \multicolumn{2}{c}{0.71--0.76}\\
+\hline
+\end{tabularx}
+\footnotetext[1]{Allocentric values for the two ranking rows are those reported prior to the egocentric change
+(Section 2.5.3); the egocentric measurement did not move either.}
+\end{table}
+
+The two ranking rows in Table~\ref{tab:exp3-confirmed} are measured on different candidate sets and different
+chance floors and should not be read as one correcting the other (Section 2.5.3): the 68\% row scores selection
+among whole, well-separated recorded behaviours, and the 47\% row scores ranking of Gaussian perturbations of a
+single behaviour. Both numbers are unchanged by the egocentric switch. On the recorded-condition ranking task,
+wrong picks are concentrated in magnitude rather than direction (86\% same-family, cosine 0.86--0.87 to the true
+best), not spread randomly.
+
+Read together, these confirm four things stated in Section 4.3.1--4.3.2. First, and most directly, the mechanism
+argued in Section 2.5.2 is measured, not assumed: how much of the command a linear probe can recover from the raw
+embedding \emph{falls} under egocentric video rather than rising, on both bodies and at both a single frame and a
+frame pair, with the insect's single-frame drop the larger of the two (0.779 to 0.293, against the B1's 0.161 to
+0.097). A lower reading here is the intended effect, not a cost: it is the pose-leak the allocentric view supplied
+being removed, which is what then lets the null/real ratio move at all. Second, egocentric video moves the
+null/real ratio for the first time in the entire chain of interventions traced from Section 2.5.1's failure
+mode, on the insect at every horizon and on the B1 from the second step onward (the one-step B1 value, 1.08,
+is a partial rather than complete fix). Third, the fine-magnitude signal is present at every stage of the
+pipeline the three $R^2$ rows probe, so its absence is not the explanation for anything reported in Section 4.3.6.
+Fourth, the yaw-transfer row is a specific, not a general, effect of the viewpoint change: forward and lateral
+transfer both fall over the same comparison, so egocentric video is not uniformly better for cross-embodiment
+transfer, only for the channel most affected by allocentric pose redundancy. The command-readability row qualifies
+how clean the fix is: the command remains partially readable from $(e_t, z_t)$ even egocentrically, so the leak
+that lets a world model bypass the action is reduced, not eliminated.
+
+\subsection{Results: every cheap fix tried, and what it ruled out}
+Exact-match ranking accuracy on the twelve-condition test tops out at 28\%, well below what a scorer with the
+signal in Table~\ref{tab:exp3-confirmed} and no error of its own should reach. Five interventions were tried
+against this gap, each targeting a different candidate explanation.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Experiment 3, measured outcome of every intervention tried against the ranking wall.}
+\label{tab:exp3-interventions}
+\begin{tabularx}{\textwidth}{>{\hsize=0.85\hsize}Y>{\hsize=0.65\hsize}Y>{\hsize=1.50\hsize}Y}
+\hline
+\textbf{Intervention} & \textbf{Targets} & \textbf{Measured outcome}\\
+\hline
+Auto-regressive 2-step rollout supervision & training recipe & Action-lever metric 0.054--0.062 across horizons
+  $k=1$--10 (baseline 0.054--0.062); rollout-accuracy ratio improved from 0.517 to 0.511 ($k{=}1$), 0.496 to
+  0.465 ($k{=}3$), 0.518 to 0.471 ($k{=}5$)\\
+Wider injection surface (latent tokens $1\to4$, FTM depth $8\to12$) & architecture capacity & Action-lever metric
+  0.059--0.061 across horizons $k=1$--10\\
+5$\times$ more target-body data (240 clips, corrected collection) & data sparsity & Signal-presence results
+  (Table~\ref{tab:exp3-confirmed}, rows 4--6) unchanged on the smaller, pre-correction set\\
+State head reading $z_t$ + FTM predicted change, vs.\ $z_t$ alone & readout combination rule & $R^2=0.78$--0.79
+  ($z_t$ alone) vs.\ $R^2=0.54$--0.63 ($z_t$ + pooled delta), both on the deployed and the oracle pathway\\
+Real retrain, $z_t$-alone readout vs.\ $z_t$+delta control & the row above, at true strength & 22\% exact
+  accuracy ($z_t$-alone retrain) vs.\ 28\% (control)\\
+\hline
+\end{tabularx}
+\end{table}
+
+Two interventions changed nothing: the action-lever metric (Section 3.4.4's shared-head readout, evaluated as the
+FTM's real-vs-mean-$z$ prediction sensitivity) is flat within noise whether the training recipe adds rollout
+supervision or the architecture is widened, and both land on the same values the unmodified baseline gets.
+Rollout supervision did measurably improve the model's raw prediction accuracy at the horizons it targeted (the
+second row of that intervention), which shows prediction quality and action-sensitivity are separable quantities
+that can move independently: an improvement in one is not evidence for the other. The data-volume intervention
+is ruled out as a sole explanation because the signal-presence results it was meant to test hold already on the
+smaller, uncorrected dataset. The readout-combination intervention reverses the direction hoped for: adding the
+predicted-change term to the state head's input lowers its offline fit rather than raising it, on both the oracle
+and the deployed pathway. The real retrain of that finding does not confirm it at deployment strength: 22\%
+against the control's 28\% is a difference within this project's observed run-to-run noise, not the decisive win
+the offline comparison predicted.
+
+\subsection{Conclusion}
+The fine-magnitude signal exists through the entire pipeline, confirmed independently at three separate stages,
+and egocentric video is confirmed necessary for the world model to be shown to use the action at all, with a
+measured, specific benefit on cross-embodiment yaw transfer and a measured, partial reduction in how much the
+command still leaks through $(e_t, z_t)$. Ranking is not one capability but two, and both readings stand at once
+rather than one correcting the other: among whole, well-separated recorded behaviours it works clearly (68\%
+against a 50\% floor), while ranking fine perturbations of a single behaviour stays at a coin flip (47\%) even
+after egocentric video is applied. Section 2.5.3's ``coin flip'' describes the second regime accurately and
+should not be read as describing ranking in general. What remains unsolved is exact, fine-grained discrimination
+within one behaviour family: the model reliably gets the right neighbourhood (86\% same-family, cosine 0.87) and
+reliably misses the exact magnitude within it, and five structurally different interventions, one training
+recipe, one architecture change, one data-volume change, one readout redesign, and that redesign's own real
+retrain, converged on the identical flat result. \textbf{That convergence is itself the finding}: it is
+evidence the limitation sits upstream of any one component, consistent with (though not proof of) teacher-forcing
+making the fine-grained action signal available but not decisively load-bearing for the model's own prediction
+(Section 2.5.1, UWM-JEPA), a mechanism demonstrated on a small, synthetic task, not yet tested on video-scale
+locomotion at all.
+
+\subsection{Standing open lever}
+One properly-motivated fix has not been tested at true strength: training against \textbf{exact counterfactual
+targets}, resuming the real simulator from the same state under a different action and matching the outcome it
+actually produces, rather than the approximation available so far. This is the direct, targeted response to
+Section 2.5.1's diagnosis, on exactly the domain (periodic locomotion) that diagnosis was never tested against.
+Two outcomes are both informative and both worth having: if it closes the wall, the mechanism transfers to
+video-scale locomotion and this thesis's remaining limitation is resolved; if it does not, this is the first
+proper test of whether the teacher-forcing account holds for a visual world model at all, which the toy-scale
+result it is built on has not yet shown either way.
+
+% ============================================================================
+\section{Summary: What Is Confirmed and What Is Open}
+\begin{table}[H]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{All three experiments, one line each.}
+\label{tab:ch4-summary}
+\begin{tabularx}{\textwidth}{>{\hsize=0.72\hsize}Y>{\hsize=1.38\hsize}Y>{\hsize=0.90\hsize}Y}
+\hline
+\textbf{Experiment} & \textbf{Headline result} & \textbf{Left open}\\
+\hline
+1. Cross-morphology & Latent beats raw command on a shared joint space; three of four hypotheses confirm & Never
+  reached a closed loop\\
+2. Cross-embodiment (Froude) & Shared coordinate transfers correspondence-free, 70\% vs.\ 28\% chance, all four
+  hypotheses confirm & Cheap adaptation only, not zero-shot; rollout currently hurts rather than helps\\
+3. Egocentric ranking & Signal present throughout the pipeline; coarse and family-level ranking work (68\%
+  win-rate); five independent fixes for exact fine-grained ranking all converge on the same wall & Exact
+  counterfactual-target training, the one properly-motivated fix left untested\\
+\hline
+\end{tabularx}
+\end{table}
+
+The chapter's honest summary is a split result. Experiments 1 and 2 confirm their hypotheses cleanly: a latent
+action beats a raw command, and a Froude-scaled body-motion coordinate transfers between structurally disjoint
+bodies with no privileged information about either. Experiment 3 confirms more than an earlier reading of this
+project's own results credited it with: the model discriminates behaviour categories reliably and ranks
+on-manifold candidates well above chance, while converging, across five independently-motivated interventions,
+on a specific and now well-characterised limit: fine magnitude discrimination within one behaviour family.
+Chapter 5 discusses what this means for the thesis's contribution and why the counterfactual-target direction is
+the most direct path past it.
+
+\chapter{CONCLUSION AND RECOMMENDATIONS}
+
+\section{Summary of Findings}
+This thesis set out to test whether a behaviour recorded on one legged robot can drive a structurally different
+one from egocentric video alone, with no kinematic model, no URDF, and no demonstrations of the target, and, in
+pursuing that, to characterise what a video world model conditioned on the resulting action representation
+actually does and does not use it for. Chapter 4 reported this as three experiments; against the three objectives
+of Section 1.2:
+
+\noindent\textbf{Objective 1 (learn a shared coordinate with no privileged information)} is met. The shared
+body-motion head (Section 3.4.4), trained with no morphology label and no kinematic model for either the hexapod
+or the Unitree B1, produces a Froude-scaled forward/lateral/yaw coordinate that both bodies' latents map onto
+(Experiment 2, Section 4.2).
+
+\noindent\textbf{Objective 2 (correspondence-free transfer, and under which objective)} is met, with the objective
+question answered concretely: reading recorded target-body frames directly through the shared coordinate reaches
+70\% selection accuracy against 28\% chance (Section 4.2), with no frame pairing, alignment, or retargeting
+between the two robots at any point, and this only holds once the shared body-motion loss term is included;
+$\mathcal{L}_{\text{motion}}$ alone, supervising through per-embodiment heads, cannot force $z_t$ to mean the same
+thing on both bodies (Section 3.4.3).
+
+\noindent\textbf{Objective 3 (characterise coarse vs.\ fine action-use, and its mechanism)} is met, and is this
+thesis's methodological contribution beyond the transfer result itself: camera viewpoint is shown, not assumed, to
+determine whether a video world model can be shown to use its action at all (Experiment 3, Section 4.3), and
+coarse-to-family-level action-conditioning is shown to be a separate capability from exact fine-grained ranking,
+which this project's world model does not yet have, across five independently-motivated interventions that
+converge on the same wall, a stronger and more specific result than an unexplained failure would be.
+
+\section{What Is Proven, and What Is a Measured Limitation}
+Two results carry the thesis: the shared coordinate transfers correspondence-free (Experiment 2), and camera
+viewpoint is a precondition for a video world model to be shown to use its action in a periodic-locomotion domain,
+not a setup detail (Experiment 3). Both are direct answers to gaps stated in Chapter 2 (Sections 2.2--2.5) that no
+surveyed method closes. A third result is real but should not be overstated: on real, on-manifold candidates, the
+model ranks well above chance (68\% win-rate) and its errors are specifically magnitude mistakes within one
+behaviour family, not direction mistakes across families, a more precise and more favourable finding than this
+thesis's own earlier reading of it (Section 2.5.3), reached only once off-manifold perturbation candidates were
+distinguished from real ones.
+
+Three limitations are equally load-bearing and are stated here rather than left implicit. \textbf{Exact
+fine-grained ranking} (Experiment 3, Section 4.3): the model discriminates behaviour categories reliably and
+discriminates magnitude within one category poorly, and five structurally different interventions, training
+recipe, architecture capacity, data volume, readout redesign, and that redesign's real retrain, all converged
+on the identical result. \textbf{The candidate-scoring circularity} (Section 4.3): the closed-loop test harness
+depends on a curated library of the target robot's own recorded behaviours, which presupposes exactly the
+capability, a controller for the target robot, that a genuinely unseen robot would not have. \textbf{The
+viewpoint trade} (Section 4.3): the egocentric camera that is necessary for the world model to use the action at
+all is the same camera under which plain behaviour cloning nearly fails (6\% of the reference distance, against
+54\% allocentrically); this thesis does not resolve that tension, and reports both sides of it rather than the
+one that is more favourable.
+
+\section{Recommendations for Remaining Work}
+Section 3.8 states these as a work plan; they are repeated here as the direct response to Experiment 3's wall.
+
+\textbf{Counterfactual-target training} is the most direct next step, and the one properly-motivated fix this
+thesis has not tested at true strength (Section 4.3.8): resuming the real simulator from the same state under a
+different action and matching the outcome it actually produces, rather than the approximation tried so far. It is
+a targeted response to a named, published diagnosis (Section 2.5.1, UWM-JEPA) of exactly the failure mode
+Experiment 3 measured, on a domain that diagnosis was never tested against, and on a small, synthetic task rather
+than video-scale locomotion. Either outcome is informative: if it closes the wall, the mechanism transfers; if it
+does not, this is the first proper test of whether the account holds for a visual world model at all.
+
+\textbf{Breaking the candidate-scoring circularity} requires replacing scored candidates with a trained policy
+that needs only the ability to actuate the target robot, not a pre-existing behaviour set (Section 2.4, following
+Hu et al.'s use of unguided motor babbling for a single robot); this thesis has identified the resolution but not
+yet demonstrated it out-performs the plain-cloning baseline of Section 4.3.4.
+
+\textbf{A third, topologically distinct embodiment} would allow this project to test, for the first time, whether
+pretraining on more embodiments improves the shared representation the way LAC-WM reports for manipulation
+(Section 2.1.4), untestable with the two bodies studied here.
+
+\section{Closing Statement}
+The central claim of this thesis is supported: a shared, Froude-scaled body-motion coordinate, learned with no
+privileged information about either body, transfers between a hexapod and a structurally disjoint quadruped from
+egocentric video alone. What this thesis adds beyond that transfer result is a measured account of where the
+resulting world model's usefulness currently ends, stated more precisely than a single pass through the evidence
+first suggested: coarse and family-level behaviour selection work well; exact fine-grained control does not yet,
+and five independent interventions converge on that being a structural property of the current objective rather
+than a component that merely needs fixing. Stating that limit precisely, rather than around it, is what makes the
+next step, counterfactual-target training, tested at true strength, a specific, testable proposal rather than
+an open-ended one.
 
 % ############################################################################
 % #  BACK MATTER                                                              #
@@ -1519,5 +2016,232 @@ G & Analysis, thesis writing, scoped extensions & & & \checkmark & \checkmark\\
     Joint-Embedding Predictive Architecture for One-shot Cross-Embodiment Imitation'', \textbf{arXiv:2605.20811}.
   \bibitem{bandura1977} A. Bandura, 1977, ``Social Learning Theory'', \textbf{Prentice-Hall}.
 \end{thebibliography}
+
+% ============================================================================
+\appendix
+\renewcommand{\chaptername}{Appendix}
+\chapter{Model Architecture and Hyperparameters}
+\addcontentsline{toc}{frontmatter}{APPENDIX}
+
+This appendix gives the full architecture, objective, and hyperparameter specification for the
+pipeline described in Chapter 3, at the level of detail Chapter 3 itself summarises. Values are those
+of the current reference checkpoint (the egocentric, hexapod~+~B1 teacher used throughout Chapter 3's
+cross-embodiment results); where a field's default in the implementation differs from the value every
+reported run actually trains with, both are given.
+
+\section{Architecture}
+Table~\ref{tab:appendix-arch} gives every learned module: what it maps, its shape, and its parameter
+count. The encoder is frozen throughout; every other row is trained. Two modules (LDAD, the
+adversary) are architectural options evaluated as ablations and are off in every run this thesis
+reports results for.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Full architecture. Parameter counts are for the reference checkpoint's configuration
+(\(z\)-dimension 64, hidden width 512, 16 attention heads throughout).}
+\label{tab:appendix-arch}
+\begin{tabularx}{\textwidth}{>{\hsize=0.78\hsize}Y>{\hsize=0.98\hsize}Y>{\hsize=1.56\hsize}Y>{\hsize=0.68\hsize}Y}
+\hline
+\textbf{Module} & \textbf{Maps} & \textbf{Shape / structure} & \textbf{Parameters}\\
+\hline
+Encoder (frozen) & frame $\to$ patch tokens & $256\times256\times3 \to 256\times1408$ &
+  $\sim$1B, never updated\\
+ITM & $(e_t, e_{t+1}) \to z_t$ & 2 self-attention + 2 cross-attention blocks, hidden 512,
+  16 heads $\to z \in \mathbb{R}^{64}$ & 13{,}368{,}384\\
+FTM & $(e_t, z_t) \to \hat{e}_{t+1}$ & 8 blocks, hidden 512, 16 heads $\to 256 \times 1408$ &
+  77{,}143{,}424\\
+Motion Decoder (total) & $(e_t, z_t) \to \hat{a}_t$ & cross-attention backbone,
+  $16\times16$ grid pooled $\times2$ & 5{,}499{,}934\\
+\quad shared backbone & reads behaviour from $z$ vs.\ frame & hidden 512 & 4{,}957{,}184\\
+\quad per-embodiment head & latent $\to$ this body's joints & linear, 18-D / 12-D & 272{,}914 /
+  269{,}836\\
+Body-motion head & $z \to$ body motion, frame-blind, one head for every embodiment &
+  LayerNorm $\to 64 \to 128 \to$ \texttt{body\_dim} & 8{,}577\\
+Action projector & $a \to z$ (control time, when the ITM's required future frame is unavailable) &
+  per-embodiment MLP, depth 2, width 512 & 305{,}216 / 302{,}144\\
+LDAD \emph{(ablation, off by default)} & action from $\mathrm{FTM}(e_t,z) - e_t$ & 3 transformer
+  layers, 8 heads & --\\
+Adversary \emph{(ablation, off by default)} & gradient-reversal body classifier on $z$ &
+  hidden 128 & --\\
+\hline
+\end{tabularx}
+\end{table}
+
+The encoder is \texttt{facebook/vjepa2-vitg-fpc64-256} (ViT-g/16). Each frame is encoded
+independently through the model's minimal 2-frame tubelet (Section 3.3), so $e_t$ carries no
+information from any other timestep.
+
+\section{Pretraining Objective}
+The loss actually trained against, for every result this thesis reports, is
+\[
+\mathcal{L} = 1.0\,\mathcal{L}_{\text{recon}} + 1.0\,\mathcal{L}_{\text{motion}} +
+0.5\,\mathcal{L}_{\text{body}},
+\]
+not the implementation's own default ($\lambda_{\text{body}} = 0$): the zero-weight setting is kept
+only as a control arm, isolating what the shared body-motion term contributes, not as normal
+practice. Table~\ref{tab:appendix-obj} lists every term the implementation supports, whether it is
+part of this weighting, and what each scores.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Every loss term the implementation supports. ``Default'' is the implementation's own
+starting value; ``In use'' is what the reported runs actually train with.}
+\label{tab:appendix-obj}
+\begin{tabularx}{\textwidth}{>{\hsize=0.59\hsize}Y>{\hsize=2.09\hsize}Y>{\hsize=0.63\hsize}Y>{\hsize=0.63\hsize}Y>{\hsize=1.06\hsize}Y}
+\hline
+\textbf{Term} & \textbf{Scores} & \textbf{Default} & \textbf{In use} & \textbf{Note}\\
+\hline
+recon & $\mathrm{MSE}(\hat{e}_{t+1}, e_{t+1})$ & 1.0 & 1.0 & always on\\
+motion & $\mathrm{MSE}(\hat{a}, a)$ through the per-embodiment decoder head & 1.0 & 1.0 & always on\\
+body & shared head, $z \to$ body motion, identical head for both robots & 0.0 & \textbf{0.5} & the
+  term that carries the cross-embodiment claim (Section 3.4.4)\\
+cross & body A's $z$ read against body B's frame, supervised by B's command & 0.0 & 0.0 & 0.5 in the
+  Stage-1 leg-length \texttt{*\_cross} runs only\\
+adv & gradient-reversal body classifier (loss rising means it is working) & 0.0 & off & ablation\\
+hinge & separation between a real- and a null-action rollout over $K$ steps & 0.0 & off & ablation\\
+readout & frozen readout recovering $a$ from the predicted embedding & 0.0 & off & ablation\\
+ldad & action decoded from the predicted state difference & 0.0 & off & ablation\\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Why $\mathcal{L}_{\text{body}}$ carries the cross-embodiment claim and
+$\mathcal{L}_{\text{motion}}$ cannot.} The motion term supervises through \emph{per-embodiment}
+decoder heads onto 18- and 12-dimensional joint commands that have no correspondence with each other,
+so nothing forces the two heads to agree on what $z$ means. The body term uses one head, shared by
+both robots, mapping $z$ to body motion alone with no access to the frame: the only term in the
+objective that asks the same $z$ to decode the same way on both bodies.
+
+\noindent\textbf{The null action}, used by the ablations above and by the diagnostic comparisons of Chapter 3, is
+\[
+z_{\text{null}} = \mathrm{ITM}(e_t, e_t),
+\]
+the latent the model infers when nothing happened between the two frames it is shown.
+
+\noindent\textbf{Checkpoint selection} uses
+\[
+\text{selection} = \lambda_{\text{recon}}\,\mathcal{L}_{\text{recon}} + \lambda_{\text{motion}}\,\mathcal{L}_{\text{motion}}
+\]
+only, the two terms every run has in common, so that a control arm and its matched treatment arm are always
+compared at the epoch that minimises the same quantity. \texttt{total} (which includes whichever experimental
+term a given run enables) is never used for this purpose.
+
+\section{Hyperparameters}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Optimisation.}
+\label{tab:appendix-opt}
+\begin{tabularx}{\textwidth}{YY|YY}
+\hline
+\textbf{Field} & \textbf{Value} & \textbf{Field} & \textbf{Value}\\
+\hline
+Batch size & 8 & Gradient clip & 1.0\\
+Learning rate & $1\times10^{-4}$ & Seed & 0\\
+Weight decay & 0.01 (AdamW) & Data-loader workers & 4\\
+Epochs & 50 & Schedule & cosine, $T_{\max} =$ epochs\\
+Precision & fp16 autocast & Device & CUDA (single GPU)\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Model dimensions.}
+\label{tab:appendix-dims}
+\begin{tabularx}{\textwidth}{YY|YY}
+\hline
+\textbf{Field} & \textbf{Value} & \textbf{Field} & \textbf{Value}\\
+\hline
+Token dimension & 1408 & Latent dimension $z$ & 64\\
+Patch grid & $16\times16$ & Hidden width & 512\\
+Action dimension & 18 (12 for B1) & Attention heads & 16\\
+MLP expansion ratio & 4.0 & Dropout & 0.0\\
+ITM self-attn.\ blocks & 2 & FTM blocks & 8\\
+ITM cross-attn.\ blocks & 2 & Latent tokens & 1\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Target construction and timing.}
+\label{tab:appendix-time}
+\begin{tabularx}{\textwidth}{>{\hsize=0.57\hsize}Y>{\hsize=0.35\hsize}Y>{\hsize=2.08\hsize}Y}
+\hline
+\textbf{Field} & \textbf{Value} & \textbf{Meaning}\\
+\hline
+\texttt{action\_lag} & 1 & The Motion Decoder is asked for the action that \emph{caused} the
+  transition $e_t \to e_{t+1}$, not the action already visible in $e_t$; at lag 0 the target is
+  trivially available and $z$ carries nothing (Section 3.6).\\
+\texttt{frame\_stride} & 1 & Spacing between the ITM's two input frames: one step, 50\,ms at the
+  simulator's 20\,Hz.\\
+\texttt{action\_chunk} & 0 & Follows \texttt{frame\_stride} automatically, so the reconstruction and
+  motion halves of the objective always describe the same time interval.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Shared body-motion target (the $\mathcal{L}_{\text{body}}$ term).}
+\label{tab:appendix-body}
+\begin{tabularx}{\textwidth}{>{\hsize=0.90\hsize}Y>{\hsize=0.51\hsize}Y>{\hsize=0.51\hsize}Y>{\hsize=2.09\hsize}Y}
+\hline
+\textbf{Field} & \textbf{Default} & \textbf{In use} & \textbf{Meaning}\\
+\hline
+$\lambda_{\text{body}}$ & 0.0 & \textbf{0.5} & weight of the shared-head term\\
+\texttt{body\_dim} & 1 & \textbf{3} & must equal the number of channels supervised\\
+\texttt{body\_channels} & $(0,)$ & \textbf{$(0,1,2)$} & 0 = forward, 1 = lateral, 2 = yaw\\
+\texttt{body\_hidden} & 128 & 128 & width of the shared head\\
+\texttt{body\_sees\_frame} & False & False & True reproduces a negative result in which the head
+  learns to identify the robot from the frame instead of reading behaviour from $z$\\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Data handling and routing.}
+\label{tab:appendix-data}
+\begin{tabularx}{\textwidth}{>{\hsize=0.98\hsize}Y>{\hsize=0.47\hsize}Y>{\hsize=1.55\hsize}Y}
+\hline
+\textbf{Field} & \textbf{Value} & \textbf{Meaning}\\
+\hline
+\texttt{within\_body\_std} & True & Motion targets are standardised per body, not pooled across
+  bodies (Section 3.5).\\
+\texttt{cross\_augment} & True & Two independently augmented views of every frame pair; the ITM sees
+  one, the reconstruction target is drawn from the other (Section 3.4).\\
+\texttt{balance\_embodiments} & True & Every embodiment receives an equal share of gradient steps per
+  epoch, regardless of how many clips it contributes.\\
+\texttt{val\_fraction} / \texttt{heldout\_pairs} & 0.1 / 400 & Validation split size.\\
+\texttt{md\_head} / \texttt{md\_pool} & mlp / 2 & Motion Decoder head type and spatial pooling.\\
+\texttt{center\_embeddings} & False & Per-embodiment appearance offsets are not subtracted from the
+  encoder output before training (kept off; see Section 3.6.4 for why the appearance gap is
+  addressed elsewhere).\\
+\texttt{ftm\_embodiment\_channel} & False & The FTM is not given the embodiment identity as an extra
+  token.\\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Ablation-specific settings}, active only when the corresponding term in
+Table~\ref{tab:appendix-obj} is switched on: hinge margin 0.1 and hinge horizon $K=3$ (both smaller
+than the values reported for the source method, chosen because a wider margin was found to collapse
+the term and this project's forward-model rollout is reliable only to about this horizon);
+readout-head width 512; LDAD decoder depth 3; adversary hidden width 128 with a 5-epoch warm-up
+ramping the reversal strength from 0 to 1.
 
 \end{document}

@@ -132,6 +132,18 @@ def main():
                          "the pose, same reasoning as the hexapod collector.")
     ap.add_argument("--noise_seed", type=int, default=0)
     ap.add_argument("--out", default="")
+    ap.add_argument("--save_state_at", type=int, default=-1,
+                    help="dump the FULL resumable state (MuJoCo qpos/qvel + the loop's own "
+                         "closed-loop variables: last action, heading integrator, gait-clock step "
+                         "counter) right after this many post-warmup policy steps, to --state_out. "
+                         "Physics state alone is not enough to resume exactly -- this policy is "
+                         "closed-loop and reacts to its own last action and heading history too.")
+    ap.add_argument("--state_out", default="")
+    ap.add_argument("--load_state", default="",
+                    help="resume from a --save_state_at snapshot instead of the default spawn "
+                         "pose. --vx/--vy/--wz (or --schedule) from here on can be a DIFFERENT "
+                         "command than whatever produced the snapshot -- this is the counterfactual "
+                         "branch: same exact state, different action from this point.")
     args = ap.parse_args()
 
     actor = load_actor(args.checkpoint)
@@ -141,15 +153,37 @@ def main():
     adr = {mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_SENSOR, i): m.sensor_adr[i]
            for i in range(m.nsensor)}
 
-    d.qpos[0:3] = [0, 0, SPAWN_Z]; d.qpos[3:7] = [1, 0, 0, 0]
-    d.qpos[7:19] = il_to_sdk(DEFAULT_IL); d.ctrl[:] = il_to_sdk(DEFAULT_IL)
-    mujoco.mj_forward(m, d)
-    for _ in range(args.warmup * DECIMATION):
-        mujoco.mj_step(m, d)
+    if args.load_state:
+        # exact resume: physics state alone is not enough for this closed-loop policy -- it also
+        # needs its own last action, gait-clock step, and heading integrator restored, or it is
+        # not actually the same state even though qpos/qvel match
+        snap = np.load(args.load_state, allow_pickle=True)
+        # mj_setState with mjSTATE_INTEGRATION restores everything mj_step actually needs to
+        # continue bit-exactly, including the contact solver's warm-start cache (qacc_warmstart)
+        # and simulation time -- hand-picking qpos/qvel/ctrl looked complete but silently missed
+        # this, and the resulting mismatch (small at first) compounds over a legged robot's
+        # contact-dominated dynamics into a real divergence within tens of steps
+        spec = mujoco.mjtState.mjSTATE_INTEGRATION
+        mujoco.mj_setState(m, d, snap["mjstate"], spec)
+        mujoco.mj_forward(m, d)
+        last = snap["last"].astype(np.float32)
+        step_i = int(snap["step_i"])
+        heading_target = float(snap["heading_target"])
+        yaw_int = float(snap["yaw_int"])
+        # no spawn->walk transient to crop here -- the resumed state is already mid-gait, and
+        # the counterfactual's own immediate response to the NEW command is exactly what a
+        # counterfactual target is supposed to capture, not something to discard
+        args.policy_warmup = 0
+    else:
+        d.qpos[0:3] = [0, 0, SPAWN_Z]; d.qpos[3:7] = [1, 0, 0, 0]
+        d.qpos[7:19] = il_to_sdk(DEFAULT_IL); d.ctrl[:] = il_to_sdk(DEFAULT_IL)
+        mujoco.mj_forward(m, d)
+        for _ in range(args.warmup * DECIMATION):
+            mujoco.mj_step(m, d)
+        last = np.zeros(12, np.float32); step_i = 0; heading_target = None; yaw_int = 0.0
 
     plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
         if args.schedule else None
-    last = np.zeros(12, np.float32); step_i = 0; heading_target = None; yaw_int = 0.0
     _noise = np.zeros(12, np.float64)
     _rng = np.random.default_rng(args.noise_seed)
     L = {k: [] for k in ("base_pos", "base_quat", "joint_pos", "joint_vel",
@@ -207,6 +241,18 @@ def main():
         for _ in range(DECIMATION):
             mujoco.mj_step(m, d)
         step_i += 1
+
+        if args.save_state_at >= 0 and _i - args.policy_warmup == args.save_state_at:
+            import os
+            os.makedirs(os.path.dirname(args.state_out) or ".", exist_ok=True)
+            spec = mujoco.mjtState.mjSTATE_INTEGRATION
+            state = np.empty(mujoco.mj_stateSize(m, spec), np.float64)
+            mujoco.mj_getState(m, d, state, spec)
+            np.savez(args.state_out, mjstate=state,
+                     last=last.copy(), step_i=step_i, heading_target=heading_target,
+                     yaw_int=yaw_int)
+            print(f"  state saved at post-warmup step {args.save_state_at} -> {args.state_out}")
+            return
 
         if _i < args.policy_warmup:                          # crop the spawn->walk transient
             continue

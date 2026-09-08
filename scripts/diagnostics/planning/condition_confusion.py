@@ -40,9 +40,8 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "control"))
 
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 from teacher_student_insect import Student, body_goal, load_teacher, pooled  # noqa: E402
-from wm.adapt3 import gather  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.state_head import StateHead  # noqa: E402
 
 ALPHAS = (1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1e3)
@@ -64,23 +63,47 @@ def gram(a, b, device, chunk=64, bchunk=256):
     return out.numpy()
 
 
-def fit_ridge(ck, cfg, itm, channels, train_data, cache_path, train_stride, device):
+def fit_ridge(ck, cfg, itm, channels, train_data, cache_path, train_stride, device, encoder=None):
     lag = max(1, cfg.action_lag)
     cache = torch.load(os.path.join(ROOT, cache_path), map_location="cpu", mmap=True)
-    tr = gather(os.path.join(ROOT, train_data), "hexapod", None, ck, cache, 2, lag, device)
+    # a real encoder, not None: the default cache (96 entries) only covers the original 48-clip
+    # datasets. Pointing --train_data at a larger set (e.g. the 240-clip beh12_c10f10t10_more)
+    # means most clips are cache misses, and gather() needs something to encode them with.
+    if encoder is None:
+        encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+    before = len(cache)
     paths = sorted(glob.glob(os.path.join(ROOT, train_data, "*.npz")))
 
+    # One clip at a time, not wm.adapt3.gather's full-list return: that holds every clip's whole
+    # embedding in RAM simultaneously (240 clips x ~47MB half-precision = ~11GB), which on top of
+    # the embedding cache OOM-killed this on a 31GB box with no swap. Only the per-timestep E/Z/Y
+    # rows need to survive past one clip -- the full per-clip tensor does not.
     E, Z, Y, cid = [], [], [], []
     with torch.no_grad():
-        for ci, (c, p) in enumerate(zip(tr, paths)):
-            bm = np.asarray(load(p, REGISTRY["hexapod"])["body_motion"])[:, channels]
-            e = c["e"].float()
+        for ci, p in enumerate(paths):
+            clip = load(p, REGISTRY["hexapod"])
+            if p not in cache:
+                cache[p] = encode_clip(encoder, clip["frames"], 2).cpu().half()
+            e = cache[p].float()
+            off = offset_for(ck, "hexapod")
+            if off is not None:
+                e = e - off.cpu()
+            bm = np.asarray(clip["body_motion"])[:, channels]
             for t in range(1, min(len(e) - 2, len(bm)), train_stride):
                 e_t, e1 = e[t:t + 1].to(device), e[t + 1:t + 2].to(device)
                 Z.append(itm(e_t, e1)[0].float().cpu())
                 E.append(e[t].flatten().half())
                 Y.append(torch.tensor(bm[t], dtype=torch.float64))
                 cid.append(ci)
+            del e
+    if len(cache) > before:
+        # write to a temp file and rename over the original -- the loaded `cache` dict still holds
+        # mmap'd tensors backed by that same file, so overwriting it in place while those are live
+        # would corrupt the mapping
+        full_path = os.path.join(ROOT, cache_path)
+        tmp_path = full_path + ".tmp"
+        torch.save(cache, tmp_path)
+        os.replace(tmp_path, full_path)
     E, Z = torch.stack(E), torch.stack(Z)
     Y = torch.stack(Y).numpy()
     cid = np.array(cid)
@@ -114,7 +137,10 @@ def fit_ridge(ck, cfg, itm, channels, train_data, cache_path, train_stride, devi
     w_full = np.linalg.solve(K + best_a * np.eye(len(K)), Ys)
     print(f"  ridge fit: alpha {best_a:.4g}, held-out-clip R2 {best_v:.3f}\n")
 
-    return {"E": E.to(device).float(), "Zc": torch.tensor(Zc, dtype=torch.float64, device=device),
+    # E stays half-precision on GPU (~5.4GB for the 240-clip set): score_ridge only ever does a
+    # matrix-VECTOR product against it, so upcasting the whole matrix to float32 (~10.2GB) was
+    # never necessary and OOM'd this 10.57GB card once the dataset grew 5x.
+    return {"E": E.to(device), "Zc": torch.tensor(Zc, dtype=torch.float64, device=device),
            "mean_e": mean_e.to(device), "s_e": s_e,
            "mean_z": torch.tensor(mean_z, dtype=torch.float64, device=device), "s_z": s_z,
            "w": torch.tensor(w_full, dtype=torch.float64, device=device), "mu": mu, "sd": sd}
@@ -123,7 +149,17 @@ def fit_ridge(ck, cfg, itm, channels, train_data, cache_path, train_stride, devi
 def score_ridge(fitted, e_t, z_batch, device):
     with torch.no_grad():
         ec = e_t.float().flatten() - fitted["mean_e"].flatten()
-        k_e = (fitted["E"] @ ec) / fitted["s_e"]
+        # the matvec itself in float32, but chunked over E's rows: casting all of E to float32 at
+        # once (~10.2GB for 240 clips) is what OOM'd this 10.57GB card; doing the matvec in half
+        # precision throughout instead (the first attempted fix) avoided the OOM but collapsed
+        # ridge to a single constant answer regardless of goal (0% accuracy, 40/40 same wrong
+        # pick) -- a real precision-loss bug, not a data effect. Chunking keeps both properties:
+        # full float32 precision, bounded peak memory.
+        E = fitted["E"]
+        k_e = torch.empty(len(E), dtype=torch.float32, device=device)
+        for i in range(0, len(E), 256):
+            k_e[i:i + 256] = E[i:i + 256].float() @ ec
+        k_e = k_e / fitted["s_e"]
         zc = z_batch.double() - fitted["mean_z"]
         k_z = (zc @ fitted["Zc"].T) / fitted["s_z"]
         K_row = k_e.double().unsqueeze(0) + k_z
@@ -152,6 +188,10 @@ def main():
     std_s = np.asarray(ck["body_stats"][1]).ravel()[:len(channels)]
 
     fitted = fit_ridge(ck, cfg, itm, channels, args.train_data, args.cache, 2, device)
+    # this card is only 10.57GB, and fitted["E"] alone is ~5.4GB resident for the rest of the run;
+    # release whatever fit_ridge's own local encoder/activations left cached before the rollout
+    # loop's own models and encoder claim their share
+    torch.cuda.empty_cache()
 
     names = tuple(s.split("=", 1)[0] for s in cfg.sources) or ("default",)
     state_model = StateHead(cfg, len(channels), names,
@@ -211,14 +251,27 @@ def main():
             a = torch.stack([acts[c][min(int(bt), len(acts[c]) - 1)] for c in conds]).to(device)
             z = proj(a, "hexapod")
 
-            roll = e_full.expand(len(conds), -1, -1)
-            for _ in range(args.horizon):
-                roll = ftm(roll, z)
-            m_f179 = md.body(None, itm(e_full.expand(len(conds), -1, -1), roll))
+            # conditions in chunks of 4, not all 12 at once: this card is only 10.57GB and
+            # fitted["E"] alone holds ~5.4GB of it resident for the whole rollout, so the full
+            # 12-way batched itm/ftm attention call leaves too little headroom (observed failing
+            # right at the edge, ~200MB short). Chunking the batch dim doesn't change results --
+            # itm/ftm/state_model have no cross-batch-element interaction -- only peak memory.
+            CHUNK = 4
+            f179_parts, state_parts = [], []
+            for i in range(0, len(conds), CHUNK):
+                a_c, z_c = a[i:i + CHUNK], z[i:i + CHUNK]
+                n_c = a_c.shape[0]
+                roll_c = e_full.expand(n_c, -1, -1)
+                for _ in range(args.horizon):
+                    roll_c = ftm(roll_c, z_c)
+                f179_parts.append(md.body(None, itm(e_full.expand(n_c, -1, -1), roll_c)))
+                one_step_c = ftm(e_full.expand(n_c, -1, -1), z_c)
+                state_parts.append(state_model(one_step_c - e_full.expand(n_c, -1, -1), z_c,
+                                               "hexapod"))
+            m_f179 = torch.cat(f179_parts, dim=0)
+            m_state = torch.cat(state_parts, dim=0)
             m_direct = md.body(None, z)
             m_ridge = score_ridge(fitted, e_full[0], z, device)
-            one_step = ftm(e_full.expand(len(conds), -1, -1), z)
-            m_state = state_model(one_step - e_full.expand(len(conds), -1, -1), z, "hexapod")
 
             for name, m in (("f179", m_f179), ("direct", m_direct),
                            ("ridge", m_ridge), ("state", m_state)):

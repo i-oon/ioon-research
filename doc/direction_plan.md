@@ -208,6 +208,407 @@ quadruped selection from 30% to 57% with data, robot, architecture and budget un
 
 ---
 
+## 1.1 Positioning update (2026-09-07) — current, supersedes the framing above pending a full rewrite
+
+> **Scope note.** Everything above this point in §1 predates the egocentric pivot and the
+> candidate-selection-vs-imagination-RL diagnostic arc (F150-F196) — it still references withdrawn
+> B1 numbers and deleted checkpoints from 2026-08-29. It has not been rewritten wholesale (that is
+> separate, larger work), but this section is the current positioning and should be read as
+> overriding it for anything about the thesis's actual claim and evidence status.
+>
+> **Label discipline, kept explicit on purpose**: every line below is tagged **[CONFIRMED]** (a
+> measured result, safe to write into the thesis as established) or **[AIM]** (a hypothesis or
+> planned test, not yet a result — do not migrate an [AIM] line into the thesis as if it were
+> [CONFIRMED]). When this section moves into `report/proposal.tex`, carry the tags with it, or
+> resolve them to prose that preserves the distinction.
+
+### The gap, two axes
+
+- Cross-embodiment locomotion exists, but via **body description** — proprioception, morphology
+  parameters, or large-scale embodiment randomization (URMA/URMAv2, Multi-Loco, One-Policy,
+  H-Zero, PEAC). *(Citations as supplied; not independently re-verified this session the way
+  UWM-JEPA was read in full — confirm each before it goes into the thesis, per this file's own
+  standing discipline of not citing a paper without reading it.)*
+- Cross-embodiment **from vision** exists, but for **manipulation** — optical-flow or
+  end-effector retargeting (TrajSkill, LAC-WM, IEEE latent-space work). Same caveat on citation
+  verification applies.
+- The intersection — vision-based cross-embodiment **locomotion**, frozen encoder, a
+  physically-grounded shared coordinate, no body description handed to the model — is unoccupied.
+  **[AIM as a literature claim]**: this is the gap being claimed; it depends on the citation set
+  above actually being correct and complete, which has not been independently checked this
+  session.
+
+### What's confirmed — safe to write as results now
+
+- **[CONFIRMED]** A shared Froude body-motion coordinate transfers cross-embodiment (F136 and the
+  closed-loop measurements built on it).
+- **[CONFIRMED]** Egocentric view fixes 1-step action-conditioning that allocentric view could not
+  (GATE C, null/real 1.03→1.16) — the frozen video encoder can be made to carry the action, at
+  least coarsely, by a viewpoint choice alone.
+- **[CONFIRMED]** The forward transition model (FTM) predicts coarse, family-level behaviour
+  accurately out to a k=10 horizon on both bodies, and the accuracy does not degrade with horizon
+  the way fine-magnitude prediction does: rollout correlation 0.938→0.970 (B1) and 0.898→0.943
+  (hexapod) from k=1 to k=10, with prediction error *shrinking* relative to the real outcome
+  spread as horizon grows (err/std 0.327→0.198 on B1, 0.341→0.226 on hexapod). Ranking the 12
+  behaviour conditions by FTM-predicted outcome matches their real ranking strongly and
+  significantly at every horizon on both bodies (Spearman ρ 0.84-0.93, p<0.001 throughout). A
+  small gradient-usefulness check on B1 (exact MuJoCo state-resume, not approximate) found the
+  gradient of predicted outcome w.r.t. action pointed toward real improvement in 3/3 tested cases.
+  **Together this is a viable controller signal at the coarse/family level** — the resolution this
+  thesis's actual goal (cross-embodiment *behaviour* transfer) needs, as distinct from the
+  fine-within-family magnitude discrimination that six independent, mechanistically distinct fixes
+  (F188, F192-F196) all failed to achieve and that this thesis explicitly parks as future work, not
+  a claim.
+- **[CONFIRMED, as prior art, not as our invention]** Frozen-encoder world model + policy learned
+  in imagination is a validated paradigm elsewhere (DINO-WM, DreamerPro) — this thesis instantiates
+  that paradigm for cross-embodiment locomotion, it does not invent the paradigm itself. *(Same
+  citation-verification caveat as above.)*
+
+### What is hypothesis, not yet result — do not claim this section as done
+
+- **[AIM]** "We investigate whether a policy trained in imagination on this frozen-encoder world
+  model achieves cross-embodiment behaviour transfer." This is the aim the RL loop (see below) is
+  built to test — not a result until Stage A/B (below) actually run and clear their pre-registered
+  bars.
+- **[AIM, explicitly parked]** Fine-grained, within-family magnitude discrimination. Named as
+  future/stretch work, not attempted as part of the core claim, per the six-null diagnostic arc
+  (F188, F192-F196) that closed this thread for this thesis's scope.
+
+### Why the thesis is defensible even if the loop underdelivers
+
+If Stage A/B (below) do not clear their bars, the thesis still stands on: a viable coarse-level
+controller signal, validated on both bodies, in a gap the existing literature does not occupy, using
+a paradigm validated elsewhere but not yet instantiated for cross-embodiment locomotion. That is
+"viable signal + positioning," not nothing. A working loop upgrades it to "demonstrated transfer."
+Do not let the loop's outcome retroactively change how the [CONFIRMED] section above is worded —
+those results are true regardless of what Stage A/B show.
+
+### Claim (3) does not need imagination-RL, and its controller has a hard scoring-space constraint (2026-09-08)
+
+**Resolved after a self-contradiction was flagged and checked against the actual F125-F136 text
+(not memory of it).** Claim (3) — drive a body not in pretraining via the shared coordinate +
+motor babble — does not require long-horizon imagination-based value learning (the thing F197's
+whole arc, and PPO/GAMMA after it, failed to make work). It needs: babble → an empirically-learned
+action→Froude map for the new body → a controller that picks actions toward a Froude goal. That
+controller does not need to integrate reward over a 20-100 step imagined horizon; it needs to move
+the body in roughly the right direction/magnitude, which is coarse, short-horizon decision-making —
+exactly the resolution the FTM is independently confirmed good at (k≤10, rho 0.85+).
+
+**"Action-selection is dead" (F144/F125/F127) does NOT mean this controller is dead — the actual
+failure was the scoring metric, not goal-directed FTM control, and this is a controlled, proven
+result, not an inference:**
+
+- F125/F127: candidate pool-selection scored by **embedding distance**
+  (`score(a) = ||rollout(a) − goal_embedding||`) never conditioned on the goal at all — under a
+  mismatch control, picks tracked "what the robot is currently doing" (56-70% agreement with the
+  demonstration) and scored *below chance* against the actual goal shown (18-23% vs. 28% chance).
+- F128/F131/F136: the **same pool-selection mechanism**, rescored by **Froude/body-motion
+  distance** — but the winning version (Mode D) is `score(a) = |body_head(proj(a)) − goal_froude|`,
+  with **no FTM rollout at all**. Mode C (the rollout version, `body_head(rollout(a))`) was tested
+  in the same pass and is *worse* (33-44% vs. Mode D's 68-70% pooled, and on 3 channels the rollout
+  actively *destroys* the turning signal, F136). Goal-conditioning appeared with the coordinate
+  change and survived its own mismatch control: 76-86% same-robot, 35-38% cross-embodiment with 1
+  channel (F131), 70% cross-embodiment with 3 channels (F136) — **all via the no-rollout Mode D.**
+
+**Important terminological correction, not to be blurred**: `body_head(proj(a))` — the actual F136
+winner — **is not a forward/world model.** It is a direct, single-step, stateless action→Froude
+regressor: given a recorded action alone, predict the resulting body motion, no rollout, no
+multi-step state, no FTM involved in the winning mechanism at all. It works, and it is not "using
+the world model to control" in the sense the rest of this plan (Stage A/B, the RL loop) means. Any
+description of claim (3)'s controller should say this precisely — "Froude-scored action regression"
+or similar — not "FTM-based control," which overstates what F136 actually validated.
+
+**Hard constraint on any future controller for claim (3), not a preference**: score in Froude/
+body-motion space, never embedding space, and prefer the no-rollout (Mode D-style) direct
+action→Froude scoring over routing through the FTM — the FTM version is the one already measured
+to be worse here, not merely untested.
+
+**What was never tested, and remains open**: short-horizon MPC, replanning every step — every prior
+attempt (F91-F136) picks from a **fixed, pre-recorded pool** of whole candidate behaviours, never
+continuously optimizes/replans a per-step action. Note this can be built either way given what's
+now confirmed: an FTM-free version (repeatedly query `body_head(proj(a))` over a small continuous
+action search each step, no rollout at all — extending the already-proven-best mechanism) or a
+classic FTM-based version (V-JEPA-2-AC style, rolling the world model forward each replanning step)
+— and given Mode D beat Mode C here, the FTM-free version is the one with evidence behind it, not
+just the untested one. F125/F127's "doesn't read the goal" finding is specific to the
+embedding-metric pool-selection setup that was tested; it does not establish that either MPC variant
+would fail the same way, and the F128/F131 fix (change the scoring space, keep everything else)
+gives good reason to expect a Froude-scored MPC controller to condition on the goal correctly too,
+plausibly better than a fixed pool (continuous replanning vs. picking from a finite discrete set).
+
+**So claim (3)'s controller options, in order of how proven they are**: (a) Froude-scored,
+no-rollout, direct action→Froude pool-selection (`body_head(proj(a))`) — proven working on known
+bodies, modest (35-70% depending on channel width), not a world model; (b) the same direct
+scoring extended to short-horizon MPC (replan every step, no FTM) — untried, plausibly stronger,
+uses the same validated coordinate and the same no-rollout mechanism; (c) an FTM-based rollout
+version of either — already measured worse than the no-rollout version here (Mode C vs. D, F136),
+not the default choice. None of these need the long-horizon imagination-RL machinery that F197
+onward spent the session on, and none of them are "world-model-based control" in that sense.
+
+### The RL loop plan (DreamerPro read 2026-09-07 — citation and a deviation both corrected)
+
+**Paradigm, citation corrected after reading the actual paper**: the actor-critic-in-imagination
+mechanics belong to **Dreamer (Hafner et al. 2020/2021)**, not DreamerPro — DreamerPro states
+explicitly it "uses the same policy learning algorithm as Dreamer," and only replaces Dreamer's
+*world-model* objective (pixel reconstruction) with a prototype/SwAV-based one, to fix a
+distraction-robustness problem this project does not have (the FTM was never trained by
+reconstruction to begin with — it is already a frozen-V-JEPA2 + prediction-objective world model).
+**Cite Dreamer for the mechanics; cite DreamerPro only as further evidence that non-reconstruction
+representations work in this paradigm**, not as the recipe being lifted.
+
+The mechanics themselves: imagination is seeded from real states encountered during training (not
+arbitrary starts); at each imagined step the actor's *stochastic* policy samples an action, the
+world model predicts both next state and reward, autoregressively; the actor maximises the
+**λ-return plus an entropy regulariser**, by backpropagating through the differentiable world model
+(the analytic/gradient path our own gradient-usefulness check, F196, supports being viable here);
+the critic regresses to that same λ-return with a squared loss.
+
+- Fixed world model = the FTM, `(e_t, z) -> next embedding`, already trained and validated to k=10
+  at the coarse level (this positioning section's [CONFIRMED] block above).
+- Reward = distance to a goal behaviour in the Froude/body-motion coordinate.
+- Actor = a policy producing `z` (or an action mapped through the existing projector to `z`),
+  trained entirely in imagined rollouts, backprop-through-FTM.
+- Critic = a value function over imagined latent trajectories, regressed to the λ-return.
+- Cross-embodiment structure matches the existing architecture: actor/critic operate in the shared
+  coordinate; only where the two bodies' action spaces differ (18-DOF vs 12-DOF) is anything
+  per-body.
+
+> **A genuine, named deviation from Dreamer, not a detail to let slide into the build silently.**
+> Dreamer continually re-grounds its world model on freshly-collected real data under the *current*
+> policy, interleaved with imagination training. This plan keeps the FTM **frozen throughout** —
+> reasonable, since it is already validated, but it removes the exact mechanism that stops a policy
+> from exploiting world-model errors in state-action regions the frozen FTM never saw. **This is
+> the F137 off-manifold ghost in a new form**: policy explores -> reaches a region the fixed FTM
+> predicts wrongly in -> policy learns to exploit the wrong prediction -> imagined reward that is
+> not real. Dreamer's re-grounding is precisely what would normally catch this, and this plan does
+> not have it.
+
+**Stage A pre-registration, locked before any code is written — two numbers, not one:**
+
+1. **Imagined return** (does the policy improve inside imagination at all) — **necessary, not
+   sufficient**. A rising imagined return alone proves nothing about the real system.
+2. **Real closed-loop performance on B1 vs the clone/direct baseline (F142/F184's ~54%)** — **the
+   actual gate.** Success = clears 54% on the real simulator, not just in imagination.
+
+**The pre-registered failure signature to watch for explicitly**: imagined return rising while real
+closed-loop performance stays flat (or fails to clear 54%) is not an ambiguous result — it is the
+FTM-exploitation signature the frozen-FTM deviation predicts, named in advance rather than
+rationalised after the fact if it appears. If that pattern shows up, the fix is some form of
+re-grounding (periodically re-collecting real data and correcting the FTM on it), which reopens
+co-training and is a materially bigger build than Stage A as scoped — not a tweak to try first.
+
+> **The whole arc below is retracted pending an optimizer fix — F197 (2026-09-07, merged finding,
+> supersedes the former separately-numbered F197-F201 stack).** Stage A0/A1 (frozen FTM), action
+> regularization, a joint uncertainty penalty, and re-grounding (three budgets) were each tried in
+> turn and each appeared, at the time, to show something FTM-side (exploitation, wrong-quantity
+> penalty, unoptimizable penalty, re-grounding insufficient). All of them assumed the actor-critic
+> optimizer reliably climbs whatever surface the FTM defines — an assumption never verified, and
+> disproven by an isolation test: actor-critic alone against the plain, **never-re-grounded** FTM,
+> 5,000 iterations (15-16x the longest budget used in any step above), a target that provably
+> cannot move. Result: no real improvement (fixed-eval realized_return -37.3 → -39.6), while the
+> critic's own value estimate diverged unboundedly (-82 → -421, drift -381.9) — the same
+> bootstrap-target divergence Stage A0 first caught, never actually resolved. **Every FTM-side
+> reading above is confounded, not confirmed** — the nulls may just be the same broken optimizer
+> failing identically regardless of which intervention was layered on top. **The one real finding**:
+> the vanilla actor-critic (EMA target critic, no Dreamer V3-style return normalization) does not
+> climb even a static FTM surface — critic bootstrap divergence must be fixed before any FTM-side RL
+> question is askable again. Does not touch the coarse controller-signal finding (measured
+> independently, no actor-critic training involved — holds). Full trace in FINDINGS.md's F197.
+
+**Staged, gated — not built all at once (kept here as the plan shape; every diagnosis inside is
+retracted pending the optimizer fix above):**
+- **Stage A — RUN (2026-09-07), retracted (F197).** Frozen FTM: trained actor did worse than the
+  B1 clone baseline (92% of D_real, itself FAIL) in real closed loop, with an imagination/reality
+  gap and negative correlation. Real gate-validity bug caught and fixed along the way (the "~54%"
+  baseline was hexapod/allocentric, not B1 — a proper B1 clone baseline was built from scratch).
+  *Read at the time as frozen-FTM exploitation; now confounded, see the retraction above.*
+- **Two cheap fixes tried, both null, retracted (F197).** Action regularization (BRAC/BCQ-style,
+  swept lambda) and a joint (state,action) uncertainty penalty (MOReL-style, discrimination-checked
+  first, swept beta) — both read at the time as informative nulls about which quantity to
+  regularize; now confounded along with everything else in the arc.
+- **Re-grounding, tried at three budgets, retracted (F197).** 6, 24, and 48 cycles (cadence
+  doubled, matched total actor-training iterations) — gap oscillated in the same range at every
+  budget, read at the time as "re-grounding insufficient"; now confounded.
+- **The failure is documented, not a misapplication.** Actor-critic-in-imagination against a fixed
+  world model is the standard Dreamer/DreamerV3 paradigm ("Dream to Generalize" uses a fixed world
+  model specifically). Koopman Dreamer (2607.19719) names this exact failure — compounding
+  return-target bias over the imagined horizon — and calls out legged locomotion specifically as
+  especially hard to diagnose here, due to its smooth, near-periodic dynamics. Not a sign anything
+  here is wrong; a known fragility this literature exists to manage, with a known fix ladder.
+- **First critic fix tried (symlog regression + percentile return normalization), same day —
+  narrows but does not close it.** realized_return now converges cleanly (-37.5 → -9.0, no
+  destabilization, replicated twice) — a real improvement. But a pre-registered Monte Carlo check
+  (value0 vs. an 800-step discounted realized return under the final policy — the quantity value0
+  is actually supposed to estimate, not the 5-step sum the original drift check used) shows the
+  critic still underestimates the long-horizon outcome by a wide margin (relative difference 0.464
+  vs. the 0.25 bar). **Still confounded, not yet re-askable.**
+- **Escalation ladder — complete, all four rungs tried and failed; escalating to PPO as
+  pre-committed.** (1) EMA target critic alone — failed outright (unbounded value drift). (2)
+  symlog critic regression + percentile return normalization — realized_return converged cleanly
+  but failed the MC check, relative difference 0.464. (3) periodic hard target updates replacing
+  the EMA — same clean convergence, WORSE MC result, 0.624. (4) two-hot distributional critic
+  (DreamerV3's actual key stabilization mechanism, the one rungs (2)/(3) never included; EMA target
+  kept since it beat hard updates) — clearly the best result (0.272, nearly half of rung (3)'s
+  error) but still narrowly fails the pre-registered 0.25 bar. **Four failed
+  critic-stabilization attempts on the same long-horizon-divergence signature → per the
+  pre-registered escalation, switch to PPO, not a fifth critic tweak.** PPO does not bootstrap a
+  value function through imagined rollouts, sidestepping this exact failure mode (documented for
+  locomotion specifically — Koopman Dreamer 2607.19719). The improving trend across the ladder
+  (0.464 → 0.624 → 0.272) shows the two-hot critic genuinely helped and is worth remembering if a
+  Dreamer-style approach is revisited later, but it doesn't clear the bar now.
+- **Before the PPO rebuild, tested whether the 0.272 gap actually blocks a working policy (it
+  does).** 0.272 vs. the 0.25 bar was close enough that the proxy alone didn't justify committing
+  to a real reimplementation — so the two-hot actor was run in the same real closed loop as every
+  other eval here, against the 92%-of-D_real clone baseline. **Result: FAIL, 19% of D_real** — but
+  notably not F197's original exploitation-and-fall signature: the actor stayed upright the entire
+  window, just barely moved (a frozen, over-conservative policy rather than a confidently-wrong
+  one). Confirms the MC-check proxy was not overly strict — real performance backs up the 0.272
+  verdict.
+- **PPO built with the same isolation-test-first discipline (Stage P0), no exemption for being a
+  different algorithm — P0 fails, and the failure margin is the decisive signal.** Standard,
+  unmodified PPO (rollout + GAE + clipped surrogate, correct tanh-squash log-prob, plain scalar
+  critic, no Dreamer tricks imported) in pure imagination against the same frozen FTM: realized
+  return genuinely improved (-42.2 → -35.4) but did not cleanly converge (one real destabilization
+  event mid-run), and the Monte Carlo check failed at **relative difference 0.281** — nearly
+  identical to two-hot's 0.272. **Two structurally unrelated algorithms converging to the same
+  ~0.27-0.28 gap against this FTM's own long-horizon rollout is strong evidence the wall is
+  FTM-side (compounding prediction error over the imagined horizon), not algorithm-side** —
+  confirms the Koopman Dreamer citation empirically, not just by reference. Per the pre-registered
+  rule, P0 failing means Stage P1 (real closed loop) is not run — no further RL-algorithm swap is
+  indicated.
+- **GAMMA test (the cheapest candidate) tried, rules out the hopeful reading — the gap does not
+  shrink with a shorter horizon, and the myopia trap fired as flagged in advance.** GAMMA=0.95 (5×
+  shorter effective horizon, ~20 vs ~100 steps), same PPO mechanics, plus an action-variation
+  diagnostic to catch a policy that "fixes" the gap by freezing into a static stance. **Result:
+  relative difference 0.306 — slightly WORSE than GAMMA=0.99's 0.281**, directly contradicting the
+  horizon-compounding prediction. `realized_return` converged cleanly (unlike GAMMA=0.99's PPO run)
+  but the myopia check shows why that's not informative: action variation collapsed ~92%
+  (0.110 → 0.0092, first half to second half of the MC rollout) — the policy learned a degenerate,
+  trivially-predictable frozen stance, not real locomotion. **Reading: the FTM's error is not
+  purely horizon-compounding — it is wrong even at a much shorter horizon.** This sets a real
+  boundary: the FTM is independently confirmed strong at the coarse/short-horizon level it was
+  validated for (rollout accuracy to k=10, ranking rho 0.85+), but not accurate enough — even
+  short-horizon — to support imagination-based long-horizon value estimation for control. **Next
+  candidates, in order**: (1) a Koopman-style spectral constraint on the FTM's latent dynamics (the
+  paper's own proposed fix for this documented failure in locomotion domains); (2) retrain/re-ground
+  the FTM's short-horizon prediction quality directly; (3) restrict this line of work to the FTM's
+  confirmed coarse/short-horizon strength rather than pursuing long-horizon imagination-RL further —
+  a real, mapped limitation of this specific FTM, not of any RL algorithm tried against it.
+- **A loss-reweighting version of (2) was scoped, then ruled out by direct measurement before being
+  built (F198).** The natural reading of `doc/literature_review2.md`'s Hu-citation — reconstruction
+  starves the body-motion/Froude term of gradient, so retrain with reconstruction demoted — assumed
+  a gradient imbalance that F149 had already shown didn't exist in the form claimed (F23's "99% of
+  gradient" was a loss-magnitude inference, not a measurement). Extending F149's own script to
+  include `lambda_state` (never measured before, since F149's checkpoint predates the flag) and
+  re-running on `beh12_state`/`teacher_state.pt` — the actual RL-arc checkpoint — on both bodies:
+  **the state/Froude term already has the largest gradient share of any term (45.1% hexapod, 47.8%
+  B1)**, not the smallest. No loss-reweighting fix is indicated. This converges with the
+  already-closed fine-magnitude calibration wall (F190-196) from a different angle: more gradient
+  into the representation was never the missing piece. Any further FTM-side fix has to be
+  architectural (Koopman-style constraint) or target the calibration wall directly — not a lambda
+  adjustment.
+- **A "Froude-forecasting FTM" (predict body-motion directly, not the next embedding) was also
+  verified against its stated premise before building, and the premise fails (F198 addendum).** The
+  idea: F188's action-lever (+0.055 real-z-vs-mean-z cosine gap, embedding space) might be an
+  artefact of the appearance-dominated embedding target — predicting Froude directly might make the
+  action a primary signal instead. Measured directly (same real-z-vs-mean-z logic, scored via the
+  existing, already-trained state head, no retraining): embedding-space gap replicates F188
+  (+0.054 hexapod, +0.034 B1, confirming the measurement), but the **Froude-space gap is -0.051 on
+  hexapod (the real action's code predicts the true change direction WORSE than a generic code) and
+  only +0.042 on B1 (still below the embedding reference)**. Per the pre-registered rule: do not
+  build the Froude-forecasting FTM on this premise. This is a more basic failure than F190-196's
+  calibration/compression story — the FTM-predicted-delta → state-head pathway's directional
+  sensitivity to the real action is weak-to-negative, independent of what it's asked to predict at
+  the end. Three independent angles (gradient share, prediction target, directional lever) now all
+  point the same way: the bottleneck is structural to this pathway, not fixable by reweighting or
+  retargeting its loss.
+- **The one untried category is architecture, not training — checked before committing to it.**
+  Every fix above changed loss/target/gradient/data/horizon; the FTM itself (`wm/models/ftm.py`) is
+  confirmed **stateless and single-step** — `forward(x_t, z, embodiment)`, no hidden state carried
+  between calls, no recurrent cell. This is not Dreamer/DreamerV3's RSSM (recurrent state `h_t`
+  carried across a sequence, action drives `h_t → h_{t+1}`) — this project adopted Dreamer's
+  actor-critic loop (F197) but never its world-model architecture. A cheap proxy (feed the frozen
+  FTM two concatenated frames instead of one, out-of-distribution but architecturally valid since
+  the attention blocks carry no positional embedding) found **no evidence** the action-lever
+  improves with more temporal context (hexapod −0.051→−0.056, B1 +0.042→+0.044) — doesn't rule out
+  the RSSM hypothesis (frozen, out-of-distribution weights aren't a real test), but gives no cheap
+  support for it either. **The real RSSM build is comparable in size to or larger than the ActSWM
+  rebuild (F146-157)** — recurrent state, sequence-chunked data pipeline (a real change from today's
+  independent-pair sampling), posterior/prior latents with a KL loss — a multi-day
+  architecture-and-pipeline project. A deliberate go/no-go decision, not a default next step.
+- **The decision was made — a real, trained recurrent model was tested via a pre-registered
+  kill-gate, and it fails; the RSSM build is killed, not committed to.** Stage R0 (a GRU carrying
+  real recurrent state, deliberately without the full posterior/prior/KL apparatus, short-trained
+  on B1's 48-clip set): a real methodology catch first — the sanity check (stateless-FTM lever
+  recomputed for comparison) initially came back +0.339 against the +0.042 reference (8x off), the
+  kind of red flag this session has learned not to wave away. Root cause: computed on only 9
+  held-out clips, too small a sample. Recomputed on the full 48-clip sample matching the reference's
+  own methodology — **reproduced exactly, +0.042 vs +0.042**, confirming the pipeline before
+  trusting anything downstream. **The gate itself, now trustworthy: FAIL.** Real action median
+  cosine 0.689 vs. mean/generic action 0.652 — gap +0.036, below even the raw +0.055 stateless
+  reference, let alone the pre-registered 0.110 (2x) bar. Trained recurrent state, in this minimal
+  form, does not restore action-sensitivity. **Killed here, per the pre-registered rule** — caught
+  in under an hour of compute, not a multi-day sink. This is evidence against this specific
+  construction (deterministic GRU, teacher-forced, short train, one body), not proof no recurrent
+  architecture could ever help — the full posterior/prior/KL machinery remains untested, which is
+  exactly what the gate was scoped to avoid paying for without cause. Combined with the gradient-
+  share, prediction-target, and directional-lever nulls above, this closes all four scoped angles
+  (loss, target, gradient, architecture) on the FTM/state pathway's action-insensitivity for this
+  session.
+- **Audited before trusting four nulls in a row — the measurement path is healthy, the nulls are
+  real.** Given two systematic bugs were already caught elsewhere this session, "nothing works"
+  across four independent angles was treated as suspicious rather than accepted at face value. Four
+  checks (mean_z not artificially close to real_z; `proj(a)` cleanly separates behaviour families,
+  not collapsed; the readout responds substantially to swapped z; and the decisive **positive
+  control** — matched z vs. a maximally mismatched z from a different behaviour family scores
+  **gap +0.121**, bigger than the real-vs-mean gap treated as weak all session and clearing the
+  RSSM kill-gate's own bar) all pass. The pipeline discriminates strongly between categorically
+  different actions — it specifically does not discriminate the real action from a generic one, a
+  finer distinction than the positive control probes. This reconciles with the independently-
+  confirmed coarse controller signal (also a between-family-scale discrimination) and confirms the
+  four nulls are genuine findings, not a broken measurement chain.
+- **The disentangling test — was the MC-check arc's failure critic-side or policy-drift-side?
+  Resolved: critic-side, cleanly, unconfounded.** Every prior MC-check compared the critic to the
+  FTM's own rollout under the TRAINED POLICY's trajectory — and that policy drifts ~1000x
+  off-distribution in real closed loop (F197), so the "ground truth" itself could have been
+  contaminated. Trained a fresh critic (PPO, GAMMA=0.9, effective horizon ~10, the validated
+  coarse-good zone) and evaluated three ways: actor's own rollout (0.318, matches the prior ladder);
+  on-distribution with each clip's own matched goal (8.655 — but flagged and not trusted, since this
+  pairing is low-regret by construction while training used random, independent goals — a possible
+  test artifact); on-distribution with a RANDOMLY sampled goal matching training's own distribution
+  exactly (**0.576, the clean number**) — still clearly fails the 0.25 bar, worse than the actor's
+  own rollout. **This rules out both policy drift and the goal-pairing artifact at once**: nothing
+  here depends on where a trained policy went (real recorded actions only), and the goal-pairing
+  confound is directly controlled for. Combined with the positive-control audit confirming every
+  pipeline component is healthy, this closes the loop: **RL via a TD-learned critic on this FTM is
+  confirmed dead for a genuine, isolated reason — a value-learning/function-approximation problem,
+  not measurement, not drift, not rollout realism.**
+  **Important constraint on what "the path forward" means, corrected mid-session**: `body_head(proj(a))`
+  (F128/F131/F136) is proven and cheap, but it bypasses the FTM entirely — `proj(a) → body_head`, no
+  rollout, no world model in the loop at all. Given the world model is this project's central,
+  non-negotiable contribution, using that mechanism alone for claim (3) would quietly drop the one
+  thing the thesis needs to demonstrate. **If claim (3) is to keep the FTM load-bearing, the
+  remaining option is a coarse-reward RL variant that still routes through the FTM at every step**
+  (state → FTM → predicted next state → reward), with the reward bucketed into coarse categories
+  (matching the resolution the positive-control audit just confirmed the pipeline handles well,
+  gap +0.121) rather than the continuous, fine-grained target that has failed throughout this arc —
+  untested, and the next thing to scope if RL-with-the-FTM is still wanted. `body_head(proj(a))`
+  remains the fallback if the world-model constraint is relaxed or reserved for a different part of
+  the pipeline (e.g. the babble→Froude mapping itself, rather than the moment-to-moment controller).
+- **Stage B** — cross-embodiment: train the goal from insect behaviour, execute on B1. The actual
+  thesis result. Gated on the critic fix above and Stage A re-clearing its real-closed-loop bar.
+- **Stage C** — hexapod gradient verification (the exact-resume version, deferred this session per
+  the decision not to reopen CoppeliaSim state-resume engineering for a gate that didn't need it) —
+  only built if the loop actually needs it, at build time, not before.
+
+**Cite**: MOPO/MOReL (the model-exploitation failure the (now-retracted) penalty-based fixes
+addressed); Dreamer (co-training world model + policy — the recipe the frozen-FTM simplification
+deviated from, and the source of the re-grounding idea, itself retracted pending the critic fix);
+Dreamer v3 (percentile return normalization — the leading candidate fix for the critic divergence
+found in F197).
+
+---
+
 ## 2. Approach
 > Full detail in `PROGRESS.md` §12. The Core Claim above is now **Stage 1** of a two-stage plan.
 
