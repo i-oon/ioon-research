@@ -70,7 +70,7 @@ all, in the easy case where the joint spaces do match.
 | Slides 14-16 | **the attempt** — ActSWM's method rebuilt, six pre-registered routes closed, and the number underneath all six |
 | Slides 17-19 | **the principle** — pose determines the future; what it explains in the literature and in our own record |
 | Slides 20-23 | **the prediction tested** — egocentric breaks the redundancy, the coordinate survives, and the two contributions |
-| Slides 24-27 | where this stands, the two months, the proposal, and how everything is measured |
+| Slides 24-27 | **the current diagnostic arc** — action selection fixed by the right scoring space, imagination-RL's wall localised to the rollout, and the single-step-prediction synthesis, with two cheap fixes for it also ruled out — and how everything is measured |
 
 ---
 
@@ -1047,123 +1047,127 @@ Demo-JEPA aligns embodiments by retargeting rather than by removing body-specifi
 
 # Part 5 — Where this stands
 
-## Slide 24 — Egocentric fixed action-conditioning, and we expected it to fix more
+## Slide 24 — Action selection: coarse works once scored in the right space, fine still doesn't
 
 ```
-  pose determines the future  ⇒  action redundant  ⇒  model ignores the action
+  score by embedding/frame distance  ──▶  reads the CURRENT frame, not the goal
         │
-        ▼  remove the body from view
-  ┌──────────────────────────────────────────────────────────────────┐
-  │  the model now USES the action                                   │
-  │  null/real 1.03 → 1.16   ← first thing in F153-F169 to move it   │
-  │  yaw readability 0.07 → 0.64                                     │
-  └──────────────────────────────────────────────────────────────────┘
-        but this is COARSE use, at one step:  real ≠ null
-        not yet precise enough to rank, or to roll far
+        ▼  rescore the same candidates by Froude/body-motion distance instead
+  goal-conditioning appears immediately
+        │
+        ▼  widen the coordinate: 1 channel (forward) → 3 (forward, lateral, yaw)
+  cross-embodiment selection roughly doubles; strafing goes from invisible to near-perfect
+        │
+        ▼  put the FTM's rollout back into the score
+  selection gets WORSE, and the rollout specifically destroys the turning signal
 ```
 
-| | allocentric | egocentric | |
+| selection rule | same-robot vs goal | cross-embod., 1ch | cross-embod., 3ch |
 |---|---|---|---|
-| **does prediction depend on the action** | 1.03, unmoved by six interventions | **1.16** insect · B1 1.08 at one step, 1.12–1.13 beyond | **fixed** |
-| **ego-motion readable in the shared coordinate** | yaw 0.07 | **yaw 0.64** | **fixed** |
-| can it order two similar actions | 33% | 47% — *a coin is 50%* | not yet |
-| can it order two different behaviours | 55% | 52% *(chance 33%)* | unchanged |
-| command readable from `(frame, z)` | 0.982 | 0.847 | −14% |
+| embedding/frame distance | 18-23% (28% chance) | — | — |
+| Froude/body-motion distance, no rollout | **76-86%** | 35-38% | **68-70%** pooled |
+| + FTM rollout added back in | — | — | 33-44%, turning **destroyed** |
 
-**We expected the ranking row to move with the first two, and it did not.** The reasoning was that
-ranking failed *because* the model ignored the latent action, so making it use the action should fix
-ranking. **It did make the model use the action — coarsely.** Enough to tell one behaviour from
-another; not yet enough to separate two versions of the same one.
-
-**So "uses the action" and "uses it precisely" turned out to be different capabilities.** That
-separation is a result of this session rather than something assumed going in.
-
-> **The two ranking rows are not a controlled before/after** — different body, different student,
-> twelve to fifteen branch points. At that count they are one number. **They license "chance in
-> both", not "improved".**
-
----
-
-## Slide 25 — Two capabilities that have not improved yet, kept separate
-
-```
-  coarse action-use          ✓ fixed by egocentric   (one step, real ≠ null)
-        │
-        ├── rollout prediction accuracy   ── reliable ~3–5 steps, then degrades
-        │                                    (a known limit for video world models)
-        │
-        └── fine action ranking           ── recorded behaviours  83%  ✓
-                                             fine perturbations   47%  ✗
-```
-
-**Reported separately, because a fix for one need not touch the other.**
-
-| what we asked of it | result |
-|---|---|
-| rank whole recorded gaits | **83%**, p = 0.019 — **it ranks when the difference is large** |
-| rank 0.5-sd perturbations | 47%, a coin is 50% |
-| perturb harder (σ 1→4) | 50 / 42 / 58%, all chance — and 33–40% of joints leave the data range |
-| follow a gradient through imagination | does not beat a random step of the same size |
-
-**The model is not blind to a small change**: its predicted response moves **15%** when the action
-moves 0.5 sd. **What has not improved is turning that response into a correct ordering.** Whether the
-remaining gap is the pretraining objective, the rollout horizon, or something else is **still being
-debugged, and we are not attributing it to one cause yet.**
-
-### The behavioural row, filled in
-
-| | clone only | + world model |
+| strafing selection | forward-only coordinate | 3-channel coordinate |
 |---|---|---|
-| `c08f09t09`, allocentric | **54% — PASS** | not run |
-| `c10f10t10`, allocentric | 37% | **27%** |
-| base body (F144) | 36% | 31% |
-| `c08f09t09`, egocentric | 6% | not run |
+| | 13-25% (17% chance) | **86-100%** |
 
-**A plain behaviour-cloned policy passes the F142 bar on one body with no world model at all.** On
-the body where the teacher is validated, the taught policy travels less than the clone — **the same
-direction F144 found, now reproduced on a second body.**
+**Predicting the frame/embedding carries appearance detail the task doesn't need; predicting the
+physical quantity directly is the right target.** This is what `lambda_state` retrains the FTM to
+do — same architecture, corrected target.
 
-**Stated as status, not verdict: the world model has not yet been shown to add behavioural value
-above cloning.** The teacher it runs through ranks fine perturbations at chance, so this is the
-outcome the ranking row predicts; **whether a better-debugged world model changes it is open.**
+| fine discrimination (`state` scorer) | exact accuracy | mean rank of 12 | direction | magnitude |
+|---|---|---|---|---|
+| recorded conditions | 28% | 2.33 | 0.867 — right way | 0.71 sd — wrong extent |
+| 0.5-sd perturbations | 47% (50% = coin) | — | — | — |
 
-**Any future claim that the world model helps has to beat the clone on the same body** — and on the
-best body that is **54%**, not 36%.
+**Coarse action-family selection: fixed, crosses embodiments. Fine magnitude discrimination: still
+near chance** — six independent readout fixes this session, all null. Two different capabilities.
 
 ---
 
-## Slide 26 — What the next two months do
+## Slide 25 — Imagination-RL: the optimizer got fixed for real; the wall that remained is the rollout
 
 ```
-  closed by measurement          open, in order
-  ├─ perturbation candidates     ├─ 1. candidate generator: in-range, gait-structured
-  ├─ imagined-actor gradients    │      (F137, and the 83% says the ranker is ready for it)
-  ├─ "ego fixes ranking"         └─ 2. supervised self-body first, then the world model
-  └─ Delta-JEPA's LDAD                  ← Ajan Blink's W14 challenge, now backed by a number
+  looked like: the actor exploits the frozen FTM's blind spots
+        │
+        ▼  isolation test: 5,000 iterations, frozen FTM, no re-grounding at all
+  actually was: the critic never converges, even against a STATIC target
+        │
+        ▼  four real stabilisation fixes, in order (table below)
+  best Dreamer variant still fails the pre-registered bar
+        │
+        ▼  switch algorithm entirely (PPO -- no bootstrapped imagined-rollout value)
+  lands on the SAME wall as the best Dreamer variant
+        │
+        ▼  shorten the horizon instead (GAMMA 0.99 → 0.95)
+  gap does not shrink -- policy freezes into a static stance instead
+        │
+        ▼  every one of these iterates the SAME single-step predictor to build a return
+  failure localises to the FTM's rollout, not the algorithm
 ```
 
-**How LDAD closed, because the way it closed is itself the finding.** Delta-JEPA's term lifted
-action-reconstruction from 0.338 to 0.537 and moved the response ratio toward physics -- **and
-`null/real` fell from 1.16 to 0.99, at both weights its authors recommend.** The objective is
-satisfiable by stamping the action legibly onto the prediction's residual, which demands no accuracy:
-**Context Collapse with the arrow reversed.** So displacement-reconstruction cannot establish that a
-world model *uses* the action, and we have the counterexample.
+| fix | MC-check relative difference (bar: < 0.25) |
+|---|---|
+| EMA target critic alone | fails outright (unbounded value drift) |
+| + symlog critic, + return normalisation | 0.464 |
+| hard/periodic target updates | 0.624 — worse |
+| + two-hot distributional critic (DreamerV3's own fix) | **0.272** — best Dreamer variant, still fails |
+| **PPO** (different algorithm, no imagined-rollout bootstrap) | **0.281** |
+| PPO, GAMMA 0.99 → 0.95 (horizon ~100 → ~20 steps) | 0.306 — worse, policy went static (action variation −92%) |
 
-**1. A candidate generator that stays inside the data.** The requirement is measured, not guessed:
-inside the recorded command range, carrying gait structure, and still separating outcomes. **The
-library meets it; nothing generated has.**
+**Two structurally unrelated algorithms land on the same ~0.27-0.28 wall, and shortening the
+horizon does not move it.** Not an algorithm problem — the same single-step predictor is being
+iterated to build every one of these returns, the exact locomotion failure mode Koopman Dreamer
+(2607.19719) names.
 
-**2. Supervised self-body perception first.** Ajan Blink's Week 14 challenge, and it is now backed by
-a measurement rather than intuition: from the head camera alone the B1 policy accounts for **0.205**
-of the command it must produce.
+---
 
-**The deliverable is unchanged: a behaviour recorded on the insect drives the B1 through the shared
-coordinate.**
+## Slide 26 — The synthesis: single-step prediction is the wrong shape — and sequence context, tried every honest way, doesn't fix it
 
-**And what ships if neither lands** is not nothing. It is a chain of pre-registered
-measurements of why locomotion world models collapse, a viewpoint fix that is **necessary and not
-sufficient**, and **two objectives shown to be satisfiable without the goal they encode** — Context Collapse in
-both directions, the second measured here for the first time.
+```
+  FTM(frame_t, action_t) → frame_t+1        one observation, one action
+        │
+        ▼  same action means different things at different points in a gait cycle
+  one-action-many-outcomes, no phase context to disambiguate them
+        │
+        ▼  Yu / WMP: locomotion world models are recurrent-over-HISTORY
+              frame-SEQUENCE + command-SEQUENCE → next state
+        │
+        ▼  premise checked on GROUND TRUTH first, no model in the loop
+  signal exists in the data (table below) → not a task property, a model gap
+        │
+        ▼  every combination of {pooled, spatial-preserved} x {non-recurrent, recurrent}
+             that is cheaply testable — command-sequence + delta-target held fixed throughout
+  ALL FOUR fail the bar (table below), including the one that is genuinely
+  spatial + recurrent at once — the widest miss of the four
+```
+
+Both Slide 24's Froude-scoring fix and Slide 25's algorithm-swap improved something real and both
+still hit a wall. Both trace to the same place: the FTM is confirmed **stateless, single-step**
+(no hidden state between calls, not an RSSM) — the standard locomotion fix (Yu, WMP) conditions on
+frame-*history* and command-*sequence* instead.
+
+| ground-truth check (Test 1, no model) | value |
+|---|---|
+| corr(\|Δaction\|, \|ΔFroude\|), within one fixed behaviour | +0.432 |
+| permutation p-value (n = 20,000) | 0.002 |
+| ridge, leave-one-out R² | 0.204 |
+
+| kill-gate (command-sequence + delta-target throughout, bar: gap > 0.110) | spatial preserved? | recurrent? | gap |
+|---|---|---|---|
+| pooled mean-vector per frame → GRU | no | yes | +0.036 |
+| learned attention-pool per frame → GRU | no — still pools every frame | yes | +0.058 |
+| full token grid, self-attention across frames | yes | no | +0.048 |
+| **ConvGRU: spatial hidden state, pooled only at final read-out** | **yes** | **yes** | **+0.069** |
+| stateless single-step FTM (reference) | — | — | +0.042 |
+
+**The genuine test — spatial detail actually flowing through a real recurrent state, at the same
+time — fails by the widest margin, not the narrowest.** The session's reframed hypothesis (fix
+action-insensitivity with temporal/sequence context, in any cheaply-testable form) is now **ruled
+out, not merely unconfirmed**. Test 1's ground-truth signal still stands — the flatness is real,
+not a task property — but no context-based fix tried recovers it. Open next: capacity/optimisation
+of a genuinely end-to-end-trained model, not input representation.
 
 ---
 
@@ -1181,6 +1185,13 @@ both directions, the second measured here for the first time.
 | coordinate transfer across bodies | `scripts/diagnostics/objective_experiments/motion_rep_check.py` |
 | gait removal | `scripts/diagnostics/egocentric_view/degait_coordinate.py` |
 | which surface the encoder reads motion from | `scripts/diagnostics/egocentric_view/texture_for_vjepa.py` |
+| goal-conditioning, mismatch control | `plan_open_loop.py --mismatch`, `does_rollout_matter.py --mismatch` |
+| Froude/body-motion scoring vs embedding scoring | `scripts/diagnostics/score_by_body_motion.py` |
+| fine-magnitude scorer accuracy | `scripts/diagnostics/planning/condition_confusion.py` |
+| Dreamer/PPO imagination-RL ladder, MC-check bar | `results/wm/closed_loop/rl_loop_isolation_test_v{2,3,4,5}*.npz`, `ppo_p0_isolation.npz`, `ppo_p0_gamma0.95.npz` |
+| gradient share into `z`, incl. `lambda_state` | `scripts/diagnostics/forward_model/loss_gradient_balance_state.py` |
+| ground-truth action→Froude signal (Test 1) | `scripts/diagnostics/objective_experiments/ground_truth_action_flatness.py` |
+| pooled/spatial x recurrent/non-recurrent kill-gates | `scripts/diagnostics/objective_experiments/sequence_context_killgate.py` |
 
 **Four guards run before results are read. Each was added after a specific failure.**
 
@@ -1193,3 +1204,5 @@ both directions, the second measured here for the first time.
 
 Speaker note: two of those ten "defects" turned out to be the measuring instrument rather than the
 scene. **When a measurement disagrees with geometry, check the measurement first.**
+
+---

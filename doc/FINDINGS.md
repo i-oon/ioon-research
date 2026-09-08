@@ -14829,7 +14829,64 @@ target over a single absolute-Froude regression, since the "true" target itself 
 per-condition constant.
 
 Runs: `test1_groundtruth_flatness.py` (scratch), `data/egocentric/beh12_b1_ego_flat`, no
-checkpoint needed -- pure numpy over the recorded `action`/`body_motion` arrays.
+checkpoint needed -- pure numpy over the recorded `action`/`body_motion` arrays. Moved into the
+repo as `scripts/diagnostics/objective_experiments/ground_truth_action_flatness.py`.
+
+**Addendum, same day: Test 2, the recurrent frame-sequence + command-sequence kill-gate -- three
+attempts, the first two confounded by pooling, the third genuinely tests the hypothesis and it
+also fails.** Test 1 cleared the gate to build a context-based fix. The first two kill-gates built
+to test it were each caught, before being trusted, as not actually testing the claimed hypothesis:
+
+1. A non-recurrent windowed self-attention Transformer over 4 frames' full token grids (spatial
+   detail preserved throughout, no pooling until the final frame's read-out) -- caught for
+   dropping real recurrent state entirely, a different confound than the one it was built to fix.
+   Gap +0.048. Not trusted as a test of "recurrence + sequence", since it has no recurrence.
+2. A GRU (matching R0's recurrent state, real per-step command sequence, and delta-Froude target
+   exactly) with R0's naive mean-pool replaced by a learned, action-conditioned attention-pool (8
+   queries over 256 tokens). **Caught by the user before being trusted as a spatial test**: an
+   attention-pool is still a pooling operation -- it collapses the full token grid to one small
+   fixed vector *before* the GRU integrates anything temporally, exactly like R0's mean-pool, just
+   with a better pooling function. Gap +0.058. Confirms two pooling *functions* fail; does not
+   test spatial-preservation at all.
+
+**Neither of the first two, nor R0, combines spatial-preservation and real recurrence at the same
+time** -- R0 and attempt 2 are recurrent-but-pooled, attempt 1 is spatial-but-non-recurrent. The
+strict hypothesis remained untested until a third design closed the gap: V-JEPA2's 256 tokens are
+a confirmed 16x16 spatial grid (`image_size=256, patch_size=16` from the cached model config), so
+a **ConvGRU** keeps the recurrent hidden state itself as a 16x16xC spatial map, updated by 3x3
+convolutions every step -- never flattened to a vector until the final global-average-pool at
+read-out time, after all temporal integration is done. Command sequence and delta-Froude target
+held identical to every prior test in this arc.
+
+| kill-gate | spatial preserved? | recurrent? | gap |
+|---|---|---|---|
+| R0: pooled mean-vector -> GRU | no | yes | +0.036 |
+| attempt 2: learned attention-pool -> GRU | no (still pools every frame) | yes | +0.058 |
+| attempt 1: full token grid, self-attention across frames | yes | no | +0.048 |
+| **ConvGRU: spatial hidden state, pooled only at final read-out** | **yes** | **yes** | **+0.069** |
+| stateless single-step FTM (reference) | -- | -- | +0.042 |
+
+Sanity check reproduced exactly (+0.042 vs +0.042) before this gate was trusted. **Result: FAIL**,
+real-action median cosine 0.665, mean-action median cosine 0.596, gap +0.069 against the
+pre-registered >0.110 bar -- the widest margin from the bar of any variant tried, not the closest.
+
+**This is the clean kill the first two attempts could not honestly claim to be.** All three
+testable cells of {pooled, spatial-preserved} x {non-recurrent, recurrent} now fail, with the one
+design that genuinely satisfies frame-sequence (spatial) + command-sequence + real recurrent state
++ delta-Froude target simultaneously failing by the widest margin. **The session's reframed
+hypothesis -- that single-step action-insensitivity is fixable by adding temporal/sequence context
+in any cheaply-testable form -- is now ruled out, not merely unconfirmed.** Combined with F198's
+earlier addenda (loss target, gradient share, and the original stateless-vs-2-frame-proxy
+architecture check), every angle this session scoped on the FTM/state pathway's action-sensitivity
+-- training signal, architecture (recurrent and non-recurrent), and now the pooled-vs-spatial axis
+specifically -- has been tried and found wanting. What remains open, not yet tested: whether the
+bottleneck is capacity/optimisation of a genuinely trained-end-to-end sequence model (all three
+kill-gates here were short, 2000-iteration probes on one body, not full pretrains) rather than
+input representation at all.
+
+Runs: `scripts/diagnostics/objective_experiments/sequence_context_killgate.py` (attempts 1 and 2,
+same file, two model classes), `scripts/diagnostics/objective_experiments/spatial_recurrent_killgate.py`
+(the ConvGRU), `wm/runs/beh12_state/{seq_spatial_gru_killgate,spatial_recurrent_killgate}.pt`.
 
 ---
 
