@@ -197,18 +197,24 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
 
     body_pred = body_target = None
     if models["md"].body_head is not None and "body_motion" in batch:
-        # the same view and the same trunk the joint head just used
-        body_pred = models["md"].body(views["view1_t"], z)
+        # `z.detach()`: L_body no longer shapes z. Isolated-frozen-z test (2026-09-08) found the
+        # action->Froude signal IS in z (rho 0.69-0.94 per channel on the real absolute
+        # body_motion target, action-lever gap 1.0-1.2 against a 0.11 bar) once a clean head reads
+        # it WITHOUT competing against L_recon/L_motion for how z is shaped -- the jointly-trained
+        # z-only head (F192) had the signal available and still failed the action-lever (+0.045),
+        # because its own gradient was one more voice pulling z toward appearance/motion instead
+        # of just reading what is already there. Stop-gradient makes this the same experiment as
+        # the isolated test that passed: z is shaped by L_recon/L_motion alone, L_body only reads.
+        body_pred = models["md"].body(views["view1_t"], z.detach())
         body_target = batch["body_motion"].to(device)
 
+    # L_state / state_head retired (2026-09-08): F192 showed its delta ingredient actively hurts
+    # (z+delta R2 0.625 < z-alone 0.781), and its target is `batch["body_motion"]` -- identical to
+    # L_body's. Once the delta ingredient is gone the two heads predict the same thing from the
+    # same input; keeping both is redundant, not a second signal. Consolidated onto L_body above.
+    # state_head.py is kept for loading old checkpoints (`teacher_state.pt`,
+    # `beh12_state_zonly/teacher_zonly.pt`); new configs should leave `lambda_state` at 0.
     state_pred = state_target = None
-    if "state" in models and "body_motion" in batch:
-        # the FTM's own predicted change, not the frame -- see wm/models/state_head.py. Computed
-        # from the same (view2_t, pred_next) pair L_recon already scores, so this reads a second
-        # quantity off a rollout that already exists rather than adding a second forward pass.
-        delta = pred_next - views["view2_t"]
-        state_pred = models["state"](delta, z, embodiment)
-        state_target = batch["body_motion"].to(device)
 
     # --- ActSWM terms (F146, F151, F152). Off unless `lambda_hinge` or `lambda_readout` is set,
     # so every earlier run reproduces byte for byte.

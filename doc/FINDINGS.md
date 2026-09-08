@@ -14888,6 +14888,167 @@ Runs: `scripts/diagnostics/objective_experiments/sequence_context_killgate.py` (
 same file, two model classes), `scripts/diagnostics/objective_experiments/spatial_recurrent_killgate.py`
 (the ConvGRU), `wm/runs/beh12_state/{seq_spatial_gru_killgate,spatial_recurrent_killgate}.pt`.
 
+**Addendum, same day: the closing result -- three independent offline probes confirm the signal is
+present; F192 re-run through this arc's own metric confirms it is not trained-recoverable. This is
+the session's core finding, not a separate failure.**
+
+**Is the signal in the raw encoder at all?** `embedding_transition_ceiling.py` regressed the raw,
+frozen `(e_t, e_next)` pair directly against real delta-Froude, no ITM/FTM/state head involved.
+`concat(e_t, e_next)` reads Spearman rho +0.35 to +0.45 on every channel, consistently across ridge
+and both kNN probes; the `delta = e_next - e_t` representation the state head is actually built on
+reads far weaker (rho +0.02 to +0.22). **The encoder has the signal. The delta representation
+discards most of it.**
+
+**Which input representation carries the most?** `embedding_representation_sweep.py` ranked six
+equations (delta, concat, concat+delta, bilinear, `z = ITM(e_t,e_next)`, and a newly-trained
+spatial cross-attention probe) by held-out Spearman rho. Ranked, median rho: `z = ITM(e_t,e_next)`
+**+0.535** (winner, and by a clear margin) > bilinear +0.413 > concat+delta +0.406 > concat +0.405 >
+trained cross-attention probe +0.392 > delta (baseline) +0.215. **The already-trained ITM's `z` --
+zero extra training -- beats every hand-built pooled feature and a purpose-built cross-attention
+probe.** The state head's own `pool(delta) + z_proj(z)` combination reads `z` as an additive term,
+not as the primary signal this ranking says it should be.
+
+**Does that signal survive the reconstruction-to-control substitution?** `z = ITM(e_t,e_next)`
+needs the real future frame, unavailable at control time; `z = proj(action)` is what is actually
+deployed. `proj_action_ceiling_check.py`: median rho +0.429, **80% of the ITM-z's +0.535 survives**
+-- not the reconstruction-vs-planning trap (F125/F131) this time, so retraining the readout to
+trust `z` was judged justified for control, not just offline scoring. Per-channel: lateral 97%
+retained (0.578 vs 0.598), yaw 80% (0.429 vs 0.535), **forward only 39%** (0.204 vs 0.529) -- a
+pre-registered caveat that forward specifically might not improve, flagged before any measurement
+of a trained head.
+
+**Does a head that reads `z` as primary actually work, once trained end to end?** This exact
+architecture change already exists: F192's `state_use_delta=false` (`self.head(self.z_proj(z))`,
+no delta at all) was already built and already retrained jointly on hexapod+B1
+(`wm/runs/beh12_state_zonly/teacher_zonly.pt`). F192's own evaluation used `condition_confusion.py`
+ranking accuracy and read it as inconclusive (22% vs 28%, within run-to-run noise) -- it never
+measured the action-lever this arc's whole kill-gate ladder has used. `zonly_action_lever_check.py`
+closes that gap, zero retraining required (the checkpoint already exists):
+
+| z source | action-lever gap | bar 0.110 |
+|---|---|---|
+| `z = ITM(e_t,e_next)` (matches the established +0.042 reference) | +0.045 | FAIL |
+| `z = proj(action)` (control-relevant) | +0.099 | FAIL |
+
+**Both fail.** proj(a)-z came closer to the bar than ITM-z (unusual -- the control-time z
+outperformed the reconstruction-time z here) but neither clears it. Per-channel (real-z-closer-
+than-mean-z win rate, chance 50%): lateral 51-54% (roughly neutral, closest to the pre-registered
+expectation), but **forward 3-5% and yaw 2-15% -- far BELOW chance, not merely flat.** The
+pre-registered expectation (lateral/yaw improve, forward doesn't) was wrong in its specifics: yaw
+did not improve either, and where the offline probe showed the strongest signal (forward and yaw
+both had non-trivial ITM-z rho), the trained head is actively worse than a constant/mean guess, not
+merely uninformative.
+
+**The honest reading, stated once and stated straight.** This is not a fourth kill-gate failure to
+add to the pile, and it is not evidence the encoder lacks the signal (three independent offline
+probes -- raw embedding regression, the six-equation ranking, and the reconstruction-to-control
+check -- all found real, consistent signal, strongest in `z`). It is not evidence the equation was
+wrong either -- `z` alone is the empirically correct equation offline, by a wide margin over every
+alternative tried. **The finding is narrower and more specific than either: the action->Froude
+signal is present in this pipeline's own latent representations, at every stage checked, and it
+does not survive being trained end to end into a predictor that uses it.** An offline linear/kNN
+probe recovering a correlation is not the same claim as a network optimized jointly with every
+other loss term in this checkpoint learning to exploit that correlation -- F192's real retrain
+found this once already (offline win, trained null), and this addendum confirms it again, this
+time against the metric that actually matters for control (the action-lever), with a per-channel
+picture that rules out "it partially worked." **This closes the session's diagnostic arc**: loss
+target (F198 main entry), gradient share (F198), prediction target (F198 addendum), four
+architectures spanning pooled/spatial x recurrent/non-recurrent (F198 addenda), and now input
+representation itself (this addendum) have all been tried, and the wall is not any one of them --
+it is the gap between what a frozen representation offline-correlates with and what a trained
+predictor built on top of this pipeline's other losses actually learns to use.
+
+Runs: `scripts/diagnostics/objective_experiments/embedding_transition_ceiling.py`,
+`embedding_representation_sweep.py`, `proj_action_ceiling_check.py`, `zonly_action_lever_check.py`.
+Checkpoint: `wm/runs/beh12_state_zonly/teacher_zonly.pt` (F192, no retraining performed here).
+
+**Addendum, same day: the gap between offline correlation and trained recovery is not a mystery
+after all -- isolated cheaply, it is joint-training competition, and the fix is confirmed on
+`L_body`'s real target before any retrain was built.** The previous addendum's closing line ("the
+gap between what a frozen representation offline-correlates with and what a trained predictor
+learns to use") stated the finding as an open gap. It isn't -- the cause was isolated directly.
+
+**Isolated frozen-z test.** FREEZE the encoder/ITM/FTM/projector exactly as `teacher_state.pt`
+left them (a checkpoint trained under the FULL joint recipe: `lambda_recon=1.0, lambda_motion=1.0,
+lambda_body=0.5, lambda_state=1.5`, i.e. `z` was already shaped under real competition, not some
+easier unshaped feature). Train ONLY a small, freshly-initialised head
+(`LayerNorm(z_dim)->Linear->GELU->Linear`, `MotionDecoder.body_head`'s own shape, not the
+delta-carrying state-head branch) on a Froude loss alone, no `L_recon`/`L_motion` in this new
+head's own loss. Two z sources (`ITM(e_t,e_next)`, `proj(action)`), two loss shapes (MSE, cosine):
+
+| z source | loss | action-lever gap (bar 0.110) | median rho |
+|---|---|---|---|
+| ITM | MSE | +0.579 | 0.594 |
+| ITM | cosine | +0.733 | 0.489 |
+| proj(a) | MSE | +0.385 | 0.405 |
+| proj(a) | cosine | +0.522 | 0.349 |
+
+**All four pass by 3.5-6.7x**, on a target this addendum's own predecessor used (`bm_next - bm_t`,
+inherited from the embedding-space lever's convention). MSE matched or beat cosine throughout --
+the "MSE optimises magnitude, kills direction" hypothesis (motivated by this session's repeated
+R2-negative/rho-positive pattern) did not hold up; loss shape was not the lever.
+
+**Gate check before scoping any retrain: does this transfer to `L_body`'s ACTUAL target?**
+Reading `wm/train.py` found `body_target = state_target = batch["body_motion"]` -- the ACHIEVED,
+ABSOLUTE value at frame `t` (`wm/data/dataset.py`: `sample["body_motion"] = clip["body_motion"][t]`),
+not a difference between two readings. The passing result above used a different target than what
+`L_body` (and the now-retired `L_state`) actually optimise. Re-ran the identical isolated-head
+setup with the target swapped to `bm[t]`:
+
+| z source | loss | action-lever gap (bar 0.110) | median rho |
+|---|---|---|---|
+| ITM | MSE | +1.048 | 0.755 |
+| ITM | cosine | +1.226 | 0.750 |
+| proj(a) | MSE | +1.092 | 0.691 |
+| proj(a) | cosine | +1.049 | 0.711 |
+
+**Transfers, and more strongly** (gaps ~10x the bar; per-channel rho 0.54-0.94, strongest on yaw).
+The recoverable signal is not an artefact of this session's delta-Froude diagnostic convention --
+it is present in `z` for the exact quantity the real pipeline trains on.
+
+**Root cause, confirmed by construction.** The `z` in the isolated test came from a checkpoint
+trained under the full joint loss, with `L_recon`'s gradient (and `L_motion`'s, `L_body`'s,
+`L_state`'s) all shaping it the whole time it was produced. It still carried the full signal when
+read by a head that itself never competed with those other losses. **The signal is
+present-but-unread in joint-trained `z`, not moved away by `L_recon`.** The failure this whole
+session chased (state-head/`L_body` underperforming a static offline probe on the same features)
+is a joint-TRAINING problem specifically: every loss sharing gradient into `z` (checked in
+`wm/train.py`: `z = itm(...)` computed once, fed into `L_recon`, `L_motion`, `L_body`, `L_state`
+with full, undetached gradient into ITM for all four) means the Froude readout's own gradient is
+one more competing voice shaping `z`, on top of just reading what performance a probe shows is
+already recoverable there.
+
+**The fix, scoped and implemented.** Three candidates were weighed: reweighting (raise
+`lambda_body` / lower `lambda_recon` -- weak prior, since F198 already showed `L_state` dominated
+gradient SHARE at 45-48% and the problem was never about how much gradient the term gets, only
+about what it competes for); isolated/staged (pretrain `z` normally, freeze, fit the readout
+separately -- proven by the isolated test itself, but a two-stage pipeline); and stop-gradient
+(`z.detach()` before the Froude readout, in a single training run -- mechanically identical to the
+isolated/staged result, without a second stage). **Stop-gradient implemented**: `wm/train.py`'s
+`forward_step` now computes `body_pred = md.body(view1_t, z.detach())`. `L_state`/`state_head` is
+retired from the loss entirely (`state_pred` now hardcoded `None`, regardless of `--lambda_state`)
+-- confirmed redundant with `L_body` once its delta ingredient (already shown harmful, F192:
+`z+delta` R2 0.625 < `z`-alone 0.781) is removed, since both trained on the identical
+`batch["body_motion"]` target. `state_head.py` and its checkpoints remain loadable for
+`teacher_state.pt`/`beh12_state_zonly` compatibility; new configs leave `lambda_state` at its
+default 0.
+
+**Retrain scoped, not yet run.** Same recipe as `teacher_state.pt` (`sources: hexapod=beh12_c10f10t10_ego_flat,
+b1=beh12_b1_ego_flat`, `lambda_recon=1.0, lambda_motion=1.0, lambda_body=0.5`, `body_channels 0,1,2`,
+50 epochs, batch 8) with only the stop-gradient change and `lambda_state` unset -- isolates exactly
+one intervention against the existing checkpoints. Not launched locally: `beh12_state_zonly`'s own
+run history (`best_state.pt` to `last.pt` timestamps) shows the same recipe took **~9 hours** on
+this machine's GPU -- scoped for the faster machine now available, not run here. The check that
+decides whether this closes the arc: re-run `zonly_action_lever_check.py`'s methodology against
+the new checkpoint once trained -- the isolated test proved the signal is recoverable from an
+*existing* `z`; it does not yet prove `z` trained *without* `L_body`'s gradient still develops the
+same signal under `L_recon`/`L_motion` alone. That is the one open link between this diagnosis and
+a working fix.
+
+Runs: `scripts/diagnostics/objective_experiments/isolated_z_head_probe.py` (delta-Froude target),
+`isolated_z_head_probe_bodytarget.py` (the real `L_body` target, the gate check). Code change:
+`wm/train.py`'s `forward_step` (stop-gradient on `L_body`, `L_state` retired).
+
 ---
 
 

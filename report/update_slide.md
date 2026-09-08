@@ -70,7 +70,7 @@ all, in the easy case where the joint spaces do match.
 | Slides 14-16 | **the attempt** — ActSWM's method rebuilt, six pre-registered routes closed, and the number underneath all six |
 | Slides 17-19 | **the principle** — pose determines the future; what it explains in the literature and in our own record |
 | Slides 20-23 | **the prediction tested** — egocentric breaks the redundancy, the coordinate survives, and the two contributions |
-| Slides 24-27 | **the current diagnostic arc** — action selection fixed by the right scoring space, imagination-RL's wall localised to the rollout, and the single-step-prediction synthesis, with two cheap fixes for it also ruled out — and how everything is measured |
+| Slides 24-28 | **the current diagnostic arc** — action selection fixed by the right scoring space, imagination-RL's wall localised to the rollout, the single-step-prediction synthesis ruled out every cheap fix, and the closing result: the signal is real but does not survive training — and how everything is measured |
 
 ---
 
@@ -1171,7 +1171,52 @@ of a genuinely end-to-end-trained model, not input representation.
 
 ---
 
-## Slide 27 — How everything above is measured
+## Slide 27 — The closing result: the signal is real, and it does not survive training
+
+```
+  raw (e_t, e_next), no model at all
+        │
+        ▼  regress directly against real delta-Froude
+  concat(e_t,e_next): rho 0.35-0.45          delta (what the head uses): rho 0.02-0.22
+        │
+        ▼  rank every representation tried (table below)
+  BEST equation: z = ITM(e_t,e_next), rho 0.535 -- beats every hand-built feature
+        │
+        ▼  does this survive reconstruction → control? (z needs e_next; control only has proj(a))
+  proj(a)-z: rho 0.429 -- 80% retained, forward channel only 39%
+        │
+        ▼  train a head that reads z as PRIMARY signal (already built: F192, state_use_delta=false)
+  measure the actual action-lever on it, not just offline correlation
+        │
+        ▼  FAIL -- both z sources, below the 0.110 bar
+```
+
+| offline probe (no training) | median rho |
+|---|---|
+| delta -- what the state head is built on | 0.215 |
+| concat(e_t, e_next) | 0.405 |
+| **z = ITM(e_t, e_next) -- the winner** | **0.535** |
+| z = proj(action) -- control-relevant | 0.429 (80% of ITM-z) |
+
+| trained head, action-lever (bar: gap > 0.110) | gap | forward | lateral | yaw |
+|---|---|---|---|---|
+| z = ITM(e_t, e_next) | +0.045 — FAIL | 3% | 54% | 2% |
+| z = proj(action) | +0.099 — FAIL | 5% | 51% | 15% |
+
+(forward/lateral/yaw columns: % of held-out samples where the real action's prediction beats the
+mean action's — chance is 50%; forward and yaw sit far BELOW chance, not merely flat)
+
+**The wall is localised precisely, and it is none of the usual suspects.** Not the encoder — three
+independent probes found real, consistent signal at every stage. Not the equation — `z` is the
+empirically correct one, by a wide margin. Not the architecture — every combination of
+pooled/spatial × recurrent/non-recurrent was tried (Slide 26) and a head that reads `z` as primary
+already exists and was already retrained. **The finding: offline correlation in a frozen
+representation does not survive being trained end-to-end into a predictor.** A real, specific,
+well-evidenced negative — not a loose end.
+
+---
+
+## Slide 28 — How everything above is measured
 
 **Every number in this deck names the script that produced it**, and the entries in
 `doc/FINDINGS.md` carry the pre-registered criterion above the result.
@@ -1191,7 +1236,11 @@ of a genuinely end-to-end-trained model, not input representation.
 | Dreamer/PPO imagination-RL ladder, MC-check bar | `results/wm/closed_loop/rl_loop_isolation_test_v{2,3,4,5}*.npz`, `ppo_p0_isolation.npz`, `ppo_p0_gamma0.95.npz` |
 | gradient share into `z`, incl. `lambda_state` | `scripts/diagnostics/forward_model/loss_gradient_balance_state.py` |
 | ground-truth action→Froude signal (Test 1) | `scripts/diagnostics/objective_experiments/ground_truth_action_flatness.py` |
-| pooled/spatial x recurrent/non-recurrent kill-gates | `scripts/diagnostics/objective_experiments/sequence_context_killgate.py` |
+| pooled/spatial x recurrent/non-recurrent kill-gates | `scripts/diagnostics/objective_experiments/sequence_context_killgate.py`, `spatial_recurrent_killgate.py` |
+| raw embedding → real delta-Froude, no model | `scripts/diagnostics/objective_experiments/embedding_transition_ceiling.py` |
+| ranking every input representation by offline rho | `scripts/diagnostics/objective_experiments/embedding_representation_sweep.py` |
+| reconstruction-z vs control-z signal retention | `scripts/diagnostics/objective_experiments/proj_action_ceiling_check.py` |
+| z-as-primary head, action-lever on the real retrain | `scripts/diagnostics/objective_experiments/zonly_action_lever_check.py` |
 
 **Four guards run before results are read. Each was added after a specific failure.**
 
