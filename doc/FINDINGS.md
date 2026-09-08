@@ -15049,6 +15049,67 @@ Runs: `scripts/diagnostics/objective_experiments/isolated_z_head_probe.py` (delt
 `isolated_z_head_probe_bodytarget.py` (the real `L_body` target, the gate check). Code change:
 `wm/train.py`'s `forward_step` (stop-gradient on `L_body`, `L_state` retired).
 
+**Addendum, same day: a cheap proxy check, run before the 9-hour retrain, corrects the diagnosis
+-- `L_body`'s gradient was not purely competing with the readout for `z`, it was also doing real
+positive work.** The stop-gradient fix trains `z` under `L_recon`+`L_motion` ONLY going forward, an
+untested regime -- every passing isolated-head test so far probed a `z` from `teacher_state.pt`,
+trained WITH `L_body`'s gradient (`lambda_body=0.5`). Audited every checkpoint in `wm/runs/` for a
+`lambda_body=0` run on the current egocentric B1/hexapod data to answer this cheaply: none exists
+(`s2_fwd_hex8-b1_ctrl` has `lambda_body=0` but is allocentric, pre-dates the egocentric line of
+work entirely; every Stage-1 run has `sources: []`, no cross-embodiment Froude setup at all). Built
+a short (8-epoch, from-scratch) proxy instead: identical sources/recipe to the planned retrain,
+`lambda_body=0.0` (no body_head built, pure recon+motion), on BIAS-2.
+
+**Probed the proxy's `z = ITM(e_t,e_next)` the same way as every prior check**, all 3 physical
+channels (the proxy's own saved `body_stats` covered only channel 0 -- `--body_channels 0 1 2` was
+omitted from the launch command -- but `body_channels` never affected how `z` itself trains when
+`lambda_body=0`, so probed against raw, unstandardised `body_motion` instead; Spearman rho is
+invariant to that rescaling). Compared per-channel against `teacher_state.pt`'s WITH-`L_body`
+reference (the isolated-head runs above):
+
+| target | forward | lateral | yaw |
+|---|---|---|---|
+| delta-Froude, retention vs. WITH-`L_body` reference | **32%** (0.170/0.529) | 71% (0.424/0.598) | 49% (0.265/0.535) |
+| absolute `body_motion[t]`, retention vs. WITH-`L_body` reference | 71% (0.470/0.660) | 64% (0.480/0.755) | 73% (0.683/0.938) |
+
+**Every cell is non-zero -- recon+motion alone does develop real Froude signal in `z` -- but every
+cell is also weaker than the WITH-`L_body` reference (32-73% retention).** This means the earlier
+framing ("signal present-but-unread in joint-trained `z`, not moved away by `L_recon`") was
+correct as far as it went but incomplete: it is not simply that `L_body`'s gradient was one more
+competing voice contributing nothing positive. **`L_body`'s gradient does real, positive work
+shaping `z`'s Froude content on top of what `L_recon`/`L_motion` alone develop.** A full
+`z.detach()` is therefore a TRADEOFF -- it removes the competition this arc diagnosed, but it also
+removes that positive contribution -- not a clean, costless fix. Forward is the weakest channel by
+a wide margin (32% retention on the delta target), consistent with forward being this project's
+hardest channel throughout (F128's original compression, F187's magnitude-discrimination wall,
+`proj_action_ceiling_check.py`'s 39% forward retention). One caveat on the proxy itself: only
+6-8 epochs (`best.pt` saved at epoch 6) against the real retrain's 50, so this is a lower bound on
+what recon+motion-alone would develop with full training, not necessarily its ceiling.
+
+**Confirmed on a second seed, same recipe, before trusting the pattern.** A parallel 8-epoch
+proxy (`beh12_proxy_reconmotion_seed1`, `--seed 1`, otherwise identical) gave delta-Froude
+retention forward/lateral/yaw 49%/69%/47% and absolute retention 73%/61%/76% -- lateral and yaw
+match seed 0 within a few points on both targets, forward-on-delta is the most seed-sensitive cell
+(32% vs 49%) but never near zero in either run. **Not a fluke of one random init.**
+
+**Decision: proceed with the full-detach stop-gradient retrain anyway, with the per-channel
+outcome pre-registered before running, since even the weakest isolated-head condition measured
+this session (`proj(a)`+MSE, rho 0.405) still cleared the action-lever bar by 3.5-10x** -- a
+weaker-but-real `z` is very likely still sufficient, but this is now a stated expectation to
+verify, not an assumption.
+
+    all channels clear 0.110          -> full stop-gradient wins outright, done.
+    forward fails (the likely outcome, given 32% retention + the hardest channel),
+      lateral/yaw clear                -> full detach costs forward specifically; the proxy's own
+                                          result argues for a PARTIAL/scaled stop-gradient next
+                                          (let some fraction of L_body's gradient still shape z,
+                                          rather than a full zero) as the follow-up, not a
+                                          different fix category.
+    all channels fail                 -> deeper than this diagnosis; re-open.
+
+Runs: `scripts/diagnostics/objective_experiments/proxy_z_signal_check.py` (scratch, on-repo).
+Checkpoint: `wm/runs/beh12_proxy_reconmotion/best.pt` (BIAS-2, 8-epoch proxy, not the real fix).
+
 ---
 
 

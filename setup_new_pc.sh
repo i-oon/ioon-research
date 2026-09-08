@@ -106,15 +106,23 @@ fi
 
 log "Installing Python packages into .venv"
 .venv/bin/pip install --upgrade pip
-# The exact SIM_GUIDE.md list, plus mujoco (sim/collect/rollout_b1_mujoco.py) and matplotlib
-# (every figures/ script) -- both are actually imported by this repo but missing from the
-# guide's own install line. Reference versions known to work: torch 2.13.0+cu130,
-# transformers 5.13.1, scikit-learn 1.7.2, numpy 2.2.6, mujoco 3.9.0 -- unpinned here since a
-# pin from one machine's CUDA/driver combination is not guaranteed to resolve on another.
+# The exact SIM_GUIDE.md list, plus mujoco (sim/collect/rollout_b1_mujoco.py), matplotlib (every
+# figures/ script), and torchvision/pillow (transformers' AutoVideoProcessor, used by
+# scripts/vjepa2_encoder.py, imports these as optional backends and fails at load time without
+# them -- confirmed on BIAS-2 2026-09-08) -- all missing from the guide's own install line.
+# Reference versions known to work: torch 2.13.0+cu130, transformers 5.13.1, scikit-learn 1.7.2,
+# numpy 2.2.6, mujoco 3.9.0 -- unpinned here since a pin from one machine's CUDA/driver
+# combination is not guaranteed to resolve on another.
 .venv/bin/pip install \
-    torch transformers coppeliasim_zmqremoteapi_client pyzmq msgpack cbor2 \
+    torch torchvision transformers coppeliasim_zmqremoteapi_client pyzmq msgpack cbor2 \
     pandas numpy opencv-python-headless imageio imageio-ffmpeg scikit-learn umap-learn \
     tensorboard mujoco matplotlib
+# --system-site-packages means pip sees the OS's Pillow as "already satisfied" and skips it, but
+# that Pillow's compiled _imaging extension is built against the OS's own Python (e.g. 3.12 on
+# Ubuntu 24.04), not this venv's 3.10 (from deadsnakes) -- ABI mismatch, ImportError at use time.
+# --ignore-installed forces pip to install a venv-local build that actually matches. Confirmed on
+# BIAS-2 2026-09-08.
+.venv/bin/pip install --ignore-installed pillow
 
 log "Verifying torch / CUDA / transformers"
 .venv/bin/python3 -c "
