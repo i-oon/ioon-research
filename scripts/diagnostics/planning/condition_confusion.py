@@ -46,6 +46,51 @@ from wm.models.state_head import StateHead  # noqa: E402
 
 ALPHAS = (1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0, 1e3)
 
+# Must match scripts/diagnostics/objective_experiments/rssm_stage1_gate.py exactly.
+RSSM_H_DIM, RSSM_Z_DIM, RSSM_POOL_DIM, RSSM_ACTION_DIM, RSSM_BODY_DIM = 256, 32, 1408, 18, 3
+
+
+class _RSSM(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cell = torch.nn.GRUCell(RSSM_Z_DIM + RSSM_ACTION_DIM, RSSM_H_DIM)
+        self.post = torch.nn.Sequential(torch.nn.Linear(RSSM_H_DIM + RSSM_POOL_DIM, 256),
+                                        torch.nn.GELU(), torch.nn.Linear(256, 2 * RSSM_Z_DIM))
+        self.prior = torch.nn.Sequential(torch.nn.Linear(RSSM_H_DIM, 128), torch.nn.GELU(),
+                                         torch.nn.Linear(128, 2 * RSSM_Z_DIM))
+        self.froude = torch.nn.Sequential(torch.nn.Linear(RSSM_H_DIM + RSSM_Z_DIM, 128),
+                                          torch.nn.GELU(), torch.nn.Linear(128, RSSM_BODY_DIM))
+
+    def step_posterior(self, h, z_prev, a_prev, e_t):
+        h = self.cell(torch.cat([z_prev, a_prev], -1), h)
+        mu_q, _ = self.post(torch.cat([h, e_t], -1)).chunk(2, -1)
+        return h, mu_q   # mean, not sampled -- deterministic at eval time
+
+    def step_prior(self, h, z_prev, a_prev):
+        h = self.cell(torch.cat([z_prev, a_prev], -1), h)
+        mu_p, _ = self.prior(h).chunk(2, -1)
+        pred = self.froude(torch.cat([h, mu_p], -1))
+        return h, mu_p, pred
+
+
+# Must match scripts/diagnostics/objective_experiments/ftm_froude_stopgrad_probe.py exactly.
+FROUDE_POOL_DIM, FROUDE_HIDDEN = 1408, 128
+
+
+class _CleanFroudeHead(torch.nn.Module):
+    """Reads pool(FTM(e_t,z)) -- FTM's OWN predicted next-embedding -- with no delta, no z_proj,
+    trained isolated (stop-gradient) from FTM's own training. The untested cell: does the world
+    model's rollout, read directly in Froude space, rank candidates -- as opposed to `direct`
+    (no FTM at all) or `f179` (multi-step embedding rollout decoded via ITM)."""
+    def __init__(self, n_channels):
+        super().__init__()
+        self.net = torch.nn.Sequential(torch.nn.LayerNorm(FROUDE_POOL_DIM),
+                                       torch.nn.Linear(FROUDE_POOL_DIM, FROUDE_HIDDEN),
+                                       torch.nn.GELU(), torch.nn.Linear(FROUDE_HIDDEN, n_channels))
+
+    def forward(self, pooled_ftm_output):
+        return self.net(pooled_ftm_output)
+
 
 def family(cond):
     return "side" if cond.startswith("side") else cond.split("_")[0]
@@ -179,6 +224,13 @@ def main():
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--scene", default="medauroidea_c08f09t09.ttt")
     ap.add_argument("--ego_seed", type=int, default=0)
+    ap.add_argument("--rssm", default="", help="path to an rssm_stage1_gate.py checkpoint; "
+                    "adds an 'rssm' scorer that rolls the RSSM's PRIOR forward --horizon steps "
+                    "from a posterior built by teacher-forcing on real preceding frames 0..bt-1")
+    ap.add_argument("--ftm_froude", default="", help="path to an ftm_froude_stopgrad_probe.py "
+                    "checkpoint; adds an 'ftm_froude' scorer: FTM(e_t,z) -> pooled -> the clean, "
+                    "stop-gradient-trained Froude head (uses the z=proj head, the control-relevant "
+                    "one -- candidates only ever have an action, never a real next frame)")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -193,10 +245,35 @@ def main():
     # loop's own models and encoder claim their share
     torch.cuda.empty_cache()
 
+    rssm = rssm_mean_s = rssm_std_s = rssm_channels = None
+    if args.rssm:
+        rssm_ck = torch.load(os.path.join(ROOT, args.rssm), map_location=device, weights_only=False)
+        rssm = _RSSM().to(device).eval()
+        rssm.load_state_dict(rssm_ck["model"])
+        for p in rssm.parameters():
+            p.requires_grad_(False)
+        rssm_channels = rssm_ck["channels"]
+        rssm_mean_s, rssm_std_s = rssm_ck["mean_s"], rssm_ck["std_s"]
+        print(f"loaded rssm scorer from {args.rssm}")
+
+    froude_head = None
+    if args.ftm_froude:
+        fh_ck = torch.load(os.path.join(ROOT, args.ftm_froude), map_location=device, weights_only=False)
+        froude_head = _CleanFroudeHead(len(fh_ck["channels"])).to(device).eval()
+        froude_head.load_state_dict(fh_ck["heads"]["proj"])   # control-relevant: candidates only have an action
+        for p in froude_head.parameters():
+            p.requires_grad_(False)
+        print(f"loaded ftm_froude scorer from {args.ftm_froude}")
+
     names = tuple(s.split("=", 1)[0] for s in cfg.sources) or ("default",)
-    state_model = StateHead(cfg, len(channels), names,
-                            use_delta=getattr(cfg, "state_use_delta", True)).to(device).eval()
-    state_model.load_state_dict(ck["state"])
+    # `state` may be absent -- checkpoints trained after L_state's retirement (2026-09-08,
+    # stop-gradient fix on L_body) never build it. Skip that scorer rather than KeyError, so this
+    # same script/protocol still runs the comparable scorers (direct/ridge/f179) on those.
+    state_model = None
+    if "state" in ck:
+        state_model = StateHead(cfg, len(channels), names,
+                                use_delta=getattr(cfg, "state_use_delta", True)).to(device).eval()
+        state_model.load_state_dict(ck["state"])
 
     goal = body_goal(os.path.join(ROOT, args.goal_clip), "hexapod", channels)
     goal_std = (goal - mean_s) / std_s
@@ -212,6 +289,12 @@ def main():
     conds = sorted(cand)
     acts = {c: torch.tensor(np.asarray(load(cand[c], REGISTRY["hexapod"])["actions"]),
                             dtype=torch.float32) for c in conds}
+    # per-transition body_motion (NOT the whole-clip average) -- feeds the "oracle" scorer, which
+    # asks: even with the true achieved motion at this exact instant (no model, no prediction),
+    # does gait-phase noise alone cap ranking below 100% against the whole-clip-average ground
+    # truth? Same logic as F190's per-transition vs clip-averaged oracle finding (39% vs 83.8%).
+    bm_full = {c: np.asarray(load(cand[c], REGISTRY["hexapod"])["body_motion"])[:, channels]
+              for c in conds}
     true_motion = {c: body_goal(cand[c], "hexapod", channels) for c in conds}
     true_std = {c: (true_motion[c] - mean_s) / std_s for c in conds}
     true_dist = {c: float(np.linalg.norm(true_std[c] - goal_std)) for c in conds}
@@ -239,7 +322,8 @@ def main():
                                 cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), policy=policy,
                                 **dict(EGO_CAM, ego_seed=args.ego_seed))
 
-    scorers = ("f179", "direct", "ridge", "state")
+    scorers = ("f179", "direct", "ridge", "oracle") + (("state",) if state_model is not None else ()) \
+        + (("rssm",) if rssm is not None else ()) + (("ftm_froude",) if froude_head is not None else ())
     picks = {s: [] for s in scorers}
     true_ranks = {c: r for r, c in enumerate(sorted(conds, key=lambda c: true_dist[c]))}
 
@@ -257,7 +341,7 @@ def main():
             # right at the edge, ~200MB short). Chunking the batch dim doesn't change results --
             # itm/ftm/state_model have no cross-batch-element interaction -- only peak memory.
             CHUNK = 4
-            f179_parts, state_parts = [], []
+            f179_parts, state_parts, froude_parts = [], [], []
             for i in range(0, len(conds), CHUNK):
                 a_c, z_c = a[i:i + CHUNK], z[i:i + CHUNK]
                 n_c = a_c.shape[0]
@@ -265,16 +349,62 @@ def main():
                 for _ in range(args.horizon):
                     roll_c = ftm(roll_c, z_c)
                 f179_parts.append(md.body(None, itm(e_full.expand(n_c, -1, -1), roll_c)))
-                one_step_c = ftm(e_full.expand(n_c, -1, -1), z_c)
-                state_parts.append(state_model(one_step_c - e_full.expand(n_c, -1, -1), z_c,
-                                               "hexapod"))
+                if state_model is not None or froude_head is not None:
+                    one_step_c = ftm(e_full.expand(n_c, -1, -1), z_c)
+                    if state_model is not None:
+                        state_parts.append(state_model(one_step_c - e_full.expand(n_c, -1, -1), z_c,
+                                                       "hexapod"))
+                    if froude_head is not None:
+                        # THE UNTESTED CELL: FTM's own single-step predicted embedding, pooled,
+                        # read by the clean stop-gradient-trained Froude head -- no delta, no z_proj.
+                        froude_parts.append(froude_head(one_step_c.mean(1)))
             m_f179 = torch.cat(f179_parts, dim=0)
-            m_state = torch.cat(state_parts, dim=0)
             m_direct = md.body(None, z)
             m_ridge = score_ridge(fitted, e_full[0], z, device)
+            # ORACLE: no model at all -- each candidate's TRUE recorded body_motion at this exact
+            # branch timestep (standardised the same way), not the model's prediction. Tests
+            # whether gait-phase noise alone caps ranking below 100% at this test's resolution.
+            m_oracle_np = np.stack([(bm_full[c][min(int(bt), len(bm_full[c]) - 1)] - mean_s) / std_s
+                                    for c in conds])
+            m_oracle = torch.tensor(m_oracle_np, dtype=torch.float32, device=device)
+            scored = [("f179", m_f179), ("direct", m_direct), ("ridge", m_ridge),
+                     ("oracle", m_oracle)]
+            if state_model is not None:
+                scored.append(("state", torch.cat(state_parts, dim=0)))
 
-            for name, m in (("f179", m_f179), ("direct", m_direct),
-                           ("ridge", m_ridge), ("state", m_state)):
+            if rssm is not None:
+                # build h at the branch point by teacher-forcing the REAL posterior over frames
+                # 0..bt-1 with real actions 0..bt-1 (same per-step pairing convention training
+                # used), THEN roll the PRIOR forward --horizon steps per candidate action --
+                # exactly f179's rollout structure, using the RSSM's prior instead of the FTM.
+                prefix = encode_clip(encoder, np.asarray(frames[:int(bt)]), 2).float().to(device)
+                prefix_pooled = prefix.mean(1)                                   # [bt, 1408]
+                a_prefix = torch.as_tensor(seed[:int(bt)], dtype=torch.float32, device=device)
+                h = torch.zeros(1, RSSM_H_DIM, device=device)
+                z = torch.zeros(1, RSSM_Z_DIM, device=device)
+                for t in range(prefix_pooled.shape[0]):
+                    h, z = rssm.step_posterior(h, z, a_prefix[t:t + 1], prefix_pooled[t:t + 1])
+                r_mean_s = torch.tensor(rssm_mean_s, dtype=torch.float32, device=device)
+                r_std_s = torch.tensor(rssm_std_s, dtype=torch.float32, device=device)
+                rssm_preds = []
+                for c in conds:
+                    a_c = acts[c][min(int(bt), len(acts[c]) - 1):min(int(bt), len(acts[c]) - 1) + 1].to(device)
+                    hc, zc = h.clone(), z.clone()
+                    for _ in range(args.horizon):
+                        hc, zc, pred = rssm.step_prior(hc, zc, a_c)
+                    rssm_preds.append(pred[0])
+                m_rssm_raw = torch.stack(rssm_preds)               # standardised on RSSM's own stats
+                # rescore in the SAME standardised space condition_confusion.py uses (mean_s/std_s)
+                m_rssm = (m_rssm_raw * r_std_s + r_mean_s - torch.tensor(mean_s, dtype=torch.float32,
+                         device=device)) / torch.tensor(std_s, dtype=torch.float32, device=device)
+                scored.append(("rssm", m_rssm))
+
+            if froude_head is not None:
+                # already in the SAME standardised space as mean_s/std_s -- ftm_froude_stopgrad_probe.py
+                # used the identical checkpoint (teacher_stopgrad.pt)'s body_stats, no rescoring needed
+                scored.append(("ftm_froude", torch.cat(froude_parts, dim=0)))
+
+            for name, m in scored:
                 if m.dim() == 1:
                     m = m.unsqueeze(-1)
                 k = min(m.shape[-1], len(channels))

@@ -15110,6 +15110,261 @@ verify, not an assumption.
 Runs: `scripts/diagnostics/objective_experiments/proxy_z_signal_check.py` (scratch, on-repo).
 Checkpoint: `wm/runs/beh12_proxy_reconmotion/best.pt` (BIAS-2, 8-epoch proxy, not the real fix).
 
+**Addendum, next day: the resolving finding -- the full retrain, run on BIAS-2 with the
+pre-registered per-channel reading locked before results were seen, clears the action-lever by
+~9x. The first fix in this entire diagnostic arc that works.**
+
+**Read this arc as a diagnosis, not a string of failures.** F198's addenda ran to eight separate
+null results before this one -- loss reweighting, the Froude-forecasting-FTM premise, four
+architecture variants spanning pooled/spatial x recurrent/non-recurrent sequence context, and
+finally the reconstruction-vs-planning gate. None of those were wasted motion: each one ruled out
+a specific candidate cause (loss target, prediction target, the RSSM/sequence-context hypothesis,
+gradient share, the encoder itself), and it was that systematic elimination -- not a guess -- that
+localized the remaining candidate to joint-training gradient competition on `z`. The isolated-head
+test and the proxy check then confirmed that localization directly before any retrain was
+committed. **Systematic elimination -> localized cause -> a targeted fix that works** is the
+honest shape of this arc, not "eight things failed, then one didn't."
+
+**The mechanism, stated precisely -- corrected once already this arc and now finalized.** Not "the
+encoder lacks the signal" (three offline probes found it, strongly). Not "`L_body`'s gradient was
+purely competing with the readout, contributing nothing" (the proxy check showed it does real,
+positive work: recon+motion alone only develops 32-76% of a WITH-`L_body` `z`'s signal strength).
+The precise mechanism: **joint training left the signal in `z` unread by the trained readout, and
+protecting the readout from further competing for `z`'s shape (via stop-gradient) recovers it** --
+even starting from a `z` that stop-gradient itself makes somewhat weaker to develop than joint
+training would. The fix is a tradeoff that pays off, not a costless correction.
+
+**The result, per the pre-registered rule (`scripts/diagnostics/objective_experiments/stopgrad_action_lever_check.py`,
+`wm/runs/beh12_body_stopgrad/best.pt`, 50 epochs, `z.detach()` on `L_body`, `L_state` retired):**
+
+| | median cos |
+|---|---|
+| real z | 0.693 |
+| mean z | -0.315 (anti-correlated with truth, not merely uninformative) |
+| **gap** | **+1.008** (bar: 0.110) |
+
+| channel | sign-agreement gap (real - mean) |
+|---|---|
+| forward | +0.238 (52.1% vs 28.4%) |
+| lateral | +0.031 (81.5% vs 78.5%, weakest but still positive) |
+| yaw | +0.243 (77.3% vs 53.0%) |
+
+**This exceeds the proxy's own prediction, and that gap is part of the honesty of the finding, not
+a loose end.** The pre-registered fallback (forward specifically failing, since the proxy found it
+the weakest channel at 32-49% retention) did not occur -- all three channels clear, with forward
+outperforming lateral here. The proxy was explicitly a lower bound (8 epochs, not 50; recon+motion
+alone, never benefiting from whatever `L_recon`/`L_motion` converge to over a full run) --the full
+50-epoch joint retrain, even with `L_body`'s gradient cut, develops a stronger `z` than the
+short proxy predicted. Reported as a positive surprise relative to a stated prior, not silently
+absorbed.
+
+**What this does and does not close.** It closes the specific chain this session's arc pursued:
+raw-embedding signal exists -> best representation identified (`z`) -> reconstruction-to-control
+substitution survives -> the trained pipeline's failure to use it is a joint-training competition
+problem -> stop-gradient resolves it, measured on the actual metric this whole arc used
+(action-lever, not an offline proxy). **It does not yet show this converts to CONTROL.** F125-F136
+already established the general principle that a metric can look solved while not being what a
+controller needs (embedding-distance selection looked fine until the mismatch control showed it
+was reading the current frame, not the goal); the action-lever is a directional-sensitivity check,
+not a ranking or closed-loop test. The next real question, not yet run: does `beh12_body_stopgrad`
+improve `condition_confusion.py`-style ranking or closed-loop control where the delta-based
+`state_head` (F187: 28% exact accuracy) did not? That is flagged as the immediate next step, not
+folded into this result -- the action-lever win is real and stands on its own regardless of what
+that check finds.
+
+Runs: `scripts/diagnostics/objective_experiments/stopgrad_action_lever_check.py`. Checkpoint:
+`wm/runs/beh12_body_stopgrad/best.pt` (BIAS-2, 50 epochs). Code change (already logged above):
+`wm/train.py`'s `forward_step`, `z.detach()` on `L_body`, `L_state` retired.
+
+**Addendum, same day: the flagged next step, run immediately -- the lever cleared, ranking did
+not. The second pre-registered outcome, and a sharper reading than "the fix failed."**
+`condition_confusion.py` (F187's own protocol: 12 recorded hexapod conditions, 40 branch points,
+live CoppeliaSim rollout, held-out goal geometry) run against the assembled stop-gradient
+checkpoint (`wm/fit_projector` + `wm/assemble_teacher` first -- this checkpoint had no action
+projector yet, fitted fresh on the correct egocentric data since the script's own defaults point
+at allocentric directories; rollout-gap ratios 0.294 hexapod / 0.201 B1 against mean-z, a real fit,
+not a fallback). The script's `state` scorer was retired along with `L_state`; patched to skip it
+gracefully rather than crash, so the comparable scorers (`direct`, `ridge`, `f179`) still ran
+head-to-head against F187's own numbers for those same scorers:
+
+| scorer | new (stop-grad) accuracy | new mean true-rank | F187 (old, delta-head) accuracy | F187 mean true-rank |
+|---|---|---|---|---|
+| **direct** (`body_head(proj(a))`, no rollout) | **28%** | 3.25 | 20% | -- |
+| state (delta-head, retired, not runnable here) | -- | -- | **28%** | **2.33** |
+| ridge | 12% | 3.60 | 22% | -- |
+| f179 (rollout-based) | 18% | 4.12 | 2% | -- |
+
+**Exact accuracy ties the delta-head's 28%; the finer mean-true-rank metric says the delta-head was
+still better** (2.33 vs 3.25, lower is better) -- so by the stricter measure, ranking did not
+improve and may be marginally worse. `ridge` regressed (22%->12%); `f179` improved sharply
+(2%->18%) but still trails `direct`. **The ~9x action-lever win did not convert to a ranking win.**
+
+**This is not "stop-gradient doesn't help control," and reading it that way would waste the
+detail in the result.** `direct` is the SAME scorer type on both checkpoints (`body_head(proj(a))`,
+no rollout, no delta) -- comparing it to itself before and after the fix shows a real, substantial
+improvement (20% -> 28%, +8 points), exactly where the fix targeted `body_head`. What did not
+happen is SURPASSING the delta-head's 28%, and losing to it on rank quality. The fix lifted the
+z-readout scorers; it did not clear a bar nothing has cleared in this arc.
+
+**The deeper pattern, now confirmed a third time this session: readable is not the same bar as
+rankable.** GATE C's discrimination number did not predict ranking (F144-era). Reconstruction
+quality did not predict ranking (the whole F125-136 mismatch-control arc). Now: a 9x action-lever
+improvement -- direct evidence `z`'s signal is extractable -- does not predict a ranking
+improvement either. Three independent instances of the same shape is not noise; it is a structural
+property of this pipeline: **making a signal READABLE (the lever), making a scorer RANK candidates
+correctly (12-way selection), and making a policy CONTROL a body (closed loop) are three separate
+bars, and clearing one does not clear the next.**
+
+**The live hypothesis for why, not yet confirmed: the ranking test may be coarse-saturated.**
+`condition_confusion.py` asks a scorer to tell 12 recorded, PHYSICALLY DISTINCT conditions apart --
+a between-family, coarse task every decent scorer this project has measured already does
+reasonably (F136: 68-70% cross-embodiment on an analogous coarse task; here, every scorer clears
+double-digit accuracy against an implicit ~8% pooled chance rate). The stop-gradient fix's proven
+win (the action-lever) is a FINE, within-behaviour, real-vs-mean-ACTION sensitivity measurement --
+not a between-family discrimination. If 12-way condition ranking is already near whatever ceiling
+this specific one-shot, single-frame, noisy-branch-point setup allows (the same per-transition
+noise floor F190 measured directly: an oracle given the exact TRUE per-transition value classified
+only 39% on a 4-way task, far below its 83.8% clip-averaged ceiling), then NO scorer improvement --
+however real -- can move this test's number, because the test's own resolution can't reflect a
+fine-grained gain. **Not yet confirmed**: whether an oracle -- true instantaneous telemetry at the
+branch point, no model involved at all -- also caps out near 28% on this exact 40-point, 12-way
+setup. That is the next check, before concluding the fix's ranking parity is a real ceiling on the
+fix rather than a ceiling on the test.
+
+Runs: `scripts/diagnostics/planning/condition_confusion.py` (patched to skip the retired `state`
+scorer when absent from a checkpoint), `wm/fit_projector.py`, `wm/assemble_teacher.py`. Checkpoint:
+`wm/runs/beh12_body_stopgrad/teacher_stopgrad.pt` (assembled: `best.pt` + freshly fitted
+`projector_stopgrad.pt`, both from the stop-gradient retrain).
+
+**Addendum, same day: the oracle check, run immediately rather than left as a hypothesis --
+confirms coarse-saturation on ONE metric, refutes it on the other, and relocates the real
+question.** `condition_confusion.py` patched to add a true physical oracle: for each candidate at
+each branch point, its OWN clip's recorded `body_motion` at that EXACT timestep (not the
+whole-clip average `true_best` uses, and no model, no prediction) -- the same per-transition-vs-
+clip-average logic F190 already established (39% vs 83.8% on a different 4-way task). Same 40
+branch points, same live rollout, added as a fifth scorer alongside f179/direct/ridge:
+
+| scorer | accuracy | mean true-rank (0=best of 12) |
+|---|---|---|
+| f179 (rollout) | 18% | 4.80 |
+| **direct (new, stop-gradient)** | **28%** | 3.25 |
+| ridge | 12% | 4.03 |
+| **oracle (true instantaneous telemetry, no model)** | **20%** | **2.15** |
+| state (old, retired, F187) | 28% | 2.33 |
+
+**Exact accuracy is saturated, not the metric's fault of any scorer.** The oracle -- perfect,
+model-free knowledge of the exact instant -- gets only 20%, BELOW `direct`'s 28%. Per-transition
+gait-phase noise alone caps exact-match this low; `direct` is already at or above what perfect raw
+information gives on this specific metric. **The coarse-saturation hypothesis is confirmed for
+exact accuracy, and it is not why the fix looks flat** -- 28% was never a ceiling problem for this
+metric to begin with.
+
+**Mean-rank is the metric with real headroom, and it is where the new fix actually falls short.**
+The oracle's rank quality (2.15) is clearly the best of any scorer; when it misses, it misses by
+little. `direct` (3.25) is worse-ranked than BOTH the oracle (2.15) AND the retired delta-head
+(2.33) -- a real regression on the one axis that isn't already saturated. **The honest target is
+not "beat 28%" (already near ceiling) -- it is closing 3.25 toward 2.15, specifically recovering
+the FINE within-family rank quality the delta-head had and the new fix lost.**
+
+**The confusion pattern names the mechanism precisely, and it is the coarse/fine theme again.**
+The oracle's mistakes are mostly CROSS-family (23/32, speed confused for turn) -- raw single-frame
+noise genuinely blurs categories, the expected signature of pure noise. `direct`'s mistakes are
+almost entirely WITHIN-family (24/29, same-speed-family confusions only) -- a far more sensible
+error pattern than noise alone predicts, meaning the model IS discriminating families correctly.
+**`direct` nails the coarse (family) discrimination and misses the fine (within-family) rank** --
+exactly the same coarse-works/fine-doesn't split this project has measured since F128/F136/F187,
+now showing up in the stop-gradient fix's own error structure.
+
+Runs: `scripts/diagnostics/planning/condition_confusion.py` (oracle scorer added: per-transition
+`body_motion` lookup from each candidate's own already-loaded clip, no new simulator telemetry
+needed). Same checkpoint and protocol as the addendum above.
+
+**Addendum, same day: does rollout close the mean-rank gap at any horizon? No -- f179 never
+approaches `direct`, the retired delta-head, or the oracle, at any k tested.** `f179` is the one
+scorer that DOES roll the FTM forward (`itm(e_full, roll_k_steps)` -> `md.body`); if the mean-rank
+gap (`direct` 3.25, needing to close toward oracle 2.15) were a single-step-vs-multi-step problem,
+some horizon should show `f179` closing it. Swept k in {1, 2, 3, 5, 10}, same 40 branch points,
+same checkpoint (`direct`/`oracle` are horizon-independent by construction and reproduced exactly
+byte-for-byte across all five runs, confirming the sweep is apples-to-apples):
+
+| horizon (k) | f179 mean-rank |
+|---|---|
+| 1 | 5.20 |
+| 2 | 4.38 |
+| 3 | 4.47 |
+| 5 | 4.40 |
+| 10 | 4.65 |
+
+**No horizon comes close.** Best case (k=2, 4.38) is still a full point worse than `direct`'s 3.25
+(no rollout at all), and there is no monotonic trend toward the oracle's 2.15 as horizon shortens
+-- k=1 is the WORST (5.20), not the best, ruling out "single-step is simply too coarse, longer
+context would fix it" as cleanly as "longer rollout compounds error" is ruled out by k=1's own
+failure. **This converges with F135/F136 from a different angle and a different checkpoint**:
+those found rolling the FTM into a selection score makes ranking WORSE than skipping the rollout
+entirely (mode C < mode D, 33-44% vs 68-70% on the 3-channel B1 test); this shows the same
+qualitative result on mean-rank, on the hexapod, on the NEW stop-gradient checkpoint's `z`, across
+every horizon from 1 to 10. **The rollout mechanism itself, not its length, is the problem** --
+not a horizon-tuning question, and not worth another sweep at more horizons.
+
+Runs: `scripts/diagnostics/planning/condition_confusion.py --horizon {1,2,3,5,10}`, same
+checkpoint and protocol as the two addenda above.
+
+**Addendum, same day: the field-standard architecture, tested properly and cheaply -- a real
+posterior/prior + KL latent (DreamerV3/RSSM's own core mechanism, absent from R0 and the ConvGRU,
+both purely deterministic recurrence) still fails ranking, and fails it worse than everything
+tried so far.** Literature citation checked and correct: DayDreamer, DreamTIP, DreamMimic,
+NE-Dreamer all roll out in a compact stochastic recurrent latent with prior/posterior + KL, not a
+stateless single-step predictor in a frozen 1408-D embedding -- a real, previously-untested
+ingredient in this arc. Built the minimal real version: `h_t=GRUCell(h_{t-1},z_{t-1},a_{t-1})`,
+posterior `q(z_t|h_t,e_t)`, prior `p(zhat_t|h_t)`, KL(posterior||prior), Froude head from
+`(h_t,z_t)` -- deliberately one axis at a time (pooled input, no embedding reconstruction, same as
+every other kill-gate's discipline in this arc), hexapod only, matching the embodiment
+`condition_confusion.py`'s ranking test evaluates.
+
+**First attempt: posterior collapse, caught by the sanity check before any verdict.** No KL
+warmup -> KL fell to ~0.003-0.015 by iteration 200-1200 (posterior matching the prior, ignoring
+the real frame almost entirely) -> held-out Froude MSE ratio **1.120**, worse than predicting the
+mean. Same discipline as every prior sanity failure this arc: not trusted, fixed before reading
+anything downstream. Added a standard linear KL warmup (0 -> full weight over 500 iterations),
+extended to 3000 iterations: KL stayed healthy throughout (0.09-0.28, no collapse), held-out
+sanity ratio **0.900** -- a real, modestly-fit model, cleared to test.
+
+**Integrated as a fifth scorer in `condition_confusion.py`** (`rssm`: teacher-force the posterior
+over real frames 0..bt-1 to build `h` at the branch point, then roll the PRIOR forward `--horizon`
+steps per candidate action -- the same rollout structure `f179` uses, with the RSSM's prior
+substituted for the FTM). Same 40 branch points, same checkpoint, same protocol as every addendum
+above:
+
+| scorer | accuracy | mean true-rank |
+|---|---|---|
+| direct | 28% | 3.25 |
+| oracle | 20% | **2.15** |
+| f179 (FTM rollout) | 18% | 4.33 |
+| ridge | 2% | 4.67 |
+| **rssm (posterior/prior/KL)** | **10%** | **5.95** |
+
+**Fails the pre-registered gate decisively -- not merely below bar, but the worst scorer measured
+in this entire arc.** Worse than `f179`'s FTM rollout, worse than `ridge`, both already-established
+nulls. Its mistakes are also the least direction-sensible: mean cosine(picked, true-best) on
+errors is 0.213, below even `f179`'s 0.468 -- the RSSM's wrong picks are closer to random than
+`direct`'s within-family confusions (24/29) or even the oracle's cross-family noise pattern (9/32).
+
+**This is the third architecturally distinct rollout mechanism to fail at improving ranking**:
+the original stateless FTM (F135/F136: rolling it into a score makes ranking WORSE than skipping
+it), the deterministic ConvGRU (spatial + recurrent, still failed its own kill-gate), and now a
+real stochastic posterior/prior/KL latent -- the literature's own standard mechanism for exactly
+this failure mode, tested properly rather than assumed, and it performs the worst of all five
+scorers including two that were already known nulls. Not evidence the field-standard architecture
+is wrong in general -- this is one seed, one short training run, one embodiment, pooled (not
+spatial) input, no embedding reconstruction term -- but no version of "add more architecture" to
+the rollout mechanism has yet helped this pipeline's ranking task, and the overnight 4-GPU
+full-RSSM commitment this result was gating is not justified by this evidence. Recommendation:
+do not launch it on this basis.
+
+Runs: `scripts/diagnostics/objective_experiments/rssm_stage1_gate.py`,
+`scripts/diagnostics/planning/condition_confusion.py --rssm wm/runs/rssm_stage1_gate.pt`.
+Checkpoint: `wm/runs/rssm_stage1_gate.pt` (hexapod, 3000 iterations, one GPU).
+
 ---
 
 

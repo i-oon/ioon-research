@@ -1171,48 +1171,47 @@ of a genuinely end-to-end-trained model, not input representation.
 
 ---
 
-## Slide 27 — The closing result: the signal is real, and it does not survive training
+## Slide 27 — The resolving result: elimination localises the cause; stop-gradient clears the lever ~9×
 
 ```
-  raw (e_t, e_next), no model at all
+  eliminated, each ruling out one cause (Slides 24-26 + offline probes):
+    loss target · gradient share · sequence-context architecture (4 variants) · the encoder itself
         │
-        ▼  regress directly against real delta-Froude
-  concat(e_t,e_next): rho 0.35-0.45          delta (what the head uses): rho 0.02-0.22
+        ▼  what's left: the trained z-only head STILL fails the lever (+0.045 / +0.099)
+             even though z demonstrably HAS the signal (offline rho 0.535, survives to proj(a))
         │
-        ▼  rank every representation tried (table below)
-  BEST equation: z = ITM(e_t,e_next), rho 0.535 -- beats every hand-built feature
+        ▼  isolate: freeze z, train a clean head on Froude ALONE (no competing L_recon/L_motion)
+  PASSES -- matches/exceeds offline rho          → cause localised: joint-training competition for z
         │
-        ▼  does this survive reconstruction → control? (z needs e_next; control only has proj(a))
-  proj(a)-z: rho 0.429 -- 80% retained, forward channel only 39%
-        │
-        ▼  train a head that reads z as PRIMARY signal (already built: F192, state_use_delta=false)
-  measure the actual action-lever on it, not just offline correlation
-        │
-        ▼  FAIL -- both z sources, below the 0.110 bar
+        ▼  fix: z.detach() before L_body (L_state retired, redundant+worse)
+             real 50-epoch retrain, BIAS-2, per-channel reading pre-registered before running
+  PASS -- gap +1.008, ~9x the 0.110 bar
 ```
 
-| offline probe (no training) | median rho |
+| action-lever, real retrain (`beh12_body_stopgrad`) | value |
 |---|---|
-| delta -- what the state head is built on | 0.215 |
-| concat(e_t, e_next) | 0.405 |
-| **z = ITM(e_t, e_next) -- the winner** | **0.535** |
-| z = proj(action) -- control-relevant | 0.429 (80% of ITM-z) |
+| real z, median cos | 0.693 |
+| mean z, median cos | -0.315 (anti-correlated, not just flat) |
+| **gap (bar: 0.110)** | **+1.008** |
 
-| trained head, action-lever (bar: gap > 0.110) | gap | forward | lateral | yaw |
-|---|---|---|---|---|
-| z = ITM(e_t, e_next) | +0.045 — FAIL | 3% | 54% | 2% |
-| z = proj(action) | +0.099 — FAIL | 5% | 51% | 15% |
+| channel | sign-agreement gap (real − mean) |
+|---|---|
+| forward | +0.238 |
+| lateral | +0.031 (weakest, still positive) |
+| yaw | +0.243 |
 
-(forward/lateral/yaw columns: % of held-out samples where the real action's prediction beats the
-mean action's — chance is 50%; forward and yaw sit far BELOW chance, not merely flat)
+**Eight nulls were the diagnosis, not the failure.** Each one eliminated a specific cause; that
+elimination is what localised the real one to joint-training gradient competition, not a guess.
+**The mechanism, stated precisely**: not "`L_body`'s gradient was pure competition" — a cheap
+proxy check showed it does real positive work too (recon+motion alone only develops 32-76% of a
+jointly-shaped `z`'s signal). The fix is a tradeoff (cut that positive contribution to remove the
+competition) and it still wins by a wide margin, exceeding even the proxy's own prediction.
 
-**The wall is localised precisely, and it is none of the usual suspects.** Not the encoder — three
-independent probes found real, consistent signal at every stage. Not the equation — `z` is the
-empirically correct one, by a wide margin. Not the architecture — every combination of
-pooled/spatial × recurrent/non-recurrent was tried (Slide 26) and a head that reads `z` as primary
-already exists and was already retrained. **The finding: offline correlation in a frozen
-representation does not survive being trained end-to-end into a predictor.** A real, specific,
-well-evidenced negative — not a loose end.
+**What this does not yet show: that it improves control.** The lever measures directional
+sensitivity, not ranking or closed-loop behaviour — this project has already been burned by that
+gap once (F125-F136). Next, unstarted: does this checkpoint beat the old delta-based `state_head`
+(F187: 28% exact accuracy) on `condition_confusion.py`-style ranking or closed loop? The lever win
+is real regardless of that answer — it just isn't the whole answer yet.
 
 ---
 
@@ -1237,6 +1236,9 @@ well-evidenced negative — not a loose end.
 | gradient share into `z`, incl. `lambda_state` | `scripts/diagnostics/forward_model/loss_gradient_balance_state.py` |
 | ground-truth action→Froude signal (Test 1) | `scripts/diagnostics/objective_experiments/ground_truth_action_flatness.py` |
 | pooled/spatial x recurrent/non-recurrent kill-gates | `scripts/diagnostics/objective_experiments/sequence_context_killgate.py`, `spatial_recurrent_killgate.py` |
+| isolated frozen-z head, MSE vs cosine loss | `scripts/diagnostics/objective_experiments/isolated_z_head_probe.py`, `isolated_z_head_probe_bodytarget.py` |
+| does z trained without L_body gradient still develop the signal | `scripts/diagnostics/objective_experiments/proxy_z_signal_check.py` |
+| the real stop-gradient retrain's action-lever, per channel | `scripts/diagnostics/objective_experiments/stopgrad_action_lever_check.py` |
 | raw embedding → real delta-Froude, no model | `scripts/diagnostics/objective_experiments/embedding_transition_ceiling.py` |
 | ranking every input representation by offline rho | `scripts/diagnostics/objective_experiments/embedding_representation_sweep.py` |
 | reconstruction-z vs control-z signal retention | `scripts/diagnostics/objective_experiments/proj_action_ceiling_check.py` |

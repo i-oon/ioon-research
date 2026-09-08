@@ -105,6 +105,37 @@ def _b1(data):
     }
 
 
+def _gecko(data):
+    """16 active leg joints (sim/scene/build_gecko_scene.py's LEG_ORDER x joint1..4), /geckobotiv
+    -- the real dynamic torso, not the decorative /body_part_1..4 siblings the camera happens to
+    be mounted on (confirmed kinematically rigid to /geckobotiv, moves identically to 5 decimal
+    places over a settling check) -- as the position/orientation source.
+
+    **No data collector writes this yet** (`sim/collect/collect_gecko_cpg.py` is interactive-only,
+    docstring says so explicitly) -- this function defines the CONTRACT a future collector must
+    satisfy (`base_pos`, `base_quat`, `action`, `frames`, matching B1's own field names), not a
+    tested reader. `forward_axis`/`heading`'s gecko branch is verified (dot=+0.998 against real
+    measured travel, `gecko_quat_check.py`); this function's field-shape assumptions are not yet
+    exercised against a real recorded clip.
+    """
+    dt = _dt_of(data, GECKO_DT)
+    position = data["base_pos"].astype(np.float64)
+    motion = np.concatenate(
+        [body_velocity(position, data["base_quat"], dt, "gecko"),
+         yaw_rate(data["base_quat"], dt, "gecko", float(np.median(position[:, 2])))], axis=1)
+    n = len(position)
+    contact = ((data["foot_contact"].astype(np.float32) > 0.5).astype(np.int64)
+              if "foot_contact" in data.files else np.zeros((n, 4), dtype=np.int64))
+    return {
+        "frames": data["frames"],
+        "actions": data["action"].astype(np.float32),
+        "contact": contact,
+        "body_motion": motion,
+        "group": int(data["expert_episode"]) if "expert_episode" in data.files else 0,
+        "body": "gecko",
+    }
+
+
 @dataclass(frozen=True)
 class Embodiment:
     name: str
@@ -124,6 +155,7 @@ class Embodiment:
 # constant that has to change when the data changes is a constant in the wrong place.
 HEXAPOD_DT = 0.05
 B1_DT = 0.02
+GECKO_DT = 0.02   # sim/scene/build_gecko_scene.py retuned the shipped 0.1625s timestep to match B1
 
 # **The yaw target is scaled by body height, and that is a choice made against an argument, not by
 # default.** Physically the moment arm of a turn is where the feet meet the ground, not the hip
@@ -162,6 +194,13 @@ def forward_axis(quat, embodiment):
     if embodiment == "hexapod":
         x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = -2 * (x * z + w * y), -2 * (y * z - w * x)
+    elif embodiment == "gecko":
+        # CoppeliaSim's own quaternion order, (x,y,z,w) -- confirmed, not assumed: /geckobotiv's
+        # raw +local_x axis, run through this formula, reads dot=+0.998 against real measured
+        # travel direction over a 6s duty-cycle-CPG rollout (0.14m net displacement). No sign
+        # correction needed, unlike the hexapod's aft-pointing axis.
+        x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
     else:
         w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
@@ -206,6 +245,11 @@ def heading(quat, embodiment):
     if embodiment == "hexapod":
         x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 2 * (x * z + w * y), 2 * (y * z - w * x)
+    elif embodiment == "gecko":
+        # same CoppeliaSim (x,y,z,w) order as forward_axis's gecko branch -- sign/axis choice
+        # only has to be internally consistent here (yaw_rate differences it away), verified there
+        x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
+        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
     else:
         w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
@@ -231,8 +275,9 @@ def yaw_rate(quat, dt, embodiment, height):
 
 HEXAPOD = Embodiment("hexapod", 18, 6, _hexapod)
 B1 = Embodiment("b1", 12, 4, _b1)
+GECKO = Embodiment("gecko", 16, 4, _gecko)
 
-REGISTRY = {e.name: e for e in (HEXAPOD, B1)}
+REGISTRY = {e.name: e for e in (HEXAPOD, B1, GECKO)}
 
 
 def load(path, embodiment):

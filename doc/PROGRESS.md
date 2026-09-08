@@ -2694,3 +2694,48 @@ projector.pt กับ projector_c08f09t09  ฟิตบนคลิปที่
 **สิ่งที่เหลืออยู่คือ pretrain กับข้อมูล** — `best.pt`, `last.pt`, `epoch*`, `config.yaml`, `summary`
 และชุดข้อมูลสามชุดที่ตรงกันแล้ว ทุกอย่างอื่นต้องสร้างใหม่จากศูนย์ ซึ่งเป็นสิ่งที่ตั้งใจ
 
+---
+
+## 27. Gecko: จาก scene ที่เพิ่งได้มาไปเป็น scene ที่สร้างเองและมีคลิปเดินตัวแรก (2026-09-06 ถึง 08)
+
+**06/09** ได้ scene สองไฟล์มา (`RL_slalom_sim2real_gamma_cfoot.ttt`, `..._cover.ttt`) ยังไม่ commit
+ไม่ถูกอ้างในเอกสารไหน และยังไม่ตัดสินใจว่าจะใช้จริง — บันทึกไว้แค่เป็นตัวเลือกสำหรับพิสูจน์ pair-
+independence (แมลง+B1 ไม่ใช่ scope แค่คู่นั้น ดู [[benchmark-not-pair-specific]]) ถ้าต้องโชว์ด้วยหุ่นตัวที่สาม
+
+**08/09** ขยับจริง — `sim/scene/build_gecko_scene.py` สร้าง `sim/env/gecko_legs.ttt` เอง (ไม่ใช้
+scene ที่ได้มา) และมี `sim/collect/collect_gecko_cpg.py` เก็บข้อมูลด้วย CPG แล้วก็มีคลิปเดินตัวแรก
+`sim/env/gecko_walk_allocentric.mp4` ทั้งสี่ไฟล์นี้ยัง untracked ทั้งหมด ยังไม่ได้ดูวิดีโอ ยังไม่รู้ว่า
+เดินได้จริงไหม และ scene เก่าไฟล์หนึ่ง (`RL_slalom_sim2real_gamma_cfoot.ttt`, ที่ commit ไปแล้วใน
+5003706) ถูกลบออกจาก working tree แบบไม่ได้ stage — ยังไม่ทราบเหตุผล
+
+**09/09** ต่อจาก reconnaissance ของอีก session หนึ่ง — ทำให้ gecko ใช้งานได้จริงสำหรับ claim (3),
+ไม่ใช่แค่ตัวเลือกสำรวจแล้ว:
+
+- **กล้อง egocentric สร้างเสร็จ** — ของเดิมมีแค่ allocentric (`add_camera()` ในสคริปต์เขียนไว้แล้วแต่
+  ยังไม่เคยรันจริงกับ scene ที่ save ไว้). รัน `build_gecko_scene.py` ใหม่ ได้ `/vjepa_cam` (256x256)
+  เพิ่มมาแล้ว ตรวจสอบว่า `/body_part_1` (จุดติดกล้อง) เคลื่อนที่ตรงกับ `/geckobotiv` (ตัวจริงที่ dynamic)
+  ทุกทศนิยมที่ 5 — กล้องจะไม่ค้าง/นิ่งตอนหุ่นเดินจริง
+- **ต่อ Froude/embodiment เข้า `wm/data/embodiment.py`** — เพิ่ม `GECKO_DT`, `_gecko()`, entry ใน
+  `REGISTRY`, และ branch ใหม่ใน `forward_axis()`/`heading()` **วัดจริง ไม่เดา** (ตามวินัยเดิมที่เคย
+  เจ็บมาแล้วกับ F71/F117): ขับ CPG จริง บันทึก quaternion จริง เทียบทิศทางที่วัดได้จริง — ได้ว่า
+  `/geckobotiv` ใช้ CoppeliaSim convention (x,y,z,w) และแกน **+local_x ตรงกับทิศเดินจริง (dot=+0.998)
+  ไม่ต้องกลับเครื่องหมายเลย** (ต่างจาก hexapod ที่ต้องกลับ)
+- **เขียนสคริปต์บันทึกข้อมูลจริง** — `sim/collect/collect_gecko_dataset.py` (ของเดิม
+  `collect_gecko_cpg.py` ขับ interactive อย่างเดียว ไม่ save อะไรเลย ตามที่ docstring บอกตรงๆ).
+  ทดสอบ end-to-end แล้ว: ขับ CPG จริง → บันทึก npz → โหลดผ่าน `wm.data.embodiment.load()` จริง →
+  ได้ `body_motion` รูปร่างถูกต้อง ไม่ degenerate → ดูภาพจากกล้องจริง (frame 33) เห็นพื้น/ผนังชัดเจน
+  ไม่ใช่ภาพเสีย ไม่นิ่ง (frame-to-frame diff เฉลี่ย 6.45)
+- **ตอบคำถามสำคัญ: CPG ของ gecko เป็น "debug bug ทั่วไป" หรือ "tune เฉพาะตัว"?** ทดสอบตรงๆ แทนการเถียง
+  ด้วยเหตุผล: `LIFT_SIGN` คำนวณจากตำแหน่งข้อต่อจริงตอนรัน (ไม่มีเลขเฉพาะ gecko ฝังไว้เลย) — เป็น
+  generic rule แท้ๆ. `SWING_SIGN` เป็นค่าคงที่ต่อขา แต่ได้มาจากการ "วัดการเคลื่อนที่จริงแล้วเช็ค" แบบ
+  เดียวกับที่ทุกตัวในโปรเจกต์นี้ต้องทำ (เหมือน `forward_axis`) — ไม่ใช่การจูนท่าเดินให้สวย. ส่วน `DUTY`
+  cycle (fast-swing/slow-stance) ทดสอบแล้วว่า **ไม่จำเป็นต่อความมั่นคง** — ลอง `duty=0.999` (sinusoid
+  ล้วนๆ ไม่มี stance phase เลย) หุ่นยังยืนได้เท่าเดิม (`min_z=0.0512` เท่ากันทั้งคู่) แค่เดินได้ระยะสั้น
+  กว่า (`x=-0.033` เทียบ `-0.095`) ไม่ใช่ล้ม. สรุป: **เป็นกรณี "debug" ไม่ใช่ "tune"** — claim ที่ว่า
+  "ไม่มี prior ความรู้เกี่ยวกับหุ่นตัวใหม่" ยังยืนได้
+
+**สถานะ:** gecko พร้อมใช้งานจริงแล้วสำหรับ claim (3) — scene, กล้องทั้งสองแบบ, CPG (debug แล้ว ไม่ใช่
+tune), Froude wiring, สคริปต์บันทึกข้อมูล ครบและ verify แล้วทุกจุด. ที่ยังไม่ได้ทำ: เก็บ babble จริง
+ตามสเกล (script รองรับ `--mode babble` แล้วแต่ยังไม่ได้ sweep noise/bias จริง), และขั้น fit-mapping +
+transfer test (ข้อ 3-5 ของ scope) ยังไม่เริ่ม
+

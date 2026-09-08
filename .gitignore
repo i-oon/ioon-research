@@ -34,3 +34,4 @@ data/_archive/
 results/dataset/**/emb.npz
 Egocentric_VSM/
 Demo-JEPA/
+Slalom-structure/
