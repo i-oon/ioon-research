@@ -15367,6 +15367,90 @@ Checkpoint: `wm/runs/rssm_stage1_gate.pt` (hexapod, 3000 iterations, one GPU).
 
 ---
 
+### F199. Babble-grounding a genuinely unseen body (gecko): zero-shot transfer fails, and the diagnosis motivates fine-tuning rather than closing the claim
+
+**The pipeline reframed this session.** The controller (direct-Froude selection) was settled at
+F136/F135 and is not being re-optimised further. The actual untested, load-bearing claim is
+upstream of it: can a body **absent from world-model pretrain** be grounded into the shared Froude
+coordinate using only motor babble, well enough for a transferred goal to predict its real motion?
+Gecko (16-D action, never in any pretrain source) is the test body, grounded only via a
+generic, undebugged-for-morphology CPG (F199's own prerequisite check: gecko's CPG fixes are
+"debugged," not "tuned" -- see `doc/PROGRESS.md`'s 2026-09-09 gecko entry).
+
+**Infrastructure built and verified before any transfer number was read**, each gated on its own
+sanity check per this session's discipline: egocentric camera added to the gecko scene and
+confirmed present after reload; `wm/data/embodiment.py`'s gecko Froude wiring verified against
+live telemetry with the empirically-measured (not assumed) quaternion convention; 36 real babble
+clips collected (`data/gecko/babble/`, differential-drive `turn_bias` added after a first pass
+with symmetric bias alone showed near-zero lateral/yaw variety) and confirmed to carry real
+3-channel Froude coverage through the actual pipeline (forward std 0.0094, lateral std 0.0099, yaw
+std 0.371, `wm/fit_gecko_projector.py`'s held-out check).
+
+**Fit (the babble-grounding step itself): passes.** Extended `beh12_body_stopgrad`'s existing
+hexapod+B1 `ActionProjector` (`wm/runs/beh12_body_stopgrad/projector_stopgrad.pt`) with a new
+"gecko" entry -- architecturally a separate `nn.ModuleDict` stack, zero shared trunk, so hexapod/B1
+weights are provably untouched (only `nets.gecko`/`mean_gecko`/`std_gecko` were missing before
+load, confirmed by asserting on `load_state_dict`'s `missing_keys`). Fit only that entry on the 36
+babble clips, held out by clip (455/2340 transitions):
+
+| | z MSE | vs mean-z | rollout gap | vs mean-z |
+|---|---|---|---|---|
+| gecko | 2.1693 | 0.188 | **0.0678** | **0.252** |
+
+Both ratios well below 1.0 -- real signal, on a body with zero pretrain exposure. Saved to
+`wm/runs/beh12_body_stopgrad/projector_stopgrad_gecko.pt`.
+
+**Transfer (does the goal-direction signal survive to real Froude on gecko): fails, zero-shot.**
+Rather than build a candidate library gecko has no analogue for (hexapod/B1's transfer tests use
+their 12 named `beh12` behaviours; gecko's babble is a continuous CPG-parameter sweep, not a
+discrete repertoire), the test used directly reads the claim: take the EXISTING, already-validated
+`CleanFroudeHead` from F197-era work (`wm/runs/ftm_froude_stopgrad_head_hexapod.pt`, trained once on
+hexapod, reading `pool(FTM(e_t,z).detach())`, predicting `body_motion[t+1]`) and apply it **zero-shot,
+frozen, no retraining** to held-out transitions of three bodies (`scripts/diagnostics/objective_experiments/gecko_froude_transfer.py`):
+
+| body | z source | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|---|
+| hexapod (head trained here) | proj | 0.600 | 0.395 | 0.454 | 0.454 |
+| B1 (zero-shot head, WM saw B1 in pretrain) | proj | 0.181 | 0.427 | **0.628** | 0.427 |
+| **gecko (zero-shot head, absent from pretrain)** | proj | 0.113 | **-0.331** | 0.151 | **0.113** |
+| gecko, ground-truth z (no babble-fit involved) | itm | 0.189 | -0.030 | 0.184 | 0.184 |
+
+Hexapod's row reproduces the head's own originally-reported numbers exactly, confirming the
+methodology. The three-body ladder (not a two-point comparison) is what makes the diagnosis
+readable: B1 isolates the cost of a zero-shot head alone (real, but forward and median rho stay
+positive, lateral/yaw hold up). **Gecko drops further than B1 on every channel and goes negative
+on lateral** -- worse than a zero-shot cost, a genuine failure to transfer.
+
+**The diagnostic that matters: even ground-truth `z` (the `itm` row, no projector/babble-fit
+involved at all) is equally weak on gecko (median 0.184 vs the proj row's 0.113).** This rules out
+"the babble fit is the weak link" as the explanation -- a perfect latent doesn't fix it either. The
+failure sits upstream, in the frozen world model's (ITM/FTM/head) own domain shift to a body and
+visual setting neither ever trained on.
+
+**This result is being logged as motivation, not as the thesis negative it looks like at first
+read.** The actual claim under test was never "grounds zero-shot" -- it is "grounds when the world
+model is fine-tuned on the new body's own babble," and this session tested the wrong version of it.
+The diagnosis above (WM domain shift, not babble-fit quality) points at exactly the mechanism
+fine-tuning is supposed to fix: a projector-only fit cannot repair a frozen encoder/FTM's domain
+shift, but adapting those components on gecko's babble plausibly can. **The correctly-scoped
+claim-(3) test is the fine-tune version, not this zero-shot one, and it has not yet been run.**
+
+**Pre-registered for the fine-tune test (not yet run):**
+  - Fine-tuned WM recovers gecko's rho toward the in-pretrain range (B1's 0.43 median, hexapod's
+    0.45) -> claim (3) holds: fine-tune-when-needed transfers the shared coordinate to a novel
+    morphology grounded by babble.
+  - Fine-tuning does not recover it -> a deeper problem than domain shift alone (the coordinate
+    itself may not transfer to a sufficiently novel body even with adaptation), which bounds the
+    claim more seriously than this zero-shot result does on its own.
+  - Report per-channel (forward/lateral/yaw), not just median -- forward is the channel that has
+    fought all session and lateral going negative here is the most informative single number.
+
+Scripts: `wm/fit_gecko_projector.py`, `scripts/diagnostics/objective_experiments/gecko_froude_transfer.py`.
+Checkpoints: `wm/runs/beh12_body_stopgrad/projector_stopgrad_gecko.pt`,
+`wm/runs/ftm_froude_stopgrad_head_hexapod.pt`. Data: `data/gecko/babble/babble_{1..36}.npz`.
+
+---
+
 
 ## Files
 
