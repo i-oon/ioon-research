@@ -1215,45 +1215,47 @@ is real regardless of that answer — it just isn't the whole answer yet.
 
 ---
 
-## Slide 28 — How everything above is measured
+## Slide 28 — The claim reframed: not "improve the controller" (settled), but "ground a body absent from pretrain"
 
-**Every number in this deck names the script that produced it**, and the entries in
-`doc/FINDINGS.md` carry the pre-registered criterion above the result.
+```
+  the actual pipeline:
+    (1) pretrain WM on known bodies
+    (2) motor babble on an UNSEEN body → fit action→z map
+    (3) transfer a Froude goal, source → new body
+    (4) control: direct-Froude selection  ← SETTLED, F135/F136. Not touched further.
+        │
+        ▼  the untested, load-bearing claim was never (4) — it's (2)-(3):
+           does babble alone ground a body NEVER in pretrain into the shared coordinate?
 
-| claim | script |
-|---|---|
-| action readable from one frame vs a pair | `scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py` |
-| does prediction need the action (`null/real`) | `scripts/diagnostics/objective_experiments/action_necessity.py` |
-| is the action-blind residual usable | `scripts/diagnostics/objective_experiments/residual_structure.py` |
-| counterfactual futures, physical and in embedding | `branch_divergence.py`, `embedding_divergence.py` |
-| coordinate transfer across bodies | `scripts/diagnostics/objective_experiments/motion_rep_check.py` |
-| gait removal | `scripts/diagnostics/egocentric_view/degait_coordinate.py` |
-| which surface the encoder reads motion from | `scripts/diagnostics/egocentric_view/texture_for_vjepa.py` |
-| goal-conditioning, mismatch control | `plan_open_loop.py --mismatch`, `does_rollout_matter.py --mismatch` |
-| Froude/body-motion scoring vs embedding scoring | `scripts/diagnostics/score_by_body_motion.py` |
-| fine-magnitude scorer accuracy | `scripts/diagnostics/planning/condition_confusion.py` |
-| Dreamer/PPO imagination-RL ladder, MC-check bar | `results/wm/closed_loop/rl_loop_isolation_test_v{2,3,4,5}*.npz`, `ppo_p0_isolation.npz`, `ppo_p0_gamma0.95.npz` |
-| gradient share into `z`, incl. `lambda_state` | `scripts/diagnostics/forward_model/loss_gradient_balance_state.py` |
-| ground-truth action→Froude signal (Test 1) | `scripts/diagnostics/objective_experiments/ground_truth_action_flatness.py` |
-| pooled/spatial x recurrent/non-recurrent kill-gates | `scripts/diagnostics/objective_experiments/sequence_context_killgate.py`, `spatial_recurrent_killgate.py` |
-| isolated frozen-z head, MSE vs cosine loss | `scripts/diagnostics/objective_experiments/isolated_z_head_probe.py`, `isolated_z_head_probe_bodytarget.py` |
-| does z trained without L_body gradient still develop the signal | `scripts/diagnostics/objective_experiments/proxy_z_signal_check.py` |
-| the real stop-gradient retrain's action-lever, per channel | `scripts/diagnostics/objective_experiments/stopgrad_action_lever_check.py` |
-| raw embedding → real delta-Froude, no model | `scripts/diagnostics/objective_experiments/embedding_transition_ceiling.py` |
-| ranking every input representation by offline rho | `scripts/diagnostics/objective_experiments/embedding_representation_sweep.py` |
-| reconstruction-z vs control-z signal retention | `scripts/diagnostics/objective_experiments/proj_action_ceiling_check.py` |
-| z-as-primary head, action-lever on the real retrain | `scripts/diagnostics/objective_experiments/zonly_action_lever_check.py` |
+  test body: gecko (16-D, zero pretrain exposure). Infrastructure built + each piece
+  sanity-gated (camera, Froude wiring, 36 babble clips, real 3-channel coverage confirmed)
 
-**Four guards run before results are read. Each was added after a specific failure.**
+  fit (babble → z map): PASSES — rollout gap 0.068, 0.25x mean-z baseline
+        │
+        ▼  transfer (zero-shot, existing hex-trained head, frozen, no retrain):
+  hexapod 0.454 (sanity, reproduces)  →  B1 0.427 (zero-shot, WM saw B1)  →  gecko 0.113 (FAILS)
+        │
+        ▼  diagnostic: ground-truth z is ALSO weak on gecko (0.184) — not a babble-fit problem,
+           the frozen WM's own domain shift to gecko is the cause
+        │
+        ▼  correctly-scoped test (in flight): fine-tune the WM jointly on hex+B1+gecko babble,
+           short warm-start, rehearsal against forgetting
+```
 
-| guard | without it | the failure that added it |
-|---|---|---|
-| **paired seeds across bodies** | "the bodies differ" and "the rooms differed" become the same number | F160's shape |
-| **appearance-leak check** | Q1 measures the landmark randomisation was meant to remove | exits non-zero, gates the run |
-| **physical intervention check** | a flag accepted, echoed to the log and ignored passes every statistical gate | F165 — eight of twelve conditions carried no intervention while the log said they did |
-| **watch the videos** | numbers pass on a scene that is not what it claims | three of ten scene defects were caught only by looking |
+| ladder (z=proj, median ρ) | hexapod | B1 | gecko |
+|---|---|---|---|
+| zero-shot | 0.454 | 0.427 | **0.113** |
 
-Speaker note: two of those ten "defects" turned out to be the measuring instrument rather than the
-scene. **When a measurement disagrees with geometry, check the measurement first.**
+**Zero-shot transfer to a body absent from pretrain fails.** Logged as motivation, not the thesis
+result: the claim was never "grounds with no adaptation" — it's "grounds when fine-tuned on the new
+body's own babble," and this is the wrong version of the test. The diagnosis (frozen ITM/FTM domain
+shift, not babble-fit quality — ground-truth z fails too) points directly at what fine-tuning is
+meant to fix.
+
+**Pre-registered for the fine-tune (in flight, BIAS-2):** forgetting gate — hex/B1 must hold ≥80%
+of their zero-shot numbers; recovery bar — gecko must reach ≥80% of B1's 0.427. A parallel
+near-morphology control (B1 excluded from pretrain, then fine-tuned in) runs the same ladder, so a
+gecko failure alone can't be blamed on "any novel body," and a B1-only success bounds how far the
+claim reaches.
 
 ---

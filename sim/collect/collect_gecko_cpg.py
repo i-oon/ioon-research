@@ -25,6 +25,14 @@ exactly what was swept by hand; edit and re-run rather than writing another scra
 Measured, 8 s runs: sinusoid + fixes 1-2 only -> 0.158 m, -3.8 deg yaw. Duty cycle + all three
 fixes -> 0.181 m, -0.0 deg yaw -- essentially a straight line.
 
+**Heading is still open-loop and still wanders.** A short (1.3 s) clip yaws 60-140 degrees
+depending on gain/frequency -- present even in the "0.181m/-0.0deg" run above once measured over
+enough cycles, just not visible in a single lucky trial. `collect_ik.py`'s hexapod gait has the
+exact same open-loop wander (its own docstring: "yaw sd 0.016... not a property of the robot, it's
+a controller we gave one and not the other") and fixes it with a PI loop on heading error trimming
+a differential left/right swing bias -- the same mechanism B1 uses (F78). `HEAD_KP`/`HEAD_KI` below
+port that pattern to gecko: off (0.0) by default so nothing changes unless explicitly enabled.
+
 **To explore live**: run this with CoppeliaSim's GUI visible (DISPLAY=:0, not `-h`), then use the
 Play/Pause toolbar buttons and CoppeliaSim's built-in Joint Tool add-on to inspect or manually jog
 individual joints. Manual edits are overwritten on the next step while this script is actively
@@ -62,6 +70,28 @@ DUTY = 0.35        # fraction of the cycle spent in swing (airborne); the rest i
 FREQ = 1.0         # Hz
 SETTLE_S = 1.0     # let the robot drop and settle before the CPG starts
 
+# Heading PI (off by default, ported from collect_ik.py's hexapod heading mode / B1's F78). LEFT
+# legs get +trim, RIGHT get -trim, same differential-drive lever as --turn_bias in
+# collect_gecko_dataset.py, just now driven by measured yaw error instead of a fixed constant.
+LEFT_LEGS = {"lf", "lh"}
+HEAD_KP = 0.0
+HEAD_KI = 0.0
+HEAD_TRIM_MAX = 0.15   # rad, cap on the per-leg swing-amplitude bias the PI can apply
+
+
+def heading_from_quat(quat):
+    """atan2(fy, fx) using embodiment.py's gecko forward-axis formula (x,y,z,w order, no sign
+    correction) -- kept in lockstep with wm/data/embodiment.py's `heading()` gecko branch so the
+    PI target here matches what the recorded data will later measure yaw against."""
+    x, y, z, w = quat
+    fx = 1 - 2 * (y * y + z * z)
+    fy = 2 * (x * y + w * z)
+    return np.arctan2(fy, fx)
+
+
+def wrap_pi(angle):
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
 
 def leg_trajectory(phase_frac, duty=DUTY, swing_amp=SWING_AMP, lift_amp=LIFT_AMP):
     """One leg's (swing, lift) target at this point in its own cycle, before SWING_SIGN/LIFT_SIGN.
@@ -81,7 +111,7 @@ def leg_trajectory(phase_frac, duty=DUTY, swing_amp=SWING_AMP, lift_amp=LIFT_AMP
     return swing, lift
 
 
-def drive(sim, duration=3.0, settle=SETTLE_S):
+def drive(sim, duration=3.0, settle=SETTLE_S, head_kp=HEAD_KP, head_ki=HEAD_KI):
     sim.loadScene(SCENE)
 
     handles, bias2 = {}, {}
@@ -94,15 +124,26 @@ def drive(sim, duration=3.0, settle=SETTLE_S):
     sim.setStepping(True)
     sim.startSimulation()
     t0 = sim.getSimulationTime()
+    yaw0, yaw_int = None, 0.0
     while True:
         t = sim.getSimulationTime() - t0
         if t > settle + duration:
             break
         if t > settle:
             tc = t - settle
+            trim = 0.0
+            if head_kp or head_ki:
+                quat = sim.getObjectQuaternion(root, sim.handle_world)
+                yaw = heading_from_quat(quat)
+                if yaw0 is None:
+                    yaw0 = yaw   # hold whatever heading the robot had when the CPG started
+                err = wrap_pi(yaw0 - yaw)
+                yaw_int = float(np.clip(yaw_int + err, -2.0, 2.0))
+                trim = float(np.clip(head_kp * err + head_ki * yaw_int, -1.0, 1.0)) * HEAD_TRIM_MAX
             for leg in LEGS:
                 frac = (FREQ * tc + PHASE[leg]) % 1.0
-                swing, lift = leg_trajectory(frac)
+                leg_bias = trim if leg in LEFT_LEGS else -trim
+                swing, lift = leg_trajectory(frac, swing_amp=max(0.05, SWING_AMP + leg_bias))
                 sim.setJointTargetPosition(handles[(1, leg)], SWING_SIGN[leg] * swing)
                 sim.setJointTargetPosition(handles[(3, leg)], SWING_SIGN[leg] * swing)
                 lift_sign = -1.0 if bias2[leg] > 0 else 1.0  # toward the open side, away from the near wall
@@ -123,10 +164,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--duration", type=float, default=3.0, help="seconds of CPG motion after settling")
     ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--head_kp", type=float, default=HEAD_KP, help="heading PI proportional gain, "
+                     "0.0=open loop (default, matches gecko's original gait)")
+    ap.add_argument("--head_ki", type=float, default=HEAD_KI, help="heading PI integral gain")
     args = ap.parse_args()
 
     sim = RemoteAPIClient("localhost", port=args.port).require("sim")
-    drive(sim, duration=args.duration)
+    drive(sim, duration=args.duration, head_kp=args.head_kp, head_ki=args.head_ki)
     print("simulation left running -- use the GUI Play/Pause to inspect or take over manually")
 
 

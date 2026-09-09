@@ -85,6 +85,22 @@ def add_camera(sim, preview=False):
     print(f"  camera mounted on /body_part_1, forward={np.round(forward, 3)}")
     print(f"  {info}")
 
+    # **Critical fix, caught by watching a rendered clip, not by any statistic.** The mount point
+    # `/body_part_1` is itself a chunky decorative shell (measured bbox half-extents up to 6.2cm),
+    # and `offset_frac`'s mount-height-scaled clearance (2.8cm up, 3.3cm forward here) is smaller
+    # than that half-extent -- so the camera sat almost inside its own mount's mesh, and every
+    # gecko frame showed a static white/gray band across the bottom 15-20% of the image (confirmed
+    # absent on hexapod/B1's own clean frames). Moving the camera itself farther away was rejected:
+    # it would also inflate `room_for`'s eye-height-scaled room size below, breaking the "room
+    # subtends the same angle from every body's eye" comparability `room_for`'s own docstring
+    # requires. Instead, `/body_part_1` is put on a visibility layer the camera's own mask excludes
+    # -- it stays exactly where it is, still parents the camera and drives the kinematics, it is
+    # simply never rendered. Verified: floor now reaches the bottom edge of frame, matching
+    # hexapod/B1's own clean clips.
+    BODY_PART_1_HIDDEN_LAYER = 0x2
+    sim.setObjectInt32Param(head, sim.objintparam_visibility_layer, BODY_PART_1_HIDDEN_LAYER)
+    sim.setObjectInt32Param(cam, sim.objintparam_visibility_layer, 0xFFFF & ~BODY_PART_1_HIDDEN_LAYER)
+
     # Same textured room the other two bodies get (ego_camera.py), scaled by this body's own mount
     # height so it subtends the same angles from the gecko's eye as it does from the insect's/B1's.
     mount_z = info["position"][2]
@@ -223,6 +239,28 @@ ALLO_TARGET_Z, ALLO_RUNWAY_AIM = 0.10, 0.75
 ALLO_SCALE_K = 5.0 / 8.0  # footprint-based, not mount-height-based -- see comment above
 
 
+ALLO_HIDDEN_LAYER = 0x4   # distinct from BODY_PART_1_HIDDEN_LAYER=0x2, only used to hide the ego room
+
+
+def hide_ego_room_from_allo(sim):
+    """The ego room (`egoWall0..4`, built by `add_camera`) is sized off the gecko's mount height
+    for the EGOCENTRIC view (walls at +/-1.19 m, ceiling at 0.89 m -- correct for a camera sitting
+    on the robot). The allocentric camera sits 5 m away at 3.3 m height (footprint-scaled, see
+    `add_allocentric_camera`'s own comment) -- **outside that room entirely**, its line of sight to
+    the robot passing straight through the low ceiling panel. Every allocentric render before this
+    fix was blank: a flat, textureless fill from being embedded in/behind that ceiling mesh, not a
+    capture bug. Adding an extra visibility-layer bit to the room (keeping its default layer so the
+    ego camera and GUI still see it) and excluding just that bit from the allo camera's mask fixes
+    this without touching the shared, cross-body `ego_camera.py` room-building code."""
+    for i in range(5):
+        try:
+            h = sim.getObject(f"/egoWall{i}")
+        except Exception:
+            continue
+        current = sim.getObjectInt32Param(h, sim.objintparam_visibility_layer)
+        sim.setObjectInt32Param(h, sim.objintparam_visibility_layer, current | ALLO_HIDDEN_LAYER)
+
+
 def add_allocentric_camera(sim):
     k = ALLO_SCALE_K
 
@@ -254,8 +292,9 @@ def add_allocentric_camera(sim):
     float_params = [0.01, 20.0, np.deg2rad(ALLO_VIEW_ANGLE), 0.05, 0, 0, 0, 0, 0, 0, 0]
     cam = sim.createVisionSensor(options, int_params, float_params)
     sim.setObjectAlias(cam, "vjepa_cam_allo")
-    sim.setObjectInt32Param(cam, sim.objintparam_visibility_layer, 0xFFFF)
+    sim.setObjectInt32Param(cam, sim.objintparam_visibility_layer, 0xFFFF & ~ALLO_HIDDEN_LAYER)
     sim.setObjectMatrix(cam, sim.handle_world, m)
+    hide_ego_room_from_allo(sim)
     print(f"  /vjepa_cam_allo  k={k:.3f}  pos={np.round(cam_pos,3)}  target={np.round(target,3)}")
     return cam
 

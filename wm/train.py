@@ -426,8 +426,17 @@ def build_models(cfg, device, heads=None, n_bodies=0):
     return models
 
 
-def build_cross_embodiment(cfg, root):
-    """Datasets, sampler and decoder heads for training across embodiments."""
+def build_cross_embodiment(cfg, root, fixed_body_stats=None):
+    """Datasets, sampler and decoder heads for training across embodiments.
+
+    `fixed_body_stats`, when given, is threaded straight into `MultiEmbodimentPairs` and skips its
+    own pooled recompute (F200). **Why this matters for a warm start specifically**: `--init_ckpt`
+    loads `md.body_head`'s weights as fit to WHATEVER standardisation the ORIGINAL run pooled --
+    e.g. hexapod alone. Adding a new source (B1, a new babble body) changes what gets pooled, so
+    the recomputed `body_stats` silently differs from the scale those warm-started weights were
+    calibrated to, and the fine-tune's very first step already grades them against a shifted
+    target. Passing the original run's own `body_stats` here removes that shift as a variable.
+    """
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
     train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
                                                   heldout_bodies=tuple(cfg.heldout_bodies),
@@ -436,7 +445,8 @@ def build_cross_embodiment(cfg, root):
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                      body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k)
+                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k,
+                                     body_stats=fixed_body_stats)
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
@@ -500,6 +510,14 @@ def parse_args(cfg):
                              "checkpoint, which is the only configuration measured before this run "
                              "-- see doc/FINDINGS.md's state-head chain. Ignored if --resume finds "
                              "a run to continue.")
+    parser.add_argument("--body_stats_from", type=str, default="",
+                        help="**F200's fix, not a general knob.** Loads `body_stats` (mean, std) "
+                             "from this checkpoint and holds it fixed for the whole run instead of "
+                             "letting `build_cross_embodiment` pool it fresh from --sources. Use "
+                             "this with --init_ckpt when adding a new source to a warm-started run "
+                             "-- otherwise the recompute silently shifts the standardisation the "
+                             "warm-started body_head's weights were calibrated to, confounding "
+                             "whether a fine-tune failure is the fine-tune or this shift.")
     return parser.parse_args()
 
 
@@ -507,7 +525,8 @@ def main():
     args = parse_args(Config())
     # --name, --resume and --init_ckpt are how the run is invoked, not part of what it is
     cfg = Config(**{k: v for k, v in vars(args).items()
-                    if k not in ("name", "resume", "init_ckpt", "allow_shape_mismatch")})
+                    if k not in ("name", "resume", "init_ckpt", "allow_shape_mismatch",
+                                 "body_stats_from")})
     cfg.train_morphs = tuple(cfg.train_morphs)
 
     torch.manual_seed(cfg.seed)
@@ -517,8 +536,17 @@ def main():
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
     cross_embodiment = bool(cfg.sources)
 
+    fixed_body_stats = None
+    if args.body_stats_from:
+        src = torch.load(os.path.join(ROOT, args.body_stats_from), map_location="cpu",
+                         weights_only=False)
+        fixed_body_stats = src["body_stats"]
+        print(f"body_stats held fixed from {args.body_stats_from}: "
+             f"mean={np.asarray(fixed_body_stats[0])} std={np.asarray(fixed_body_stats[1])}")
+
     if cross_embodiment:
-        train_set, val_set, heads = build_cross_embodiment(cfg, ROOT)
+        train_set, val_set, heads = build_cross_embodiment(cfg, ROOT,
+                                                            fixed_body_stats=fixed_body_stats)
         train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed,
                                        balance=cfg.balance_embodiments)
         val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, False, cfg.seed)

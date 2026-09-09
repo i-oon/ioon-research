@@ -15451,6 +15451,77 @@ Checkpoints: `wm/runs/beh12_body_stopgrad/projector_stopgrad_gecko.pt`,
 
 ---
 
+### F200. The near-morphology fine-tune control (B1 into a hexapod-only pretrain) makes B1's transfer WORSE, not better -- a specific recipe failure, not a claim-(3) failure
+
+**Scope, stated precisely up front.** This is a negative result about ONE fine-tune recipe (10
+epochs, lr 3e-5, warm-started via `--init_ckpt`), run as the near-morphology control alongside the
+still-pending gecko fine-tune. It is not a result about whether babble-grounding a body absent from
+pretrain can ever work -- B1 does not have gecko's separate, confirmed out-of-range Froude-scale
+problem (raw forward speed ~30 cm/s, Froude ~0.13, close to hexapod's own scale), so a clean failure
+here would be informative about the recipe specifically, not about the underlying claim.
+
+**Setup.** `beh12_hexonly_stopgrad` (hexapod-only pretrain, Option A) warm-started via `--init_ckpt`
+into a second run with B1 added as a source (`beh12_hexb1_finetune`, 10 epochs, lr 3e-5,
+`balance_embodiments=True`, `--allow_shape_mismatch True` for `MorphProbe`'s 1-body->2-body output
+layer). Projector refit, a fresh checkpoint-specific `CleanFroudeHead` trained, then scored with
+`gecko_froude_transfer.py --bodies hexapod b1` against the same zero-shot ladder methodology F199
+established.
+
+**Result: B1 regressed on every channel.**
+
+| B1 (z=proj) | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|
+| zero-shot (before fine-tune, WM never saw B1) | +0.057 | +0.264 | +0.526 | 0.264 |
+| **post-fine-tune** | **-0.068** | +0.231 | +0.326 | **0.231** |
+
+Forward flips sign, yaw drops 38%, median falls rather than rising. Hexapod itself holds up
+(head-trained-here 0.536 pre-finetune -> 0.469 post, ~87.5% retained, clears the 80% forgetting-gate
+threshold on its own), so this is specifically a B1-transfer regression, not a general collapse.
+
+**Checked for a measurement confound first, per standing discipline -- found a real training-time
+one instead.** Compared `body_stats` (the pooled mean/std the shared body-head's target is
+standardised against) across the relevant checkpoints:
+
+| checkpoint | forward (mean, std) | lateral (mean, std) | yaw (mean, std) |
+|---|---|---|---|
+| `beh12_hexonly_stopgrad` (what the body-head was warm-started FROM) | 0.1048, 0.0739 | 0.0171, 0.0350 | 0.0113, 0.0266 |
+| `beh12_hexb1_finetune` (the fine-tune's actual training target scale) | 0.1029, 0.0701 | **0.0120, 0.0493** | 0.0131, 0.0266 |
+
+Lateral shifts a real amount (mean -30%, std +41%); forward and yaw are closer but not identical.
+`beh12_hexb1_finetune`'s stats are bit-identical to the original `beh12_body_stopgrad`'s -- expected,
+since `body_stats` is a deterministic pool over the same hex+B1 directories either way, which rules
+out the pooling itself being buggy or nondeterministic.
+
+**This is not a measurement artifact.** Spearman rho is invariant to affine rescaling of the target,
+so a `body_stats` difference between two checkpoints cannot by itself bias a rho-vs-rho comparison
+between them -- the confound, if real, has to live in training, not in how the result was read.
+`md.body_head`'s warm-started weights map z to HEXAPOD-ONLY's standardised scale; from the first
+fine-tune step the loss instead grades them against the shifted pooled scale above, on top of
+learning B1 itself, inside only 10 short epochs. That is a specific, plausible mechanism for a
+warm-start to transiently regress rather than improve. It does not cleanly account for every
+channel -- forward and yaw dropped more than lateral despite lateral's stat shift being the largest,
+which a single shared small head training jointly on all three can produce (a scale mismatch on one
+channel can disturb gradients on the others) but which also means this is a strong suspect, not a
+proven sole cause.
+
+**Verdict, at its correct scope: this fine-tune recipe fails on B1, and the silent `body_stats`
+recompute at fine-tune start is a specific, fixable suspect -- not evidence that babble-grounding an
+absent-from-pretrain body cannot work.** The recipe space is not exhausted by one configuration.
+Candidate fixes, not yet tried: pass the ORIGINAL pretrain's `body_stats` explicitly into the
+fine-tune's `MultiEmbodimentPairs` construction (avoiding the silent recompute entirely) rather than
+letting it re-derive fresh from the newly-pooled sources; or a short stats-only re-calibration pass
+before resuming full fine-tuning. Do not read this as a claim-(3) result -- it is a recipe-level
+negative, and the gecko side of this same parallel test is separately on hold pending a CPG-amplitude
+fix for a different, independently-confirmed problem (gecko's Froude-normalised forward speed sits
+~10x below hexapod/B1's own range).
+
+Scripts: `wm/fit_projector.py`, `scripts/diagnostics/objective_experiments/train_froude_head.py`,
+`scripts/diagnostics/objective_experiments/gecko_froude_transfer.py --bodies hexapod b1`.
+Checkpoints: `wm/runs/beh12_hexonly_stopgrad/best.pt`, `wm/runs/beh12_hexb1_finetune/best.pt`,
+`wm/runs/beh12_hexb1_finetune/projector_a.pt`, `wm/runs/beh12_hexb1_finetune/ftm_froude_head_hexapod.pt`.
+
+---
+
 
 ## Files
 
