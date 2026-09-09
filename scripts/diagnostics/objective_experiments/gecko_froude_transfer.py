@@ -163,6 +163,9 @@ def main():
         ROOT, "wm/runs/beh12_body_stopgrad/projector_stopgrad_gecko.pt"))
     ap.add_argument("--head_ckpt", default=os.path.join(
         ROOT, "wm/runs/ftm_froude_stopgrad_head_hexapod.pt"))
+    ap.add_argument("--bodies", nargs="+", default=["hexapod", "b1", "gecko"],
+                    help="which of DIRS to score; drop 'gecko' for a checkpoint that never saw "
+                         "it (e.g. Option A's hexapod+B1-only pretrain/fine-tune)")
     args = ap.parse_args()
 
     checkpoint = torch.load(args.teacher_ckpt, map_location="cpu", weights_only=False)
@@ -195,7 +198,7 @@ def main():
     print(f"\n{'body':<10}{'z src':<8}{'n held':>8}" +
          "".join(f"{c + ' rho':>12}" for c in CHANNEL_NAMES) + f"{'median rho':>13}{'cos(med)':>10}")
     proj_median = {}
-    for name in ("hexapod", "b1", "gecko"):
+    for name in args.bodies:
         e_t, e_next, bm_next, actions_all, held_mask, n_clips, n_held = gather_body(
             name, DIRS[name], encoder, checkpoint, channels, mean_s, std_s)
         print(f"# {name}: {n_clips} clips, {n_held} held out, {int(held_mask.sum())} transitions "
@@ -210,6 +213,11 @@ def main():
                  "".join(f"{r:>12.3f}" for r in rhos) + f"{med:>13.3f}{cos:>10.3f}")
         del e_t, e_next, bm_next, actions_all, held_mask
         torch.cuda.empty_cache()
+
+    if "gecko" not in args.bodies:
+        print("\n(gecko not scored -- this checkpoint/run wasn't asked to include it; VERDICT "
+             "block skipped, it depends on a gecko number)")
+        return
 
     hex_bar, b1_bar = FORGET_TOL * F199_HEX_BASELINE, FORGET_TOL * F199_B1_BASELINE
     recover_bar = RECOVER_FRAC * F199_B1_BASELINE
