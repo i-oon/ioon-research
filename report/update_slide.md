@@ -1049,133 +1049,19 @@ Demo-JEPA aligns embodiments by retargeting rather than by removing body-specifi
 
 > **How to read Part 5.** Everything here is about **motor babble** — the standard way a robot that
 > nobody has a controller for gets bootstrapped. B1 results and gecko results are kept apart: B1 was
-> in pretrain, gecko never was. **All gecko work is on Slide 31 alone** and appears in no flow
+> in pretrain, gecko never was. **All gecko work is on Slide 32 alone** and appears in no flow
 > diagram or result table above it.
 >
 > **บทพูด (TH).** ตั้งแต่ part นี้ไปคือเรื่อง **motor babble** — วิธีมาตรฐานที่ใช้ตั้งต้นหุ่นที่ยังไม่มี controller
 > ขอแยก B1 กับ gecko ให้ชัด: **B1 เคยอยู่ใน pretrain แต่ gecko ไม่เคย**
-> **เรื่อง gecko อยู่ที่สไลด์ 31 หน้าเดียว** ไม่ปนกับแผนภาพหรือตารางไหนข้างบนเลย
+> **เรื่อง gecko อยู่ที่สไลด์ 32 หน้าเดียว** ไม่ปนกับแผนภาพหรือตารางไหนข้างบนเลย
 
 ---
 
-## Slide 23.5 — Controller vs. what we test
-
-```
-  A CONTROLLER / POLICY                    WHAT WE ACTUALLY TEST (a "closed loop")
-  ────────────────────                     ──────────────────────────────────────
-  state ──▶ network ──▶ joint torques      goal ──▶ score 12 RECORDED clips ──▶ replay the winner
-  invents the motion itself                picks from motions that already exist
-  runs at 50 Hz forever                    one pick per step, 65 steps, then stops
-  can produce a motion nobody recorded     can NEVER produce a motion nobody recorded
-```
-
-| | a controller/policy | our closed loop |
-|---|---|---|
-| where the motion comes from | invented by the network | **a library of 12 recorded clips** |
-| can it fall over? | yes — it is real physics | **no — kinematic replay, the body is posed directly** |
-| what "survival" proves | the policy is stable | **nothing. It cannot fall by construction** |
-| what it DOES prove | — | **whether the goal was read and the right motion chosen** |
-
-**We do not have a controller, and this deck never claims one.** What is measured is *selection*:
-given a goal expressed in a shared physical coordinate, does the system pick the right behaviour for
-a body it was never trained on. The motion itself is always something a human recorded earlier.
-
-> **บทพูด (TH).** สไลด์นี้สำคัญมาก และผมเองก็สับสนบ่อย ขอแยกให้ชัด
-> **Controller/policy จริง ๆ** = เอา state เข้า แล้วเน็ตเวิร์ก **คิดท่าเดินขึ้นมาเอง** ส่งแรงให้ข้อต่อ วิ่งตลอดเวลา และ **ล้มได้**
-> **สิ่งที่เราทดสอบ (closed loop)** = มีคลิปที่อัดไว้แล้ว 12 คลิป ระบบแค่ **เลือกว่าจะเล่นคลิปไหน** ให้ตรงเป้า แล้ว replay
-> เพราะฉะนั้น **มันล้มไม่ได้เลยโดยโครงสร้าง** — ตัวเลข "รอด 3/3" จึงไม่ได้แปลว่าเก่ง มันแปลว่าไม่มีอะไรให้ล้ม
-> สิ่งที่มันพิสูจน์จริง ๆ คือ **อ่านเป้าหมายถูกไหม และเลือกท่าถูกไหม** เท่านั้น — **เรายังไม่มี controller และเดคนี้ไม่เคยเคลมว่ามี**
-
 ---
 
-## Slide 23.6 — Froude, and how a goal is made
+## Slide 24 — Imagination-RL: the wall is the rollout
 
-**Froude number** = speed made dimensionless by body size, `Fr = v / sqrt(g · L)`, where `L` is
-roughly leg/hip height. Two robots of different size walking "the same way" get the **same Froude**
-even though their m/s differ. That is the entire reason a hexapod's goal can mean anything to a B1.
-
-| | hexapod | B1 | gecko |
-|---|---|---|---|
-| hip height `L` | ~0.09 m | ~0.56 m | **~0.06 m** |
-| a normal walk, in m/s | 0.13 | 0.29 | 0.013 |
-| **the same walk, in Froude** | **~0.13** | **~0.13** | **~0.04** |
-
-Three channels are used, all dimensionless: **forward**, **lateral** (strafing), **yaw** (turning).
-
-```
-  HOW THE GOAL IS PRODUCED — two options, deliberately separated
-  ─────────────────────────────────────────────────────────────
-  physics goal :  read the recorded NUMBER off the source clip        (privileged, a sanity ceiling)
-  vision goal  :  watch the source clip's video → ITM → body_head     (what deployment would do)
-
-  HOW A CANDIDATE IS SCORED — two options, deliberately separated
-  ──────────────────────────────────────────────────────────────
-  DIRECT   a ──▶ projector ──▶ z ──▶ body_head ──▶ Froude     (no world model in the loop)
-  ROLLOUT  e_t + z ──▶ FTM ──▶ imagined future ──▶ ITM ──▶ body_head ──▶ Froude   (world model in)
-
-  score = | candidate's Froude − goal's Froude |   → pick the smallest
-```
-
-Crossing the two gives the 2×2 (A/B/C/D) on Slide 30. They are separated **on purpose**: bundling
-them is what confounded an earlier version of this test.
-
-> **บทพูด (TH).** ก่อนดูผล ขออธิบายสองคำที่ใช้ตลอด
-> **Froude** คือความเร็วที่หารด้วยขนาดตัว `v / sqrt(g·L)` — หุ่นคนละขนาดที่ "เดินเหมือนกัน" จะได้ค่า Froude เท่ากัน
-> ทั้งที่ m/s ไม่เท่ากัน **นี่คือเหตุผลเดียวที่เป้าหมายจากแมลงจะมีความหมายกับ B1 ได้** เราใช้ 3 ช่อง: เดินหน้า / ไถลข้าง / เลี้ยว
-> **เป้าหมายผลิตได้ 2 แบบ**: อ่านตัวเลขที่อัดไว้ตรง ๆ (physics — เป็นเพดานอ้างอิง มีข้อมูลพิเศษ) กับ ดูวิดีโอแล้วถอดออกมา (vision — แบบที่ใช้จริงตอน deploy)
-> **การให้คะแนนผู้สมัครก็ 2 แบบ**: **Direct** = แปลง action เป็น z แล้วอ่าน Froude เลย ไม่ใช้ world model
-> **Rollout** = ใช้ world model จินตนาการอนาคตก่อน แล้วค่อยอ่าน — แล้วเทียบว่าใครใกล้เป้าที่สุด
-> ที่ต้องแยกสองแกนนี้ออกจากกัน เพราะเวอร์ชันก่อนหน้าเราเอามามัดรวมกัน ทำให้สรุปไม่ได้ว่าตัวไหนเป็นตัวปัญหา
-
----
-
-## Slide 24 — What the coordinate fixed
-
-**Scoring in the right space is what turned selection on.** Frame distance reads the current frame,
-not the goal. Rescoring by body-motion (Froude) distance fixes that immediately.
-
-| selection rule | same-robot | cross-embod., 1ch | cross-embod., 3ch |
-|---|---|---|---|
-| frame/embedding distance | 18-23% (28% chance) | — | — |
-| **Froude distance, no rollout** | **76-86%** | 35-38% | **68-70%** |
-| + FTM rollout added back | — | — | 33-44%, turning destroyed |
-
-| strafing | 1-channel | 3-channel |
-|---|---|---|
-| | 13-25% (17% chance) | **86-100%** |
-
-### Limitation: coarse yes, fine no
-
-Picking the right *kind* of motion works. Picking the right *amount* does not — and it did not
-improve when the representation changed. Images could not separate fine magnitudes; Froude could
-not either.
-
-| question | result |
-|---|---|
-| which family? (walk / turn / strafe) | **works, crosses embodiments** |
-| how much? rank 12 conditions | 28% exact, mean rank 2.33/12 |
-| how much? 0.5-sd perturbations of one behaviour | **47% vs a 50% coin** |
-| direction of correction | 0.867 — right way |
-| extent of correction | 0.71 sd — wrong amount |
-
-**The information is not missing.** Probed straight off the frozen embedding delta — no ITM, no FTM,
-no trained head — the fine speed signal reads out clearly. The pipeline cannot use it; the encoder
-did not discard it.
-
-Six independent readout fixes, all null. **Not focused — the claim is the shared coordinate, which
-is coarse and works.**
-
-> **บทพูด (TH).** สไลด์นี้มีสองส่วน: **ส่วนที่แก้ได้** กับ **ข้อจำกัด**
-> แก้ได้: เดิมให้คะแนนด้วยระยะห่างของภาพ ซึ่งไปอ่านเฟรมปัจจุบัน ไม่ได้อ่านเป้า พอเปลี่ยนเป็น Froude การทำตามเป้าโผล่มาทันที
-> ขยายจาก 1 เป็น 3 ช่อง การเลือกข้ามหุ่นดีขึ้นเกือบเท่าตัว การไถลข้างจากมองไม่เห็นเลยเป็นเกือบสมบูรณ์
->
-> ข้อจำกัด: เลือก**ชนิดท่า**ได้ เลือก**ความแรง**ไม่ได้ และ**ไม่ดีขึ้นเลยตอนเปลี่ยนวิธี** — ใช้ภาพก็ไม่ได้ ใช้ Froude ก็ไม่ได้ (47% เทียบเหรียญ 50%)
-> **แต่ข้อมูลไม่ได้หาย** — probe ตรง ๆ บน embedding ดิบยังอ่านออกชัด แปลว่า pipeline ใช้มันไม่เป็น ไม่ใช่ encoder ทิ้ง
-> ลองแก้มา 6 วิธี null หมด **เราไม่โฟกัสตรงนี้** เพราะ claim คือพิกัดกลางที่ข้ามหุ่นได้ ซึ่งเป็นงานหยาบ ๆ และอันนั้นทำได้แล้ว
-
----
-
-## Slide 25 — Imagination-RL: the wall is the rollout
 
 ```
   looked like: the actor exploits the frozen FTM's blind spots
@@ -1218,7 +1104,8 @@ failure mode Koopman Dreamer (2607.19719) names.
 
 ---
 
-## Slide 26 — Sequence context does not fix it
+## Slide 25 — Sequence context does not fix it
+
 
 ```
   FTM(frame_t, action_t) → frame_t+1        one observation, one action
@@ -1271,7 +1158,8 @@ representation.
 
 ---
 
-## Slide 27 — Stop-gradient clears the lever ~9×
+## Slide 26 — Stop-gradient clears the lever ~9×
+
 
 ```
   eliminated, each ruling out one cause (Slides 24-26 + offline probes):
@@ -1319,7 +1207,191 @@ ranking or closed-loop behaviour — a gap this project has been burned by befor
 
 ---
 
-## Slide 28 — Motor babble, and what we added
+## Slide 27 — What the coordinate fixed
+
+
+**Scoring in the right space is what turned selection on.** Frame distance reads the current frame,
+not the goal. Rescoring by body-motion (Froude) distance fixes that immediately.
+
+| selection rule | same-robot | cross-embod., 1ch | cross-embod., 3ch |
+|---|---|---|---|
+| frame/embedding distance | 18-23% (28% chance) | — | — |
+| **Froude distance, no rollout** | **76-86%** | 35-38% | **68-70%** |
+| + FTM rollout added back | — | — | 33-44%, turning destroyed |
+
+| strafing | 1-channel | 3-channel |
+|---|---|---|
+| | 13-25% (17% chance) | **86-100%** |
+
+### Limitation: coarse yes, fine no
+
+Picking the right *kind* of motion works. Picking the right *amount* does not — and it did not
+improve when the representation changed. Images could not separate fine magnitudes; Froude could
+not either.
+
+| question | result |
+|---|---|
+| which family? (walk / turn / strafe) | **works, crosses embodiments** |
+| how much? rank 12 conditions | 28% exact, mean rank 2.33/12 |
+| how much? 0.5-sd perturbations of one behaviour | **47% vs a 50% coin** |
+| direction of correction | 0.867 — right way |
+| extent of correction | 0.71 sd — wrong amount |
+
+**The information is not missing.** Probed straight off the frozen embedding delta — no ITM, no FTM,
+no trained head — the fine speed signal reads out clearly. The pipeline cannot use it; the encoder
+did not discard it.
+
+Six independent readout fixes, all null. **Not focused — the claim is the shared coordinate, which
+is coarse and works.**
+
+> **บทพูด (TH).** สไลด์นี้มีสองส่วน: **ส่วนที่แก้ได้** กับ **ข้อจำกัด**
+> แก้ได้: เดิมให้คะแนนด้วยระยะห่างของภาพ ซึ่งไปอ่านเฟรมปัจจุบัน ไม่ได้อ่านเป้า พอเปลี่ยนเป็น Froude การทำตามเป้าโผล่มาทันที
+> ขยายจาก 1 เป็น 3 ช่อง การเลือกข้ามหุ่นดีขึ้นเกือบเท่าตัว การไถลข้างจากมองไม่เห็นเลยเป็นเกือบสมบูรณ์
+>
+> ข้อจำกัด: เลือก**ชนิดท่า**ได้ เลือก**ความแรง**ไม่ได้ และ**ไม่ดีขึ้นเลยตอนเปลี่ยนวิธี** — ใช้ภาพก็ไม่ได้ ใช้ Froude ก็ไม่ได้ (47% เทียบเหรียญ 50%)
+> **แต่ข้อมูลไม่ได้หาย** — probe ตรง ๆ บน embedding ดิบยังอ่านออกชัด แปลว่า pipeline ใช้มันไม่เป็น ไม่ใช่ encoder ทิ้ง
+> ลองแก้มา 6 วิธี null หมด **เราไม่โฟกัสตรงนี้** เพราะ claim คือพิกัดกลางที่ข้ามหุ่นได้ ซึ่งเป็นงานหยาบ ๆ และอันนั้นทำได้แล้ว
+
+---
+
+## Slide 28 — Controller vs. what we test, and what Froude is
+
+```
+  A CONTROLLER / POLICY                 WHAT WE TEST (a "closed loop")
+  ────────────────────                  ──────────────────────────────
+  state ──▶ network ──▶ torques         goal ──▶ score 12 RECORDED clips ──▶ replay winner
+  invents the motion                    picks from motions that already exist
+  can fall over                         cannot fall — the body is posed directly
+```
+
+| | controller/policy | our closed loop |
+|---|---|---|
+| motion comes from | invented by the network | **a library of 12 recorded clips** |
+| what "survival" proves | the policy is stable | **nothing — it cannot fall by construction** |
+| what it DOES prove | — | **was the goal read, and the right motion chosen** |
+
+**We do not have a controller and never claim one.** What is measured is *selection*.
+
+### Froude, and how a goal is made
+
+`Fr = v / sqrt(g · L)` — speed made dimensionless by body size (`L` ≈ hip height). Two robots of
+different size walking "the same way" get the **same Froude**. That is the whole reason a hexapod's
+goal can mean anything to a B1. Three channels: **forward**, **lateral**, **yaw**.
+
+| | hexapod | B1 | gecko |
+|---|---|---|---|
+| hip height `L` | ~0.09 m | ~0.56 m | ~0.06 m |
+| a normal walk, m/s | 0.13 | 0.29 | 0.013 |
+| **same walk, in Froude** | **~0.13** | **~0.13** | **~0.04** |
+
+```
+  GOAL — two sources, kept separate
+    physics :  read the recorded NUMBER off the source clip   (privileged ceiling)
+    vision  :  source clip's video → ITM → body_head          (what deployment does)
+
+  SCORING — two mechanisms, kept separate
+    DIRECT   a ──▶ projector ──▶ z ──▶ body_head ──▶ Froude          (no world model)
+    ROLLOUT  e_t + z ──▶ FTM ──▶ imagined ──▶ ITM ──▶ body_head      (world model in)
+
+  score = | candidate Froude − goal Froude |   → pick the smallest
+```
+
+Crossing the two gives the 2×2 (A/B/C/D) on Slide 30 — separated **on purpose**, since bundling
+them confounded an earlier version of this test.
+
+> **บทพูด (TH).** ผมเองก็สับสนบ่อย ขอแยกให้ชัด
+> **Controller จริง ๆ** = เน็ตเวิร์ก**คิดท่าเองจาก state** ส่งแรงให้ข้อต่อ และ **ล้มได้**
+> **สิ่งที่เราทดสอบ** = มีคลิปอัดไว้ 12 คลิป ระบบแค่**เลือกว่าจะเล่นอันไหน** แล้ว replay — **ล้มไม่ได้เลยโดยโครงสร้าง**
+> ตัวเลข "รอด 3/3" จึงไม่ได้แปลว่าเก่ง มันแปลว่าไม่มีอะไรให้ล้ม สิ่งที่พิสูจน์จริงคือ**อ่านเป้าถูกไหม เลือกท่าถูกไหม**
+>
+> **Froude** คือความเร็วหารด้วยขนาดตัว `v/sqrt(g·L)` — หุ่นคนละขนาดที่เดินเหมือนกันจะได้ค่าเท่ากัน
+> **นี่คือเหตุผลเดียวที่เป้าจากแมลงมีความหมายกับ B1** ใช้ 3 ช่อง: เดินหน้า/ไถลข้าง/เลี้ยว
+> **เป้าผลิตได้ 2 แบบ** (อ่านตัวเลขที่อัดไว้ = มีข้อมูลพิเศษ / ถอดจากวิดีโอ = แบบที่ใช้จริง)
+> **ให้คะแนนได้ 2 แบบ** (Direct ไม่ใช้ world model / Rollout ใช้) — ที่ต้องแยกสองแกนนี้เพราะเวอร์ชันก่อนเรามัดรวมกัน เลยสรุปไม่ได้ว่าตัวไหนพัง
+
+## Slide 29 — The correct adaptation pipeline
+
+
+```
+  wrong mechanism, tried first: wm.train --init_ckpt
+    jointly retrains ITM+FTM+decoder+body_head+probe under the FULL pretrain loss
+    → B1 got WORSE than zero-shot (0.264 → 0.231), forward went negative
+        │
+        ▼  the actual question: "are we even running LAC-WM's adaptation?" — NO
+  the real staged procedure, never assembled into one pipeline before:
+    stage 1  wm.adapt          — fine-tune ONLY ITM+FTM on the new body's own clips
+    stage 2  fit_projector     — refit a→z against the ADAPTED itm
+    stage 3  wm.adapt3         — optional joint fine-tune (skipped)
+    stage 4  fit_body_head     — refit the shared Froude head against the projector's own z
+```
+
+| B1, z=proj | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|
+| zero-shot (no adaptation) | 0.057 | 0.264 | 0.526 | 0.264 |
+| `wm.train` joint retrain (wrong mechanism) | −0.068 | 0.231 | 0.326 | 0.231 |
+| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
+
+**Every channel more than doubles, forward included — never once positive under the wrong
+mechanism.** The whole "B1 got worse" episode was a tooling error, not a result about the claim.
+
+> **บทพูด (TH).** สไลด์นี้คือการแก้ที่ต้นเหตุ
+> ตอนแรกเรา "fine-tune" ด้วยวิธีที่ผิดสนิท — มันไป retrain ทุกอย่างพร้อมกันด้วย loss ของการ pretrain
+> ผลคือ B1 **แย่ลงกว่าไม่ทำอะไรเลย** (0.264 → 0.231) แล้วเราก็เสียเวลาไล่หาว่าทำไมมันพัง ทั้งที่คำถามที่ถูกคือ "เราใช้วิธี adaptation จริง ๆ หรือยัง" — **คำตอบคือยัง**
+> พอใช้ขั้นตอน 4 stage ที่ถูกต้อง **ทุกช่องดีขึ้นเกินเท่าตัว** โดยเฉพาะช่อง forward ที่ไม่เคยเป็นบวกเลยในวิธีเดิม
+> บทเรียน: **มันเป็นบั๊กเครื่องมือ ไม่ใช่ข้อสรุปว่าวิธีเราไม่เวิร์ก**
+
+---
+
+## Slide 30 — The 2×2: which half is broken
+
+
+```
+  goal source (physics / vision)  ×  candidate scoring (direct / rollout)
+```
+
+Same goal clip, same 12 candidates, scored per step (not dominant-pick):
+
+| mode | candidates | goal | goal read err | top pick | % steps right family | dist. to true goal |
+|---|---|---|---|---|---|---|
+| **A** | direct | physics (privileged) | 0.0000 | turn_w0.008 | **78%** | **0.038** |
+| **D** | direct | **vision only** | **0.0293** | turn_w0.008 | **80%** | **0.038** |
+| B | rollout | physics (privileged) | 0.0000 | side_R_lvl1 | 47% | 0.290 |
+| C | rollout | **vision only** | 0.0293 | side_R_lvl1 | 40% | 0.290 |
+
+**Reading the goal from video costs nothing.** D is handed no recorded number and misreads the goal
+by 0.029 in Froude — yet matches A exactly (same top pick, same distance, 80% vs 78%). The
+misreading is smaller than the gap between the two closest candidates (0.033 vs 0.038), so it never
+changes the ranking. **This is the claim: a vision goal performs like a privileged proprioceptive
+measurement.**
+
+**Rollout does not merely fail — it prefers the worst candidate.** `side_R_lvl1` is the *farthest*
+of all 12 from the goal (0.290 against the best 0.033). Handing it a perfect goal (mode B, error
+0.0000) does not help. The goal is not the problem; the world model in the scoring loop is.
+
+**Reminder (Slide 28): selections from a library, not a controller.** Nothing here can fall.
+
+**📹 VIDEO — C vs D.** Three panels, aligned by elapsed time (the two bodies record at 20 Hz and
+50 Hz, so matching by frame index puts the goal 2.5× ahead). Goal panel shows both what the system
+read and the true value; footer shows both errors.
+
+| panel | shows |
+|---|---|
+| left | source body ego — the goal |
+| middle | new body ego — what the loop sees |
+| right | new body allocentric — **replayed ground truth, not control** |
+
+> **บทพูด (TH).** สไลด์นี้แยกว่า**ครึ่งไหนของลูปพัง** โดยไขว้สองแกน: เป้ามาจากไหน × ให้คะแนนยังไง
+> **A กับ D เท่ากัน** — D อ่านเป้าจากวิดีโอผิดไป 0.029 แต่**เลือกคลิปเดียวกัน ระยะห่างเท่ากัน** (80% เทียบ 78%)
+> เพราะความผิดพลาดนั้น**เล็กกว่าช่องว่างระหว่างผู้สมัครสองตัวที่ใกล้ที่สุด** (0.033 กับ 0.038) มันเลยไม่เปลี่ยนอันดับ
+> **นี่คือข้อเคลม: เป้าจากภาพทำงานได้เท่ากับการวัดด้วย proprioception ที่แอบดูตัวเลขจริง**
+> **ส่วน rollout ไม่ใช่แค่พลาด แต่เลือกตัวที่แย่ที่สุด** — `side_R_lvl1` ห่างจากเป้าที่สุดใน 12 ตัว (0.290)
+> และ**ต่อให้แจกเป้าที่ถูกต้อง 100% ให้ (mode B) ก็ยังพัง** แปลว่าปัญหาไม่ใช่เป้าหมาย แต่คือ world model ตอนให้คะแนน
+> **ย้ำ:** นี่คือการเลือกคลิปจากคลัง ไม่ใช่ controller — มันล้มไม่ได้อยู่แล้ว
+
+---
+
+## Slide 31 — Motor babble, and what we added
+
 
 ```
   a robot nobody has a controller for
@@ -1362,82 +1434,10 @@ half-works (0.427); adapting on that body's own babble takes it to 0.572.
 > ตาราง: **B1 ดีขึ้นจริง 0.427 → 0.572** โดยใช้แค่ **9 คลิป / 1000 steps** — นี่คือต้นทุนทั้งหมดของหุ่นตัวใหม่
 > ไม่ต้องอัดข้อมูลเพิ่ม stage อื่นแค่ fit หัวเล็ก ๆ สองอันบน babble ชุดเดิม ส่วนช่อง gecko **ห้ามอ่านรวมกัน** เดี๋ยวอธิบายแยก
 
-## Slide 29 — The correct adaptation pipeline
+---
 
-```
-  wrong mechanism, tried first: wm.train --init_ckpt
-    jointly retrains ITM+FTM+decoder+body_head+probe under the FULL pretrain loss
-    → B1 got WORSE than zero-shot (0.264 → 0.231), forward went negative
-        │
-        ▼  the actual question: "are we even running LAC-WM's adaptation?" — NO
-  the real staged procedure, never assembled into one pipeline before:
-    stage 1  wm.adapt          — fine-tune ONLY ITM+FTM on the new body's own clips
-    stage 2  fit_projector     — refit a→z against the ADAPTED itm
-    stage 3  wm.adapt3         — optional joint fine-tune (skipped)
-    stage 4  fit_body_head     — refit the shared Froude head against the projector's own z
-```
+## Slide 32 — Gecko: the actual unseen body
 
-| B1, z=proj | forward ρ | lateral ρ | yaw ρ | median ρ |
-|---|---|---|---|---|
-| zero-shot (no adaptation) | 0.057 | 0.264 | 0.526 | 0.264 |
-| `wm.train` joint retrain (wrong mechanism) | −0.068 | 0.231 | 0.326 | 0.231 |
-| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
-
-**Every channel more than doubles, forward included — never once positive under the wrong
-mechanism.** The whole "B1 got worse" episode was a tooling error, not a result about the claim.
-
-> **บทพูด (TH).** สไลด์นี้คือการแก้ที่ต้นเหตุ
-> ตอนแรกเรา "fine-tune" ด้วยวิธีที่ผิดสนิท — มันไป retrain ทุกอย่างพร้อมกันด้วย loss ของการ pretrain
-> ผลคือ B1 **แย่ลงกว่าไม่ทำอะไรเลย** (0.264 → 0.231) แล้วเราก็เสียเวลาไล่หาว่าทำไมมันพัง ทั้งที่คำถามที่ถูกคือ "เราใช้วิธี adaptation จริง ๆ หรือยัง" — **คำตอบคือยัง**
-> พอใช้ขั้นตอน 4 stage ที่ถูกต้อง **ทุกช่องดีขึ้นเกินเท่าตัว** โดยเฉพาะช่อง forward ที่ไม่เคยเป็นบวกเลยในวิธีเดิม
-> บทเรียน: **มันเป็นบั๊กเครื่องมือ ไม่ใช่ข้อสรุปว่าวิธีเราไม่เวิร์ก**
-
-## Slide 30 — The 2×2: which half is broken
-
-```
-  goal source (physics / vision)  ×  candidate scoring (direct / rollout)
-```
-
-Same goal clip, same 12 candidates, scored per step (not dominant-pick):
-
-| mode | candidates | goal | goal read error | top pick | % steps right family | |top pick − true goal| |
-|---|---|---|---|---|---|---|
-| **A** | direct | physics (privileged) | 0.0000 | turn_w0.008 | **78%** | **0.038** |
-| **D** | direct | **vision only** | **0.0293** | turn_w0.008 | **80%** | **0.038** |
-| B | rollout | physics (privileged) | 0.0000 | side_R_lvl1 | 47% | 0.290 |
-| C | rollout | **vision only** | 0.0293 | side_R_lvl1 | 40% | 0.290 |
-
-**Reading the goal from video costs nothing.** D is handed no recorded number and misreads the goal
-by 0.029 in Froude — yet matches A exactly (same top pick, same distance, 80% vs 78%). The
-misreading is smaller than the gap between the two closest candidates (0.033 vs 0.038), so it never
-changes the ranking. **This is the claim: a vision goal performs like a privileged proprioceptive
-measurement.**
-
-**Rollout does not merely fail — it prefers the worst candidate.** `side_R_lvl1` is the *farthest*
-of all 12 from the goal (0.290 against the best 0.033). Handing it a perfect goal (mode B, error
-0.0000) does not help. The goal is not the problem; the world model in the scoring loop is.
-
-**Reminder (23.5): selections from a library, not a controller.** Nothing here can fall.
-
-**📹 VIDEO — C vs D.** Three panels, aligned by elapsed time (the two bodies record at 20 Hz and
-50 Hz, so matching by frame index puts the goal 2.5× ahead). Goal panel shows both what the system
-read and the true value; footer shows both errors.
-
-| panel | shows |
-|---|---|
-| left | source body ego — the goal |
-| middle | new body ego — what the loop sees |
-| right | new body allocentric — **replayed ground truth, not control** |
-
-> **บทพูด (TH).** สไลด์นี้แยกว่า**ครึ่งไหนของลูปพัง** โดยไขว้สองแกน: เป้ามาจากไหน × ให้คะแนนยังไง
-> **A กับ D เท่ากัน** — D อ่านเป้าจากวิดีโอผิดไป 0.029 แต่**เลือกคลิปเดียวกัน ระยะห่างเท่ากัน** (80% เทียบ 78%)
-> เพราะความผิดพลาดนั้น**เล็กกว่าช่องว่างระหว่างผู้สมัครสองตัวที่ใกล้ที่สุด** (0.033 กับ 0.038) มันเลยไม่เปลี่ยนอันดับ
-> **นี่คือข้อเคลม: เป้าจากภาพทำงานได้เท่ากับการวัดด้วย proprioception ที่แอบดูตัวเลขจริง**
-> **ส่วน rollout ไม่ใช่แค่พลาด แต่เลือกตัวที่แย่ที่สุด** — `side_R_lvl1` ห่างจากเป้าที่สุดใน 12 ตัว (0.290)
-> และ**ต่อให้แจกเป้าที่ถูกต้อง 100% ให้ (mode B) ก็ยังพัง** แปลว่าปัญหาไม่ใช่เป้าหมาย แต่คือ world model ตอนให้คะแนน
-> **ย้ำ:** นี่คือการเลือกคลิปจากคลัง ไม่ใช่ controller — มันล้มไม่ได้อยู่แล้ว
-
-## Slide 31 — Gecko: the actual unseen body
 
 **Separate from everything above.** B1 was in pretrain. Gecko was not — no URDF, no kinematics, no
 expert clips, only babble. This is early work, kept apart on purpose.
@@ -1485,3 +1485,4 @@ coordinate** — it bounds which bodies this method reaches.
 > แต่ขาตัวเองบังเต็มจอ **เป็นข้อจำกัดของเซนเซอร์ ไม่ใช่ของพิกัดกลาง** และยัง**ไม่ควรรัน 2×2 กับมันตอนนี้**
 
 ---
+
