@@ -87,7 +87,7 @@ Each document has one role and does not repeat another.
 | | |
 |---|---|
 | [doc/direction_plan.md](doc/direction_plan.md) | **the plan as it stands today.** Edited in place, never stacked — read this first |
-| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered `F1`…`F184`, with the trap each one avoids. Cited from everywhere else. **Not append-only** — a finding is corrected or withdrawn when a later one refutes it |
+| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered `F1`…`F169`, with the trap each one avoids. Cited from everywhere else. **Not append-only** — a finding is corrected or withdrawn when a later one refutes it |
 | [doc/OPEN_QUESTION.md](doc/OPEN_QUESTION.md) | only what is still undecided. A settled question moves to FINDINGS and leaves one line here |
 | [doc/PROGRESS.md](doc/PROGRESS.md) | the dated engineering log, including what was tried and failed. Thai and English |
 | [doc/SIM_GUIDE.md](doc/SIM_GUIDE.md) | how to actually run anything described above |
@@ -97,8 +97,8 @@ Each document has one role and does not repeat another.
 | [sim/README.md](sim/README.md) | building scenes, recording data, rendering |
 
 **Papers this builds on** are in [doc/ref/](doc/ref/) — LAC-WM (the source architecture), V-JEPA 2,
-DreamerV3, and the latent-action locomotion line. `F67` reads LAC-WM against our own design and
-`F81` explains why its action projector is not optional.
+DreamerV3, and the latent-action locomotion line. `F60` reads LAC-WM against our own design and
+`F72` explains why its action projector is not optional.
 
 ## Layout
 

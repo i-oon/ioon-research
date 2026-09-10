@@ -1,6 +1,6 @@
 """Does insect pretraining transfer locomotion, or only familiarity with the feature space?
 
-F52 showed that ITM and FTM pretrained on stick insects adapt to the B1 from roughly 7x fewer
+F45 showed that ITM and FTM pretrained on stick insects adapt to the B1 from roughly 7x fewer
 target clips than the same architecture from random init. `scratch` controls for "any
 initialisation at all", but it does not separate two very different readings of that margin:
 
@@ -20,7 +20,7 @@ body and the scene at the same time as the ordering, and a difference in transfe
 three explanations instead of one.
 
 **What `shuffled` does NOT do, and this matters.** It does not remove motion. Its partners average
-21.9 frames away and the measured gait cycle is 19 (F53), so a shuffled pair shows the body at two
+21.9 frames away and the measured gait cycle is 19 (F46), so a shuffled pair shows the body at two
 points of a stride -- a *long-baseline* view of motion, not the absence of one. Measured,
 `shuffled` matches `real` at every budget, which therefore licenses only the narrower reading:
 
@@ -116,7 +116,7 @@ def train_arm(mode, clips, cfg, steps, lr, batch, seed, device, save, min_gap=10
         # two arms would agree on.
         #
         # `far` exists because `shuffled` does not separate what it was built to separate. Its
-        # partners average 21.9 frames away against a measured gait cycle of 19 (F53), so it is
+        # partners average 21.9 frames away against a measured gait cycle of 19 (F46), so it is
         # not a pair without motion -- it is a pair with a *long baseline*, and it mixes short
         # ones in as well. Restricting to |partner - t| >= min_gap asks whether the long baseline
         # alone carries the pretraining benefit, which is the claim that one timestep is the wrong

@@ -1,12 +1,12 @@
 """Re-collect the B1's four turn levels so they match the insect in sign and in strength.
 
 **Two defects, one rollout.** `turn_wz0.00` is the forward clip under another name -- +0.1259
-forward and +0.0008 yaw, identical to `speed_vx0.30` in both channels (F114) -- and the whole family
-turns the *opposite way* from the insect, which F75 diagnosed on 2026-08-22 and which was recorded
-as fixed without being applied (F115). Every cross-embodiment turning result compares a left turn
+forward and +0.0008 yaw, identical to `speed_vx0.30` in both channels (F105) -- and the whole family
+turns the *opposite way* from the insect, which F66 diagnosed on 2026-08-22 and which was recorded
+as fixed without being applied (F106). Every cross-embodiment turning result compares a left turn
 with a right turn.
 
-**Matched on what the robots achieve, not on what they are told.** F72 paired the two sides on
+**Matched on what the robots achieve, not on what they are told.** F63 paired the two sides on
 commanded turn rate and reported agreement within 3%; measured, only the third of four pairs
 matches. Sweeping `--wz` at `--vx 0.30` gives a linear response, and these are the commands that
 land on the insect's achieved yaw:
@@ -23,7 +23,7 @@ the pretrained model already learned the insect's version.
 **Four clips per condition come from four windows of one rollout**, because MuJoCo starts every run
 at the same state and is deterministic, so four runs of one command are the same clip four times.
 The windows do not overlap. The insect's four come from four separate CoppeliaSim episodes, which
-differ because that engine does not repeat (F105); this is the closest available equivalent.
+differ because that engine does not repeat (F95); this is the closest available equivalent.
 
   .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/allocentric/beh12_b1_turns
 """
@@ -35,8 +35,8 @@ import sys
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# name, commanded wz, level, first episode id -- ids continue the existing scheme (F114's table)
-# **The condition is a shared target, and each policy needs its own command to hit it.** F80 keeps
+# name, commanded wz, level, first episode id -- ids continue the existing scheme (F105's table)
+# **The condition is a shared target, and each policy needs its own command to hit it.** F71 keeps
 # both B1 policies, two clips each per condition, because every clip of one policy is the same limit
 # cycle at a different phase -- four clips of one policy say one thing four times. The two need
 # different commands for the same result: at the insect's weakest turn `gait3` needs -0.061 and
@@ -56,7 +56,7 @@ SYM = "sim/assets/b1_policy/base_1.7hz_sym/model_600.pt"
 # 50 Hz and the clips are stored at 20 Hz, and the median of the downsampled series is not the
 # median of the full one -- fitting on the wrong rate left the strongest level 27% short.
 # **Positive, to match both insect bodies.** The first pass matched the goal body's negative turns;
-# F117 then found the *pretraining* body turning the other way, and the cheapest resolution is to
+# F108 then found the *pretraining* body turning the other way, and the cheapest resolution is to
 # align everything to it -- pretraining is the expensive artefact, collection and fine-tuning are
 # not. The goal body was re-collected at `--spin_sign -1` and the commands here are negated with it.
 # The policy's response was linear in the sweep, so the magnitudes carry over; **that is an
@@ -65,7 +65,7 @@ LEVELS = (("turn_w0.008", 0, 1000, {"sym": 0.023, "gait3": 0.081}),
           ("turn_w0.024", 1, 1100, {"sym": 0.115, "gait3": 0.169}),
           ("turn_w0.037", 2, 1200, {"sym": 0.191, "gait3": 0.252}),
           ("turn_w0.075", 3, 1300, {"sym": 0.587, "gait3": 0.664}))
-# two clips per policy, in the order the existing set uses: sym first, then gait3 (F80)
+# two clips per policy, in the order the existing set uses: sym first, then gait3 (F71)
 POLICIES = (("sym", SYM, 1.7), ("gait3", "", 2.0))
 CLIPS_PER_POLICY, FRAMES, FPS = 2, 66, 20.0
 

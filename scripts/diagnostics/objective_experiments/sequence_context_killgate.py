@@ -8,7 +8,7 @@ Gated on `ground_truth_action_flatness.py`: ground truth showed real signal (per
 ridge-LOO R^2=0.204) for real-action-deviation -> real-Froude-deviation within a fixed behaviour.
 This cleared the "worth building" bar for a context-based fix.
 
-**This must differ from the R0 GRU kill-gate (F198 addenda) on the ONE axis that matters, and
+**This must differ from the R0 GRU kill-gate (F180 addenda) on the ONE axis that matters, and
 change nothing else, or a null result is uninterpretable.** Checking R0 against the four
 properties this line of attack needs (frame-sequence not pooled, command-sequence, real recurrent
 state, delta-Froude target): R0 already had three of the four -- `h_t =

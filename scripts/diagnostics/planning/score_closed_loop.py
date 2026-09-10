@@ -109,7 +109,7 @@ def channel_for(condition, ref):
     **Choosing by magnitude graded every turn as a walk.** Forward speed exceeds yaw in all four
     turn conditions on both bodies -- 0.136 against 0.088 even at `turn_s0.56` -- so `S.R. speed`
     measured forward travel on turning runs and **turn rate was never scored in any closed loop**
-    (F108). Shared with the renderer so a video's header cannot disagree with the table.
+    (F98). Shared with the renderer so a video's header cannot disagree with the table.
     """
     named = {"turn": "yaw", "side": "lateral", "speed": "forward"}
     for prefix, ch in named.items():
@@ -128,7 +128,7 @@ def main():
                          "the one driven. **The goal is what a run has to be scored against, not "
                          "the demonstration**: in a cross-embodiment run `--demo` supplies only "
                          "the start state and the warm-start commands and is held fixed and "
-                         "neutral while the goal varies (F109, F110), so grading against it reads "
+                         "neutral while the goal varies (F100, F101), so grading against it reads "
                          "a forward B1 walk for a run whose goal was an insect turning. Defaults "
                          "to `--demo_dir`, which is right when goal and demonstration coincide.")
     args = ap.parse_args()

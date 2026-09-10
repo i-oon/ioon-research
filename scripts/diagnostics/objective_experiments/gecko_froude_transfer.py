@@ -3,7 +3,7 @@ candidate library, no controller, no new collection.
 
   .venv/bin/python3 scripts/diagnostics/objective_experiments/gecko_froude_transfer.py
 
-**Why this replaces the selection/mean-rank framing.** F136's benchmark shape (rank N named
+**Why this replaces the selection/mean-rank framing.** F127's benchmark shape (rank N named
 candidates) only makes sense when N candidates exist. Hexapod/B1 have 12; gecko has none -- only
 a continuous generic-CPG babble sweep, no hand-built behaviour repertoire. Forcing a library onto
 gecko would be infrastructure built to match a metric, not to answer the actual question: does the
@@ -59,7 +59,7 @@ from wm.models.action_projector import ActionProjector, action_dims_from  # noqa
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
-# F199's zero-shot numbers (median rho, z=proj) -- the "before" this script's --teacher_ckpt /
+# F181's zero-shot numbers (median rho, z=proj) -- the "before" this script's --teacher_ckpt /
 # --proj_ckpt overrides are meant to be compared against once a fine-tune has run.
 F199_HEX_BASELINE = 0.454
 F199_B1_BASELINE = 0.427
@@ -230,13 +230,13 @@ def main():
     print("=" * 78)
     print(f"forgetting gate  hexapod {proj_median['hexapod']:+.3f} "
          f"({'PASS' if hex_ok else 'FAIL'}, bar {hex_bar:.3f} = {FORGET_TOL:.0%} of "
-         f"F199 zero-shot {F199_HEX_BASELINE:.3f})")
+         f"F181 zero-shot {F199_HEX_BASELINE:.3f})")
     print(f"                 b1      {proj_median['b1']:+.3f} "
          f"({'PASS' if b1_ok else 'FAIL'}, bar {b1_bar:.3f} = {FORGET_TOL:.0%} of "
-         f"F199 zero-shot {F199_B1_BASELINE:.3f})")
+         f"F181 zero-shot {F199_B1_BASELINE:.3f})")
     print(f"recovery bar     gecko   {proj_median['gecko']:+.3f} "
          f"({'PASS' if gecko_ok else 'FAIL'}, bar {recover_bar:.3f} = {RECOVER_FRAC:.0%} of "
-         f"B1's {F199_B1_BASELINE:.3f}; F199 zero-shot was {F199_GECKO_ZEROSHOT:.3f})")
+         f"B1's {F199_B1_BASELINE:.3f}; F181 zero-shot was {F199_GECKO_ZEROSHOT:.3f})")
 
     if hex_ok and b1_ok and gecko_ok:
         print("\n-> CLAIM (3) HOLDS: fine-tuning the world model on gecko's babble recovers a real")

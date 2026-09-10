@@ -12,7 +12,7 @@ number the robot never had.
 
 **Only the gap between the two lines is the bug.** Both dip at the ends because the robot really
 does start from rest and slow at the end, and that transient is *useful* -- speed variation is the
-one intervention that moved the forward model (F63), and accelerating from a stop is a behaviour
+one intervention that moved the forward model (F56), and accelerating from a stop is a behaviour
 both robots share, which is exactly what an alignment target wants. The fix keeps the transient and
 corrects its magnitude; it is not an argument for trimming the data.
 

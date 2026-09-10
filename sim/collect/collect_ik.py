@@ -50,7 +50,7 @@ EP = 66
 
 # Seconds per recorded step. The insect expert runs at 20 Hz (`sim_time` in
 # expert_66k_aug3c_fcontact.csv), so a 66-step clip is 3.30 s. Written down rather than left
-# implicit: F74 was a frame rate nobody had recorded, and it made every cross-embodiment number
+# implicit: F65 was a frame rate nobody had recorded, and it made every cross-embodiment number
 # compare 20 ms on one robot against 50 ms on the other.
 STEP_DT = 0.05
 CHAIN_NAMES = ("m1", "coxa", "m2", "femur", "m3", "tibia", "tibial", "forceSensor", "foot")
@@ -198,7 +198,7 @@ def cpg_frame(recipe, leg_gain, leg_off, t, spin):
     """One frame of the oscillator, with `spin` supplied per step rather than fixed.
 
     **This exists so the hexapod can hold a heading the way the B1 does.** The B1's rollout runs a
-    PI controller on heading error (F78) and drifts 0.33 deg/s; the insect's oscillator is open loop
+    PI controller on heading error (F69) and drifts 0.33 deg/s; the insect's oscillator is open loop
     and wanders 3x more (yaw sd 0.016 against 0.005 in the conditions where neither robot is
     turning). That difference is not a property of the two robots -- it is a controller we gave one
     and not the other -- and it lands in the yaw channel's noise floor, where two thirds of the
@@ -304,7 +304,7 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     side's amplitude down instead, and over three repeats moved the heading **+2 degrees at +0.3 and
     +14 at -0.3** -- neither monotonic nor symmetric, against `--spin`'s 73. What it does instead is
     brake, travel 0.37 to 0.21 m, because shortening both legs on one side slows the robot more than
-    it turns it. **`--spin` is the steering drive** (F71).
+    it turns it. **`--spin` is the steering drive** (F62).
     """
     sim.loadScene(f"{ENV}/{scene}")
     # **Oscillate around the animal's walking posture, not the model's spawn pose.** The scene's
@@ -338,7 +338,7 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     # **The oscillator's own clock, and `--schedule` has to live here or it does nothing.**
     # `schedule_path` retimes the recorded *foot path*, but `--gait cpg` keeps only `cmds.mean(0)`
     # from it as a bias pose and regenerates the stroke from `cycles` -- so a schedule passed to a
-    # CPG run was silently discarded, and F165's first collection produced eight conditions with no
+    # CPG run was silently discarded, and F151's first collection produced eight conditions with no
     # within-clip speed change at all while its log said otherwise. Advancing the phase by a
     # per-frame rate is the same operation in the oscillator's own terms: rate 1 is the recorded
     # pace, 0 holds the pose, 1.4 is forty percent faster.
@@ -422,7 +422,7 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
             # Splitting this by leg row was tried and does not cancel the yaw: front alone
             # yaws +1 degree, middle +12, hind +80, so it is not a front-against-hind couple and
             # the best of four gain sets still left 20 degrees. Switching the fore-aft swing off
-            # is what fixes it (F71).
+            # is what fixes it (F62).
             cmds[:, i * 3 + 2] += sign * strafe * amps[2] * o[:, 2]
 
     return cmds, dict(target_leg_length=leg_length(sim), scale=1.0,
@@ -462,7 +462,7 @@ def piecewise(spec, frames):
     **The turn equivalent of `--schedule`, and the point is the onset.** `--spin` is one number for
     a whole clip, so a turn is a *property* of the clip and the frame that starts it never exists.
     A probe on such a set can read "this is a turning clip" off any frame; it can never be asked
-    "is the turn about to begin", which is what a controller needs and what F164's random jitter
+    "is the turn about to begin", which is what a controller needs and what F150's random jitter
     could not supply. Segments share `parse_schedule`'s grammar so one habit covers both.
     """
     segments = parse_schedule(spec, require_moving=False)
@@ -513,7 +513,7 @@ def retime(brel, speed, speed_end=None):
 
     **Every leg is resampled by the same time map**, so the inter-leg phase relationships are
     untouched. That matters here more than it looks: the expert is a real stick insect walking a
-    variable wave, and F56 measured that its five non-reference legs land at near-uniform phase
+    variable wave, and F49 measured that its five non-reference legs land at near-uniform phase
     (concentration 0.07-0.24) where a B1's are pinned at 0.99-1.00. That variability is a property
     of the animal and the reason no tight cross-robot pairing exists; retiming preserves it, where
     authoring a synthetic tripod path would throw it away along with the rest of the recording.
@@ -528,7 +528,7 @@ def retime(brel, speed, speed_end=None):
     T = len(next(iter(brel.values())))
     end = speed if speed_end is None else speed_end
 
-    # A **ramp**, not a constant factor, when speed_end differs. F58 measured why this matters:
+    # A **ramp**, not a constant factor, when speed_end differs. F51 measured why this matters:
     # with one speed per clip the body-speed target takes 12 distinct values across 32 clips, and
     # the shared decoding head learns the lookup table rather than the quantity -- train loss 0.077
     # against 0.855 on held-out clips, where 1.0 is "predict the mean". Sweeping the speed inside a
@@ -601,11 +601,11 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
 
     **`heading` closes the loop on body direction, and exists to remove an asymmetry we created.**
-    The B1's rollout runs a PI controller on heading error and drifts 0.33 deg/s (F78); the insect's
+    The B1's rollout runs a PI controller on heading error and drifts 0.33 deg/s (F69); the insect's
     oscillator was open loop and wandered three times as much -- yaw sd 0.016 against 0.005 in the
     eight conditions where neither robot turns, which is two thirds of the dataset. That difference
     is not a property of the two animals, it is a controller given to one and not the other, and it
-    lands squarely in the yaw channel's noise floor (F85). Pass
+    lands squarely in the yaw channel's noise floor (F75). Pass
     `dict(kp=, ki=, recipe=, leg_gain=, leg_off=)` to correct it the same way, by modulating the
     oscillator's own `--spin` term rather than by matching the noise afterwards.
 
@@ -764,7 +764,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             step_cmd = np.asarray(policy(observation, t), np.float32)
         if heading is not None and prev is not None:
             # **Error is (current - start), and the sign is not free.** Positive `--spin` yaws
-            # *negative* -- measured, `spin 0.4` gives omega -0.416, and F75 had to re-collect the
+            # *negative* -- measured, `spin 0.4` gives omega -0.416, and F66 had to re-collect the
             # turn set at negative spin to make both robots turn the same way. So a body that has
             # drifted positive needs a *positive* trim to come back, which means the error must be
             # (current - start). Written the other way round it is positive feedback: the first
@@ -776,7 +776,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
                                  t, heading["recipe"]["spin"] + trim).astype(np.float32)
         if cmd_noise > 0.0:
             # **Off-rhythm exploration, and the logged action is the perturbed one.** A gait makes
-            # the pose predict the next frame by rhythm alone (F159), so testing whether that
+            # the pose predict the next frame by rhythm alone (F145), so testing whether that
             # redundancy is a property of the *data* needs commands that leave the rhythm. The
             # noise is temporally correlated -- white noise at 20 Hz is filtered out by the joint
             # controller and never reaches the pose -- and it is added **after** the heading and
@@ -811,7 +811,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         # Position alone cannot separate crabbing from turning: both change where the robot goes,
         # and only attitude says whether it is still facing the way it started. It is also three of
         # the six channels of the body pose delta that the shared head should eventually target
-        # (F70), and none of them could even be screened without this.
+        # (F61), and none of them could even be screened without this.
         # **The abdomen, not the head.** `/head` is a segment that swings with every step -- 129
         # degrees of sway across a clip -- so its attitude says almost nothing about where the body
         # is pointing. Measured off the head, straight walking read as a 108 degree turn.
@@ -871,7 +871,7 @@ def main():
                     help="sweep the speed across the clip, from --speed to this. Leave unset for "
                          "a constant factor. A ramp makes the body-speed target continuous instead "
                          "of one value per clip, which is what stops a decoding head memorising "
-                         "it (F58).")
+                         "it (F51).")
     ap.add_argument("--loops", type=int, default=1,
                     help="repeat each 66-step expert foot path into one longer clip")
     ap.add_argument("--behavior", type=str, default="walk",
@@ -906,10 +906,10 @@ def main():
     ap.add_argument("--head_kp", type=float, default=0.0,
                     help="proportional gain of a heading controller on the oscillator's own --spin. "
                          "0 leaves the gait open loop, which is how every clip before 2026-08-23 "
-                         "was recorded. The B1 has had PI heading control since F78 and drifts 0.33 "
+                         "was recorded. The B1 has had PI heading control since F69 and drifts 0.33 "
                          "deg/s where the insect wanders three times as much; that asymmetry is a "
                          "controller we gave one robot and not the other, and it lands in the yaw "
-                         "channel's noise floor (F85). --gait cpg only")
+                         "channel's noise floor (F75). --gait cpg only")
     ap.add_argument("--head_ki", type=float, default=0.0,
                     help="integral gain. Proportional alone cannot reject a constant disturbance "
                          "below disturbance/gain, which is exactly how the B1's standing bias "
@@ -952,7 +952,7 @@ def main():
     ap.add_argument("--ego", action="store_true",
                     help="**mount the camera on the robot and look forward.** The de-risk gate for "
                          "the egocentric direction: a head view cannot show the robot its own pose, "
-                         "so the single-frame action redundancy that F159 measured should break. "
+                         "so the single-frame action redundancy that F145 measured should break. "
                          "**Look at a frame before trusting it** -- the orientation defaults are "
                          "conventions, not measurements")
     ap.add_argument("--ego_forward", type=float, nargs=3, default=None, metavar=("X", "Y", "Z"),
@@ -1007,7 +1007,7 @@ def main():
                          "to the final joint command and logs the perturbed command as `a_t`, so a "
                          "set can be collected in which the pose does not determine the next frame "
                          "by rhythm alone. 0 reproduces every set collected before 2026-08-31. "
-                         "Start at 0.05 and **watch the video before measuring anything** (F163)")
+                         "Start at 0.05 and **watch the video before measuring anything** (F149)")
     ap.add_argument("--noise_tau", type=float, default=5.0,
                     help="correlation time of --cmd_noise, in steps. White noise (tau 1) is "
                          "filtered out by the joint controller and never reaches the pose")
@@ -1186,7 +1186,7 @@ def main():
                 # yaws its way across the floor and happens to finish the right distance away passes
                 # `walk_check`; watching the video is what caught it. 1.0 is a straight line. The
                 # recorded gait runs 1.28; the first oscillator settings ran 1.44, and wander that is
-                # not commanded shows up later as lateral variation belonging to no behaviour (F70).
+                # not commanded shows up later as lateral variation belonging to no behaviour (F61).
                 xy = h[:, :2]
                 net = float(np.linalg.norm(xy[-1] - xy[0]))
                 wander = (float(np.linalg.norm(np.diff(xy, axis=0), axis=1).sum()) / net

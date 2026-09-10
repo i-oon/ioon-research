@@ -10,7 +10,7 @@ body held out of training, capacity costs accuracy: with identical inputs, a lin
 reached 4.88 deg per joint on the held-out body where the full decoder reached 10.94, while
 the full decoder was 5.7x better on the bodies it trained on. Two training bodies do not
 constrain what happens between them, so a model free enough to fit them as two separate cases
-does exactly that. See FINDINGS.md F4b.
+does exactly that. See FINDINGS.md F4.
 
   mlp     cross-attention backbone, two-layer head. The original design.
   linear  cross-attention backbone, single linear projection as the head.
@@ -21,12 +21,12 @@ does exactly that. See FINDINGS.md F4b.
 256 patch tokens recovers a held-out body's three segment scales to 0.050, 0.039 and 0.002,
 while the trained decoder's answer for that body implies (0.98, 0.98, 0.97) against an actual
 (0.80, 0.90, 0.90) -- worse than the linear map, with 5.2M parameters against 4,227
-(FINDINGS.md F20). The information is in the frame, linearly available, and the decoder does not
+(FINDINGS.md F17). The information is in the frame, linearly available, and the decoder does not
 use it.
 
 The difference is how each one reaches the tokens. The probe averages all of them. The decoder
 sees them only through cross-attention with `z` as the query, so it retrieves what `z` asks for,
-and `z` is 64 percent gait phase (F19); morphology sits in the tokens unqueried. `pooled` adds
+and `z` is 64 percent gait phase (F16); morphology sits in the tokens unqueried. `pooled` adds
 the averaged view alongside the attention path, so the same signal the probe uses is reachable
 without `z` having to ask.
 """
@@ -94,7 +94,7 @@ class MotionDecoder(nn.Module):
 
         # **The head predicts a window of commands, not one.** With `frame_stride` k the pair
         # e_t -> e_{t+k} is caused by k commands, so scoring `z` against a single one asks the
-        # latent to summarise an interval and then grades it on an instant. Measured (F88):
+        # latent to summarise an interval and then grades it on an instant. Measured (F78):
         # widening the frames alone took validation motion from 0.218 to 0.928, roughly the level
         # of predicting the training mean. LAC-WM chunks both sides for this reason.
         #
@@ -114,11 +114,11 @@ class MotionDecoder(nn.Module):
         # LAC-WM does not face that fork: its motion decoder targets end-effector and camera pose,
         # the same numbers for a human hand, a humanoid and a Franka arm, so one output layer
         # enforces shared meaning. Its EAC-WM baseline -- separate encoders per embodiment, what we
-        # had -- gives embeddings "clearly separated by dataset" in their Figure 2 (F55, F58).
+        # had -- gives embeddings "clearly separated by dataset" in their Figure 2 (F48, F51).
         #
         # **Why it does not take `x_t`, unlike every other head here.** LAC-WM's MD is conditioned
         # on the observation, so matching the method means passing the frame. That was tried
-        # (`stage2_speed7_bodyframe`, F64) and it destroys the effect: cross-embodiment transfer
+        # (`stage2_speed7_bodyframe`, F57) and it destroys the effect: cross-embodiment transfer
         # goes from +0.544 / +0.435 to **-10.5 / -57.2**, worse than no term at all.
         #
         # The reason is not that the head ignores `z` -- ablating `z` still costs 2.32x. It is that
@@ -136,7 +136,7 @@ class MotionDecoder(nn.Module):
         if not build_body:
             self.body_head = None
         elif self.body_sees_frame:
-            # kept so F64's negative result is reproducible, not because it should be used
+            # kept so F57's negative result is reproducible, not because it should be used
             self.body_head = _head(self.mode, self.width, cfg.body_dim)
         else:
             self.body_head = nn.Sequential(

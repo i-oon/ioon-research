@@ -5,7 +5,7 @@ command. It is well posed only because every insect body walks the *same expert 
 a given timestep two bodies share the intent exactly and differ only in geometry. The hexapod and
 the B1 share no episodes, so the pairing has to be reconstructed from something both robots
 record. Per-leg contact is the candidate: it needs no shared gait period, and the four corner legs
-correspond anatomically (F41b).
+correspond anatomically (F35).
 
 This decides whether that works **before** a training run, the same way the encoder probe on
 slide 10 predicts a split's outcome for a few minutes of CPU rather than four GPU-hours.

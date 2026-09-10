@@ -5,7 +5,7 @@
 #
 #   bash scripts/run/com7_state_head_more.sh          # on com7, under tmux
 #
-# **Why this run exists.** F186/F187 (condition_confusion.py) found the state head ranks well
+# **Why this run exists.** F171/F172 (condition_confusion.py) found the state head ranks well
 # above noise on well-separated candidates (68% win, 3.95x signal/floor) but is far from the
 # ~100% a scorer with no error of its own should get there. The errors concentrate almost
 # entirely on confusing ADJACENT SPEEDS (speed_c7.1 vs c8.8, etc.) -- a real but closely-spaced
@@ -25,7 +25,7 @@
 # construction, and the batch sampler will oversample b1 more than usual as a result.
 #
 # **The read.** This is not a ranking-test pass/fail like the first run -- it is a before/after on
-# F187's own diagnostic:
+# F172's own diagnostic:
 #   condition_confusion.py accuracy/cosine/magnitude-gap clearly improve on the enlarged set
 #     -> the wall was data sparsity, and the fix is more collection, not more architecture
 #   no meaningful change
@@ -81,7 +81,7 @@ if [ -f "$RUN/teacher_more.pt" ]; then echo "skip $RUN/teacher_more.pt"; else
 fi
 
 echo
-echo "=== F187's own diagnostic, before/after. CoppeliaSim must be up, GUI, one instance  $(date '+%F %T')"
+echo "=== F172's own diagnostic, before/after. CoppeliaSim must be up, GUI, one instance  $(date '+%F %T')"
 echo "  medauroidea_c08f09t09.ttt on port 23000 -- see doc/SIM_GUIDE.md"
 echo "  this does not launch CoppeliaSim itself: start it, confirm the connection, THEN continue"
 read -p "CoppeliaSim ready on port 23000 with medauroidea_c08f09t09.ttt? [y/N] " ok
@@ -102,5 +102,5 @@ $PY -u scripts/diagnostics/planning/rank_fine_three_ways.py \
 echo
 echo "=== done  $(date '+%F %T')"
 echo "send back $RUN/{best_state.pt,teacher_more.pt,config.yaml} and both scripts' printed output"
-echo "read F186/F187 (doc/FINDINGS.md) before reading these numbers -- this run only means"
+echo "read F171/F172 (doc/FINDINGS.md) before reading these numbers -- this run only means"
 echo "something in comparison to the 68% / 3.95x / adjacent-speed-confusion baseline they measured"

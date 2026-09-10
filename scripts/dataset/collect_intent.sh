@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# F166. Meaningful phase-breaking: the robot leaves the rhythm **on purpose**.
+# F152. Meaningful phase-breaking: the robot leaves the rhythm **on purpose**.
 #
-# **F165's run of this script is void.** `--gait cpg` kept only `cmds.mean(0)` from the scheduled
+# **F151's run of this script is void.** `--gait cpg` kept only `cmds.mean(0)` from the scheduled
 # foot path and regenerated the stroke from `--cycles`, so eight of the twelve conditions carried no
 # within-clip change while every log line said they did. `cpg_commands` now takes a per-frame pace
 # and advances its phase by `cumsum(rate) - rate`, which reproduces `arange(frames)` exactly at rate
@@ -11,8 +11,8 @@
 #
 #   bash scripts/dataset/collect_intent.sh          # CoppeliaSim GUI, exactly ONE instance
 #
-# **Distinct from both earlier attempts, and that is the whole point.** F163's speed ramp retimed
-# the whole foot path and preserved inter-leg phase, so the gap stayed at +0.024. F164's random
+# **Distinct from both earlier attempts, and that is the whole point.** F149's speed ramp retimed
+# the whole foot path and preserved inter-leg phase, so the gap stayed at +0.024. F150's random
 # `--cmd_noise` broke the phase and opened the gap to +0.198, but with **jitter**: a model trained
 # on it learns to read noise, which is useless for control. Here the rhythm breaks because a
 # *command* changed -- a stop, a speed break, a turn beginning -- so the thing the transition
@@ -22,13 +22,13 @@
 # frame of a turning clip says "turning clip" and no frame is the one where the turn begins; a probe
 # can read the label off any frame and never has to predict the change. Onsets are placed at
 # different fractions across conditions, and in both directions, so "later in the clip" and
-# "turning" are not the same thing -- the reasoning F60 used for collecting ramps both ways.
+# "turning" are not the same thing -- the reasoning F53 used for collecting ramps both ways.
 #
 # **This is also the exploratory set the parked bootstrap problem needs.** One collection, two uses.
 #
-# **The clean control already exists**: `data/allocentric/beh12_c10f10t10_sweepn00_flat`, from F164's sitting,
+# **The clean control already exists**: `data/allocentric/beh12_c10f10t10_sweepn00_flat`, from F150's sitting,
 # which read 0.729 single-frame with a +0.102 gap. Sitting-to-sitting variation on that measurement
-# is about 0.035 and 0.018 (F164), so a real effect has to clear that.
+# is about 0.035 and 0.018 (F150), so a real effect has to clear that.
 #
 # **Read the `da` row of `intent_recoverability.py` and nothing else as the result.** A gap on the
 # family label is a label, which we already have and already rejected. **Separability improving is
@@ -78,7 +78,7 @@ fi
 
 echo
 echo "############ GATE -- did the intervention reach the robot? ############"
-echo "F165's first run failed here and nowhere else: --schedule was discarded by --gait cpg, and"
+echo "F151's first run failed here and nowhere else: --schedule was discarded by --gait cpg, and"
 echo "the command lines, the log, walk_check, separability and the R2 tables all passed it."
 echo "**Nothing below runs unless every condition changes within its clip.**"
 $PY scripts/dataset/check_within_clip_intent.py --data "$OUT" --clean "$CLEAN"
@@ -88,7 +88,7 @@ echo "############ SEPARABILITY -- context only, NOT the result ############"
 $PY scripts/dataset/collect_beh12.py --separability "$OUT" || true
 
 echo
-echo "############ GAP, against F164's clean null: 0.729 single frame, +0.102 gap ############"
+echo "############ GAP, against F150's clean null: 0.729 single frame, +0.102 gap ############"
 $PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$OUT" --embodiment hexapod --cache results/wm/cache/intent2.pt --stride 2
 
@@ -96,7 +96,7 @@ echo
 echo "############ INTENT -- the da row is the result ############"
 $PY scripts/diagnostics/objective_experiments/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$OUT" --embodiment hexapod --cache results/wm/cache/intent2.pt --stride 2
-echo "--- the same three targets on F164's CLEAN arm, so the da row has its own null"
+echo "--- the same three targets on F150's CLEAN arm, so the da row has its own null"
 $PY scripts/diagnostics/objective_experiments/intent_recoverability.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt \
     --data "$CLEAN" --embodiment hexapod \
     --cache results/wm/cache/sweepn00.pt --stride 2

@@ -6,7 +6,7 @@
 #   bash scripts/step1_egocentric.sh train       # on com7, under tmux, ~6 h
 #   bash scripts/step1_egocentric.sh measure     # anywhere the checkpoint is
 #
-# **Q1 showed the signal exists. This asks whether a trained model uses it.** F155 through F169 are
+# **Q1 showed the signal exists. This asks whether a trained model uses it.** F142 through F154 are
 # a record of signals that existed and were then ignored by a trained predictor, so the two are not
 # the same question and only this one decides whether anything downstream has ground to stand on.
 #
@@ -16,9 +16,9 @@
 #                                measure a landmark instead of the view
 #   GATE B  null separability    `ITM(e_t, e_t)` must still be a *different vector* from a real
 #                                transition. **If it is not, `null/real` compares a thing with
-#                                itself** and a ratio near 1.0 would mean nothing -- an F160-shaped
+#                                itself** and a ratio near 1.0 would mean nothing -- an F146-shaped
 #                                confound. This cannot be checked before training
-#   GATE C  the question         `null/real` on the HELD-OUT body, against F157's allocentric 1.03
+#   GATE C  the question         `null/real` on the HELD-OUT body, against F141's allocentric 1.03
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -34,12 +34,12 @@ case "${1:-}" in
 
 collect)
   # **The held-out body, egocentric.** Every number this project decides on is measured on
-  # `c08f09t09`, which no run trains on -- F159's 0.779, F155's 1.03, every rollout figure. Without
+  # `c08f09t09`, which no run trains on -- F145's 0.779, F142's 1.03, every rollout figure. Without
   # its egocentric twin, GATE C would be read on a body the model was trained on and could not be
   # compared with the allocentric baseline at all.
   #
   # `--spin_sign -1` reproduces the dataset's turn direction. **The default is +1 and produces turns
-  # the other way round**, which is F117's week-long error waiting to happen again.
+  # the other way round**, which is F108's week-long error waiting to happen again.
   #
   # `--ego_seed 0` with `--repeats 4` gives room = repeat index, so the four clips of every
   # condition sit in four different rooms and every room hosts all twelve behaviours. **The same
@@ -85,7 +85,7 @@ measure)
 
   echo
   echo "############ GATE C -- does the trained model USE the action? ############"
-  echo "Allocentric baseline, same measurement, same held-out body: null/real = 1.03 (F155, F157)."
+  echo "Allocentric baseline, same measurement, same held-out body: null/real = 1.03 (F142, F141)."
   echo "PASS: clearly above ~1.10 on both bodies.  FAIL: near 1.03 -- the viewpoint was necessary"
   echo "and not sufficient, which is reportable as it stands."
   $PY scripts/diagnostics/objective_experiments/action_necessity.py --ckpt "$RUN/best.pt" \

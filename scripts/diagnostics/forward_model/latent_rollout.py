@@ -1,7 +1,7 @@
 """Can the forward model actually roll the world forward, given the actions?
 
 Everything measured so far asked the forward model the wrong question. It was scored on
-whether it improves action reconstruction, and it does not (F23, F30). But that is not what
+whether it improves action reconstruction, and it does not (F20, F46). But that is not what
 a world model is for. Its job is to answer "if I apply this action, what happens next" --
 which is what makes planning possible, and which nothing so far has tested.
 
@@ -85,7 +85,7 @@ def main():
     data_dir = raw if os.path.isabs(raw) else os.path.join(ROOT, raw)
     # A B1 clip is named p{policy}_vx{speed}, not {body}_ep{n}, and stores its command under a
     # different key -- but this measurement only reads frames, so an embodiment-agnostic glob is
-    # enough. Needed to roll an insect-trained forward model on quadruped video (F50's follow-up).
+    # enough. Needed to roll an insect-trained forward model on quadruped video (F43's follow-up).
     if args.glob:
         paths = sorted(glob.glob(os.path.join(data_dir, args.glob)))[:args.clips]
         if not paths:

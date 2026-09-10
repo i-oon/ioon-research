@@ -201,14 +201,14 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         # action->Froude signal IS in z (rho 0.69-0.94 per channel on the real absolute
         # body_motion target, action-lever gap 1.0-1.2 against a 0.11 bar) once a clean head reads
         # it WITHOUT competing against L_recon/L_motion for how z is shaped -- the jointly-trained
-        # z-only head (F192) had the signal available and still failed the action-lever (+0.045),
+        # z-only head (F177) had the signal available and still failed the action-lever (+0.045),
         # because its own gradient was one more voice pulling z toward appearance/motion instead
         # of just reading what is already there. Stop-gradient makes this the same experiment as
         # the isolated test that passed: z is shaped by L_recon/L_motion alone, L_body only reads.
         body_pred = models["md"].body(views["view1_t"], z.detach())
         body_target = batch["body_motion"].to(device)
 
-    # L_state / state_head retired (2026-09-08): F192 showed its delta ingredient actively hurts
+    # L_state / state_head retired (2026-09-08): F177 showed its delta ingredient actively hurts
     # (z+delta R2 0.625 < z-alone 0.781), and its target is `batch["body_motion"]` -- identical to
     # L_body's. Once the delta ingredient is gone the two heads predict the same thing from the
     # same input; keeping both is redundant, not a second signal. Consolidated onto L_body above.
@@ -216,14 +216,14 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     # `beh12_state_zonly/teacher_zonly.pt`); new configs should leave `lambda_state` at 0.
     state_pred = state_target = None
 
-    # --- ActSWM terms (F146, F151, F152). Off unless `lambda_hinge` or `lambda_readout` is set,
+    # --- ActSWM terms (F137, F141, F141). Off unless `lambda_hinge` or `lambda_readout` is set,
     # so every earlier run reproduces byte for byte.
     hinge = readout_loss = None
     if cfg.lambda_hinge > 0 or cfg.lambda_readout > 0:
-        # **The null is `ITM(e_t, e_t)` -- the latent of "nothing happened".** F148's standing
+        # **The null is `ITM(e_t, e_t)` -- the latent of "nothing happened".** F139's standing
         # stance is an *action*, and pretraining has no action projector to map it into `z`; a
         # hinge built on `proj(stance)` puts exactly zero gradient into `z`, measured on both
-        # bodies (F151). The stance null remains the right one for anything measured through the
+        # bodies (F141). The stance null remains the right one for anything measured through the
         # projector, which is a different stage. **Never compare the two stages' `/mean-z`.**
         z_null = models["itm"](views["view1_t"], views["view1_t"])
         real, null, seps = views["view2_t"], views["view2_t"], []
@@ -233,17 +233,17 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
             seps.append(1 - F.cosine_similarity(real.flatten(1), null.flatten(1), dim=1).mean())
         if cfg.lambda_hinge > 0:
             # margin 0.1, not ActSWM's 0.3: at 0.3 the term overshoots, switches itself off and
-            # collapses -- 0.019, 0.137, 0.496, 0.008 with its gradient dying to 0.00006 (F151).
-            # At 0.1 separation rises and holds on both bodies (F152).
+            # collapses -- 0.019, 0.137, 0.496, 0.008 with its gradient dying to 0.00006 (F141).
+            # At 0.1 separation rises and holds on both bodies (F141).
             hinge = F.relu(cfg.hinge_margin - torch.stack(seps)).mean()
         if cfg.lambda_readout > 0 and "readout" in models:
             # the readout is frozen and randomly initialised: it cannot relocate the boundary it
-            # scores, so the only way to lower this is to make the transitions separable (F150)
+            # scores, so the only way to lower this is to make the transitions separable (F141)
             readout_loss = F.mse_loss(models["readout"][embodiment](views["view2_t"], real),
                                       action.reshape(len(action), -1)[:, :models["readout"][
                                           embodiment].out_dim])
 
-    # --- Delta-JEPA's LDAD (F183). Off unless `lambda_ldad` is set, so every earlier run is
+    # --- Delta-JEPA's LDAD (F168). Off unless `lambda_ldad` is set, so every earlier run is
     # unchanged. **The difference is taken on the PREDICTION, not on the true next frame**: the
     # gradient has to reach the forward model, which is the module that collapses, and a difference
     # of two true embeddings would train the decoder alone.
@@ -426,17 +426,8 @@ def build_models(cfg, device, heads=None, n_bodies=0):
     return models
 
 
-def build_cross_embodiment(cfg, root, fixed_body_stats=None):
-    """Datasets, sampler and decoder heads for training across embodiments.
-
-    `fixed_body_stats`, when given, is threaded straight into `MultiEmbodimentPairs` and skips its
-    own pooled recompute (F200). **Why this matters for a warm start specifically**: `--init_ckpt`
-    loads `md.body_head`'s weights as fit to WHATEVER standardisation the ORIGINAL run pooled --
-    e.g. hexapod alone. Adding a new source (B1, a new babble body) changes what gets pooled, so
-    the recomputed `body_stats` silently differs from the scale those warm-started weights were
-    calibrated to, and the fine-tune's very first step already grades them against a shifted
-    target. Passing the original run's own `body_stats` here removes that shift as a variable.
-    """
+def build_cross_embodiment(cfg, root):
+    """Datasets, sampler and decoder heads for training across embodiments."""
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
     train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
                                                   heldout_bodies=tuple(cfg.heldout_bodies),
@@ -445,8 +436,7 @@ def build_cross_embodiment(cfg, root, fixed_body_stats=None):
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                      body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k,
-                                     body_stats=fixed_body_stats)
+                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k)
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
@@ -510,14 +500,6 @@ def parse_args(cfg):
                              "checkpoint, which is the only configuration measured before this run "
                              "-- see doc/FINDINGS.md's state-head chain. Ignored if --resume finds "
                              "a run to continue.")
-    parser.add_argument("--body_stats_from", type=str, default="",
-                        help="**F200's fix, not a general knob.** Loads `body_stats` (mean, std) "
-                             "from this checkpoint and holds it fixed for the whole run instead of "
-                             "letting `build_cross_embodiment` pool it fresh from --sources. Use "
-                             "this with --init_ckpt when adding a new source to a warm-started run "
-                             "-- otherwise the recompute silently shifts the standardisation the "
-                             "warm-started body_head's weights were calibrated to, confounding "
-                             "whether a fine-tune failure is the fine-tune or this shift.")
     return parser.parse_args()
 
 
@@ -525,8 +507,7 @@ def main():
     args = parse_args(Config())
     # --name, --resume and --init_ckpt are how the run is invoked, not part of what it is
     cfg = Config(**{k: v for k, v in vars(args).items()
-                    if k not in ("name", "resume", "init_ckpt", "allow_shape_mismatch",
-                                 "body_stats_from")})
+                    if k not in ("name", "resume", "init_ckpt", "allow_shape_mismatch")})
     cfg.train_morphs = tuple(cfg.train_morphs)
 
     torch.manual_seed(cfg.seed)
@@ -536,17 +517,8 @@ def main():
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
     cross_embodiment = bool(cfg.sources)
 
-    fixed_body_stats = None
-    if args.body_stats_from:
-        src = torch.load(os.path.join(ROOT, args.body_stats_from), map_location="cpu",
-                         weights_only=False)
-        fixed_body_stats = src["body_stats"]
-        print(f"body_stats held fixed from {args.body_stats_from}: "
-             f"mean={np.asarray(fixed_body_stats[0])} std={np.asarray(fixed_body_stats[1])}")
-
     if cross_embodiment:
-        train_set, val_set, heads = build_cross_embodiment(cfg, ROOT,
-                                                            fixed_body_stats=fixed_body_stats)
+        train_set, val_set, heads = build_cross_embodiment(cfg, ROOT)
         train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed,
                                        balance=cfg.balance_embodiments)
         val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, False, cfg.seed)
@@ -646,7 +618,7 @@ def main():
             for name, off in state_offsets(models, encoder, train_set, cfg, device).items():
                 models["state"].set_offset(name, off)
         else:
-            print("state_use_delta=False (F192): state head reads z_proj(z) alone, "
+            print("state_use_delta=False (F177): state head reads z_proj(z) alone, "
                   "no pool/offset to fit")
         # a one-time check, not a per-step one: this is exactly the failure that cost a full day
         # of diagnosis earlier -- state_target silently on the wrong scale, discovered only when
@@ -778,7 +750,7 @@ def main():
                if "cross" in train_metrics else "")
             # **Printed because the separation curve is the diagnostic, not the endpoint.** At
             # margin 0.3 it read 0.019, 0.137, 0.496, 0.008 across one short run -- an overshoot,
-            # the hinge switching itself off, and a collapse (F151). A summary that showed only
+            # the hinge switching itself off, and a collapse (F141). A summary that showed only
             # the final value would have called that a number. Watch it every epoch.
             + (f" | hinge {train_metrics['hinge']:.4f} sep {train_metrics['separation']:.4f}"
                f"/{val_metrics['separation']:.4f}"

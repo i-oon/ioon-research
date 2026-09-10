@@ -1,11 +1,11 @@
 """Can a cross-embodiment pairing be built in task space, where the contact labels failed?
 
-F45 ruled out three pairing labels and **all three were built from foot contact** -- which is
+F39 ruled out three pairing labels and **all three were built from foot contact** -- which is
 precisely where a quadruped's trot and a hexapod's wave differ most. It looked for a correspondence
 in the place the two robots have least in common, and found none: the coarse labels pair every
 frame and mean nothing, the fine one means something and pairs a third.
 
-F55 argues that this single missing pairing is what leaves `lambda_cross` undefinable, which leaves
+F48 argues that this single missing pairing is what leaves `lambda_cross` undefinable, which leaves
 nothing forcing one `z` to mean the same thing on both robots, which is why the trunk partitions and
 why learned dynamics do not travel. So it is worth one more attempt in a space the contact labels
 never touched.
@@ -32,7 +32,7 @@ supervises the decoder with the *partner's* command, so a label that does not im
 command even on a single robot yields a **wrong** target rather than a noisy one, and wrong targets
 do not average out with more data.
 
-**The trap this shares with F45.** Coverage and meaning trade against each other: widen the bins
+**The trap this shares with F39.** Coverage and meaning trade against each other: widen the bins
 until both robots overlap and that is the same operation that destroys what the label meant. Both
 columns are reported, or the trade is invisible.
 
@@ -72,14 +72,14 @@ def phase_of(contact, kind):
     reference foot actually lands, that estimate put the B1's touchdown at a tight 0.25-0.31 and
     the insect's at 0.41, 0.45, 0.61, 0.76, 0.87 -- five successive strides of the *same* leg in
     one clip, which should all read alike. The insect's stride is stable at 19 frames on every clip
-    and body (F53), so the gait was periodic and the estimator was not.
+    and body (F46), so the gait was periodic and the estimator was not.
 
     Anchoring on a gait event fixes both problems at once: phase 0 is the same anatomical instant
     on either robot, so "same phase" means the same thing across them, which is the whole point of
     a pairing label.
 
     Contact is used **only to place the origin**, never as the label itself -- that is what
-    separates this from the three labels F45 ruled out. Where the stride begins is a question
+    separates this from the three labels F39 ruled out. Where the stride begins is a question
     inside one robot; it does not ask the two gaits to resemble each other.
     """
     down = contact[:, FRONT_LEFT[kind]] > 0.5
@@ -229,7 +229,7 @@ def main():
           f"{intent_ratio(phase_only, hex_act, hex_grp, rng, args.draws):>10.3f}"
           f"{intent_ratio(b1_phase_only, b1_act, b1_grp, rng, args.draws):>10.3f}")
 
-    print("\nCompare with F45's contact labels, on the same three conditions:")
+    print("\nCompare with F39's contact labels, on the same three conditions:")
     print("  feet down 0-4       overlap 0.572  pairable 98.9%  intent 0.998 on the b1")
     print("  diagonal loaded     overlap 0.711  pairable  100%  intent 0.918 on the hexapod")
     print("  corner pattern      overlap 0.240  pairable 33.8%  intent 0.63 / 0.52")

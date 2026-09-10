@@ -4,7 +4,7 @@
         --ckpt wm/runs/beh12_actswm/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
-**This decides whether a separation term can ever bite.** F154 found the hinge cost long-horizon
+**This decides whether a separation term can ever bite.** F141 found the hinge cost long-horizon
 accuracy and returned no sensitivity. Two explanations survive that and they call for opposite work:
 `lambda_recon` is out of balance and wants tuning, or **one-step prediction does not require `z`**,
 in which case no weighting saves the hinge and the prediction task itself has to be made harder.
@@ -13,7 +13,7 @@ The measurement is one step only, and it swaps what drives the forward model whi
 state fixed:
 
   real       `ITM(e_t, e_t+1)` -- the action that actually happened
-  null       `ITM(e_t, e_t)`   -- F151's null: the model's own name for "nothing happened"
+  null       `ITM(e_t, e_t)`   -- F141's null: the model's own name for "nothing happened"
   shuffled   a real latent from a random position in the same clip -- an action the model has seen,
              paired with a state that never preceded it
   mean       the clip's own mean latent
@@ -21,10 +21,10 @@ state fixed:
 
 **The number that decides it is `null/real`.** Near 1.0 means the action channel buys nothing at one
 step and the objective cannot teach sensitivity. Comfortably above 1.0 means the channel is used and
-F154 is a weighting problem.
+F141 is a weighting problem.
 
 Reported per behaviour family, because the families differ: a single-speed gait fixes its own phase
-from the frame (F119's within-clip trap) while turning does not.
+from the frame (F110's within-clip trap) while turning does not.
 """
 import argparse
 import collections

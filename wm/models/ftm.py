@@ -8,7 +8,7 @@ block structure follows LAC-WM, where latent actions are sequences of chunked st
 `cfg.ftm_embodiment_channel` appends a learned per-embodiment token to the latent sequence.
 The point is to give the model a route to the identity that is not z: with 33.0% of z's
 variance being "which robot this is", and that identity load-bearing rather than incidental
-(FINDINGS.md F39), nothing can strip it from z without breaking what depends on it. The
+(FINDINGS.md F33), nothing can strip it from z without breaking what depends on it. The
 channel supplies it separately so z is free to stop carrying it.
 
 A token rather than something added into z, so that with the channel off the model is

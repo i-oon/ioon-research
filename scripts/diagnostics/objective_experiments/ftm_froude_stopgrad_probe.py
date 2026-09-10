@@ -15,7 +15,7 @@ ALONE, `pred_next.detach()`, so this head's gradient never reaches FTM -- same s
 mechanism as the winning `body_head` fix, applied one step downstream.
 
 **Why this differs from the -0.051 result.** That test reused the ALREADY-EXISTING `state_head`
-(delta-based: `pool(ftm(e_t,z)-e_t) + z_proj(z)`, F192's confirmed-harmful architecture) on a
+(delta-based: `pool(ftm(e_t,z)-e_t) + z_proj(z)`, F177's confirmed-harmful architecture) on a
 checkpoint where THAT head was trained under full joint competition -- conflating two already-
 identified confounds (bad architecture, no stop-gradient) into one number. This test removes both:
 no delta, no z_proj, no joint competition -- a clean test of whether FTM's raw predicted embedding

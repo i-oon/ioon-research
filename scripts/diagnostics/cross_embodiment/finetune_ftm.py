@@ -1,8 +1,8 @@
 """How few clips of a new robot does it take to adapt the forward model to it?
 
-F50 and F51 established that a frozen forward model does not survive a change of robot: an
+F43 and F44 established that a frozen forward model does not survive a change of robot: an
 insect-trained FTM rolled on B1 video scores 0.57-0.71x against holding the frame still, worse
-than predicting no motion at all. F51 also showed that is not an architectural limit -- the same
+than predicting no motion at all. F44 also showed that is not an architectural limit -- the same
 design trained on both robots rolls the B1 at 1.34-1.53x -- and that coverage inside a family
 moves the forward model by only 5-8% where it moves the motion decoder by 3.9x.
 
@@ -19,7 +19,7 @@ forward model can be adapted, and does insect pretraining make that cheaper than
 
 Only the FTM and ITM are adapted; the V-JEPA2 encoder stays frozen, as everywhere else in the
 project. Adapting the encoder would change what `e_t` means and make the rollout numbers
-incomparable with F32, F51 and slide 12.
+incomparable with F46, F44 and slide 12.
 
 And the rollout is scored against **hold-still on the same clips**, not against the pretrained
 model's own starting point. A forward model that improves on itself while still losing to a frozen

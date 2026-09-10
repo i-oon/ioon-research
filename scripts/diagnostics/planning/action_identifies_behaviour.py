@@ -1,6 +1,6 @@
 """Does the action, on its own, say which behaviour is being performed?
 
-**This is the question underneath F93, F96 and F97, asked without a world model in the way.**
+**This is the question underneath F83, F86 and F87, asked without a world model in the way.**
 Stage 3 fine-tuned the projector and the forward model together and the forward model responded by
 **ignoring the action channel entirely** -- its prediction given `proj(a)` matched its prediction
 given the mean latent to three decimals, at every checkpoint, while the training loss halved. A
@@ -55,7 +55,7 @@ def run(clips, label, w, epochs=300, seed=0):
     conds = {c: i for i, c in enumerate(sorted({c["cond"] for c in clips}))}
     inv = {i: c for c, i in conds.items()}
     # hold out one clip per condition -- a frame-level split leaves near-duplicate windows of the
-    # same clip on both sides and reports memorisation as accuracy (F76)
+    # same clip on both sides and reports memorisation as accuracy (F67)
     by_cond = {}
     for i, c in enumerate(clips):
         by_cond.setdefault(c["cond"], []).append(i)

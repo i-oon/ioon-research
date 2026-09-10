@@ -1,21 +1,21 @@
-"""Does feeding the state head the raw frame instead of the FTM's delta reopen F64's identity leak?
+"""Does feeding the state head the raw frame instead of the FTM's delta reopen F57's identity leak?
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/frame_vs_delta.py
 
 The state-head design reads `FTM(e_t,z) - e_t`, not `e_t`, specifically to avoid the failure
 `body_sees_frame=True` hit once already: a frame-conditioned head learns one mapping per robot and
 stops needing the latent, collapsing cross-embodiment transfer from +0.544/+0.435 to -10.5/-57.2
-(F64). This checks the analogous risk for the new head before spending a com7 run on it.
+(F57). This checks the analogous risk for the new head before spending a com7 run on it.
 
 Two ridge fits, same [z] block, only the other input swapped -- same protocol as
 `target_action_share.py`, so the numbers sit beside its 0.358/0.359/0.404.
 
-    [e_t, z]              raw frame + z            the configuration F64 found unsafe
+    [e_t, z]              raw frame + z            the configuration F57 found unsafe
     [e_t+1 - e_t, z]       predicted delta + z       the proposed state-head input
 
 **What would make the delta design unsafe:** if `[e_t, z]` scores much higher than
 `[delta, z]` for the WRONG reason -- because `e_t` lets the readout identify which embodiment it is
-looking at, the same shortcut F64 took. That is checked directly with a third fit on **which body
+looking at, the same shortcut F57 took. That is checked directly with a third fit on **which body
 this is**: if `e_t` predicts embodiment far better than `delta` does, the raw-frame route has the
 leak available; if the two are close, the frame is not the thing supplying the advantage, if any.
 
@@ -170,7 +170,7 @@ def main():
 
     print("\n  READ: body-motion R2 should be close for [e_t,z] and [delta,z] (both carry state)."
           "\n  embodiment-id R2 should be LOW for [delta,z] and can be high for [e_t,z] -- that gap"
-          "\n  is F64's leak. If [delta,z] also identifies embodiment well, the delta does not close"
+          "\n  is F57's leak. If [delta,z] also identifies embodiment well, the delta does not close"
           "\n  the leak and the design needs rethinking before com7.")
 
 

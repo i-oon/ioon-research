@@ -3,7 +3,7 @@
 **The point is the input, not the architecture.** Delta-JEPA (2606.31232) trains the world model so
 that the *difference* of consecutive state latents carries the action, with a large weight, and
 reports that this is what prevents action-insensitive collapse. Its own explanation for why the
-endpoints are not enough is exactly F168's result here: given `[z_t, z_t+1]` a decoder can read the
+endpoints are not enough is exactly F153's result here: given `[z_t, z_t+1]` a decoder can read the
 action off action-correlated cues in `z_t+1` without modelling the transition at all. **A difference
 cannot be read that way**, which is the whole argument for the term.
 

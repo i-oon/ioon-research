@@ -13,7 +13,7 @@ and does that get better after training with the rollout term?
 Two numbers per k, both against a fixed reference so they read as ratios rather than raw MSE:
 
     model rollout MSE     ||rollout_k(e_t) - e_t+k||^2, auto-regressive
-    copy-forward MSE      ||e_t - e_t+k||^2, the do-nothing baseline (F87's shape)
+    copy-forward MSE      ||e_t - e_t+k||^2, the do-nothing baseline (F77's shape)
 
 A ratio near or above 1.0 means the model has stopped adding anything past that horizon -- it would
 have done as well by predicting no change at all. Falling ratio with training is the direct test of

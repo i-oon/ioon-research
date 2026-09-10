@@ -15,12 +15,12 @@
 # `/abdomen`, the **rear** segment.
 # **A camera facing the wrong way still produces 66 frames, still passes every downstream script,
 # and would answer Q1 with a resounding false pass**, because a view of the sky reveals no action
-# either. F165 was voided by exactly this class of error.
+# either. F151 was voided by exactly this class of error.
 #
 # **Two questions, both must pass:**
 #
 #   Q1  does egocentric BREAK the single-frame redundancy?
-#       third-person single-frame action R2 is 0.779 on the insect (F159). If a head view still
+#       third-person single-frame action R2 is 0.779 on the insect (F145). If a head view still
 #       reads the command from one frame, the view change did not fix anything -- **report what
 #       leaked**: legs in shot, a room simple enough to localise from, or the camera seeing the body.
 #
@@ -85,7 +85,7 @@ $PY scripts/diagnostics/egocentric_view/check_appearance_leak.py --data "$OUT/in
 
 echo
 echo "############ Q1 -- is the action still readable from ONE egocentric frame? ############"
-echo "  third-person baseline, F159: insect 0.779 single frame, 0.887 pair"
+echo "  third-person baseline, F145: insect 0.779 single frame, 0.887 pair"
 for SPEC in "hexapod $OUT/insect_flat ego_hex" "b1 $OUT/b1_flat ego_b1"; do
   set -- $SPEC
   [ -d "$2" ] && $PY scripts/diagnostics/objective_experiments/inverse_dynamics_r2.py \

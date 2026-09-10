@@ -1,6 +1,6 @@
 """Does shortening the window turn the motion target from a state into a change?
 
-**This checks the premise of the planned port before we spend a retrain on it (F67, step 2l).**
+**This checks the premise of the planned port before we spend a retrain on it (F60, step 2l).**
 LAC-WM's motion decoder is allowed to see the current frame because its target is a *delta* between
 two frames, which no single still can supply. Ours is body speed averaged over one second, which the
 frozen encoder reads from one frame at R^2 0.676 -- a *state*. The plan assumes that chunking to
@@ -65,7 +65,7 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--ckpt", default="",
                     help="also read each target out of this checkpoint's `z`. Both halves of the "
-                         "F64 condition have to hold: the target must be unreadable from the frame "
+                         "F57 condition have to hold: the target must be unreadable from the frame "
                          "AND readable from `z`. A target nothing can supply is noise, not a "
                          "constraint.")
     args = ap.parse_args()
@@ -82,7 +82,7 @@ def main():
 
     print("Forward speed averaged over W steps, read from a SINGLE frame's frozen embedding.")
     print("R^2 near 0 means one frame cannot supply it -- the property that makes a target safe")
-    print("to decode with a frame-conditioned head (F64).\n")
+    print("to decode with a frame-conditioned head (F57).\n")
     itm, checkpoint = None, None
     if args.ckpt:
         path = args.ckpt if os.path.isabs(args.ckpt) else os.path.join(ROOT, args.ckpt)
@@ -120,7 +120,7 @@ def main():
                 elif source == "z":
                     x = latent(cache[path], name)
                 else:
-                    # **The measurement F64 actually calls for.** `z` beating the frame is close to
+                    # **The measurement F57 actually calls for.** `z` beating the frame is close to
                     # tautological -- `z` is built from e_t AND e_{t+1}, so on any forward-looking
                     # target it holds information a single frame cannot have. The head, though, gets
                     # both inputs at once, so what decides whether it shortcuts is whether the frame

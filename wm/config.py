@@ -105,7 +105,7 @@ class Config:
     # 1,003 pairs across 12 epochs, on a validation split too small to detect the memorisation
     # that invites. Balancing the *sampler* is not balancing the *data*.
     #
-    # F13 says the hexapod side loses little: sixteen times more episodes of the same bodies
+    # F11 says the hexapod side loses little: sixteen times more episodes of the same bodies
     # changed nothing, because what matters is how many bodies there are, not how many episodes
     # each walks. So the cap costs episodes, which are flat, and keeps bodies, which are not.
     #
@@ -139,7 +139,7 @@ class Config:
     #
     # Measured motivation: 33.0% of z's variance is the embodiment, and deleting the eight
     # directions that carry it costs 1.69x against a random-direction control's 1.16x, so the
-    # identity in z is load-bearing rather than passive leakage (FINDINGS.md F39). Removing it
+    # identity in z is load-bearing rather than passive leakage (FINDINGS.md F33). Removing it
     # with an adversary alone therefore breaks something the model depends on. The channel
     # relieves the need first; only then does removing the ability cost nothing.
     #
@@ -155,7 +155,7 @@ class Config:
     # that shows up as the two embodiments' pooled embeddings sitting 3.94x apart relative to
     # their own spread, and it is enough on its own to make a stance-fraction readout fitted on
     # one embodiment fail on the other at 4.72x -- an offset absorbed into the readout's
-    # intercept, not a difference in how contact is represented (FINDINGS.md F41).
+    # intercept, not a difference in how contact is represented (FINDINGS.md F35).
     #
     # Centre only, never scale. The diagnosis was an offset; dividing each of the 1,408
     # dimensions by its own spread would additionally reweight L_recon across dimensions, which
@@ -174,7 +174,7 @@ class Config:
     # How much capacity sits between the latent and the joint command: "mlp" is the original
     # decoder, "linear" keeps the cross-attention backbone with a single output projection,
     # "probe" removes the backbone entirely and linearly maps mean-pooled tokens plus z.
-    # Capacity helps on the training bodies and hurts on a held-out one (FINDINGS.md F4b).
+    # Capacity helps on the training bodies and hurts on a held-out one (FINDINGS.md F4).
     md_head: str = "mlp"
     md_pool: int = 2
 
@@ -194,18 +194,18 @@ class Config:
     # frames[t] is the *result* of actions[t] and the transition frames[t] -> frames[t+1] is
     # caused by actions[t+1]. With action_lag 0 the target is therefore already visible in the
     # decoder's own input, e_t, and z has nothing left to supply: measured, giving the ITM two
-    # copies of e_t instead of a real transition costs only 1.11-1.19x (FINDINGS.md F29).
+    # copies of e_t instead of a real transition costs only 1.11-1.19x (FINDINGS.md F25).
     #
     # action_lag 1 asks for the action that caused the transition, which is what z is defined to
     # represent. The decoder never sees e_{t+1}, so that answer can only arrive through z.
     # 0 reproduces every run recorded before 2026-08-09.
     # How far apart the ITM's two frames sit. **1 is the default and is measured to be the wrong
     # unit for this data**: at 20 Hz `t -> t+1` is 50 ms, one nineteenth of a 0.95 s stride and 19%
-    # of the pose change half a stride carries (F54). At that spacing the next frame is largely
-    # guessable from the current one, so nothing forces the forward model to read `z` -- F87
+    # of the pose change half a stride carries (F47). At that spacing the next frame is largely
+    # guessable from the current one, so nothing forces the forward model to read `z` -- F77
     # measured the frame outweighing the latent 28x, and a latent from a different behaviour
     # costing 0.25%. LAC-WM down-samples the observation frequency by chunking to five steps for
-    # the same reason. **F54 also found the long baseline losing at every horizon across robots**,
+    # the same reason. **F47 also found the long baseline losing at every horizon across robots**,
     # so raising this must be checked against transfer, not only against z-usage.
     frame_stride: int = 1
     action_lag: int = 1
@@ -216,7 +216,7 @@ class Config:
     #
     # Widening `frame_stride` without this is measurably wrong, not merely suboptimal. The pair
     # e_t -> e_{t+k} is caused by k commands, so `z` is asked to summarise k steps while
-    # `L_motion` still scores it against one. Measured (F88): stride 10 raised the forward model's
+    # `L_motion` still scores it against one. Measured (F78): stride 10 raised the forward model's
     # use of the latent 1.6x (sweep z 4.257 -> 6.764) and simultaneously took validation motion
     # from 0.218 to 0.928 -- about the level of predicting the training mean, i.e. the decoder
     # stopped working. LAC-WM does not hit this because it chunks both: "we chunk the actions into
@@ -230,7 +230,7 @@ class Config:
     # x_{t+1} into z. Measured cost: the FTM's target becomes 4.39x more augmentation noise than
     # signal, so L_recon takes 99% of the gradient while chasing something unpredictable, and z
     # is never pressured to become an action. False falls back to the dimensional bottleneck,
-    # z at 64 numbers against e_{t+1}'s 359,000. See FINDINGS.md F25.
+    # z at 64 numbers against e_{t+1}'s 359,000. See FINDINGS.md F20.
     cross_augment: bool = True
 
     # Gradient-reversal head that removes body identity from z. Off by default, and superseded
@@ -242,9 +242,9 @@ class Config:
     # latent is required to mean the same thing on both robots. `lambda_motion` cannot do this: it
     # supervises through per-embodiment heads onto joint commands that have no correspondence
     # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
-    # (F55). 0.0 reproduces every run recorded before 2026-08-17.
+    # (F48). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
-    # --- ActSWM (F146). Zero by default: every run before 2026-08-31 reproduces unchanged.
+    # --- ActSWM (F137). Zero by default: every run before 2026-08-31 reproduces unchanged.
     lambda_ldad: float = 0.0      # Delta-JEPA's LDAD: decode the action from the PREDICTED
     # state difference `FTM(e_t, z) - e_t`. Their sweep puts the useful range at 10-50 and their
     # best at 50, which is far above every other term here -- the term is meant to dominate, and a
@@ -261,7 +261,7 @@ class Config:
     # is a separate flag rather than folded into an existing one. 0.0 reproduces every run before
     # 2026-09-05.
     lambda_rollout: float = 0.0
-    hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F151)
+    hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F141)
     hinge_K: int = 3              # **3, not their 12** -- our rollout is reliable to about here
     readout_hidden: int = 512
     # Decode body motion from the FTM's predicted CHANGE (`FTM(e_t,z) - e_t`), not from z alone.
@@ -271,7 +271,7 @@ class Config:
     # default: every run before this existed reproduces unchanged.
     lambda_state: float = 0.0
     state_hidden: int = 256
-    # **F192, control this flag decides.** Offline probes found z alone predicts forward speed
+    # **F177, control this flag decides.** Offline probes found z alone predicts forward speed
     # better than z combined with the FTM's pooled predicted change (R2 0.781 vs 0.625 oracle,
     # 0.791 vs 0.537 on proj(action), the z ranking deploys) -- combining dilutes z rather than
     # adding to it. False drops `pool`/the offset from StateHead entirely, reading z_proj(z) alone.
@@ -280,11 +280,11 @@ class Config:
     body_dim: int = 1            # must equal len(body_channels)
     # Which columns of `body_motion` the shared head supervises. Column 0 is forward speed, 1 is
     # lateral, 2 is yaw. Default (0,) is forward only -- lateral is an embodiment label in disguise
-    # (F58: AUC 0.788 from that column alone) and yaw is the candidate `data/allocentric/beh12_*` was built to
-    # test (F77). Kept in the config rather than as a module constant so a control arm and a
+    # (F51: AUC 0.788 from that column alone) and yaw is the candidate `data/allocentric/beh12_*` was built to
+    # test (F68). Kept in the config rather than as a module constant so a control arm and a
     # widened arm are the same code path with different settings.
     body_channels: tuple = (0,)
-    # True reproduces F64's negative result: conditioning the shared head on the frame lets it
+    # True reproduces F57's negative result: conditioning the shared head on the frame lets it
     # identify the robot and decode per-robot, and transfer collapses to -10.5 / -57.2.
     body_sees_frame: bool = False
     body_hidden: int = 128

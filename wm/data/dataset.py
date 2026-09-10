@@ -28,7 +28,7 @@ def clip_paths(data_dir, morphs):
     named = set(morphs) & set(EXCLUDED_BODIES)
     if named:
         print(f"WARNING: {sorted(named)} do not walk -- they collapse and rotate on the spot. "
-              f"See FINDINGS.md F42.")
+              f"See FINDINGS.md F36.")
     paths = []
     for path in sort_clips(glob.glob(os.path.join(data_dir, "*.npz"))):
         if os.path.basename(path).split("_")[0] in morphs:
@@ -156,13 +156,13 @@ class IKWalkPairs(Dataset):
         #
         # **`frame_stride` is how far apart the ITM's two frames are, and 1 is the wrong default
         # for this data.** At 20 Hz `t -> t+1` is 50 ms -- one nineteenth of a 0.95 s stride, and
-        # 19% of the pose change half a stride carries (F54). At that spacing `e_{t+1}` is largely
-        # guessable from `e_t`, so nothing forces the forward model to read `z`: F87 measured the
+        # 19% of the pose change half a stride carries (F47). At that spacing `e_{t+1}` is largely
+        # guessable from `e_t`, so nothing forces the forward model to read `z`: F77 measured the
         # frame outweighing the latent **28x**, and a latent drawn from a different behaviour
         # costing **0.25%**. LAC-WM chunks to five steps for the same reason, "which we found in
         # practice improves world model learning".
         #
-        # **The risk, from the same finding.** F54's long-baseline arm won every multi-step horizon
+        # **The risk, from the same finding.** F47's long-baseline arm won every multi-step horizon
         # in-domain and *lost* at every horizon across robots -- "across robots the little that
         # survives is the one-step structure". That arm sampled partners uniformly within a clip
         # (0-65 frames apart) rather than at a fixed spacing, and it predates the body head, which
@@ -185,7 +185,7 @@ class IKWalkPairs(Dataset):
         self.epoch = 0
         # False gives the ITM and FTM the same un-augmented frames. What stops the ITM copying
         # x_{t+1} into z is then the dimensional bottleneck alone: z is 64 numbers against
-        # e_{t+1}'s 359,000. See FINDINGS.md F25 for why the augmentation had to go.
+        # e_{t+1}'s 359,000. See FINDINGS.md F20 for why the augmentation had to go.
         self.cross_augment = cross_augment
 
     def set_epoch(self, epoch):
@@ -392,7 +392,7 @@ class MultiEmbodimentPairs(Dataset):
         self.epoch = 0
         # False gives the ITM and FTM the same un-augmented frames. What stops the ITM copying
         # x_{t+1} into z is then the dimensional bottleneck alone: z is 64 numbers against
-        # e_{t+1}'s 359,000. See FINDINGS.md F25 for why the augmentation had to go.
+        # e_{t+1}'s 359,000. See FINDINGS.md F20 for why the augmentation had to go.
         self.cross_augment = cross_augment
 
     def set_epoch(self, epoch):

@@ -24,7 +24,7 @@ from wm.models.itm import InverseTransitionModel
 TRAIN = ['c10f10t10','c06f10t10','c10f10t06','c06f10t06','c10f06t06']
 HELD  = ['c08f09t09','c06f06t06']
 # Two of the five training bodies veer: a 94.6 mm dead zone against a 92.5 mm closest target
-# leaves them yawing 0.35-0.38 m off course, where every sound body stays under 0.17 m (F42).
+# leaves them yawing 0.35-0.38 m off course, where every sound body stays under 0.17 m (F36).
 # They stay in the headline row because the before/after comparison is matched on them, but the
 # split is also reported on the three sound bodies alone, since a body with a distinct gait adds
 # between-body variance and would inflate exactly the term being claimed as small.

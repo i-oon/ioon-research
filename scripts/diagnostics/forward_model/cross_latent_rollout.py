@@ -5,9 +5,9 @@ it action embeddings derived from **another**, and score the predicted next embe
 
     e_hat = FTM( e_t from B1 ,  z_t from the hexapod )   vs   e_{t+1} from B1
 
-**This is not F51.** That asked whether the *forward model* survives a change of robot, using each
+**This is not F44.** That asked whether the *forward model* survives a change of robot, using each
 robot's own latent, and measured 0.57-0.71x -- worse than predicting no motion. This asks whether
-the **latent** transfers, which is what the shared body head is claimed to produce (F83). Different
+the **latent** transfers, which is what the shared body head is claimed to produce (F73). Different
 component, different question.
 
 **No decoder is needed and none exists.** LAC-WM reports PSNR/LPIPS/FID/FVD because they trained a
@@ -15,7 +15,7 @@ custom V-JEPA2 RGB decoder; their FDM predicts a visual embedding exactly as our
 measurement itself lives in embedding space either way.
 
 **Two baselines, because the raw number is uninterpretable.** The clips are not synchronised in gait
-phase -- that is F45's pairing problem, and it does not go away here -- so a cross-robot latent is
+phase -- that is F39's pairing problem, and it does not go away here -- so a cross-robot latent is
 mismatched in phase even if it is perfectly shared in behaviour. Bracketing it:
 
     own z         the same robot's own latent            an upper bound
@@ -58,7 +58,7 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--hex_dir", default="data/allocentric/beh12_c10f10t10_flat")
     ap.add_argument("--b1_dir", default="data/allocentric/beh12_b1_flat",
-                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
+                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F104-F106).")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -125,7 +125,7 @@ def main():
 
     if enc is not None:
         torch.save(cache, cache_path)
-    print("\nThe clips are not phase-synchronised (F45), so the cross-robot latent is mismatched in")
+    print("\nThe clips are not phase-synchronised (F39), so the cross-robot latent is mismatched in")
     print("gait phase even where behaviour is shared. Read the gap-closed column, not the raw MSE.")
 
 

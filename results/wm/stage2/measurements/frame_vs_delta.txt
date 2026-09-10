@@ -15,5 +15,5 @@ wm/runs/beh12_ego/teacher_ego.pt
 
   READ: body-motion R2 should be close for [e_t,z] and [delta,z] (both carry state).
   embodiment-id R2 should be LOW for [delta,z] and can be high for [e_t,z] -- that gap
-  is F64's leak. If [delta,z] also identifies embodiment well, the delta does not close
+  is F57's leak. If [delta,z] also identifies embodiment well, the delta does not close
   the leak and the design needs rethinking before com7.

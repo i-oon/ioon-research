@@ -15,7 +15,7 @@ would -- see the noise-injection plan (separate, not this script) for that.
 **Commands, and where each came from.**
 
   turn   per-policy wz, copied verbatim from `recollect_b1_turns.py`'s own LEVELS table --
-         already verified against the insect reference (F117/F118) and NOT re-derived here.
+         already verified against the insect reference (F108/F109) and NOT re-derived here.
   speed  vx read directly off the existing `beh12_b1_ego_flat` clips' own stored `command` field
          (mean per condition), same value for both policies -- no per-policy speed split is
          recorded in the existing data, so none is assumed here.
@@ -27,7 +27,7 @@ would -- see the noise-injection plan (separate, not this script) for that.
 **Pilot mode first, on purpose.** `--pilot` reproduces the EXISTING clip count (2 per policy, 4
 total) for a couple of conditions only, so the output can be checked against the real
 `beh12_b1_ego_flat` numbers before spending the time to render all 12 conditions at 5x. Do not skip
-this -- F189 (hexapod's turn-sign bug) was exactly the failure mode a small check like this catches
+this -- F174 (hexapod's turn-sign bug) was exactly the failure mode a small check like this catches
 before it costs a full collection run.
 """
 import argparse

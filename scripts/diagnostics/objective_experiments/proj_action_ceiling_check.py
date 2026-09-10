@@ -8,7 +8,7 @@ reconstruction-vs-planning gate, before any state-head retrain is scoped.
 hand-built pooled feature, including the delta the state head is actually built on (rho +0.215).
 But `ITM(e_t, e_next)` REQUIRES the real future frame -- it is a reconstruction-time quantity. At
 control time, the only thing available is `z = proj(action)`, no `e_next`, no ITM. This project has
-been burned by exactly this substitution before (F97: `a -> z` is one-to-many; F131: a head fitted
+been burned by exactly this substitution before (F87: `a -> z` is one-to-many; F122: a head fitted
 on ITM latents got WORSE when actually asked to score `proj(a)`, because the two latents occupy
 different regions of the same space). **If `proj(a)` does not carry the same signal `ITM(e_t,e_next)`
 does, retraining the state head to trust `z`'s content more only fixes offline scoring against a

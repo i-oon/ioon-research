@@ -4,7 +4,7 @@
         --ckpt wm/runs/beh12_ego/best.pt --data data/egocentric/beh12_c08f09t09_ego_flat \\
         --embodiment hexapod --cache results/wm/cache/ego_hex.pt
 
-**The student architecture decision, made by measurement before a student is built.** F175 measured
+**The student architecture decision, made by measurement before a student is built.** F160 measured
 a pooled readout at **0.263 on the insect and 0.081 on the B1** egocentrically, against a
 cross-attention decoder over the same tokens at **0.847 / 0.778**. `pooled(e) = e.mean(-2)` discards
 where things are in the frame, and egocentrically where things are IS how the world moves, which is
@@ -19,14 +19,14 @@ rather than learn one. So the choice is how to read it:
 
     pooled          `e.mean(-2)` into the Student MLP -- the current design, and the baseline
     conv            a small convolution over the grid, Hu-style spatial inductive bias, cheap
-    attention       a learned query cross-attending over the 256 tokens -- what F175 measured
+    attention       a learned query cross-attending over the 256 tokens -- what F160 measured
 
 **Accuracy is only half the decision.** Pooling was adopted to hold 20 Hz. So this also times each
 head **and times the frozen encoder**, because if the encoder already eats the budget then the head's
 cost is not what the choice should turn on -- and that is a measurement, not an assumption.
 
 Split by clip in families, `within cond` reported alongside, the same rule as
-`pooled_student_check.py`, so the numbers land on the same scale as the bar F176 locked.
+`pooled_student_check.py`, so the numbers land on the same scale as the bar F161 locked.
 """
 import argparse
 import collections
@@ -89,7 +89,7 @@ class Conv(nn.Module):
 
 
 class Attention(nn.Module):
-    """A learned query, cross-attending over the 256 tokens -- F175's 0.778 path."""
+    """A learned query, cross-attending over the 256 tokens -- F160's 0.778 path."""
 
     def __init__(self, token_dim, goal_dim, action_dim, hidden=512, grid=16, heads=8):
         super().__init__()
@@ -108,7 +108,7 @@ class Attention(nn.Module):
 
 
 HEADS = {"pooled  (the current Student)": Pooled, "conv  (spatial, cheap)": Conv,
-         "attention  (F175's path)": Attention}
+         "attention  (F160's path)": Attention}
 
 
 def main():
@@ -125,7 +125,7 @@ def main():
     ap.add_argument("--wd", type=float, default=1e-2)
     ap.add_argument("--bar", type=float, default=None,
                     help="the within-condition bar this body is read against: 0.294 insect, 0.059 "
-                         "B1 (F176). **Not a target to beat by tuning** -- it is what the pooled "
+                         "B1 (F161). **Not a target to beat by tuning** -- it is what the pooled "
                          "design reaches, and the question is how much of the token grid's 0.847 / "
                          "0.778 a runnable head recovers.")
     ap.add_argument("--time_encoder", action="store_true",

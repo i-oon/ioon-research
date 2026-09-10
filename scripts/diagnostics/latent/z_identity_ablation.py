@@ -1,6 +1,6 @@
 """Is the embodiment identity in the latent load-bearing, or is it passive leakage?
 
-F38 measured that 33.0% of the latent's variance is "which embodiment is this", and that a linear
+F32 measured that 33.0% of the latent's variance is "which embodiment is this", and that a linear
 probe recovers the embodiment from `z` at 1.000. Both say identity is *present*. Neither says
 anything is *using* it, and that difference decides what the fix is:
 
@@ -25,7 +25,7 @@ Two controls, because "removing a direction costs accuracy" is true of *any* dir
 
   random     project out the same number of random orthogonal directions, averaged over seeds.
              This is the floor: the cost of losing capacity, with nothing meaningful removed.
-  zero_z     the whole latent zeroed, the ceiling from F26's ablation.
+  zero_z     the whole latent zeroed, the ceiling from F22's ablation.
 
 Read the identity row against the random row, not against zero. If identity costs no more than
 random, it was passive and the side channel is the wrong intervention.

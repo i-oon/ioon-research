@@ -2,9 +2,9 @@
 
     .venv/bin/python3 scripts/figures/render_selection_clips.py
 
-**These are two recorded clips side by side, not a robot being driven.** F136 measures selection
+**These are two recorded clips side by side, not a robot being driven.** F127 measures selection
 among recorded behaviours; the physics loops this project has run cross-embodiment are the
-chance-level ones (F121, F122), and using those frames to illustrate F136 would be the overclaim
+chance-level ones (F112, F113), and using those frames to illustrate F127 would be the overclaim
 the mismatch control exists to prevent. Every panel is labelled with which body it is and what the
 panel is, so a frame lifted out of the deck still says what it is.
 

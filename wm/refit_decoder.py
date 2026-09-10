@@ -1,4 +1,4 @@
-"""Refit the MotionDecoder alone, against the ceiling F173 pre-registered.
+"""Refit the MotionDecoder alone, against the ceiling F158 pre-registered.
 
     .venv/bin/python3 -m wm.refit_decoder --ckpt wm/runs/beh12_ego/best.pt \\
         --sources hexapod=data/egocentric/beh12_c08f09t09_ego_flat \\
@@ -6,7 +6,7 @@
 
 **This is the step that decides whether teacher-student has a base, and it is not a training
 improvement.** Trained on egocentric, the decoder reached 0.076 on train motion and never left 1.53
-on validation -- worse than predicting the mean. F173 then put a dual ridge on the head's own input
+on validation -- worse than predicting the mean. F158 then put a dual ridge on the head's own input
 and read **0.608 on the insect and 0.334 on the B1**, against a trained head at -0.53. **The
 information was in front of it and it extracted none of it**, so the curve is a training failure and
 the head is refittable. This refits it and checks that claim.
@@ -23,7 +23,7 @@ and 0.910 against 0.789** -- 105% and 115%. So the egocentric refit is expected 
 
 **Everything but the decoder is frozen.** The ITM supplies `z = ITM(e_t, e_t+1)` under `no_grad`, so
 the latent this is scored on is the one GATE C was measured on and not a new one -- refitting the
-head and the latent together would make the result incomparable with both F172 and the ceiling.
+head and the latent together would make the result incomparable with both F157 and the ceiling.
 
 **The split is the ceiling's split, exactly**: by clip, in behaviour families, the odd-indexed clip
 of each family held out. A within-clip split on periodic locomotion scores the neighbouring frame.
@@ -116,7 +116,7 @@ def main():
     ap.add_argument("--ceiling", nargs="+", default=[], metavar="EMBODIMENT=R2",
                     help="override the pre-registered ceiling, for the allocentric control arm "
                          "where it is 0.938 / 0.789 rather than 0.608 / 0.334. **Not a knob for "
-                         "the egocentric run** -- F173 fixed those two numbers before this script "
+                         "the egocentric run** -- F158 fixed those two numbers before this script "
                          "existed, which is the whole point of having fixed them.")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
@@ -164,7 +164,7 @@ def main():
                 torch.nn.init.trunc_normal_(m.weight, std=0.02); torch.nn.init.zeros_(m.bias)
     opt = torch.optim.AdamW(md.parameters(), lr=args.lr, weight_decay=args.wd)
 
-    print(f"\n  reference, pre-registered in F173 (a linear lower bound, not a ceiling): " +
+    print(f"\n  reference, pre-registered in F158 (a linear lower bound, not a ceiling): " +
           "  ".join(f"{k} {v:.3f}" for k, v in CEILING.items()))
     print("  **Pass is reaching the reference, not 1.0. Allocentric control: 105% / 115%.**\n")
     print(f"  {'epoch':>7}" + "".join(f"{n + ' train':>16}{n + ' test':>15}" for n in data))

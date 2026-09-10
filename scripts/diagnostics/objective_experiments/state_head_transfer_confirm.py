@@ -4,10 +4,10 @@
 
 The offline proxy (`offset_fix_check.py`) is a closed-form ridge on a static snapshot: leak to
 chance (0.464), Delta-state R2 unchanged (0.852=0.852), held-out clips, offset fit on train only.
-**That is not the same claim as "training under `L_state` is safe."** F64's collapse was a trained
+**That is not the same claim as "training under `L_state` is safe."** F57's collapse was a trained
 network finding a shortcut over many gradient steps; a one-shot linear probe on a frozen checkpoint
 cannot rule that out. This trains the real `StateHead` and watches the number that matters: per
-embodiment held-out Delta-state R2, before and after -- collapse looks like F64's -10.5/-57.2, not
+embodiment held-out Delta-state R2, before and after -- collapse looks like F57's -10.5/-57.2, not
 like a modest change.
 
     control      FTM trained on L_recon alone (state head absent) -- matches every run before this
@@ -278,7 +278,7 @@ def main():
     print(f"    leak on trained head's own pooled-delta input: {leak_t:.3f}  "
           f"(pre-fine-tune {leak_before:.3f}; un-corrected pooled delta was 0.961-0.977; "
           f"chance is the majority class fraction, ~0.50-0.51 with balanced embodiments)")
-    print("\n  READ: F64's collapse was -10.5/-57.2 -- catastrophically negative, not merely lower.")
+    print("\n  READ: F57's collapse was -10.5/-57.2 -- catastrophically negative, not merely lower.")
     print("  Both R2 well above 0 and comparable across embodiments, with leak still near chance,")
     print("  means transfer held under real gradient pressure. Either R2 deeply negative or leak")
     print("  reopening (rising back toward the un-corrected 0.977-0.961) means it did not.")

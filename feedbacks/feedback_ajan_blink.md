@@ -18,20 +18,20 @@ be read as a tracker rather than re-read as minutes.
 | W4-2 | Decide: interpolation or extrapolation | **done** — slide 8 is the extrapolation limit, slide 9 tests the diagnosis |
 | W11.1-1 | How is this different from Diffusion? | **answered** — slide 17. A diffusion latent is structureless by construction; ours is inferred and measurable. The part that stands: the differentiator is the transfer claim, not the architecture |
 | W11.1-2 | Few sensors + fast, or many + slow? | **answered** — slide 17. Measured: V-JEPA2 is **94.9 ms, 10.5 Hz**, which puts us on the biological side. Vision buys commensurability, not bandwidth |
-| W11.1-3 | Removing proprioception is not possible | **conceded, with our own number** — the frozen encoder reads contact across embodiments at chance (F41b). Two-rate architecture: vision plans, proprioception stabilises |
+| W11.1-3 | Removing proprioception is not possible | **conceded, with our own number** — the frozen encoder reads contact across embodiments at chance (F35). Two-rate architecture: vision plans, proprioception stabilises |
 | W11.1-4 | Why a Motion Decoder at all | **answered** — only module whose output is in physical units, and the only one that must differ per embodiment |
 | W11.1-5 | Gradient explosion across 4 chained modules | `grad_clip 1.0`, no instability in any run. Small answer, honestly |
-| W11.1-6 | Ablation per network | **done** — F32 (forward model), F39/F43 (identity), F44 (z-ablation on the 4-leg) |
+| W11.1-6 | Ablation per network | **done** — F46 (forward model), F33/F37 (identity), F38 (z-ablation on the 4-leg) |
 | W11.1-7 | Focus on tuning the loss | **his steer was right** — `lambda_cross` took body share 8.8% -> 1.2% |
 | **W11.2-1** | **Never present numbers alone — record video of the gait beside every number** | **partly done.** 4-leg predictions replayed and rendered (slide 15). **Not done for the hexapod held-out body, and not done for any ablation** |
 | **W11.2-2** | **Intensive ablation study: remove a block, show the behaviour degrades — not just the metric** | **not done.** Every ablation we have is numeric. None has been replayed through physics to show the walk degrading |
 
-| **W14-1** | **Compare: world model from scratch vs supervised self-body perception (joint state + image) first** | **not run.** It is the same shape as the training-only allocentric-supervision idea (Role A) and it is now motivated by a measurement rather than a hunch -- the egocentric B1 student reads 0.205 within-condition (F178), which bounds what a controller can reach from the head camera alone |
-| **W14-2** | **Both views matter -- third-person to observe others, first-person for one's own task** | **conceded, and it sharpened into a measurement.** The spoiler is not a property of the third-person view as such: on the B1 a single allocentric frame predicts the command at only **0.166**, against the insect's **0.773** (F175, F178). His two-views framing survives; our "third-person spoils it" claim does not, unscoped |
+| **W14-1** | **Compare: world model from scratch vs supervised self-body perception (joint state + image) first** | **not run.** It is the same shape as the training-only allocentric-supervision idea (Role A) and it is now motivated by a measurement rather than a hunch -- the egocentric B1 student reads 0.205 within-condition (F163), which bounds what a controller can reach from the head camera alone |
+| **W14-2** | **Both views matter -- third-person to observe others, first-person for one's own task** | **conceded, and it sharpened into a measurement.** The spoiler is not a property of the third-person view as such: on the B1 a single allocentric frame predicts the command at only **0.166**, against the insect's **0.773** (F160, F163). His two-views framing survives; our "third-person spoils it" claim does not, unscoped |
 | **W14-3a** | **The demos show no imitation from Reference to Clone to Teacher** | **explained, and his observation was the symptom of W14-3b.** Held-out cloning error 0.065 is **2.55 deg per joint per step** against a 9.99 deg command sd; over 66 steps that walks the robot into poses no clip contains. **The clone is accurate per frame and has nothing to pull it back once it drifts** |
 | **W14-3b** | **Say whether sampling is trajectory- or snapshot-based** | **answered: snapshot.** One frame through V-JEPA2, pooled to 1408-D, plus a 3-D goal held constant for the clip, into a 512-wide MLP, out as 18 joint commands, MSE on standardised targets. **No history, no RNN, no action chunk.** The question was the right one -- it names the mechanism behind W14-3a |
-| **W14-3c** | Re-run the demo after fixing the camera | **done, and it did not fix the teacher.** `null/real` 1.03 to 1.16, so the world model now uses the action -- **and the teacher still ranks at 47% against a coin's 50%** (F179). This time with the control F145 lacked: physics separates the candidates (0.0034 against a 0.0000 floor), so **the teacher cannot order them rather than the outcomes being identical** |
-| **W14-4** | The ego-centric pivot as the paper's contribution | **measured and scoped.** The world model does now use the action -- `null/real` 1.03 to 1.16 (F172) -- but the same pivot does **not** make it rank fine differences (F179, 47% against a coin) and the decoder's readability falls about 14% (F174). Both halves ship together |
+| **W14-3c** | Re-run the demo after fixing the camera | **done, and it did not fix the teacher.** `null/real` 1.03 to 1.16, so the world model now uses the action -- **and the teacher still ranks at 47% against a coin's 50%** (F164). This time with the control F136 lacked: physics separates the candidates (0.0034 against a 0.0000 floor), so **the teacher cannot order them rather than the outcomes being identical** |
+| **W14-4** | The ego-centric pivot as the paper's contribution | **measured and scoped.** The world model does now use the action -- `null/real` 1.03 to 1.16 (F157) -- but the same pivot does **not** make it rank fine differences (F164, 47% against a coin) and the decoder's readability falls about 14% (F159). Both halves ship together |
 
 **The Week 11 Part 2 items are still open and they are the same request twice: show behaviour, not
 only numbers. Week 14 adds one genuinely new experiment (W14-1) and two corrections to claims we
@@ -260,7 +260,7 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 1.  **ข้อจำกัดของ Visual Encoder (Embedding Resolution):** เมื่อทดลองป้อนภาพเริ่มต้นเหมือนกัน แต่เฟรมถัดไปขยับคนละแบบอย่างชัดเจน (สายตามนุษย์แยกออกได้สบาย) ปรากฏว่า **Embedding Feature จาก V-JEPA 2 มองเห็นความต่างทางพฤติกรรมนี้สูงกว่าระดับ Noise เพียงแค่ 1.1 เท่าเท่านั้น** ทำให้โมเดลแยกพฤติกรรมไม่ออก
 2.  **ภาพบอดี้ของหุ่นยนต์ทำหน้าที่เป็น "ตัวสปอยล์เฉลยล่วงหน้า" (The Spoiler Effect):** ในการมองแบบ Third-Person View (หรือ Allocentric View) ภาพตัวหุ่นยนต์และจังหวะขาในเฟรมปัจจุบัน **"สปอยล์เฉลยล่วงหน้า" ไปเรียบร้อยแล้ว** ว่าการก้าวเดินสเต็ปถัดไปจะเป็นอย่างไร โดยเฉพาะพฤติกรรมการเดินที่เป็น **คาบการเคลื่อนที่ซ้ำๆ (Periodic Gait Cycle Loop)** ยิ่งทำให้เดาง่ายมาก
     *   ไออุ่นพิสูจน์โดยทดลองใช้ภาพเฟรมปัจจุบันเพียงเฟรมเดียวมาทำนาย Joint Action ล่วงหน้า พบว่า**สามารถเดาถูกได้สูงถึง 70-90%**
-    *   > **แก้ไขภายหลังการประชุม (F175, F178):** ตัวเลขนี้เป็นของ **แมลงกิ่งไม้เท่านั้น** เมื่อวัดแบบเดียวกันบน B1 เฟรมเดียวทำนาย Joint Action ได้แค่ **0.166** เทียบกับ **0.773** ของแมลง **ท่าของ B1 ไม่เคยสปอยล์คำสั่งของมันเลย** ข้อเคลม "Third-Person View สปอยล์เฉลย" จึงต้องระบุขอบเขตว่าเป็นผลของสัตว์หกขาที่เดินเป็นคาบ ไม่ใช่คุณสมบัติของมุมกล้อง
+    *   > **แก้ไขภายหลังการประชุม (F160, F163):** ตัวเลขนี้เป็นของ **แมลงกิ่งไม้เท่านั้น** เมื่อวัดแบบเดียวกันบน B1 เฟรมเดียวทำนาย Joint Action ได้แค่ **0.166** เทียบกับ **0.773** ของแมลง **ท่าของ B1 ไม่เคยสปอยล์คำสั่งของมันเลย** ข้อเคลม "Third-Person View สปอยล์เฉลย" จึงต้องระบุขอบเขตว่าเป็นผลของสัตว์หกขาที่เดินเป็นคาบ ไม่ใช่คุณสมบัติของมุมกล้อง
     *   เมื่อภาพปัจจุบันใบ้เฉลยไปเกือบหมด World Model จึงเลือกทางลัด (Shortcut) โดยการจำภาพตรงหน้าแทนการเรียนรู้ไดนามิกจาก Z ส่งผลให้ Latent Action ไร้ความหมาย
     *   *ข้อเปรียบเทียบ:* ในงานแขนกล (Manipulation) จะไม่มีปัญหาสปอยล์นี้ เพราะโพสของแขนกลใน 1 เฟรม ไม่ได้บ่งบอกง่ายๆ ว่าปลายแขน (End-effector) กำลังจะพุ่งขยับไปที่ตำแหน่งใดต่อในพิกเซลถัดไป
 
@@ -271,9 +271,9 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 *   **เหตุผลเชิงระบบ:** การติดกล้องไว้ที่ตัวหุ่นจะทำให้โมเดลไม่เห็นบอดี้และข้อต่อขาของตัวเองในภาพ เป็นการ**ปิดบังเฉลยล่วงหน้า** บีบบังคับให้ World Model ต้องเรียนรู้รอยต่อภาพ (Transition) และหันมาพึ่งพาพารามิเตอร์แอคชันเพื่อทำนายภาพข้างหน้าจริง
 *   **Research Gap ที่โดดเด่น:** งานอื่น (เช่น งานของ Yumu) ใช้ First-person view ในการทำ locomotion ซ่อมแซมระบบตัวเองอยู่แล้ว แต่ไม่เคยมีใครเขียนอธิบายเชิงวิทยาศาสตร์ว่าทำไมต้องใช้ การที่ไออุ่นสามารถพรูฟได้ว่า **"Third-Person View สปอยล์เฉลยทำให้ World Model ละเลยแอคชัน"** จึงถือเป็น **Contribution ที่แปลกใหม่และแข็งแกร่งมาก** สำหรับเขียนเคลมในเปเปอร์ตบท้าย
 *   **ผลการทดสอบเบื้องต้นด้วย Ego-centric:** สามารถลดการแฝงข้อมูลแอคชันลงได้เกือบ 3 เท่า, เพิ่มระยะห่างการเรียนรู้ระหว่างเฟรมขึ้นเกือบ 3 เท่า และทำให้ความแม่นยำในการทำนาย **Yaw (การเลี้ยว)** ดีขึ้นอย่างชัดเจนที่สุด
-*   **ผลหลังเทรนจริง (F172, F174, F179) — สองครึ่งที่ต้องพูดคู่กันเสมอ:**
+*   **ผลหลังเทรนจริง (F157, F159, F164) — สองครึ่งที่ต้องพูดคู่กันเสมอ:**
     *   **ได้:** World Model **หันมาใช้แอคชันจริง** `null/real` ขยับจาก 1.03 (ค้างมาตลอดทุก intervention) เป็น **1.16** บนแมลง และ 1.13 บน B1 นี่คือสิ่งที่การ pivot ถูกออกแบบมาให้เกิด และมันเกิด
-    *   **เสีย:** ความสามารถในการ **อ่านคำสั่งกลับออกมา** จากเฟรมลดลงราว **14%** และที่สำคัญกว่านั้น **การจัดอันดับแอคชันที่ต่างกันเล็กน้อยไม่ดีขึ้นเลย** — ครูเลือกถูก 47% เทียบกับการโยนเหรียญ 50% (F179)
+    *   **เสีย:** ความสามารถในการ **อ่านคำสั่งกลับออกมา** จากเฟรมลดลงราว **14%** และที่สำคัญกว่านั้น **การจัดอันดับแอคชันที่ต่างกันเล็กน้อยไม่ดีขึ้นเลย** — ครูเลือกถูก 47% เทียบกับการโยนเหรียญ 50% (F164)
     *   **ข้อสรุปเชิงกลไก:** "ใช้แอคชันในการทำนาย" กับ "เรียงลำดับแอคชันได้" เป็นคนละความสามารถ Ego-centric แก้อย่างแรก ไม่ได้แก้อย่างที่สอง
 
 ---
@@ -327,7 +327,7 @@ V-JEPA 2 สามารถจำแนกความแตกต่างไ�
 **5.5 เหตุผลที่ครูทำให้แย่ลง — วัดแล้วหลังการประชุม**
 ครูคือ **World Model เอง** (ActionProjector → FTM roll 3 step → ITM → body head) ทุก step มันสร้าง 32 ตัวเลือกรอบคำสั่งของ student แล้ว**จินตนาการ**ว่าแต่ละตัวจะพาลำตัวไปทางไหน แล้วเลือกตัวที่ใกล้เป้าที่สุดเป็นเฉลย
 
-**F145 วัดว่าการจินตนาการนั้นเรียงลำดับได้ถูก 4 จาก 12 ครั้ง — โยนเหรียญได้ 6** ครูเปลี่ยนคำสั่งทุกครั้งแล้วสิ่งที่เปลี่ยนไม่ได้ดีกว่าเดิม **DAgger จึงสอน student ด้วย noise รอบตัวมันเอง** นั่นคือ 36% → 31%
+**F136 วัดว่าการจินตนาการนั้นเรียงลำดับได้ถูก 4 จาก 12 ครั้ง — โยนเหรียญได้ 6** ครูเปลี่ยนคำสั่งทุกครั้งแล้วสิ่งที่เปลี่ยนไม่ได้ดีกว่าเดิม **DAgger จึงสอน student ด้วย noise รอบตัวมันเอง** นั่นคือ 36% → 31%
 
 **5.6 สิ่งที่ทำไปแล้วตามคำแนะนำ**
 ไออุ่นยอมรับว่ายังไม่เข้าใจกระบวนการฝั่ง Cloning ดีพอ และรับปากจะกลับไปทำเดโมใหม่หลังแก้มุมกล้อง Ego-centric แล้ว **สถานะปัจจุบัน:** แก้มุมกล้องแล้วและ World Model หันมาใช้แอคชันจริง (`null/real` 1.03 → 1.16) **แต่การทดสอบซ้ำพบว่าครูยังเรียงลำดับไม่ได้ — 47% เทียบเหรียญ 50%** และคราวนี้มีตัวควบคุมพิสูจน์ว่าฟิสิกส์แยกตัวเลือกออกจริง (0.0034 เทียบพื้น 0.0000) **ครูเรียงไม่ได้เอง ไม่ใช่เพราะตัวเลือกเหมือนกันเกินไป**

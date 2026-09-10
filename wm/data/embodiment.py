@@ -25,14 +25,14 @@ def body_motion(position, dt):
     Two choices carry this, and both were measured rather than assumed.
 
     **Froude, not m/s.** Dividing by sqrt(g * hip height) is what makes 0.18 m/s at 0.13 m and
-    0.30 m/s at 0.56 m the same number. F56: the hexapod averages 0.155 and the B1 0.159 despite a
+    0.30 m/s at 0.56 m the same number. F49: the hexapod averages 0.155 and the B1 0.159 despite a
     four-fold size difference, so this is the level at which the two robots genuinely overlap.
 
     **Smoothed to a stride, not per frame.** Instantaneous forward speed is dominated by the body
     rocking with each step, which is a leg-level quantity with no cross-robot counterpart. Measured
     on the multi-speed insect set, between-clip speed variation sits at 0.63 of the within-clip
     rocking at a five-frame window and **1.45** at a stride-length window. Targeting the raw
-    per-frame value would hand this head mostly rocking and almost no speed. Same lesson as F54's
+    per-frame value would hand this head mostly rocking and almost no speed. Same lesson as F47's
     training window: the informative scale is the stride, not the timestep.
     """
     height = float(np.median(position[:, 2]))
@@ -59,7 +59,7 @@ def body_motion(position, dt):
 # **Yaw is column 2** and is a candidate, not a default. It is the channel `data/beh12_*` was built
 # to create: both robots now turn, matched to within 10% on dimensionless rate with forward speed
 # held apart from it. Untrained it transfers at +0.10 +/- 0.19, which is zero -- but forward speed
-# untrained is 0.31 against 0.90 trained (F66), so the untrained number does not settle it (F77).
+# untrained is 0.31 against 0.90 trained (F59), so the untrained number does not settle it (F68).
 # Set `cfg.body_channels` to (0, 2) to supervise it.
 BODY_CHANNELS = (0,)
 
@@ -149,7 +149,7 @@ class Embodiment:
 # velocity, so these cannot be left implicit.
 #
 # **These are fallbacks now, not the source of truth.** Clips written after 2026-08-22 carry their
-# own `dt`, and `_dt_of` prefers it. F74: the B1 replay rendered one frame per 50 Hz rollout step
+# own `dt`, and `_dt_of` prefers it. F65: the B1 replay rendered one frame per 50 Hz rollout step
 # while the insect records at 20 Hz, so a stored transition meant 20 ms on one robot and 50 ms on
 # the other -- and `B1_DT = 0.02` was correct for the old clips and is wrong for the new ones. A
 # constant that has to change when the data changes is a constant in the wrong place.
@@ -166,7 +166,7 @@ GECKO_DT = 0.02   # sim/scene/build_gecko_scene.py retuned the shipped 0.1625s t
 #
 # **It is still wrong to use here, because the collection is matched on the height version.** The
 # `--spin` levels in `data/beh12_hex` were solved so that w_hat = omega sqrt(h/g) lands on the B1's
-# (F72), and under stance-radius scaling the same matched pair reads **0.130 against 0.066** -- a
+# (F63), and under stance-radius scaling the same matched pair reads **0.130 against 0.066** -- a
 # factor of two for two behaviours that are supposed to be the same. A shared head handed that can
 # only fit both by learning which robot it is looking at, which is the exact shortcut this term
 # exists to remove.
@@ -187,8 +187,8 @@ def forward_axis(quat, embodiment):
     `body_quat` is (x, y, z, w) off /abdomen whose fore-aft axis is **z pointing aft** -- its dot
     product with the direction straight walking actually travels is **-0.96**, so the axis has to be
     negated. The B1's `base_quat` is MuJoCo (w, x, y, z) with base x forward and no correction.
-    Verified against straight walking rather than read off an axis name (F71 swapped left and right
-    by trusting the name; F75 hid a sign inside a magnitude).
+    Verified against straight walking rather than read off an axis name (F62 swapped left and right
+    by trusting the name; F66 hid a sign inside a magnitude).
     """
     q = np.asarray(quat, dtype=np.float64)
     if embodiment == "hexapod":
@@ -197,10 +197,21 @@ def forward_axis(quat, embodiment):
     elif embodiment == "gecko":
         # CoppeliaSim's own quaternion order, (x,y,z,w) -- confirmed, not assumed: /geckobotiv's
         # raw +local_x axis, run through this formula, reads dot=+0.998 against real measured
-        # travel direction over a 6s duty-cycle-CPG rollout (0.14m net displacement). No sign
-        # correction needed, unlike the hexapod's aft-pointing axis.
+        # **Gecko's forward is -(body y), and the body X AXIS POINTS ALMOST STRAIGHT UP.** The
+        # original reading here took the body x-axis, checked its normalised direction against a
+        # single 6 s rollout's travel, and passed -- because normalising hides the real problem.
+        # Measured over all 36 babble clips: the x-axis's horizontal projection has mean length
+        # **0.065** and dips to 0.000, so 99.9% of frames sit inside the region where `arctan2` of
+        # it is numerically meaningless. That is what produced heading steps of up to 358 degrees
+        # between consecutive 50 Hz frames (16.8% of steps above 90 degrees), i.e. ~50 rev/s for a
+        # walking gecko -- and `np.unwrap` cannot repair a signal whose per-step direction is noise.
+        # It also scrambled `body_velocity`, which resolves world velocity onto this axis and its
+        # left-normal: forward and lateral were being read off a randomly-spinning frame.
+        # The -y axis is the same direction physically (cos +0.924 against measured travel, against
+        # the x-axis reading's -0.916) and is genuinely horizontal: mean length 0.998, 0% unstable,
+        # and **zero** per-step heading jumps over the same 2,340 steps.
         x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
-        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
+        fx, fy = 2 * (w * z - x * y), 2 * (x * x + z * z) - 1
     else:
         w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
@@ -237,7 +248,7 @@ def heading(quat, embodiment):
     **Factored out of `yaw_rate` so there is exactly one place these formulas live.** The hexapod's
     `body_quat` is (x, y, z, w) off an **aft-pointing** abdomen axis and the B1's `base_quat` is
     MuJoCo's (w, x, y, z) with base x forward; hand-rolling either has already cost this project a
-    week (F71, F117). `yaw_rate` differences this, so the aft-pointing axis cancels there as a
+    week (F62, F108). `yaw_rate` differences this, so the aft-pointing axis cancels there as a
     constant -- **anything using the absolute angle must only ever compare two headings of the same
     robot**, never a heading against zero.
     """
@@ -246,10 +257,13 @@ def heading(quat, embodiment):
         x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 2 * (x * z + w * y), 2 * (y * z - w * x)
     elif embodiment == "gecko":
-        # same CoppeliaSim (x,y,z,w) order as forward_axis's gecko branch -- sign/axis choice
-        # only has to be internally consistent here (yaw_rate differences it away), verified there
+        # Same -(body y) axis as `forward_axis`'s gecko branch, and it must stay in lockstep with
+        # it. "Only has to be internally consistent because yaw_rate differences it away" was the
+        # reasoning that let the old near-vertical x-axis stand here: differencing removes a
+        # constant offset, but it does not remove NOISE, and an `arctan2` taken on a vector of mean
+        # length 0.065 is noise. See `forward_axis` for the measurements.
         x, y, z, w = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
-        fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
+        fx, fy = 2 * (w * z - x * y), 2 * (x * x + z * z) - 1
     else:
         w, x, y, z = q[:, 0], q[:, 1], q[:, 2], q[:, 3]
         fx, fy = 1 - 2 * (y * y + z * z), 2 * (x * y + w * z)
@@ -260,11 +274,11 @@ def yaw_rate(quat, dt, embodiment, height):
     """Dimensionless turn rate, smoothed over the same window as `body_motion`.
 
     **The two robots store orientation differently and neither convention is guessable.** The
-    hexapod's `body_quat` is (x, y, z, w) off /abdomen, whose **z axis points aft** -- F71 read left
+    hexapod's `body_quat` is (x, y, z, w) off /abdomen, whose **z axis points aft** -- F62 read left
     and right swapped by taking it as forward. The B1's `base_quat` is MuJoCo's (w, x, y, z) with
     base x forward. Only differences are used, so the aft-pointing axis cancels as a constant.
 
-    F75: this must be **signed**. The pairing in F72 was built on |w_hat|, which hid that the two
+    F66: this must be **signed**. The pairing in F63 was built on |w_hat|, which hid that the two
     robots were turning opposite ways -- and in signed data that made yaw separate the robots at
     AUC 0.871, the exact failure the embodiment gate exists to catch.
     """

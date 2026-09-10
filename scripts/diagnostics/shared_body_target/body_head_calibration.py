@@ -1,7 +1,7 @@
 """Does the shared body head read a robot's motion, per channel, on each robot separately?
 
-**The check F129 exists because nobody ran it.** The head was used to score candidates on the B1
-(F128) and read as compressed and too narrow. Measured on the body it trained on it is exact --
+**The check F120 exists because nobody ran it.** The head was used to score candidates on the B1
+(F119) and read as compressed and too narrow. Measured on the body it trained on it is exact --
 correlation +0.99, compression 1.0x -- and on the B1 it returns the dataset mean for every
 behaviour, because `beh12_hexonly` is a hexapod-only pretrain and neither `wm/adapt.py` nor
 `wm/adapt3.py` adapts the motion decoder. **Run this before scoring anything with a body head.**
@@ -13,8 +13,8 @@ behaviour, because `beh12_hexonly` is a hexapod-only pretrain and neither `wm/ad
                   1.0 is a head that reproduces the range; large means it answers near-constantly.
 
 **Report both robots and every channel.** A head can calibrate on forward and return a constant on
-yaw -- that is F83's channel competition, and it is a different result from "the head does not
-work". The pass bar fixed in F129 is **compression under about 1.5x on every channel of both
+yaw -- that is F73's channel competition, and it is a different result from "the head does not
+work". The pass bar fixed in F120 is **compression under about 1.5x on every channel of both
 robots**.
 
     .venv/bin/python3 scripts/diagnostics/shared_body_target/body_head_calibration.py \\
@@ -134,7 +134,7 @@ def main():
 
     print("  compression is the measured range over the predicted range, 5th-95th percentile.")
     print("  **A head that has never seen an embodiment returns that embodiment's mean** and shows")
-    print("  a large compression with a near-zero correlation -- which is F129, not a broken head.")
+    print("  a large compression with a near-zero correlation -- which is F120, not a broken head.")
 
 
 if __name__ == "__main__":

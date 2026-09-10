@@ -2,10 +2,10 @@
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/pipeline_speed_ceiling.py
 
-**F190 found the raw frozen embedding delta carries the fine speed-magnitude signal clearly** (kNN
+**F175 found the raw frozen embedding delta carries the fine speed-magnitude signal clearly** (kNN
 ~50% on 4-way, chance 25%; R2 0.40). That rules out the encoder as a hard ceiling. It does not rule
 out the signal being lost one or two stages later, before a scorer ever sees it. Two links, tested
-here with the exact same probes as F190 so the numbers read side by side:
+here with the exact same probes as F175 so the numbers read side by side:
 
     real z       = ITM(e_t, e_t+1), from TRUE observed transitions. Tests whether the 64-D
                    bottleneck itself discards fine magnitude that the raw delta still has.
@@ -13,13 +13,13 @@ here with the exact same probes as F190 so the numbers read side by side:
                    ranking actually uses at test time (the next frame is the thing being decided),
                    so this is the one link every prior check in this chain has skipped.
 
-**The read.** If `real z` matches F190's raw-delta numbers, the ITM is not the bottleneck. If
-`projected z` matches `real z`, the projector is not either -- and the residual gap in F186/F187
+**The read.** If `real z` matches F175's raw-delta numbers, the ITM is not the bottleneck. If
+`projected z` matches `real z`, the projector is not either -- and the residual gap in F171/F172
 is not explained by any of these three, pointing back to the state head's own readout or the
 95-97% oracle ceiling already established. If `projected z` reads clearly WORSE than `real z`, the
 projector is where fine magnitude dies, independent of how much training data the state head gets.
 
-Same data, same held-out-by-clip split, same three probes (kNN raw, kNN PCA-50, MLP) as F190, so
+Same data, same held-out-by-clip split, same three probes (kNN raw, kNN PCA-50, MLP) as F175, so
 the comparison is apples to apples.
 
 Diagnosis only; trains nothing, touches no checkpoint file.

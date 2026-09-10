@@ -15,11 +15,11 @@ the **same** `z`, and report the norms.
 
     recon dominates dL/dz     the weighting is wrong -> lower lambda_recon, or normalise recon
     the terms are balanced    the weighting is fine and the *task* is too easy -> act on 2i and
-                              predict further ahead, which F54 already measured to be better
+                              predict further ahead, which F47 already measured to be better
 
 **Context for reading it.** The forward model beats the do-nothing baseline by only 27.5%: copying
 `e_t` gives an MSE of 2.338 (the variance of a one-step change) against the trained model's 1.696.
-So most of the reconstruction problem is solved without reading `z` at all (F87), and a large
+So most of the reconstruction problem is solved without reading `z` at all (F77), and a large
 `recon` gradient would mostly be pulling `z` toward a solution it is not needed for.
 
   .venv/bin/python3 scripts/diagnostics/forward_model/loss_gradient_balance.py --ckpt wm/runs/beh12_body_fwd/best.pt
@@ -145,7 +145,7 @@ def main():
     print("\nIf `share of grad` differs sharply from `share of loss`, the loss values were never the")
     print("right thing to read. recon dominating the gradient means the weighting is wrong; the")
     print("terms being balanced means the weighting is fine and the prediction task is too easy,")
-    print("which is step 2i and F54's finding rather than a tuning problem.")
+    print("which is step 2i and F47's finding rather than a tuning problem.")
     if enc is not None:
         torch.save(cache, cache_path)
 

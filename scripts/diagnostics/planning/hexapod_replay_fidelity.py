@@ -1,9 +1,9 @@
-"""Does replaying a recorded hexapod clip reproduce its speed, as F93 implies it must?
+"""Does replaying a recorded hexapod clip reproduce its speed, as F83 implies it must?
 
-F102 decomposed the closed loop's speed shortfall into three terms. The second -- **what replaying
+F92 decomposed the closed loop's speed shortfall into three terms. The second -- **what replaying
 a recorded command sequence costs before any planner is involved** -- was measured on the B1 at
 **0.84, 0.76, 0.99** of the clip's own recorded speed, and attributed to the B1's action being a
-policy's response to state (F93). The hexapod's commands come from IK and a clock and read no
+policy's response to state (F83). The hexapod's commands come from IK and a clock and read no
 state at all, **so this term should be absent there.** That is a prediction, and it has not been
 tested; if it fails, the explanation for the B1 is incomplete.
 
@@ -74,12 +74,12 @@ def main():
         if m > 0.95:
             print("**The term is absent on the hexapod, as predicted.** Its commands are written by")
             print("a clock and read no state, so re-issuing them reproduces the motion. The replay")
-            print("loss in the decomposition belongs to the B1 alone, and F93's account of why is")
+            print("loss in the decomposition belongs to the B1 alone, and F83's account of why is")
             print("complete: an action that is a response cannot be re-issued, one that is a plan can.")
         else:
             print("**The prediction fails.** The hexapod loses speed on replay too, so 'the action")
             print("is a response' does not explain the B1's loss on its own, and the decomposition")
-            print("in F102 needs a different second term.")
+            print("in F92 needs a different second term.")
 
 
 if __name__ == "__main__":

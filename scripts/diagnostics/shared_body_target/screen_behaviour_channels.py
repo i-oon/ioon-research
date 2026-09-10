@@ -1,23 +1,23 @@
 """Which body-motion channels carry shared meaning, now that both robots actually vary in them.
 
-F70 screened six channels and only forward speed passed, and its stated cause was that the other
+F61 screened six channels and only forward speed passed, and its stated cause was that the other
 five were **constants in our data** -- both robots only ever walked forwards. `data/allocentric/beh12_*` removes
 that: twelve matched conditions per robot spanning speed (Froude 0.12-0.21), turn (w_hat
 0.007-0.076) and sideways travel (Froude 0.07-0.19), balanced 4/4/4. So this is a direct re-test of
 a negative result whose stated failure mode has been deliberately removed.
 
-Four channels, not F70's three: **yaw is the one the collection was built for** and the old screen
+Four channels, not F61's three: **yaw is the one the collection was built for** and the old screen
 had no rotational channel at all.
 
 Each is scored at two timescales, because a body-velocity channel is the sum of what the robot is
 doing (slow, shareable) and where it is in its gait cycle (fast, a six-leg wave and a four-leg trot
-have nothing in common there). And against F69's three gates:
+have nothing in common there). And against F60's three gates:
 
     varies        a constant carries no signal whatever else is true of it
-    hides robot   AUC near 0.5 from the target alone; lateral failed this at 0.788 in F58
+    hides robot   AUC near 0.5 from the target alone; lateral failed this at 0.788 in F51
     transfers     a readout fitted on one robot, applied to the other, R^2 on held-out clips
 
-**`dt` is read from each clip, never assumed.** F74: the B1 was rendered at 50 Hz against the
+**`dt` is read from each clip, never assumed.** F65: the B1 was rendered at 50 Hz against the
 insect's 20 until 2026-08-22, and `B1_DT = 0.02` is still the constant in `wm/data/embodiment.py`.
 Hard-coding a rate is what let that go unnoticed for so long.
 
@@ -61,7 +61,7 @@ def heading(quat, embodiment):
     The two robots store orientation differently and neither convention is guessable:
 
         hexapod   `body_quat` off /abdomen as (x, y, z, w), and the abdomen's **z axis points
-                  aft** -- F71 read left and right swapped by taking it as forward
+                  aft** -- F62 read left and right swapped by taking it as forward
         B1        `base_quat` from MuJoCo as (w, x, y, z), base frame x forward, world z up
 
     Only differences of this are used, so a constant offset (the aft-pointing axis) cancels.
@@ -82,17 +82,17 @@ def targets(position, quat, dt, embodiment, smooth):
     """The four channels, dimensionless, optionally averaged over about one stride.
 
     **Forward and lateral come from `wm.data.embodiment`, not from a second implementation here.**
-    F79: this file differenced world x and y, so its "forward" was walking speed times how much the
+    F70: this file differenced world x and y, so its "forward" was walking speed times how much the
     robot still pointed along world x -- which for a turning robot is mostly a rotation measurement.
     Re-deriving a target in a diagnostic is how a probe ends up scoring a quantity the loss was
-    never taught, which F70's docstring already warns about for the smoothing window.
+    never taught, which F61's docstring already warns about for the smoothing window.
     """
     height = float(np.median(position[:, 2]))
     scale = np.sqrt(G * max(height, 1e-6))
     # **Unsmoothed here, smoothed once below.** `body_velocity` applies its own stride window, so
     # calling it and then smoothing again gave forward and lateral roughly two strides of averaging
     # against yaw's one -- a quiet advantage to forward in every channel comparison, introduced with
-    # the F79 frame fix. The body frame comes from the same `forward_axis`, so nothing about F79 is
+    # the F70 frame fix. The body frame comes from the same `forward_axis`, so nothing about F70 is
     # undone; only the double smoothing is.
     f = forward_axis(quat, embodiment)
     left = np.stack([-f[:, 1], f[:, 0]], axis=1)
@@ -100,7 +100,7 @@ def targets(position, quat, dt, embodiment, smooth):
     out = [(v * f).sum(1) / scale, (v * left).sum(1) / scale,
            np.gradient(position[:, 2].astype(np.float64), dt) / scale]
     # yaw rate is made dimensionless by sqrt(h/g), not by sqrt(g h): it is a rate, not a speed.
-    # This is the w_hat that F72's matched-turn table is built on, so the two agree by construction.
+    # This is the w_hat that F63's matched-turn table is built on, so the two agree by construction.
     yaw_scale = (np.sqrt(STANCE[embodiment] / G) if os.environ.get("YAW_SCALE") == "stance"
                  else np.sqrt(max(height, 1e-6) / G))
     out.append(np.gradient(heading(quat, embodiment), dt) * yaw_scale)
@@ -147,7 +147,7 @@ def load(name, directory, encoder, itm, checkpoint, cache, chunk, features="z", 
             frames = clip["frames"]
             position = clip["head"] if "head" in clip.files else clip["base_pos"]
             quat = clip["body_quat"] if "body_quat" in clip.files else clip["base_quat"]
-            # never assume the rate -- see F74
+            # never assume the rate -- see F65
             dt = float(clip["dt"]) if "dt" in clip.files else HEXAPOD_DT
             condition = str(clip["condition"])
         if path not in cache:
@@ -159,7 +159,7 @@ def load(name, directory, encoder, itm, checkpoint, cache, chunk, features="z", 
         n = len(e) - 1
         if features == "frozen":
             # the control: V-JEPA2 untouched. If a channel transfers here and not through `z`,
-            # the barrier is in the modules we train, not in the data (F43/F46)
+            # the barrier is in the modules we train, not in the data (F37/F40)
             z = bands(e.numpy())[:n]
         else:
             with torch.no_grad():
@@ -179,14 +179,14 @@ def main():
     ap.add_argument("--ckpt", default="wm/runs/s2_fwd_hex7-b1_body0.5/last.pt")
     ap.add_argument("--hex_dir", default="data/allocentric/beh12_c10f10t10_flat")
     ap.add_argument("--b1_dir", default="data/allocentric/beh12_b1_flat",
-                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
+                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F104-F106).")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--window", type=float, default=0.0,
-                    help="smoothing window in seconds, overriding BODY_WINDOW_S. F70 established "
+                    help="smoothing window in seconds, overriding BODY_WINDOW_S. F61 established "
                          "these channels only cross robots at stride scale; whether every channel "
                          "needs the *same* scale was never tested, and yaw's noise floor is 2.6x "
-                         "forward's (F85), so it may need a longer one")
+                         "forward's (F75), so it may need a longer one")
     ap.add_argument("--behaviours", default="",
                     help="comma-separated behaviour axes to keep, e.g. 'speed'. **Needed to compare "
                          "against any pre-2026-08-22 number**: the old datasets were forward "
@@ -262,7 +262,7 @@ def main():
             print(f"{channel:<10}{'smoothed' if smooth else 'per frame':<11}"
                   f"{spread:>8.2f}{auc:>11.3f}{f1:>9.3f}{f2:>9.3f}   {gates}")
     print("\nVHT = varies / hides which robot / transfers. Read the smoothed rows: the per-frame")
-    print("rows are dominated by gait phase, which the two bodies do not share (F70).")
+    print("rows are dominated by gait phase, which the two bodies do not share (F61).")
 
 
 if __name__ == "__main__":

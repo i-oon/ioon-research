@@ -4,7 +4,7 @@
 #
 #   bash scripts/step2_gate_projector.sh     # wherever BOTH checkpoints are; needs a GPU
 #
-# **This runs before teacher-student, not alongside it.** GATE C (F172) showed the forward model now
+# **This runs before teacher-student, not alongside it.** GATE C (F157) showed the forward model now
 # uses the action, which is what a teacher needs. But teacher-student, the action projector and every
 # path that emits a joint command run through two components this run has not measured egocentric:
 #
@@ -12,7 +12,7 @@
 #                   never leaves 1.53 on validation -- above 1.0, worse than predicting the mean.
 #   ActionProjector `a -> z`.  Never fitted on an egocentric checkpoint at all.
 #
-# **Building a student on either of those without measuring them first is how F123, F126 and F128
+# **Building a student on either of those without measuring them first is how F114, F117 and F119
 # were built.** Both arms of every comparison are run here in the same pass, on the same settings,
 # so no number is quoted from an older run against different data.
 #
@@ -44,14 +44,14 @@ echo "############ GATE D1 -- is the command readable from what the decoder is s
 # **Three columns per body, and the verdict is not on the last one.** Egocentrically `e_t` is
 # *expected* to fall -- Q1 is single-frame action R2 0.779 to 0.293, and that fall is the thing that
 # made the forward model use the action at all. So `[e_t, z]` landing under the allocentric value is
-# not by itself a failure. **The question is whether the burden shifted to `z`**: F168 has `z`
+# not by itself a failure. **The question is whether the burden shifted to `z`**: F153 has `z`
 # carrying the action, and if `z`-only holds near its allocentric level while `e_t`-only drops, the
 # command is still in what the decoder is shown and the head only has to be refitted to read it from
 # `z` rather than from the frame.
 #
 #
 # **The allocentric hexapod arm is already measured** -- e_t 0.773, z 0.903, [e_t, z] 0.938, on
-# `beh12_hex-b1_body3` against held-out `c08f09t09`. `e_t` at 0.773 reproduces F159's 0.779 from a
+# `beh12_hex-b1_body3` against held-out `c08f09t09`. `e_t` at 0.773 reproduces F145's 0.779 from a
 # different script, which is what says the instrument is sound. It is passed to the egocentric
 # hexapod arm as `--reference` rather than re-run. **The allocentric B1 arm is measured too** --
 # e_t 0.166, z 0.790, [e_t, z] 0.789 -- and it does not resemble the insect's at all: the quadruped's

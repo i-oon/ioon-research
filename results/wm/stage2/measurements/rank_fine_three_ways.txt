@@ -4,7 +4,11 @@
 goal speed_c5.8 [ 0.1311  0.0267 -0.0002]
 
 Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  36%|███▌      | 303/843 [00:00<00:00, 3000.13it/s]Loading weights:  72%|███████▏  | 604/843 [00:00<00:00, 2843.89it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2923.16it/s]
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]
+Loading weights:  36%|███▌      | 303/843 [00:00<00:00, 3000.13it/s]
+Loading weights:  72%|███████▏  | 604/843 [00:00<00:00, 2843.89it/s]
+Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2923.16it/s]
     floor x2.08: 5.0 m -> 10.4 m, surface held at +0.000
     ground randomised, seed 0, applied to 18 shape(s)
     ego camera: {'forward': [0.991, 0.0, -0.131], 'position': [-1.357, -0.046, 0.397]}
@@ -427,4 +431,4 @@ simulator noise floor (same action twice, 4 states): 0.0013
   direct: mean(student-teacher) -0.0038, signal/floor -2.88x
   ridge: mean(student-teacher) -0.0033, signal/floor -2.47x
 
-a coin is 50%. F179 measured f179-scorer at 47% under this exact protocol before.
+a coin is 50%. F164 measured f179-scorer at 47% under this exact protocol before.

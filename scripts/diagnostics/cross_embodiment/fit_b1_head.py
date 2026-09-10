@@ -1,7 +1,7 @@
 """Does a backbone trained on stick insects alone help control a quadruped?
 
 This is the cross-embodiment transfer question asked on the one genuinely different robot we have.
-The 4-leg test body (F44, F48) is the stick insect with legs removed, and F47 measured that the
+The 4-leg test body (F38, F41) is the stick insect with legs removed, and F41 measured that the
 model reads it as the body it was cut from -- 0.578 from the base body's latent against a chance
 level of 0.981. The B1 is not that: a different robot, 12 joints against 18, a trot against a
 wave, a different silhouette.
@@ -18,8 +18,8 @@ Protocol, fitting and metrics are imported from `fit_4leg_head` so the numbers s
 scale as the 4-leg result and the two can be read side by side.
 
 **The question is how much transfers, not whether the answer is zero.** Two measurements predict
-little: F41b found the frozen encoder describes a loaded leg differently for each robot -- 0.531
-and 0.547 across, below chance on the front legs -- and F45 found the two robots' behaviour
+little: F35 found the frozen encoder describes a loaded leg differently for each robot -- 0.531
+and 0.547 across, below chance on the front legs -- and F39 found the two robots' behaviour
 distributions barely overlap, the B1 spending 84.6% of its time in two trot patterns the insect
 visits 9.8% and 5.7% of the time. Report the margin either way; a prediction is not a result.
 
@@ -229,7 +229,7 @@ def main():
     margin = summary["random"] / summary["pretrained/real"]
     print(f"\nmargin over a random backbone: {margin:.2f}x")
     print("The 4-leg body scores 2.85x on this protocol. A margin near 1.0x here means the insect "
-          "features\ncarry nothing to the quadruped, which is what F41b and F45 predict.")
+          "features\ncarry nothing to the quadruped, which is what F35 and F39 predict.")
 
 
 if __name__ == "__main__":

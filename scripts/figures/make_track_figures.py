@@ -27,20 +27,20 @@ OUT = os.path.join(ROOT, "results", "wm", "figures")
 
 BLUE, RED, GREY, GREEN = "#2471a3", "#c0392b", "#c8ccce", "#1e8449"
 
-# F35: volume-matched retrain, four bodies -> seven, 7,540 -> 7,735 training pairs
+# F29: volume-matched retrain, four bodies -> seven, 7,540 -> 7,735 training pairs
 # tib_cross and bracket_cross on the same held-out body c10f10t08, matched at 96
 # training clips. R^2 is against that body's own mean posture, so the zero line *is*
 # the constant-pose baseline -- no separate reference line needed.
 BEFORE, AFTER = 12.67, 3.27
 R2_BEFORE, R2_AFTER = -0.78, 0.89
 
-# F19 / F38: two-way variance decomposition of the latent
+# F16 / F32: two-way variance decomposition of the latent
 SHARES = [
     ('Stage 2\nhexapod against B1\nboth trained on', 39.6, 33.0, 27.4),
     ('Stage 1\nacross insect bodies\nwith the cross-body loss', 88.7, 1.2, 10.1),
 ]
 
-# F37 / F41: stance-fraction readout on the frozen encoder, RMSE over the target's own spread.
+# F31 / F35: stance-fraction readout on the frozen encoder, RMSE over the target's own spread.
 #
 # Band-pooled patch tokens with each embodiment standardised by its own statistics -- the setting
 # that controls the most and transfers best, and therefore the fair test of whether the behaviour

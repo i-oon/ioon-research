@@ -4,12 +4,12 @@
 0.986 within the B1 and **0.373 across**, below the frozen encoder's 0.531 and below chance, so
 training leaves the two robots' codes pointing opposite ways.
 
-F56 measured why that is not going to be fixed by a better leg-level label. One leg's phase fixes
+F49 measured why that is not going to be fixed by a better leg-level label. One leg's phase fixes
 all four of the B1's legs (concentration 0.99-1.00) and almost nothing about the insect's other
 five (0.07-0.24), so the insect's gait carries roughly six loosely coupled degrees of freedom where
 the B1's carries one. **Any leg-level quantity is asking for a correspondence that does not exist.**
 
-Body-level motion is the level where a correspondence *does* exist, and F56 measured that too: both
+Body-level motion is the level where a correspondence *does* exist, and F49 measured that too: both
 robots walk at a Froude number of 0.155 and 0.159 despite hip heights of 0.13 m and 0.56 m. Every
 legged robot has a body, a forward speed and a height, whatever its leg count.
 
@@ -59,7 +59,7 @@ def bands(tokens, grid=16, n=4):
     """Average within four horizontal bands of the patch grid, as the leg probe does.
 
     Mean-pooling all 256 patches buries a quantity living in a few of them and preserves a constant
-    offset between the datasets that a fitted readout absorbs and mis-applies (F41).
+    offset between the datasets that a fitted readout absorbs and mis-applies (F35).
     """
     t = tokens.reshape(len(tokens), grid, grid, -1)
     return t.reshape(len(tokens), n, grid // n * grid, -1).mean(2).flatten(1).numpy()
@@ -160,7 +160,7 @@ def cell(train, test):
     # r^2 is the R^2 this readout would reach if its gain and intercept were refitted on the
     # target. A cell with low `r` has the direction wrong; a cell with high `r` and very negative
     # R^2 has the direction right and only the calibration wrong. R^2 alone cannot tell them
-    # apart, and -7.083 is where that mattered (F66).
+    # apart, and -7.083 is where that mattered (F59).
     r = 0.0 if pred.std() < 1e-9 else float(np.corrcoef(pred, y_te)[0, 1])
     return r2, r
 
@@ -177,7 +177,7 @@ def correlation(a_train, b_train, tests):
 
     **The stable companion to the R^2 cells, and it exists because they are not.** Two seeds of an
     identical configuration move validation total by 0.7 percent and the cross-embodiment R^2 by
-    **27** (F65). R^2 scores a readout fitted on one robot and applied to the other, so it charges
+    **27** (F58). R^2 scores a readout fitted on one robot and applied to the other, so it charges
     for scale and offset on top of direction, and it is unbounded below -- a slightly wrong readout
     reads -7 where a slightly right one reads +0.6.
 
@@ -268,11 +268,11 @@ def main():
     print("\n`correlation` fits a readout on each robot separately, runs both over the same frames,")
     print("and correlates the outputs: 1.0 means the two robots order speed identically, 0.0 means")
     print("unrelated. Bounded and symmetric where the R^2 cells are neither, and blind to the scale")
-    print("and offset R^2 charges for, so it is the number to compare across seeds (F65).")
+    print("and offset R^2 charges for, so it is the number to compare across seeds (F58).")
     print("\nRead the two cross columns against the frozen-encoder row above them, not against")
     print("zero alone: the question is whether training made the robots more comparable at body")
     print("level than V-JEPA2 already had them, which is the comparison the leg probe fails.")
-    print("\nFor reference, the same 2x2 for the leg-level 'is this leg loaded' readout (F38):")
+    print("\nFor reference, the same 2x2 for the leg-level 'is this leg loaded' readout (F32):")
     print("  frozen encoder    0.806  0.941  0.531  0.547   (chance 0.500)")
     print("  z, Stage 2        0.811  0.986  0.373  0.401")
 

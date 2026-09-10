@@ -7,7 +7,7 @@ anything, because three separate results suggest it may not:
   * sweeping the planning horizon 1/3/5/10 on the B1 moved behaviour accuracy around with no
     ordering -- ten steps rolls *worse* than hold-still and plans no worse than five;
   * the forward model's rollout accuracy and its ability to rank actions came apart everywhere
-    they were measured together (F98);
+    they were measured together (F88);
   * and if the answer is "no", the world model in this loop is a similarity function, not a
     predictor, and the honest next step is to train a policy rather than search at run time.
 
@@ -48,9 +48,9 @@ def evaluate(clips, val, cand, proj, itm, ftm, name, h, device, limit=240, seed=
              mismatch=None):
     """`mismatch`, when given, maps a family to the clip index its goal frame is taken from.
 
-    **The control F125 forced.** With the goal drawn from the demonstration's own future, a rule
+    **The control F116 forced.** With the goal drawn from the demonstration's own future, a rule
     that reads the current frame and names the behaviour already visible scores exactly as well as
-    one that follows the goal -- that is how F123's 55.8% survived until it was swapped. Taking the
+    one that follows the goal -- that is how F114's 55.8% survived until it was swapped. Taking the
     goal from a *different behaviour* separates them: a goal-follower tracks the goal's family and a
     frame-reader tracks the demonstration's.
     """
@@ -127,7 +127,7 @@ def main():
                     help="take each demonstration's goal frame from a clip of a **different "
                          "behaviour family**. Without it, goal-following and reading the current "
                          "frame produce the same score and cannot be told apart -- the confound "
-                         "that made F123's 55.8% look like selection. The extra column "
+                         "that made F114's 55.8% look like selection. The extra column "
                          "`roll/goal` scores the rollout's pick against the family the goal was "
                          "actually taken from.")
     args = ap.parse_args()

@@ -17,7 +17,7 @@ Three feature sets, one ridge, one split:
     [e_t, e_t+3]        a wider pair, in case spacing is what separates them
 
 **If the single frame matches the pair, the action is already in the pose** and the transition
-carries almost nothing extra. That is a stronger statement than "the residual is noise" (F158),
+carries almost nothing extra. That is a stronger statement than "the residual is noise" (F144),
 because it locates the cause: **periodicity, not a weak model.**
 
 **This measurement barely depends on the checkpoint.** The features are frozen encoder embeddings;
@@ -55,7 +55,7 @@ def main():
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--pair_lags", type=int, nargs="+", default=[1, 3])
     ap.add_argument("--target", choices=("action", "z"), default="action",
-                    help="**`action` is F159's question, `z` is the one never asked.** `z` is "
+                    help="**`action` is F145's question, `z` is the one never asked.** `z` is "
                          "`ITM(e_t, e_t+1)`, built from two frames by construction, and our "
                          "pipeline then pushes it toward the action from both sides -- the "
                          "projector fits `proj(a) ~ z` and the body head fits `z -> motion`. So a "

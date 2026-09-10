@@ -1,6 +1,6 @@
 """Does switching between recorded clips cost travel, or was that an artefact of a residual?
 
-F102 decomposed the closed loop's speed shortfall into three terms and reported the third --
+F92 decomposed the closed loop's speed shortfall into three terms and reported the third --
 stitching -- as **a residual rather than a measurement**: actual divided by (picks x replay),
 which absorbs every error in the other two. On three runs it read 1.08 forward, 0.59 turning, 0.20
 sideways, which would say switching clips costs the turning and lateral channels badly. That is a

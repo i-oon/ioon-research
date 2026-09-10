@@ -8,7 +8,7 @@ two quantities that decide what the picture means, both computed in the **full**
 
   probe       how well a linear readout recovers the embodiment from the representation
   silhouette  how separated the two embodiments are, -1 to 1, near 0 meaning intermingled
-  share       how much of the variance the embodiment explains (the F38 decomposition)
+  share       how much of the variance the embodiment explains (the F32 decomposition)
 
 A probe near 1.0 with a silhouette near 0 is the case a picture cannot show: the label is fully
 present and linearly recoverable while the clusters visually overlap. Overlapping is not shared.
@@ -48,7 +48,7 @@ from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 # The four bodies `stage2_clean` trains on. The earlier list included `c10f10t06` and
 # `c06f10t06`, which veer 0.35-0.40 m off course on a 94.6 mm dead zone, and the runs it was
-# written for also trained on two bodies that collapse outright (FINDINGS.md F42). Plotting a
+# written for also trained on two bodies that collapse outright (FINDINGS.md F36). Plotting a
 # latent over bodies the model never saw -- or saw only falling over -- describes neither.
 INSECT_BODIES = bodies_in(os.path.join(ROOT, "data", "ik_walk_8body"))
 INSECT_EPS = [6, 20, 22]

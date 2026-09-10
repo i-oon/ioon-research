@@ -2,7 +2,7 @@
 
 **This is LAC-WM's stage 1, and until now it existed only as a diagnostic.**
 `scripts/diagnostics/cross_embodiment/finetune_ftm.py` adapts, scores and throws the weights away, which answers
-"how much does N clips buy" and leaves nothing to run a controller on. F96 needed exactly that: the
+"how much does N clips buy" and leaves nothing to run a controller on. F86 needed exactly that: the
 cross-embodiment planner defaults instead of selecting, and the measurement located the cause in
 the forward model's ignorance of the target robot rather than in the action projector -- which is
 untestable without an adapted forward model saved to disk.

@@ -20,7 +20,7 @@ phase term, and the interaction, on a grid of embodiment by phase bin.
 Also reported, because the decomposition alone can mislead: how well a linear probe recovers the
 embodiment from the latent, and how far apart the two clusters sit relative to the spread within
 one. A latent can hold embodiment identity at high probe accuracy while it explains almost none of
-the variance -- presence and dominance are different questions, and F26 showed they come apart.
+the variance -- presence and dominance are different questions, and F22 showed they come apart.
 
   .venv/bin/python3 scripts/z_embodiment_share.py --ckpt wm/runs/stage2_balanced/epoch012.pt
 """

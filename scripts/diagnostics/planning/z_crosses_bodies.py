@@ -65,7 +65,7 @@ def main():
     ap.add_argument("--ckpt", default="wm/runs/beh12_hexonly/stage3_b1_nce_s0.pt")
     ap.add_argument("--hex_dir", default="data/allocentric/beh12_c08f09t09_flat")
     ap.add_argument("--b1_dir", default="data/allocentric/beh12_b1_flat",
-                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F113-F115).")
+                    help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% of frames, never pins its camera, files the forward clip under `turn_wz0.00`, and turns the opposite way from the insect (F104-F106).")
     ap.add_argument("--chunk", type=int, default=2)
     args = ap.parse_args()
 

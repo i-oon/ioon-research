@@ -14,7 +14,7 @@
 #
 #   1. the shared prefix reproduces  -- within the measured floor, about 7 mm at 15 frames
 #   2. the branch diverges           -- clearly above that floor, on position AND heading
-#   3. turning survives              -- **the weak case for both robots** (F136), and position alone
+#   3. turning survives              -- **the weak case for both robots** (F127), and position alone
 #                                       understates it, which is why heading is measured
 #
 # **Pre-registered pass mark: 3x noise on position *and* heading at every horizon, per arm.** A cell

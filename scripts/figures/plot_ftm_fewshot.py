@@ -6,7 +6,7 @@ motion and cannot support planning however low its training loss went.
 
 **The horizon is in seconds, not steps, and that is why the panel titles carry both.** The earlier
 version of this measurement used `data/allocentric/fwd_b1_50hz` at 20 ms per stored transition against the
-insect's 50 ms (F74), so its h=10 spanned 0.2 s where this one spans 0.5 s. The two curves are not
+insect's 50 ms (F65), so its h=10 spanned 0.2 s where this one spans 0.5 s. The two curves are not
 comparable at matched step counts and this figure replaces rather than extends the old one.
 
   .venv/bin/python3 scripts/figures/plot_ftm_fewshot.py
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEAL, GREY, INK = "#2a9d8f", "#adb5bd", "#22333b"
-DT = 0.05  # seconds per stored transition, both robots, after the F74 fix
+DT = 0.05  # seconds per stored transition, both robots, after the F65 fix
 # Two pretraining sets that differ in *which kind* of variety they carry, drawn together because
 # the point of the figure is that they land on top of each other.
 ARMS = (("beh12_hexonly", TEAL, "insects: 1 body, 12 behaviours"),

@@ -5,14 +5,14 @@
         --data data/egocentric/beh12_c08f09t09_ego_flat \\
         --embodiment hexapod --cache results/wm/cache/ego_hex.pt
 
-**Separates three places the action could live**, which the fine-ranking failure (F179, 47%) cannot
+**Separates three places the action could live**, which the fine-ranking failure (F164, 47%) cannot
 distinguish on its own:
 
-    e_t                     the frame alone            -- F159's question, 0.779 allocentric
+    e_t                     the frame alone            -- F145's question, 0.779 allocentric
     e_t+1 (ground truth)    the true next frame
     FTM(e_t, z)             the model's prediction     -- does the FTM stamp the action in?
     z = ITM(e_t, e_t+1)     the latent
-    e_t -> z                is z single-frame readable -- F168's question, 0.856 allocentric
+    e_t -> z                is z single-frame readable -- F153's question, 0.856 allocentric
 
 **The read.** Ground truth low and prediction high means the FTM writes the action into its output
 rather than predicting a future that happens to contain it -- the shortcut sits in the objective.
@@ -30,7 +30,7 @@ Each feature block's kernel is normalised by its mean diagonal before any are su
 blocks are unaffected: scaling a kernel is a shift in the ridge penalty, which is cross-validated.
 
 Same ridge, same clip-level split and same `gather` as `inverse_dynamics_r2.py`, so these numbers sit
-beside F159's and F168's rather than needing their own protocol. **Diagnosis only; trains nothing.**
+beside F145's and F153's rather than needing their own protocol. **Diagnosis only; trains nothing.**
 """
 import argparse
 import collections
@@ -152,7 +152,7 @@ def main():
         got[name] = r2
         print(f"  {name:>34}{r2:>11.3f}{alpha:>9.4g}")
 
-    print("\n  MEASUREMENT 2b -- is z itself readable from one frame  (F168 asked this)")
+    print("\n  MEASUREMENT 2b -- is z itself readable from one frame  (F153 asked this)")
     print(f"  {'features':>34}{'z R2':>11}{'alpha':>9}")
     for name, Kf in (("e_t  (frame alone)", K["e_t"]),
                      ("e_t+1  GROUND TRUTH", K["e_next_gt"])):

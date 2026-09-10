@@ -1,4 +1,4 @@
-# Frozen comparison of the pretraining control arms (F54), 2026-08-16
+# Frozen comparison of the pretraining control arms (F47), 2026-08-16
 # No finetuning at all (--steps 0). Same checkpoints in both sections.
 
 ## On B1 -- a robot neither arm has ever seen

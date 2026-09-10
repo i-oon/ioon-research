@@ -1,4 +1,4 @@
-"""Distil a walking policy for the insect from short imagined rollouts (F142).
+"""Distil a walking policy for the insect from short imagined rollouts (F133).
 
     .venv/bin/python3 sim/control/teacher_student_insect.py bc      # bootstrap by cloning clips
     .venv/bin/python3 sim/control/teacher_student_insect.py improve # the world-model teacher
@@ -9,7 +9,7 @@ question: can short imagined rollouts train a policy that walks, on the easy cas
 model is trustworthy? If it cannot, teacher-student is dead and no transfer result can rescue it.
 
     teacher   from `e_t`, sample actions around the student's current output, project each through
-              the action projector, roll the forward model **h <= 3** steps -- F140 measures the
+              the action projector, roll the forward model **h <= 3** steps -- F131 measures the
               rollout worse than a frozen frame by five -- and read the body motion the rolled
               transition implies. The label is the sampled action whose imagined motion is nearest
               the goal.
@@ -17,16 +17,16 @@ model is trustworthy? If it cannot, teacher-student is dead and no transfer resu
     student   pi(e_t, goal) -> 18 joint targets. One forward pass at run time, no library, no
               rollout, no planner.
 
-**The goal is a body-motion vector in the shared coordinate** (F136's three channels), which is why
+**The goal is a body-motion vector in the shared coordinate** (F127's three channels), which is why
 this design is worth testing at all -- the same goal is readable from another robot's video. That
 step is not taken here.
 
 **Bootstrap is by cloning the insect's own recorded clips**, which is honest on this robot: it is
-the body the project has data for, and F137 measured that a policy starting from noise never walks.
+the body the project has data for, and F128 measured that a policy starting from noise never walks.
 The `bc` stage alone is therefore also the control -- **if cloning already passes, the teacher has
 added nothing**, and both numbers are reported.
 
-**Pass or fail is decided by `eval` against a bar fixed before any training** (F142): upright for
+**Pass or fail is decided by `eval` against a bar fixed before any training** (F133): upright for
 the whole 3-second window **and** at least half of `D_real`, the replayed distance of a real walk.
 Statues fail on distance, lurches fail on uprightness, and the render is diagnosis only -- it never
 promotes a numeric fail.
@@ -129,7 +129,7 @@ def clone(args, device):
     """Bootstrap: fit the student on the insect's recorded frames and commands.
 
     **This is also the control.** If the cloned policy already clears the bar, the teacher stage has
-    added nothing and F142 says so rather than crediting it.
+    added nothing and F133 says so rather than crediting it.
     """
     ck, cfg, *_ = load_teacher(args.teacher, device)
     channels = [int(c) for c in cfg.body_channels]
@@ -448,7 +448,7 @@ def main():
     ap.add_argument("--samples", type=int, default=32, help="candidates the teacher ranks per step")
     ap.add_argument("--sigma", type=float, default=0.5, help="candidate spread, in action sd")
     ap.add_argument("--horizon", type=int, default=3,
-                    help="**never past 3.** F143 measures the teacher's state ratio crossing 0.8 "
+                    help="**never past 3.** F134 measures the teacher's state ratio crossing 0.8 "
                          "exactly there on this body")
     ap.add_argument("--refit", type=int, default=300, help="gradient steps after each episode")
     ap.add_argument("--out", default="wm/runs/students/insect_bc.pt")

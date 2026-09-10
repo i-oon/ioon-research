@@ -4,7 +4,7 @@
         --ckpt wm/runs/beh12_ego/best.pt --data data/egocentric/beh12_c08f09t09_ego_flat \\
         --embodiment hexapod --cache results/wm/cache/ego_hex.pt
 
-**P3: this decides the student's architecture, and it decides it before a student exists.** F174's
+**P3: this decides the student's architecture, and it decides it before a student exists.** F159's
 mechanism hypothesis is that egocentrically the joint command lives in *where things sit in the
 frame*: a linear ridge on flattened tokens reads 0.334 on the B1 while cross-attention over the same
 tokens reaches 0.778, a **2.3x** gap against **1.15x** allocentrically. `sim/control/teacher_student_insect.py`'s
@@ -17,7 +17,7 @@ quality repairs a policy that pooled the signal away, so this runs before Q1 is 
 
 Four rows, and the pooled ones are the question:
 
-    e_t                    every token -- the reference F173/F174 were measured on
+    e_t                    every token -- the reference F158/F159 were measured on
     pooled(e_t)            **the student's actual visual input**
     [pooled(e_t), z]       the student if it were also handed the latent
     pooled, MLP            the student's actual architecture, not a ridge: the same 512-wide MLP
@@ -131,7 +131,7 @@ def main():
     # and the goal is the clip's own mean body motion -- so it differs BETWEEN conditions and is
     # constant WITHIN one. Leaving it out of the features measured a bound the student is not
     # actually under; leaving it in and pooling the R2 over all twelve conditions measures mostly
-    # behaviour selection, which F145 already showed the pipeline can do. Both rows are needed.
+    # behaviour selection, which F136 already showed the pipeline can do. Both rows are needed.
     # **`body_channels` comes back as strings from the saved config** -- `['0', '1', '2']` -- so it
     # has to be coerced, not trusted. Indexing with them raises rather than silently misreading,
     # which is the good case; the bad one would have been a config that stringifies something
@@ -194,7 +194,7 @@ def main():
 
     # **Within condition, the goal is constant and explains nothing.** Scoring against each
     # condition's own mean removes behaviour selection from the number and leaves only whether the
-    # right MAGNITUDE was produced -- the coarse-versus-fine cut of F145 and F111, asked of the
+    # right MAGNITUDE was produced -- the coarse-versus-fine cut of F136 and F102, asked of the
     # student. **This is the column a closed-loop result is read against.**
     base_of = {c: An[tr][cond_id[tr] == c].mean(0) for c in set(cond_id[tr].tolist())}
     centre_te = np.stack([base_of.get(c, An[tr].mean(0)) for c in cond_id[te]])
@@ -246,12 +246,12 @@ def main():
         print(f"  {'[pooled, goal], the Student exactly':>38}{mlp_g:>11.3f}")
         print(f"\n  **Neither pooled-alone nor [pooled, goal] is the bar.** Pooled-alone drops an")
         print("  input the student receives and reads too low; [pooled, goal] pooled over all")
-        print("  twelve conditions is mostly behaviour SELECTION, which F145 already showed the")
+        print("  twelve conditions is mostly behaviour SELECTION, which F136 already showed the")
         print("  pipeline does at 55% against 33%. **The `within cond` column above is the one a")
         print("  closed-loop result is read against** -- goal held constant, so it asks only")
         print("  whether the right MAGNITUDE was produced. A student high on the first and low on")
         print("  the second picks the right behaviour and cannot steer it, which fails the closed")
-        print("  loop with a perfect teacher: the F145 wall, arriving at the student.")
+        print("  loop with a perfect teacher: the F136 wall, arriving at the student.")
         if Zprev is not None:
             mlp_zp = fit_mlp(torch.cat([P, Zprev], 1)[tr], A[tr],
                              torch.cat([P, Zprev], 1)[te], A[te], device)
@@ -269,7 +269,7 @@ def main():
 
     print("\n  **The comparison is against the same rows on the allocentric checkpoint, never")
     print("  against these alone.** The question is not what pooling costs -- it is whether it")
-    print("  costs MORE egocentrically, which is what F174's spatial hypothesis predicts and what")
+    print("  costs MORE egocentrically, which is what F159's spatial hypothesis predicts and what")
     print("  would mean a pooling student trains toward the linear floor instead of the refit")
     print("  reference. **If it does, the student needs the token grid and the 20 Hz budget has to")
     print("  be revisited before anything is built; no teacher quality repairs it.**")

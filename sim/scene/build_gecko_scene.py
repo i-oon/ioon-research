@@ -239,26 +239,41 @@ ALLO_TARGET_Z, ALLO_RUNWAY_AIM = 0.10, 0.75
 ALLO_SCALE_K = 5.0 / 8.0  # footprint-based, not mount-height-based -- see comment above
 
 
-ALLO_HIDDEN_LAYER = 0x4   # distinct from BODY_PART_1_HIDDEN_LAYER=0x2, only used to hide the ego room
-
-
-def hide_ego_room_from_allo(sim):
+def capture_allo_unoccluded(sim, cam):
     """The ego room (`egoWall0..4`, built by `add_camera`) is sized off the gecko's mount height
     for the EGOCENTRIC view (walls at +/-1.19 m, ceiling at 0.89 m -- correct for a camera sitting
     on the robot). The allocentric camera sits 5 m away at 3.3 m height (footprint-scaled, see
     `add_allocentric_camera`'s own comment) -- **outside that room entirely**, its line of sight to
     the robot passing straight through the low ceiling panel. Every allocentric render before this
     fix was blank: a flat, textureless fill from being embedded in/behind that ceiling mesh, not a
-    capture bug. Adding an extra visibility-layer bit to the room (keeping its default layer so the
-    ego camera and GUI still see it) and excluding just that bit from the allo camera's mask fixes
-    this without touching the shared, cross-body `ego_camera.py` room-building code."""
+    capture bug.
+
+    **A first attempt at fixing this used `objintparam_visibility_layer` masking (excluding the
+    room from the allo camera's own mask) -- confirmed NOT to work**: the mask was verified applied
+    correctly on both sides, but the render stayed blank regardless. CoppeliaSim's vision-sensor
+    render does not appear to honor that mask as an occlusion filter the way it does for GUI/other
+    display purposes. What does work, confirmed directly: physically moving the walls away before
+    the capture and back after. That is what this function does -- it is a capture-time helper, not
+    something bakeable into the saved scene, since the room must stay in place for the egocentric
+    camera and for dynamics between calls. Use this instead of a plain
+    `sim.handleVisionSensor`/`sim.getVisionSensorImg` pair whenever capturing from the allocentric
+    camera; the walls are back in their original position before this function returns, so nothing
+    else (ego view, physics) is disturbed."""
+    wall_handles, original = [], []
     for i in range(5):
         try:
             h = sim.getObject(f"/egoWall{i}")
         except Exception:
             continue
-        current = sim.getObjectInt32Param(h, sim.objintparam_visibility_layer)
-        sim.setObjectInt32Param(h, sim.objintparam_visibility_layer, current | ALLO_HIDDEN_LAYER)
+        p = sim.getObjectPosition(h, sim.handle_world)
+        wall_handles.append(h)
+        original.append(p)
+        sim.setObjectPosition(h, sim.handle_world, [p[0] + 1000.0, p[1] + 1000.0, p[2]])
+    sim.handleVisionSensor(cam)
+    buf, res = sim.getVisionSensorImg(cam)
+    for h, p in zip(wall_handles, original):
+        sim.setObjectPosition(h, sim.handle_world, p)
+    return buf, res
 
 
 def add_allocentric_camera(sim):
@@ -292,10 +307,11 @@ def add_allocentric_camera(sim):
     float_params = [0.01, 20.0, np.deg2rad(ALLO_VIEW_ANGLE), 0.05, 0, 0, 0, 0, 0, 0, 0]
     cam = sim.createVisionSensor(options, int_params, float_params)
     sim.setObjectAlias(cam, "vjepa_cam_allo")
-    sim.setObjectInt32Param(cam, sim.objintparam_visibility_layer, 0xFFFF & ~ALLO_HIDDEN_LAYER)
+    sim.setObjectInt32Param(cam, sim.objintparam_visibility_layer, 0xFFFF)
     sim.setObjectMatrix(cam, sim.handle_world, m)
-    hide_ego_room_from_allo(sim)
     print(f"  /vjepa_cam_allo  k={k:.3f}  pos={np.round(cam_pos,3)}  target={np.round(target,3)}")
+    print("  NOTE: capture from this camera with capture_allo_unoccluded(), not a plain "
+          "handleVisionSensor/getVisionSensorImg call -- see that function's docstring")
     return cam
 
 
@@ -380,6 +396,24 @@ def build(sim, preview=False):
     # directly: a 0.9 rad step command covered barely half the distance in 0.4 s. The achieved leg
     # motion was a small, lagging fraction of what was commanded, regardless of phase or amplitude
     # tuning, until this was fixed.
+    #
+    # `bullet_joint_pospid1` (P gain) shipped at 0.1 with NO damping (`pospid3=0.0`). Even after
+    # raising maxvel/maxforce above, the gecko's froude-speed calibration (collect_gecko_cpg.py)
+    # found the achieved swing range was still capped at ~52% of commanded (0.364/0.700 rad) --
+    # the joint physically cannot develop enough torque to track a fast-changing target, regardless
+    # of its velocity/force ceiling. Adding damping to match (as tried for the locked/spring joints
+    # above, which target a FIXED position) made this measurably WORSE (achieved range collapsed to
+    # ~0.03-0.10 rad): those joints hold still, these track a continuously MOVING CPG target, and
+    # Bullet's D-term damps against raw joint velocity, not velocity-relative-to-target -- so any
+    # damping here fights the very motion needed to follow the trajectory. P alone, undamped, is the
+    # correct lever. Swept and measured: P=0.15 gives froude_fwd 0.169-0.175, comfortably PAST
+    # hexapod (0.134) and B1 (0.131) rather than matching them -- the same kind of out-of-range
+    # problem the calibration was trying to fix, just on the other side. P=0.11 was chosen instead:
+    # froude_fwd 0.133-0.138, the closest direct match to hex/B1 found, with yaw drift -3 to +40
+    # degrees per ~2.6s clip (combined with collect_gecko_cpg.py's DUTY_BIAS) -- comparable to
+    # P=0.15's yaw result, without the speed overshoot. P=0.2 pushes speed further still
+    # (0.176-0.188) with wider yaw variance (+23 to +53); none of these were picked for raw speed,
+    # P=0.11 was picked for matching hex/B1's actual value.
     print(f"\n{len(ACTIVE_JOINTS)} active leg joints, leg-major order:")
     active_handles = []
     for name in ACTIVE_JOINTS:
@@ -387,8 +421,11 @@ def build(sim, preview=False):
         active_handles.append(h)
         sim.setObjectFloatParam(h, sim.jointfloatparam_maxvel, 6.0)   # was 1.047 rad/s
         sim.setJointMaxForce(h, 20.0)                                  # was 4.1 N*m
+        sim.setEngineFloatParam(sim.bullet_joint_pospid1, h, 0.11)    # was 0.1, no damping added (see above)
+        sim.setEngineFloatParam(sim.bullet_joint_pospid3, h, 0.0)
         cyclic, (lo, rng) = sim.getJointInterval(h)
-        print(f"  {name:<14} interval=[{lo:+.3f}, {lo + rng:+.3f}]  maxvel=6.0 rad/s maxForce=20 N*m")
+        print(f"  {name:<14} interval=[{lo:+.3f}, {lo + rng:+.3f}]  maxvel=6.0 rad/s maxForce=20 N*m "
+              f"pospid1=0.11 pospid3=0.0")
 
     print()
     add_camera(sim, preview=preview)

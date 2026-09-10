@@ -11,7 +11,7 @@ the `action_lag` convention the collector and `predict_actions.py` already use.
 `z MSE` is how well the projector reproduces the latent. It is the training objective and it is the
 weaker test: `z` is 64-D and correlated, so a low error can still put the prediction somewhere the
 forward model behaves differently -- the same identifiability problem that made weight-vector
-comparison useless in F66, where ridge coefficients on correlated `z` read at chance even for the
+comparison useless in F59, where ridge coefficients on correlated `z` read at chance even for the
 best-transferring run.
 
 `rollout gap` is the one to trust. It feeds the projector's `z` to the FDM and compares the predicted
@@ -74,7 +74,7 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
                            for t in range(0, n, 8)])
         actions = torch.as_tensor(clip["actions"], dtype=torch.float32, device=device)
         # the command that caused frames[t] -> frames[t+1]; short clips are dropped rather than
-        # padded, since a padded action is a wrong label and F45 measured what wrong labels cost
+        # padded, since a padded action is a wrong label and F39 measured what wrong labels cost
         if len(actions) < n + lag:
             continue
         E.append(e[:n].cpu().half()); Z.append(z); A.append(actions[lag:lag + n])
@@ -147,7 +147,7 @@ def main():
 
     # **Split by clip, not by frame.** Consecutive frames of one clip are near-duplicates, so a
     # frame-level split leaves the training data in the test set -- the leak that made yaw look
-    # like it transferred at +0.31 until it was held out by condition instead (F76).
+    # like it transferred at +0.31 until it was held out by condition instead (F67).
     # **`// 60` was not a clip boundary.** Clips here run 57 to 65 transitions, so a fixed block
     # size straddles them: every block held out shared a clip with the training set, which is the
     # frame-level leak this comment exists to prevent. Grouped on the index `gather` records.

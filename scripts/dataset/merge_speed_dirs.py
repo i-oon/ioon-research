@@ -7,7 +7,7 @@ them into one directory would collide on the filename; renaming only the file wo
 **`lambda_cross` pairs on `expert_episode`, the field inside the npz, not on the filename**
 (`wm/data/dataset.py`). Left untouched, a 92-frame clip at speed 0.72 and a 60-frame clip at 1.10
 both claim to be episode 6, and the loss would decode one body's latent against another body's
-frame from a different point in the stride at a different speed. F45 measured what that costs: a
+frame from a different point in the stride at a different speed. F39 measured what that costs: a
 mis-paired frame supplies a **wrong** partner command rather than a noisy one, and wrong targets do
 not average out with more data.
 

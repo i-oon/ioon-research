@@ -1,13 +1,13 @@
 """Does a latent inferred from an *unseen embodiment* still tell the decoder what to output?
 
-F46 crossed the decoder's two inputs between two bodies of the same embodiment and found it
+F40 crossed the decoder's two inputs between two bodies of the same embodiment and found it
 answers with the latent's body. This asks the same question across embodiments, on the one pair
 where it is exactly definable.
 
 The 4-leg insect is the base stick insect with its middle legs ghost-removed, driven by the
 *unchanged* six-leg IK gait. So its 12 commands are the base body's corner-leg columns
 **bit-identically** -- verified, max difference 0.0000 deg -- and it walks the same expert
-episodes. F45 killed cross-embodiment pairing for the B1 because nothing links a hexapod frame to
+episodes. F39 killed cross-embodiment pairing for the B1 because nothing links a hexapod frame to
 a quadruped frame; none of that applies here, because intent is shared by construction.
 
 That gives a well-posed swap the B1 cannot support:
@@ -26,7 +26,7 @@ out of reach for it -- which is what makes the comparison fair. The two differ b
 carries a skill to an embodiment the model never trained on. If a latent inferred from 4-leg video
 still drives the decoder's output, the latent is doing embodiment-independent work. If the decoder
 ignores it and answers from the frame it is holding, then whatever carries the 4-leg few-shot
-result (F44) is the frozen encoder's features, not the learned latent.
+result (F38) is the frozen encoder's features, not the learned latent.
 
 **The trap.** The ITM never saw a 4-legged robot, so this is out of distribution for it by
 construction -- that is the question, not a defect. But it does mean a *degenerate* answer is

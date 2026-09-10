@@ -1,5 +1,5 @@
 """Reads the FTM's predicted change, not the frame, so it cannot decode robot identity instead of
-motion -- the trap `body_sees_frame=True` fell into once already (F64: cross-embodiment transfer
+motion -- the trap `body_sees_frame=True` fell into once already (F57: cross-embodiment transfer
 +0.544/+0.435 -> -10.5/-57.2, because a frame-conditioned head learns one mapping per robot and
 stops needing the latent to carry the behaviour).
 
@@ -11,7 +11,7 @@ stops needing the latent to carry the behaviour).
 tokens *concentrates* an identity leak rather than diluting it -- pooled delta reads embodiment at
 0.977, nearly as leaky as the raw frame. Removing each embodiment's own mean pooled-delta collapsed
 that to chance (0.464, held-out clips, offset fit on training clips only) while Delta-state ridge R2
-was unchanged (0.852 both ways) -- an additive per-embodiment offset, F41's mechanism, not something
+was unchanged (0.852 both ways) -- an additive per-embodiment offset, F35's mechanism, not something
 distributed that needs an adversary.
 
 **The offset is a frozen buffer, per embodiment, exactly like `ActionProjector`'s `mean_*`/`std_*`.**
@@ -26,7 +26,7 @@ keep training under `L_recon`; a long run risks the fixed offset drifting stale 
 computed from changes. Fine for a short confirm fine-tune (`multistep_derisk.py`-scale); a full
 retrain may need periodic re-estimation from training clips only, not yet implemented here.
 
-**`use_delta=False` (F192).** Offline probes on frozen features found `z` alone predicts forward
+**`use_delta=False` (F177).** Offline probes on frozen features found `z` alone predicts forward
 speed better than `z` combined with pooled delta -- R2 0.781 vs 0.625 on the oracle ITM `z`, 0.791
 vs 0.537 on `proj(action)`, the z ranking actually deploys. Combining does not add information on
 top of `z`, it dilutes it. `use_delta=False` drops `pool`/the offset entirely and reads `z_proj(z)`

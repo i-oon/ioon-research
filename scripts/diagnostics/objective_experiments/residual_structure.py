@@ -4,7 +4,7 @@
         --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/allocentric/beh12_c08f09t09_flat \\
         --embodiment hexapod
 
-**F157 closed the objective-level path**: no weighting and no frameskip makes the action matter more
+**F141 closed the objective-level path**: no weighting and no frameskip makes the action matter more
 than about three percent of one-step prediction error. This asks what those three percent *are*
 before anything is rebuilt.
 
@@ -91,7 +91,7 @@ def main():
     ap.add_argument("--data", required=True)
     ap.add_argument("--embodiment", default="hexapod")
     ap.add_argument("--lag", type=int, default=1, help="**set this to the checkpoint's own "
-                    "`frame_stride`.** Measuring off-distribution is what made F156 wrong")
+                    "`frame_stride`.** Measuring off-distribution is what made F143 wrong")
     ap.add_argument("--cache", default="")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--stride", type=int, default=3)

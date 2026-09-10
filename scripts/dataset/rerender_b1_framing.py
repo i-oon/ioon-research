@@ -1,6 +1,6 @@
 """Re-render `beh12_b1_flat` with the camera that keeps the whole robot in shot.
 
-**Two flags, both defects, both measured before this script existed (F113).** At the scene's
+**Two flags, both defects, both measured before this script existed (F104).** At the scene's
 authored 15-degree angle the B1 touches an image edge in 62% of frames averaged over the twelve
 conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at
 25 degrees it is 0% everywhere. And the B1's camera was never pinned to a fixed world point, so its

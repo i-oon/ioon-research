@@ -7,7 +7,7 @@ passes, so this makes four coloured, mildly textured walls around the spawn and 
 
 **Two conventions that are not guessable and have cost this project time before.** A CoppeliaSim
 vision sensor looks along its own **+z**. The insect's body frame has **z pointing aft** off
-`/abdomen` (F71, F117), so its camera must be turned to face **-z_body**; the B1's base has **x
+`/abdomen` (F62, F108), so its camera must be turned to face **-z_body**; the B1's base has **x
 forward**, so its camera faces **+x_body**. Both defaults are below and both are **guesses until
 somebody looks at a frame** -- `--ego_euler` exists so they can be corrected without editing code,
 and the run sheet renders before it measures.

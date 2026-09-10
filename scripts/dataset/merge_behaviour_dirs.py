@@ -18,7 +18,7 @@ Episode numbers are `axis_index * 1000 + condition_index * 100 + clip_index`, wh
 unique, keeps the condition recoverable arithmetically, and leaves room to pair across embodiments
 later: the same condition slot on the two robots gets the same number, so if `lambda_cross` is ever
 turned on it pairs matched behaviours rather than matched filenames. It is 0.0 in every Stage 2 run
-today (F71's collection notes), so nothing depends on that yet.
+today (F62's collection notes), so nothing depends on that yet.
 
   .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py \\
       --src data/allocentric/beh12_hex --out data/allocentric/beh12_c10f10t10_flat --embodiment hexapod

@@ -17,7 +17,7 @@ The stage boundary runs through the entry points, not through the modules -- `mo
 | **finetune** | `fit_projector.py` | Action Projector, one per embodiment | the target robot's own actions |
 
 **Why there are two stages at all.** `z_t = ITM(e_t, e_{t+1})` needs the *next* frame, which at
-control time is the thing being decided, so **the ITM can never run in the loop** (F81). The
+control time is the thing being decided, so **the ITM can never run in the loop** (F72). The
 projector is the module that replaces it: `a_t -> z_t`, no future required. Everything measured in
 this project so far reads `z` off two ground-truth frames -- reconstruction, not control, as
 `predict_actions.py` says in its own docstring.
@@ -30,7 +30,7 @@ this project so far reads `z` off two ground-truth frames -- reconstruction, not
 | `models/ftm.py` | `(e_t, z) -> e_{t+1}`. The world model proper; what a planner rolls forward |
 | `models/motion_decoder.py` | `(e_t, z) -> joint commands`, per-embodiment heads plus a shared body head. An auxiliary loss that stops the latent shortcutting -- **not** a runtime controller |
 | `models/action_projector.py` | `a -> z`, per embodiment. What makes control possible |
-| `models/adversary.py` | reversed-gradient head on `z`; measured not to reverse the embodiment split (F44) |
+| `models/adversary.py` | reversed-gradient head on `z`; measured not to reverse the embodiment split (F38) |
 
 ## The objective
 
@@ -41,7 +41,7 @@ commands share no correspondence, so each gets its own head. **`L_body` is the o
 the same `z` to decode the same way on both robots**, which is why matched behaviour data matters to
 it specifically. `cfg.body_channels` selects which columns it supervises: `(0,)` forward speed only,
 `(0, 2)` forward and yaw. Lateral is column 1 and is excluded -- it fails the embodiment gate, and
-half the B1 clips carry a per-policy artefact in it (F79, F80).
+half the B1 clips carry a per-policy artefact in it (F70, F71).
 
 ### The training window is a pair of settings, not one
 
@@ -49,7 +49,7 @@ half the B1 clips carry a per-policy artefact in it (F79, F80).
 commands `L_motion` asks for, and **it defaults to 0, meaning follow `frame_stride`** -- because
 widening one without the other is not a weaker version of the change, it is a broken objective. The
 pair `e_t -> e_{t+k}` is caused by k commands, so a `z` that summarises k steps was being graded
-against the single command at `t + action_lag`. Measured (F88): stride 10 raised the forward model's
+against the single command at `t + action_lag`. Measured (F78): stride 10 raised the forward model's
 use of the latent 1.6x and simultaneously took val `motion` from 0.218 to 0.928, which is the level
 of predicting the training mean. Both defaults are 1-equivalent, so runs recorded before this exist
 unchanged.
@@ -118,7 +118,7 @@ toward 1x means the latent has become useless and the decoder is reading everyth
 
 **6. Is the latent leaking identity?** In a cross-embodiment run this is the tripwire: a `probe`
 climbing toward 0.8 in the first epochs means the shared body head is learning *which robot it is
-looking at* rather than what the robot is doing. F58 measured exactly that -- 0.824 by epoch 1 with
+looking at* rather than what the robot is doing. F51 measured exactly that -- 0.824 by epoch 1 with
 lateral in the target, against a control at 0.537.
 
 **In adversarial runs only,** `probe` is the one to trust; `adv` fights a reversed gradient and
@@ -149,7 +149,7 @@ the two datasets; degrees are.
 | What you see | What it means | What to do |
 |---|---|---|
 | `recon` rising two epochs running | diverging | stop, lower the learning rate |
-| `val motion` improving 10x while `heldout` is flat | the classic failure this project is about | not a bug; it is the finding (F11) |
+| `val motion` improving 10x while `heldout` is flat | the classic failure this project is about | not a bug; it is the finding (F10) |
 | `z-gap` falling toward 1x | latent has gone useless | if adversarial, lower `lambda_adv` |
 | `x-gap` and `z-gap` both falling | decoder is ignoring both inputs, predicting a constant | check that `motion` is actually falling |
 | `probe` below 0.10 with five bodies | adversarial oscillation, not removal | lower `lambda_adv`, lengthen `adv_warmup_epochs` |

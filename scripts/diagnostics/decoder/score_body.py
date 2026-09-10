@@ -15,7 +15,7 @@ constant pose scores, with both decoder inputs ablated:
 
   z zeroed      does the answer depend on the latent
   frame zeroed  does the frame help or hurt. On a body outside the training range it has
-                previously *hurt*, which is the pathway failure F18 named.
+                previously *hurt*, which is the pathway failure F16 named.
 
   .venv/bin/python3 scripts/score_body.py --ckpt wm/runs/tib_cross/best.pt \\
       --bodies c10f10t06:data/allocentric/fwd_hex8body c10f10t08:data/allocentric/fwd_bracket

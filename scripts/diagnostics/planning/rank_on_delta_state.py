@@ -3,11 +3,11 @@
     .venv/bin/python3 scripts/diagnostics/planning/rank_on_delta_state.py
 
 `target_action_share.py` found that `z` carries the action's effect on **body motion** (ridge R2
-0.359 from `z` alone) and almost nothing about the **embedding displacement** (0.005). F179's ranker
+0.359 from `z` alone) and almost nothing about the **embedding displacement** (0.005). F164's ranker
 already uses the planning `z` and already scores in body-motion units, but it gets there the long
 way:
 
-    F179       proj(a) -> FTM rollout -> ITM -> body head -> delta-state
+    F164       proj(a) -> FTM rollout -> ITM -> body head -> delta-state
     direct     proj(a) ------------------------> body head -> delta-state
 
 The embedding round-trip is exactly where the measurements say the action is drowned. This scores
@@ -17,7 +17,7 @@ both paths on the same candidates.
 
     coarse     the twelve recorded conditions. Their true body motion is recorded, so the correct
                answer is known offline and this is a real ranking test.
-    fine       0.5 sd perturbations, F179's setting. Their true outcome needs the simulator, so this
+    fine       0.5 sd perturbations, F164's setting. Their true outcome needs the simulator, so this
                file reports only how far apart the two paths place them -- **separation, not
                accuracy**. A path that cannot separate them cannot rank them, so a collapse here
                settles the question cheaply; a spread here does not settle it the other way.

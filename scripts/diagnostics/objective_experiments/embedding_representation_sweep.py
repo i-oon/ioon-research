@@ -28,7 +28,7 @@ gets retrained on next -- not a guess.
      for both frames (not pooled), one cross-attention layer (`e_t`'s tokens as queries into
      `e_next`'s tokens), pooled only at the very end, trained directly to regress delta-Froude
      (not to reconstruct anything) -- the "spatial, not pooled" arm this project's own record
-     (F177/F178: attention-over-tokens beats pooling by ~0.08 R2 on egocentric command decoding,
+     (F162/F163: attention-over-tokens beats pooling by ~0.08 R2 on egocentric command decoding,
      both bodies) says is worth checking before concluding concat is the ceiling
 
 Probes 1-4: ridge + kNN (k=5, 15), held out by clip (20%). Probe 5: same, on the 64-D `z`. Probe 6

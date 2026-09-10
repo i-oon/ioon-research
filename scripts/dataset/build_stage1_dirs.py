@@ -5,7 +5,7 @@ Three constraints have to hold at once, and no directory already on disk satisfi
   1. Every clip walks. A clip counts as walking if the body's head travelled at least
      WALK_FORWARD_M forward (signed, so a body that reverses fails) and drifted less than
      WALK_LATERAL_M sideways. The original runs trained on bodies that failed 30/30 -- see
-     FINDINGS.md F42 -- and even the sound bodies scatter a few clips each.
+     FINDINGS.md F36 -- and even the sound bodies scatter a few clips each.
 
   2. tib_cross and bracket_cross see the same number of clips. Slide 9 claims wider
      femur/tibia coverage helps *at matched data volume*; without matching, a better score is

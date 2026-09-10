@@ -1,6 +1,6 @@
 """LAC-WM's stage 3: fine-tune the action projector and the forward model *together*.
 
-**This exists because of F97, not as a refinement of stage 2.** Stage 2 fits the projector by
+**This exists because of F87, not as a refinement of stage 2.** Stage 2 fits the projector by
 regressing `proj(a)` onto the ITM's latent `z`. On the hexapod that works (rollout gap 0.230).
 On the B1 it does not (0.640 on the same latent space and clip count, 0.841 after adaptation,
 1.301 on the few-shot budget) and the reason is a property of the robot: the B1's action is a
@@ -85,7 +85,7 @@ def gather(directory, name, encoder, checkpoint, cache, chunk, lag, device):
             e = e - off.cpu()
         n = len(e) - 1
         actions = torch.as_tensor(np.asarray(clip["actions"]), dtype=torch.float32)
-        if len(actions) < n + lag:  # a padded action is a wrong label, and F45 priced wrong labels
+        if len(actions) < n + lag:  # a padded action is a wrong label, and F39 priced wrong labels
             continue
         with np.load(path, allow_pickle=True) as raw:
             # **`condition` is written by `merge_behaviour_dirs.py`, not by the collector.** Sets
@@ -194,7 +194,7 @@ def main():
                          "every run of one configuration is bit-identical**, so repeats say "
                          "nothing and a single run cannot be told apart from a lucky one -- "
                          "which matters here, because the same arm moved 9%% to 58%% speed "
-                         "error between 12k and 15k steps (F116).")
+                         "error between 12k and 15k steps (F107).")
     ap.add_argument("--steps", type=int, default=3000)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--lr_proj", type=float, default=1e-3)

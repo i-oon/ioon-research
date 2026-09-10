@@ -1,8 +1,8 @@
-"""F186 corrected: 68% on recorded conditions is not near-ceiling. Where does each scorer lose?
+"""F171 corrected: 68% on recorded conditions is not near-ceiling. Where does each scorer lose?
 
     .venv/bin/python3 scripts/diagnostics/planning/condition_confusion.py
 
-**The correction this diagnoses.** F186 read `state`'s 3.95x signal/floor on recorded conditions as
+**The correction this diagnoses.** F171 read `state`'s 3.95x signal/floor on recorded conditions as
 confirming candidate separation was the whole wall. It wasn't the whole story: 68% win rate is far
 from the ~100% a scorer with no error of its own should get when candidates are already 4x above the
 noise floor apart. Two layers are tangled in that 68% -- `perturb` stacks candidate-similarity AND
@@ -292,7 +292,7 @@ def main():
     # per-transition body_motion (NOT the whole-clip average) -- feeds the "oracle" scorer, which
     # asks: even with the true achieved motion at this exact instant (no model, no prediction),
     # does gait-phase noise alone cap ranking below 100% against the whole-clip-average ground
-    # truth? Same logic as F190's per-transition vs clip-averaged oracle finding (39% vs 83.8%).
+    # truth? Same logic as F175's per-transition vs clip-averaged oracle finding (39% vs 83.8%).
     bm_full = {c: np.asarray(load(cand[c], REGISTRY["hexapod"])["body_motion"])[:, channels]
               for c in conds}
     true_motion = {c: body_goal(cand[c], "hexapod", channels) for c in conds}

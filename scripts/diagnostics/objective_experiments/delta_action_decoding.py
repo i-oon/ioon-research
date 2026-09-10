@@ -9,17 +9,17 @@
 
 Delta-JEPA (2606.31232) trains a world model to reconstruct the action from the *difference* of
 consecutive state latents, `dz = z_t+1 - z_t`, with a large weight. Its stated target is
-action-insensitive collapse, and it explains F168 precisely: given the endpoints `[z_t, z_t+1]` a
+action-insensitive collapse, and it explains F153 precisely: given the endpoints `[z_t, z_t+1]` a
 decoder can read the action off action-correlated cues in `z_t+1` without modelling the transition
 at all, while a difference cannot be read that way. **It was tested on manipulation and navigation.
 Neither is periodic.**
 
-  **general**   can the action be read from `dz` at all? F158 measured the passive residual and
+  **general**   can the action be read from `dz` at all? F144 measured the passive residual and
                 found noise; that is a measurement of what is there, not of what training would put
                 there. This run establishes the untrained baseline the LDAD arm has to beat.
-  **fine**      can it be read for actions differing by the amounts that F145, F179 and F182 could
+  **fine**      can it be read for actions differing by the amounts that F136, F164 and F167 could
                 not separate? **This is the deciding one.** Reconstruction is split into the part
-                between behaviours -- which F145 already showed is available at 52% -- and the part
+                between behaviours -- which F136 already showed is available at 52% -- and the part
                 *within* one behaviour, which is the wall.
 
 **The architectural mapping, stated because getting it wrong would invalidate the finding.**
@@ -68,11 +68,11 @@ def main():
                     help="**a stage-1 pretrain carries no projector**, so an arm's `best.pt` cannot "
                          "supply one and the response-separation rows need it. Point this at a "
                          "projector fitted against THIS checkpoint -- fitted against another one it "
-                         "is a different latent space, which is the F160 trap. Omit it and the "
+                         "is a different latent space, which is the F146 trap. Omit it and the "
                          "reconstruction rows still run; only the ratio is skipped.")
     ap.add_argument("--sigma", type=float, default=0.5,
                     help="the fine perturbation, in units of each joint's own sd. **0.5 is the one "
-                         "F144 ranked and F179 measured at 2.5% outcome separation**, so the "
+                         "F135 ranked and F164 measured at 2.5% outcome separation**, so the "
                          "response-separation rows below are about exactly those candidates.")
     args = ap.parse_args()
 
@@ -143,7 +143,7 @@ def main():
     for name, Kf in (("dz_pred = FTM(e_t,z) - e_t   **LDAD's own target**", K_p),
                      ("dz = e_t+1 - e_t   (encoder only -- CANNOT move)", K_d),
                      ("e_t alone   (the endpoint contrast)", K_e),
-                     ("[e_t, dz]   (endpoints, F168's setting)", K_e + K_d)):
+                     ("[e_t, dz]   (endpoints, F153's setting)", K_e + K_d)):
         r2, pred, _ = ridge_r2(Kf[np.ix_(tr, tr)], Kf[np.ix_(te, tr)], An[tr], An[te], folds)
         ss = ((pred - An[te]) ** 2).sum()
         within = 1 - ss / max(float(((An[te] - centre) ** 2).sum()), 1e-9)
@@ -202,7 +202,7 @@ def main():
     print("  embeddings and is identical for every checkpoint by construction; it is a property of")
     print("  the data and a reference, never a result. `dz_pred` is what the LDAD term trains.")
     print("\n  **`within cond` is the deciding column and `dz_pred` has to clear it, not the first one.**")
-    print("  Between behaviours the action is already recoverable and F145 reads 52% on it; the")
+    print("  Between behaviours the action is already recoverable and F136 reads 52% on it; the")
     print("  wall is inside one behaviour. **A dz that reconstructs the action overall and not")
     print("  within a condition is the same wall relocated**, which is the outcome Delta-JEPA's")
     print("  own evidence cannot rule out -- manipulation and navigation are not periodic.")

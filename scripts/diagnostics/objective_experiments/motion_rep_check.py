@@ -2,8 +2,8 @@
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/motion_rep_check.py --ckpt wm/runs/beh12_hex-b1_body3/best.pt
 
-**Two properties Direction B needs, and they may trade off against each other.** F159 showed the
-action is readable from a single V-JEPA2 frame because the pose encodes the command; F136 showed the
+**Two properties Direction B needs, and they may trade off against each other.** F145 showed the
+action is readable from a single V-JEPA2 frame because the pose encodes the command; F127 showed the
 three-channel body coordinate transfers across robots. An encoder rebuild is only worth weeks if a
 motion-organised representation **breaks the first without breaking the second**.
 

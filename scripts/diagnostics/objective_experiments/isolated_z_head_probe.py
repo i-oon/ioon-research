@@ -7,13 +7,13 @@ Spearman/cosine metric actually measures)?
 
 **Why this, not another architecture change.** `embedding_representation_sweep.py` found
 `z = ITM(e_t,e_next)` recovers real delta-Froude at median rho +0.535, offline, via ridge/kNN.
-`zonly_action_lever_check.py` found the ALREADY-TRAINED z-only state head (F192,
+`zonly_action_lever_check.py` found the ALREADY-TRAINED z-only state head (F177,
 `state_use_delta=false`, trained jointly with `L_recon + L_motion + L_body + L_state`) fails the
 action-lever (+0.045 / +0.099, bar 0.110) and is actively worse than a mean guess on forward/yaw.
 The gap between those two numbers is the open question, not "try another architecture": an offline
 kNN/ridge probe and a network trained jointly with three other loss terms are not the same
 experiment, and the state-head/delta branch this session has hammered on throughout is a dead
-branch regardless (F192: `z+delta` R2 0.625 < `z` alone 0.781 -- delta actively hurts).
+branch regardless (F177: `z+delta` R2 0.625 < `z` alone 0.781 -- delta actively hurts).
 
 **This isolates the two remaining candidate causes cheaply, one small head, two loss variants:**
   - FREEZE the encoder, ITM, FTM, and action projector -- `z` is computed once and never updated,
@@ -24,7 +24,7 @@ branch regardless (F192: `z+delta` R2 0.625 < `z` alone 0.781 -- delta actively 
   - Two loss shapes: MSE (standard) and a cosine/direction loss (`1 - cosine_similarity`) --
     the offline probes (kNN, ridge scored by Spearman rho) are direction-sensitive and
     magnitude-tolerant in a way plain MSE is not; this session has repeatedly seen R2-negative,
-    rho-positive results (F190's MLP, this session's ridge-vs-kNN gaps), consistent with MSE
+    rho-positive results (F175's MLP, this session's ridge-vs-kNN gaps), consistent with MSE
     optimizing magnitude at the expense of the direction rho actually measures.
 
 Two z sources tested (matching every prior check in this arc): `z = ITM(e_t,e_next)` (the +0.535

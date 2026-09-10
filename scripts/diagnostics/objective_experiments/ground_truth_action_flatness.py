@@ -5,7 +5,7 @@
 Pure ground truth, no model in the loop at all: uses only the real recorded actions and the
 real (sim-measured, dt-derived) body_motion (Froude) arrays straight from the B1 npz clips.
 
-**Why this was checked.** F198's addenda ruled out loss target, gradient share, and two
+**Why this was checked.** F180's addenda ruled out loss target, gradient share, and two
 architectures (pooled-GRU recurrent state, and a two-frame pooled proxy) as fixes for the FTM's
 action-lever staying near +0.042-+0.055 -- the single-step model barely distinguishes the real
 recorded action from a generic/mean one when predicting outcome direction. Before scoping a

@@ -19,7 +19,7 @@ carries its own weight and the survival column means something.
 the planner runs them -- 50 ms per decision, not the policy's native 20 ms -- the forward clip
 survives all 66 steps and the turning and sideways clips fall at 28 and 27. So a full-length
 physics episode is available for forward travel and half an episode for the others, and **falling
-is a result to report rather than a reason not to run.** F93's "0 of 8" was measured over 300
+is a result to report rather than a reason not to run.** F83's "0 of 8" was measured over 300
 steps at 50 Hz, six seconds; this loop is three.
 
     .venv/bin/python3 sim/control/close_loop_b1_physics.py \\
@@ -68,11 +68,11 @@ def main():
                     help="translate the goal clip into the **driven** robot's mean appearance "
                          "before planning against it. The score is a raw MSE between a predicted "
                          "B1 embedding and the goal embedding, and embodiment is strongly "
-                         "decodable from these embeddings (F43, F46), so across robots that "
+                         "decodable from these embeddings (F37, F40), so across robots that "
                          "distance is led by which robot is in the picture. Offline this is the "
                          "difference between selecting *below* chance and clearing the same-robot "
                          "baseline -- exact condition 4.2% to 23.2%, behaviour 34.7% to 55.8% "
-                         "(F123). Only the goal moves: `e_t` is the forward model's input and "
+                         "(F114). Only the goal moves: `e_t` is the forward model's input and "
                          "shifting that would trade one confound for another. No effect when the "
                          "goal is the demonstration.")
     ap.add_argument("--candidates_dir", default="data/allocentric/beh12_b1_flat",
@@ -80,7 +80,7 @@ def main():
                          "in 61% of frames, never pins its camera, files the forward clip under "
                          "`turn_wz0.00`, and turns the opposite way from the insect -- so its "
                          "turning conditions cannot be reached from an insect goal at all "
-                         "(F113-F115). Anything pointed at the old directory reproduces those.")
+                         "(F104-F106). Anything pointed at the old directory reproduces those.")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--horizon", type=int, default=5)
@@ -91,7 +91,7 @@ def main():
                     help="hold the chosen behaviour for this many steps before deciding again. "
                          "**1 is re-deciding every step, which is what every run so far used and "
                          "what nothing has justified.** Switching clips was measured to cost half "
-                         "the turning and four fifths of the lateral travel (F102), so committing "
+                         "the turning and four fifths of the lateral travel (F92), so committing "
                          "is the cheapest thing that could recover them")
     ap.add_argument("--steps", type=int, default=66)
     ap.add_argument("--settle", type=int, default=25)
@@ -99,9 +99,9 @@ def main():
                     help="body height below this fraction of its settled height counts as fallen")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--floor_scale", type=float, default=3.0,
-                    help="scale the floor about the origin, as the dataset render does. At 24 degrees the camera reaches the far edge of the scene's 15 m floor and draws a band across the upper third of the frame; enlarging it removes the band. **Must match whatever `data/allocentric/beh12_b1_fixed` was rendered with** -- a loop planning on frames that differ from its adaptation set in any static way is measuring that difference (F113).")
+                    help="scale the floor about the origin, as the dataset render does. At 24 degrees the camera reaches the far edge of the scene's 15 m floor and draws a band across the upper third of the frame; enlarging it removes the band. **Must match whatever `data/allocentric/beh12_b1_fixed` was rendered with** -- a loop planning on frames that differ from its adaptation set in any static way is measuring that difference (F104).")
     ap.add_argument("--cam_fov", type=float, default=24.0,
-                    help="perspective angle in degrees. **24, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 24 it is 0% on all 48 (F113). The floor also has to be enlarged -- see `render_b1_replay.py --floor_scale`. Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
+                    help="perspective angle in degrees. **24, not the scene's authored 15.** At 15 the B1 touches an image edge in 62% of frames averaged over the twelve conditions and in 100% of the sideways ones, while the insect never does in any of its 48 clips; at 24 it is 0% on all 48 (F104). The floor also has to be enlarged -- see `render_b1_replay.py --floor_scale`. Must match whatever the dataset was rendered with, or the frames the loop plans on are not the frames it was adapted on.")
     ap.add_argument("--out", default="results/wm/closed_loop/b1_physics")
     args = ap.parse_args()
 

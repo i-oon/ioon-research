@@ -14,15 +14,15 @@ be read as a tracker rather than re-read as minutes.
 
 | # | asked for | where it stands |
 |---|---|---|
-| W7-1 | Prove V-JEPA2 works for locomotion — e.g. can it tell foot contact? | **done, and it is now a headline measurement.** Per-leg contact from the frozen encoder: **0.806 insect, 0.941 B1** balanced accuracy against 0.500 chance (F41b). This is exactly the test he proposed |
+| W7-1 | Prove V-JEPA2 works for locomotion — e.g. can it tell foot contact? | **done, and it is now a headline measurement.** Per-leg contact from the frozen encoder: **0.806 insect, 0.941 B1** balanced accuracy against 0.500 chance (F35). This is exactly the test he proposed |
 | W7-2 | Say "third-person observer", not "visual observation" | wording — check the deck says it early |
 | W7-3 | Story order: proprioception is hard -> can vision replace it -> that forces predicting the future -> world model | slides 1-2 partly do this; worth re-reading against his order |
 | W7-4 | Comparison table vs proprioceptive methods | **not done** |
 | W7-5 | Draw the validation pipeline concretely | **not done** |
 | **W11-1** | **Simplify the architecture diagram; mark backbone / frozen / connector-head** | **not done — and now easy**, because the 4-leg work made the frozen/head split concrete: 99.7% frozen, 0.3% new head |
-| **W11-2** | **Is a connector/head enough for 6-leg vs 4-leg, where joint patterns differ entirely?** | **ANSWERED, and it is the strongest result we have.** New 12-D head on a frozen Stage 2 backbone, fitted on 5 clips of a 4-leg insect: **1.75 deg vs 4.99 for a random backbone, 2.86x**, and the predictions replay as stable walking (F44, slide 15) |
+| **W11-2** | **Is a connector/head enough for 6-leg vs 4-leg, where joint patterns differ entirely?** | **ANSWERED, and it is the strongest result we have.** New 12-D head on a frozen Stage 2 backbone, fitted on 5 clips of a 4-leg insect: **1.75 deg vs 4.99 for a random backbone, 2.86x**, and the predictions replay as stable walking (F38, slide 15) |
 | W11-3 | Camera limits and occlusion | **not addressed.** Far-side legs are occluded by the body; we noted it as a reason the per-leg diagonal is not higher, but ran no test |
-| **W11-4** | **Does Cross-Body Loss suppress emergent behaviour?** | **open, and now sharper.** We can show `lambda_cross` cut body identity 8.8% -> 1.2% without hurting the world model (F32: rollout unchanged). But "does it reduce diversity in the latent" was never measured |
+| **W11-4** | **Does Cross-Body Loss suppress emergent behaviour?** | **open, and now sharper.** We can show `lambda_cross` cut body identity 8.8% -> 1.2% without hurting the world model (F46: rollout unchanged). But "does it reduce diversity in the latent" was never measured |
 | **W11-5** | **Design your own action-evaluation metric — the source paper only plots t-SNE/UMAP** | **done, and it is a contribution.** Per-leg contact transfer, identity ablation against a random-direction control, forward-model rollout against hold-still and constant-velocity, physical replay. All of it is ours; none of it is in LAC-WM |
 | W11-6 | Next: use the world model to accelerate policy training, show sample efficiency | **not started** — this is the deployment step |
 | W11-7 | Lab synthesis table: Beam (IRL) / Pram (Flow Matching) / Ioon (World Model) — which framework for which data | **not done** |

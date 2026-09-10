@@ -7,7 +7,7 @@ after a full pretrain has been run on a mis-wired objective.
 
   1  the null-action contrast   roll the forward model twice from the same `e_t`, once on the real
                                 action's latent and once on the **null** action's -- the standing
-                                stance of that body (F148), never a zero vector, which collapses
+                                stance of that body (F139), never a zero vector, which collapses
                                 both robots. Confirm the two rollouts differ.
 
   2  the frozen readout         instantiate the new module -- randomly initialised, never trained,
@@ -48,7 +48,7 @@ class FrozenActionReadout(nn.Module):
     **Randomly initialised is the mechanism, not a detail.** A readout that learns can move the
     boundary it scores to wherever the loss is looking -- which is what our contrastive repair did,
     producing sensitivity that lived only in the projector's region and only on the body it was
-    adapted to (F139, F143). A fixed random map cannot relocate anything, so the only way to lower
+    adapted to (F130, F134). A fixed random map cannot relocate anything, so the only way to lower
     the loss is to make the transitions themselves separable.
 
     Nothing downstream consumes its output. It exists to route gradient into the forward model.
@@ -70,7 +70,7 @@ class FrozenActionReadout(nn.Module):
 
 
 def stance_action(directory, embodiment):
-    """The standing stance of this body: the pose its clips start in (F148)."""
+    """The standing stance of this body: the pose its clips start in (F139)."""
     p = sorted(glob.glob(os.path.join(ROOT, directory, "*.npz")))[0]
     return np.asarray(load(p, REGISTRY[embodiment])["actions"])[0].astype(np.float32)
 
@@ -142,7 +142,7 @@ def main():
 
     print("\n  `||real - null||` is what the separation term has to grow. If it were ~0 the hinge")
     print("  would have nothing to push apart; if the null were the zero vector it would be large")
-    print("  and meaningless, because the null would be a fall (F148).\n")
+    print("  and meaningless, because the null would be a fall (F139).\n")
 
     print("CHECK 2 — the frozen readout: no gradient to itself, gradient through it to the FDM\n")
     ftm_train = ForwardTransitionModel(cfg).to(device)

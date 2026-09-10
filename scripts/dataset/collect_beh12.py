@@ -3,7 +3,7 @@
 **The existing `data/allocentric/beh12_c10f10t10_flat` was collected by hand, one command per condition, and the
 commands were never written down.** Ten of the twelve are recoverable from the condition names --
 `speed_c7.1` is `--cycles 7.1`, `turn_s0.29` is `--spin 0.29` -- and the two sideways levels per
-direction are recoverable from nothing at all. The base sideways recipe survives in FINDINGS F71,
+direction are recoverable from nothing at all. The base sideways recipe survives in FINDINGS F62,
 but which two magnitudes became `lvl0` and `lvl1` does not, and the achieved lateral speeds are not
 symmetric between left and right (0.071 / 0.185 against -0.118 / -0.186), so they were tuned
 per direction rather than scaled from one number.
@@ -75,15 +75,15 @@ def turn_conditions(sign=1.0):
 
 TURN = turn_conditions()
 
-# F71's sideways gait: fore-aft amplitude zero, feet half a cycle out of phase, and a `--spin`
+# F62's sideways gait: fore-aft amplitude zero, feet half a cycle out of phase, and a `--spin`
 # that cancels the yaw the strafe induces -- different per direction, which is why left and right
-# do not mirror. **The two levels are a reconstruction**: the base is F71's `--strafe 0.8` and the
+# do not mirror. **The two levels are a reconstruction**: the base is F62's `--strafe 0.8` and the
 # lower level is set to reproduce the recorded lateral speeds. `--verify` is what checks it.
 SIDE_BASE = ["--amps", "0.00", "0.20", "0.30", "--ft_phase", "0.5", "--symmetric",
              "--spin_amp", "0.25", "--ik_iters", "8"]
 # **`lvl0`'s magnitude is per body, and 0.4 is the base body's value.** On `c08f09t09` the same
 # 0.4 produces a robot that barely moves -- +0.017 lateral against `lvl1`'s -0.131, with the sign
-# of the residue rather than of a strafe (F106). The recipe's own rule is that commands do not port
+# of the residue rather than of a strafe (F96). The recipe's own rule is that commands do not port
 # across geometries; this makes the one number that failed adjustable instead of baked in.
 LVL0_STRAFE = 0.4
 
@@ -142,7 +142,7 @@ def separability(root, turn_sign=0.0):
 
     A planner cannot resolve two conditions the *robot* does not resolve, so this bounds what any
     representation could do. Measured on `data/allocentric/beh12_c10f10t10_flat` it also explains nothing about
-    F91's failure -- there the turn levels are 2.7x to 6.8x apart and the speed levels 1.7x, and
+    F81's failure -- there the turn levels are 2.7x to 6.8x apart and the speed levels 1.7x, and
     the planner resolves speed 9/9 and turn 2/9. It succeeds on the closest axis.
     """
     import itertools
@@ -169,7 +169,7 @@ def separability(root, turn_sign=0.0):
     # `c08f09t09` both `side_*_lvl0` conditions came out with the wrong sign -- `side_R_lvl0` at
     # +0.017 lateral, motionless in all three channels -- because the strafe recipe under-drives
     # shorter legs. Every pair was still 2x apart, so this function reported the set as fine, and
-    # the body went on to carry the project's headline closed-loop result (F106). A condition that
+    # the body went on to carry the project's headline closed-loop result (F96). A condition that
     # barely moves is trivially separable from one that moves a lot; what has to be asked instead
     # is whether each condition does **what its name says**.
     print()
@@ -182,7 +182,7 @@ def separability(root, turn_sign=0.0):
     # **Turning is checked for sign, not only for size, and that gap cost a week.** The four turn
     # levels of one body must all rotate the same way, and they must rotate the way the reference
     # body does -- `--turn_sign`. Checking `|yaw|` alone is what let `c10f10t10` turn one way and
-    # `c08f09t09` the other through four bodies and two robots (F75, F115, F117): the calibration
+    # `c08f09t09` the other through four bodies and two robots (F66, F106, F108): the calibration
     # tables all reported magnitudes and agreed to within 3%.
     turns = {c: w for c, (f, l, w) in mean.items() if c.startswith("turn")}
     if turns:
@@ -245,7 +245,7 @@ def main():
                          "scripts/dataset/merge_behaviour_dirs.py")
     ap.add_argument("--only", nargs="*", default=[], help="condition names, for a partial re-run")
     ap.add_argument("--repeats", type=int, default=4,
-                    help="clips per condition. Drop to 1 while sweeping a recipe -- but F71 "
+                    help="clips per condition. Drop to 1 while sweeping a recipe -- but F62 "
                          "measured the sideways amplitude as a *narrow* optimum whose neighbours "
                          "scatter by a factor of ten across identical runs, so a value chosen on "
                          "one clip has to be confirmed on four.")
@@ -267,7 +267,7 @@ def main():
     ap.add_argument("--verify_out", default="data/allocentric/beh12_verify_raw")
     ap.add_argument("--spin_sign", type=float, default=1.0,
                     help="multiply every turn level's --spin by this. **The same positive spin "
-                         "rotates c10f10t10 one way and c08f09t09 the other** (F117), so a body "
+                         "rotates c10f10t10 one way and c08f09t09 the other** (F108), so a body "
                          "whose turns must match a reference collects them with -1 here. Verify "
                          "with --separability --turn_sign rather than assuming the flag flips "
                          "the motion: the two bodies already disagree under an identical command.")
@@ -275,7 +275,7 @@ def main():
                     help="the yaw sign this body's turns must have, to match the body the "
                          "goals come from. 0 disables the check. Two hexapod bodies running "
                          "the same --spin turned opposite ways and nothing noticed for a "
-                         "week, because every table reported |yaw| (F117).")
+                         "week, because every table reported |yaw| (F108).")
     ap.add_argument("--separability", default="",
                     help="measure a collected directory instead of collecting: how far apart the "
                          "conditions sit in body-motion space, in units of their own spread. This "

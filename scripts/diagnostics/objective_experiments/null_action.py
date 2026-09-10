@@ -125,7 +125,7 @@ def main():
 
     # **the dataset-mean pose, which is a different object from the stance the clips start in.**
     # A mean over a gait cycle averages swing against stance; whether that posture holds the robot
-    # up is a question, not an assumption -- F137 measured sampling around it travelling backwards.
+    # up is a question, not an assumption -- F128 measured sampling around it travelling backwards.
     args.b1_mean = np.concatenate([load(f, REGISTRY["b1"])["actions"]
                                    for f in sorted(glob.glob(os.path.join(
                                        ROOT, "data/allocentric/beh12_b1_flat/*.npz")))]).mean(0).astype(np.float64)

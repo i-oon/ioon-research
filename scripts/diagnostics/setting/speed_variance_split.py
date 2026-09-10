@@ -1,7 +1,7 @@
 """Is body speed readable from one frame because of physics, or because we built the data badly?
 
 The frozen encoder reads forward Froude from a single frame at R^2 0.676, and that number is why the
-shared head has to be blind (F64). But it mixes two things that call for opposite responses:
+shared head has to be blind (F57). But it mixes two things that call for opposite responses:
 
     between-clip   the frame reveals *which clip* this is, and every clip has one constant speed,
                    so recognising the condition is enough -- **an artefact of how we collected**

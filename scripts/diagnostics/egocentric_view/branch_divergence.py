@@ -11,7 +11,7 @@ overcome that first. **Expect a lower ratio here, and this is the one to believe
 
 **Heading is reported beside position because position understates turning.** A robot that rotates
 in place moves its head barely at all; the B1's turn counterfactual read 1.07 px of displacement at
-h=30 while its quaternion had moved 0.138. Turning is also the behaviour F136 found weakest, so it
+h=30 while its quaternion had moved 0.138. Turning is also the behaviour F127 found weakest, so it
 is the one most likely to fail and is broken out separately.
 
 `--noise` takes two runs of the **same** commands, which is the floor everything is read against;

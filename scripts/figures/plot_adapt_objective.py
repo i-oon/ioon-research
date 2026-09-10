@@ -5,15 +5,15 @@ only `--lambda_nce` separates the last two, and the MSE arm ran 15,000 steps aga
 contrastive arm's 12,000. The first two arms are earlier, weaker adaptations kept in the figure
 because they show the source method's objective failing at three different amounts of it.
 The goal frames come from a **hexapod** clip and the candidates are B1 clips, so only the goal
-crosses embodiments (F107).
+crosses embodiments (F97).
 
 **Every point is a separate recorded goal clip, not a rerun.** The B1 loop is MuJoCo and repeats
-bit for bit (F105), so repeating a configuration returns the identical number and carries no
+bit for bit (F95), so repeating a configuration returns the identical number and carries no
 information; the spread that means something is across the four clips recorded for one condition.
 
 **Chance is 33%, not 1/12.** The candidate library holds twelve conditions in unequal families --
 four speed, four turn, two per sideways direction -- so a planner picking uniformly at random lands
-on the right *family* far more often than 8% (F98).
+on the right *family* far more often than 8% (F88).
 
   .venv/bin/python3 scripts/figures/plot_adapt_objective.py
 """
@@ -52,7 +52,7 @@ def rate(run_dir, goal, want):
     with np.load(hits[0], allow_pickle=True) as z:
         chosen = np.asarray(z["chosen"], str)
     # warm-start steps replay a recorded clip rather than being planned, and are excluded here for
-    # the same reason `score_closed_loop.py` excludes them (F110)
+    # the same reason `score_closed_loop.py` excludes them (F101)
     warm = int(np.sum(np.char.startswith(chosen, "warm:")))
     planned = chosen[warm:]
     return float(np.mean([family(c) == want for c in planned]))

@@ -10,7 +10,7 @@ Three panels, left to right, each a data-flow sketch of the motion decoder.
                     position in a physical space both embodiments share.
 
 **A frame-conditioned version of our shared head was also run and scored -10.5**, worse than no
-term at all, which is where F64 comes from. It is not drawn: it differs from LAC-WM's decoder in
+term at all, which is where F57 comes from. It is not drawn: it differs from LAC-WM's decoder in
 *two* ways at once -- the frame conditioning and a one-dimensional state target sitting beside
 joint heads that carry ten times its weight -- so the panel invited the reading that we had tested
 the published design and refuted it. We had not. The number belongs in a sentence, not a diagram.
@@ -105,9 +105,9 @@ def main():
     args = ap.parse_args()
 
     fig, axes = plt.subplots(1, 3, figsize=(15.5, 4.6))
-    # F83, on the matched behaviour data and held out by condition. The earlier -7.08 / +0.54 was
+    # F73, on the matched behaviour data and held out by condition. The earlier -7.08 / +0.54 was
     # measured on forward-walking-only clips at the wrong B1 frame rate and is not comparable
-    # (F74, F84), so it is not shown even as a second row.
+    # (F65, F74), so it is not shown even as a second row.
     panel(axes[0], "Joint targets alone — what we had",
           "own robot  0.3517\ncross-robot  −28.9", GREY, shared_head=None)
     panel(axes[1], "Ours: one shared head, reading $z$ alone",

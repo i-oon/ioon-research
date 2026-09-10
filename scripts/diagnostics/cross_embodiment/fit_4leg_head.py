@@ -57,7 +57,7 @@ def all_paths(data_dir, prefix="middleloss"):
     """The clip prefix is a parameter because a 4-leg body can be built from any geometry.
     `middleloss` is the base insect; `middleloss08` is the same leg removal applied to the
     held-out body c08f09t09, which is what makes the geometry unseen as well as the leg count
-    (F47). Everything else about the protocol is identical, so the two are comparable."""
+    (F41). Everything else about the protocol is identical, so the two are comparable."""
     paths = sorted(glob.glob(os.path.join(data_dir, f"{prefix}_ep*.npz")))
     if not paths:
         raise SystemExit(f"no {prefix}_ep*.npz found in {data_dir}")

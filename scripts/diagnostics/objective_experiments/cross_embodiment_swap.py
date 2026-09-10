@@ -3,8 +3,8 @@
     .venv/bin/python3 scripts/diagnostics/objective_experiments/cross_embodiment_swap.py
 
 Three identity-removal attempts have now failed (delta, frozen offset, recompute), each chased on
-the premise that F64's -10.5/-57.2 collapse means high embodiment-leak is dangerous here too. That
-premise was never measured on THIS head. F64's head read body motion from a shared trunk *fed the
+the premise that F57's -10.5/-57.2 collapse means high embodiment-leak is dangerous here too. That
+premise was never measured on THIS head. F57's head read body motion from a shared trunk *fed the
 raw frame*; this head reads a Froude-shared quantity from a *predicted change*, and the leak measured
 so far (0.750, post-fine-tune) is on its INPUT, not shown to control its OUTPUT.
 
@@ -13,7 +13,7 @@ inference.** The state head takes an explicit `embodiment` argument only to pick
 to subtract. Scoring hexapod's own held-out transitions through the WRONG buffer (`b1`'s offset)
 answers the load-bearing question directly: if Delta-state R2 barely moves, the offset -- and by
 extension the identity information it removes -- is not what the shared trunk is using to predict
-body motion, and the leak is cosmetic. If R2 collapses the way F64's did, the correction is
+body motion, and the leak is cosmetic. If R2 collapses the way F57's did, the correction is
 load-bearing and the leak is fatal after all.
 
     correct    hexapod transitions, hexapod's own offset   (already measured: R2 +0.057)
@@ -23,8 +23,8 @@ load-bearing and the leak is fatal after all.
 **Reads:**
 
   R2 barely moves under the swap        the leak is cosmetic; stop chasing removal mechanisms and
-                                        re-test whether the state head actually ranks (F179-style)
-  R2 collapses toward F64's shape       the leak is fatal; additive removal has failed three ways,
+                                        re-test whether the state head actually ranks (F164-style)
+  R2 collapses toward F57's shape       the leak is fatal; additive removal has failed three ways,
                                         an adversarial term or an architectural rethink is next
 
 com7 stays blocked regardless of this result -- it answers whether the removal chase is the right
@@ -208,7 +208,7 @@ def main():
 
     print("\n  READ: if 'WRONG' R2 is close to 'correct' R2, the offset/identity correction is not")
     print("  load-bearing for the prediction -- the leak is cosmetic. If 'WRONG' collapses sharply")
-    print("  (strongly negative, F64-shape), the correction matters and the leak is fatal.")
+    print("  (strongly negative, F57-shape), the correction matters and the leak is fatal.")
 
 
 if __name__ == "__main__":

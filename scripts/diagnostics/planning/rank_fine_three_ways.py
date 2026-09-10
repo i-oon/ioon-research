@@ -1,9 +1,9 @@
-"""F179's local arm, three scorers side by side: embedding rollout, state-blind body head, ridge.
+"""F164's local arm, three scorers side by side: embedding rollout, state-blind body head, ridge.
 
     .venv/bin/python3 scripts/diagnostics/planning/rank_fine_three_ways.py
 
 Closes the one thing `rank_on_delta_state.py` could not: **accuracy**, not separation, on fine
-perturbations, judged in the simulator exactly as F179 was.
+perturbations, judged in the simulator exactly as F164 was.
 
     f179       proj(a) -> FTM rollout -> ITM -> body head      state-aware, embedding-mediated
     direct     proj(a) -> body head                            state-BLIND by construction
@@ -22,7 +22,7 @@ inputs.
 **`direct` is included on purpose, not as a straw man.** It is state-blind: `proj(a) -> body head`
 never reads `e_t`, so it scores what an action does *on average*, and `rank_on_delta_state.py` found
 it separates and coarse-ranks well precisely because it bypasses the world model. If it also wins
-here, the result is F184 again -- a win that argues against the world model's contribution, not for
+here, the result is F169 again -- a win that argues against the world model's contribution, not for
 Delta-state as a target.
 
 All three share the branch points, the perturbation draw, `repeat_control`'s noise floor, and the
@@ -166,11 +166,11 @@ def main():
     ap.add_argument("--samples", type=int, default=32)
     ap.add_argument("--sigma", type=float, default=0.5)
     ap.add_argument("--candidates", choices=("perturb", "conditions"), default="perturb",
-                    help="**the ceiling check.** `perturb` is F179's setting -- Gaussian noise "
+                    help="**the ceiling check.** `perturb` is F164's setting -- Gaussian noise "
                          "around the student's guess, 2.5% separation, none of the four scorers "
-                         "beat a coin on it (F185). `conditions` swaps in the twelve recorded "
+                         "beat a coin on it (F170). `conditions` swaps in the twelve recorded "
                          "behaviours from --train_data as candidates instead: on-manifold, large "
-                         "separation, F143 read the old f179-style scorer at 85-90% on this. If a "
+                         "separation, F134 read the old f179-style scorer at 85-90% on this. If a "
                          "scorer can't clear this either, it cannot rank at all, independent of "
                          "candidate generation; if it clears this but not `perturb`, the wall really "
                          "is separation, not the scorer.")
@@ -338,7 +338,7 @@ def main():
         for name in scorers:
             gap = np.mean([r[0] - r[1] for r in stats[name]["rows"]])
             print(f"  {name}: mean(student-teacher) {gap:+.4f}, signal/floor {gap / max(floor, 1e-9):.2f}x")
-    print("\na coin is 50%. F179 measured f179-scorer at 47% under this exact protocol before.")
+    print("\na coin is 50%. F164 measured f179-scorer at 47% under this exact protocol before.")
 
 
 if __name__ == "__main__":

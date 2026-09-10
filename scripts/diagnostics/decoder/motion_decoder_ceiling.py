@@ -5,7 +5,7 @@
         --embodiment hexapod
 
 **The gate teacher-student sits on.** Training on egocentric video, `MotionDecoder` reaches 0.076 on
-train motion and never leaves 1.53 on validation (F172) -- above 1.0, so worse than predicting the
+train motion and never leaves 1.53 on validation (F157) -- above 1.0, so worse than predicting the
 training mean, so `R2 = -0.53`. Teacher-student, the action projector and every path that emits a
 joint command run through that head. **Two very different things produce that curve and they call
 for opposite responses**, so it has to be separated before anything is built on it:
@@ -150,7 +150,7 @@ def main():
     print("  made the forward model use the action at all. So `[e_t, z]` landing under the")
     print("  allocentric 0.938 is not by itself a failure, and judging on that column alone would")
     print("  read the intended change as a defect.")
-    print("\n  **The question is whether the burden shifted to `z`.** F168 has `z` carrying the")
+    print("\n  **The question is whether the burden shifted to `z`.** F153 has `z` carrying the")
     print("  action; if `z`-only holds near its allocentric 0.903 while `e_t`-only falls, the")
     print("  command still exists in what the decoder is shown, and the head has to be refitted to")
     print("  read it from `z` rather than from the frame. **That is a repair, and teacher-student")

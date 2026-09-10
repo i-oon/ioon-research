@@ -9,7 +9,7 @@ The bodies and the dataset come from each checkpoint's own config. They used to 
 in this file, and that list still held `c10f10t06` and `c06f10t06` long after both were found to
 veer 0.35-0.40 m off course -- so the variance split quoted on slide 6 was computed partly on
 robots that do not walk. A body list written into a script is correct only until the next run
-changes its split, and nothing warns you when it stops being (FINDINGS.md F42).
+changes its split, and nothing warns you when it stops being (FINDINGS.md F36).
 
   .venv/bin/python3 scripts/z_content.py --ckpt wm/runs/m3d_cross/best.pt \\
       wm/runs/m3d_bracketed/best.pt

@@ -4,11 +4,11 @@
         --ckpt wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0_bodyfit_proj.pt \\
         --projector wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0.pt
 
-**Why this exists, and what every earlier result did not test.** F136 selects among twelve recorded
+**Why this exists, and what every earlier result did not test.** F127 selects among twelve recorded
 B1 clips and reaches 70% cross-embodiment. Those clips already contain working behaviours: **the
 shared coordinate picks the right one and the clip supplies the "how".** Remove the library and the
 coordinate alone cannot say which joint sequence produces a given body motion on a body it has never
-controlled. **That gap is what a world model is for**, and F135's finding that the rollout adds
+controlled. **That gap is what a world model is for**, and F126's finding that the rollout adds
 nothing was measured in the one setting where a library had already done the rollout's job.
 
 So: a goal in the shared coordinate, read from an **insect's** frames; a bank of **sampled** action
@@ -84,7 +84,7 @@ def sample_actions(rng, mean, std, k, h, scale, smooth):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--ckpt", required=True, help="the body-head checkpoint (F136's refit)")
+    ap.add_argument("--ckpt", required=True, help="the body-head checkpoint (F127's refit)")
     ap.add_argument("--projector", required=True, help="the stage-3 checkpoint carrying the projector")
     ap.add_argument("--data", default="data/allocentric/beh12_b1_flat")
     ap.add_argument("--goal_dir", default="data/allocentric/beh12_c08f09t09_flat")

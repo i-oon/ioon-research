@@ -1,8 +1,8 @@
 """Are the frames the loop drives itself into outside what the model was fitted on?
 
 **The gap this is for.** Scored on recorded clips the planner picks the right behaviour family 62%
-of the time (F100). Running as a controller it is in the right family on **38-71%** of its steps
-(F102). Nothing measured so far separates two explanations:
+of the time (F90). Running as a controller it is in the right family on **38-71%** of its steps
+(F92). Nothing measured so far separates two explanations:
 
   * the frames differ -- the loop visits states no recording contains, and the model is worse there;
   * the frames are fine and something else in the loop is wrong.

@@ -4,7 +4,7 @@
 #
 #   bash scripts/run/com7_state_head.sh          # on com7, under tmux
 #
-# **The chain this closes, in order.** F179: fine-ranking through the embedding rollout sits at
+# **The chain this closes, in order.** F164: fine-ranking through the embedding rollout sits at
 # 47%, coin-flip. target_action_share.py: z carries body motion at ridge R2 0.359 and the embedding
 # at 0.005 -- the recon target buries the action, the shared coordinate does not. Three identity-
 # removal attempts on the state head's pooled-delta input (delta-vs-frame, frozen offset, periodic
@@ -22,10 +22,10 @@
 # from scratch is an untested variant and is deliberately not what this run does.
 #
 # **The pass bar, fixed before the run so it cannot be moved afterwards.**
-#   * F179's local arm, properly powered: n>=40 branch points (SD ~8pts, not 13), F179's own goal
+#   * F164's local arm, properly powered: n>=40 branch points (SD ~8pts, not 13), F164's own goal
 #     clip (hexapod_ep100, speed_c7.1), planning z (proj(a), never ITM(e_t,e_t+1)), --repeat_control 4
 #   * f179-scorer (embedding rollout) vs state-head scorer, side by side, same branch points
-#   * state-head scorer clearly above BOTH 53% (this session's f179 baseline) and 47% (F179's own
+#   * state-head scorer clearly above BOTH 53% (this session's f179 baseline) and 47% (F164's own
 #     number) -> the direction holds to planning, write it up
 #   * state-head scorer ~= f179/coin, even with R2 0.81-0.85 offline -> the wall is between
 #     reconstruction accuracy and ranking, not the target; report that as the finding

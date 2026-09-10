@@ -37,7 +37,7 @@ the only measurement of what the contaminated data cost. Details in
 | `logs/` | training logs |
 | `eval/` | `evaluation.json` from the early two-body runs |
 | `4leg_head/` | the held-out 4-leg embodiment: few-shot curves, replays, summaries |
-| `ablation_replay/` | identity/frame/latent ablations driven through physics (F43b) |
+| `ablation_replay/` | identity/frame/latent ablations driven through physics (F37) |
 
 **`dataset/` is the category that is easy to forget.** Thirteen files -- `morphology_bodies`,
 `ratio_gaits_ep6`, `foot_force_threshold`, `dead_zone_comparison`, `leg_loss_strips`,
@@ -68,7 +68,7 @@ Needed when filing the inbox. Everything follows `{script}_{run}_{epoch}_{body}.
 
 Body codes disambiguate further: `c08f09t09` and friends are hexapod bodies (Stage 1 and 2 both
 use them), `middleloss` is the 4-leg built on the base geometry, `middleloss08` the one built on
-held-out `c08f09t09` (F48).
+held-out `c08f09t09` (F41).
 
 ## Where the 2026-08-16 numbers live
 
@@ -77,16 +77,16 @@ be traced to the file that produced it.
 
 | file | backs |
 |---|---|
-| *(none in this repo)* | **F52** itself -- the 1/3/5/7/9-clip sweep ran on com7 and its log stayed there. The table is transcribed in FINDINGS.md F52; regenerate with the command in that finding if it is ever needed here. |
+| *(none in this repo)* | **F45** itself -- the 1/3/5/7/9-clip sweep ran on com7 and its log stayed there. The table is transcribed in FINDINGS.md F45; regenerate with the command in that finding if it is ever needed here. |
 | `stage2/logs/preflight_real.log` | the gate that checked the control arms were trained enough to compare |
-| `stage2/logs/ft_pretrain_real.log` | F52's control: real temporal pairs |
-| `stage2/logs/ft_pretrain_shuffled.log` | F52's control: shuffled pairs, adjacency removed |
-| `stage2/measurements/pretrain_control_frozen.txt` | **F54** -- both arms with no adaptation at all, on the B1 and on held-out insect clips. The 1.38x-to-0.54x embodiment gap. |
+| `stage2/logs/ft_pretrain_real.log` | F45's control: real temporal pairs |
+| `stage2/logs/ft_pretrain_shuffled.log` | F45's control: shuffled pairs, adjacency removed |
+| `stage2/measurements/pretrain_control_frozen.txt` | **F47** -- both arms with no adaptation at all, on the B1 and on held-out insect clips. The 1.38x-to-0.54x embodiment gap. |
 | `stage2/logs/pretrain_control.log` | how both control arms were trained (see RUNS.md) |
-| `stage1_correct/logs/horizon_c10f10t10.log` | **F53** -- F31 re-measured, the table on slide 11 |
-| `stage1_correct/logs/horizon_m3d_clean.log` | F53's robustness check, all five bodies pooled |
+| `stage1_correct/logs/horizon_c10f10t10.log` | **F46** -- F26 re-measured, the table on slide 11 |
+| `stage1_correct/logs/horizon_m3d_clean.log` | F46's robustness check, all five bodies pooled |
 
-> An 11-clip row was measured for F52 and is **not reportable**: with 14 clips and 4 held out,
+> An 11-clip row was measured for F45 and is **not reportable**: with 14 clips and 4 held out,
 > `train = order[:11]` and `test = order[-4:]` overlap by one clip, so a quarter of the test set
 > was in training. The script now refuses that budget outright. Read budgets 1-9 only, and note
 > that 10 is the largest clean budget the B1 set allows.
@@ -95,7 +95,7 @@ be traced to the file that produced it.
 
 `cfg.action_lag` decides which command the Motion Decoder is asked for, counted from frame `t`.
 Every run listed below except `lag1_*` was trained with **`action_lag 0`**, where the target is
-already visible in the decoder's own input and the latent has no job (FINDINGS.md F29). Their
+already visible in the decoder's own input and the latent has no job (FINDINGS.md F25). Their
 numbers are still valid against each other and are read back correctly by
 `wm.config.from_checkpoint`, which restores the behaviour each checkpoint was trained with.
 
@@ -166,7 +166,7 @@ Held-out `c08f09t09`, 195 transitions, both runs `action_lag 0`.
 | the latent zeroed entirely | 19.24 (5.39x) | 6.04 (2.08x) |
 
 Removing the transition costs 11-19 percent, and reversing it costs more than removing it. `z`
-was a pose code, not a latent action. FINDINGS.md F29 -- this is why `action_lag` exists.
+was a pose code, not a latent action. FINDINGS.md F25 -- this is why `action_lag` exists.
 
 ## What the latent contains
 
@@ -183,7 +183,7 @@ split by what explains it. Eight contact patterns, majority class 0.144; five bo
 | variance: interaction | 26.8% | 10.1% | 15.4% |
 
 Behaviour survives; the body's share of the variance falls sevenfold. The small z-gap above is
-`z` shedding the body code, not `z` going empty. FINDINGS.md F26.
+`z` shedding the body code, not `z` going empty. FINDINGS.md F22.
 
 ## The other held-out body, `c06f06t06`
 
@@ -210,11 +210,11 @@ segment scales, where the correct answer in command space is (1.0, 1.0, 1.0):
 
 The cross model reads apparent segment size off the image accurately and applies the command
 change that *relative* shortening would need; here the shrink was uniform and needed none.
-FINDINGS.md F28.
+FINDINGS.md F24.
 
 ## Physical replay on the held-out body
 
-`c08f09t09`, three clips, open loop, same scene and physics for both passes. FINDINGS.md F27.
+`c08f09t09`, three clips, open loop, same scene and physics for both passes. FINDINGS.md F23.
 
 | | control ep 6 | cross ep 8 |
 |---|---|---|
@@ -242,7 +242,7 @@ augmentation). Produced by `scripts/diagnostics/aug_noise.py`.
 | **jitter only, no crop** | **4.02** | **2.10** |
 | crop 95-100% + jitter | 7.02 | 3.66 |
 
-No setting recovers the signal. FINDINGS.md F25.
+No setting recovers the signal. FINDINGS.md F20.
 
 `z-gap` and `x-gap` are `zero_z` and `zero_x` divided by the held-out error, so they say how much
 the decoder needs the latent and the frame. They compare **between runs only**; zeroing an input

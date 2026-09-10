@@ -67,12 +67,12 @@ reference point. Blockquotes are reserved for caveats.
 
 **The scoped contribution, verbatim, and the only version to be written:**
 
-> In periodic visual locomotion, the joint action is inverse-recoverable from a SINGLE frame (F159:
+> In periodic visual locomotion, the joint action is inverse-recoverable from a SINGLE frame (F145:
 > insect R2 0.78, turning 0.93) because gait phase makes the pose encode the command -- so the
-> action is forward-redundant (F158: <3% of prediction error). This closes the loop between two
+> action is forward-redundant (F144: <3% of prediction error). This closes the loop between two
 > prior observations -- adjacent-frame redundancy (AHA-WAM) and the action-invariant teacher-forcing
 > solution (UWM-JEPA) -- with a measured mechanism, and shows the objective-level fix-family fails
-> on it (ActSWM hinge, F153/F157) and that the residual-target route is closed (F158), since the
+> on it (ActSWM hinge, F141) and that the residual-target route is closed (F144), since the
 > residual of an action-blind prediction carries no action beyond the frame -- because there is no
 > action-dependent forward signal to recover, only a redundant one.
 
@@ -85,9 +85,9 @@ locomotion". AHA-WAM and UWM-JEPA each state part of it already.
 | **UWM-JEPA** 2605.25313 Sec 4 | the action-invariant solution as a training-target problem; fix is counterfactual targets | in locomotion that solution is **near-optimal**, so target fixes have nothing better to reach |
 | **Yeom et al.** 2606.07687 | V-JEPA inverse-recoverable action signal; CALVIN's static-scene note | **inverse-recoverable is not forward-necessary**; periodicity is the severe form of their exception |
 
-**The claim is deliberately narrow about target-level fixes.** F158 tested a *residual* target;
+**The claim is deliberately narrow about target-level fixes.** F144 tested a *residual* target;
 UWM-JEPA's *counterfactual* target has never been trained and is **not** claimed to fail. Widening
-that clause requires running the arm -- see F161.
+that clause requires running the arm -- see F147.
 
 ### Positioning against Yeom et al. (2606.07687)
 
@@ -111,48 +111,48 @@ left open, periodicity being the severe form of CALVIN's static tabletop; adds t
 **inverse-recoverable is not forward-necessary**; and ties that distinction to a measured objective
 failure.
 
-**One sentence in it must be narrowed, and F159 is why.** "อ่านได้เกือบสมบูรณ์จาก single-frame pose"
+**One sentence in it must be narrowed, and F145 is why.** "อ่านได้เกือบสมบูรณ์จาก single-frame pose"
 holds on the **insect**, where a single frame reads the command at R2 0.779 against a pair's 0.887.
 **It does not hold on the B1**, where a single frame reads 0.161 against a pair's 0.342. The
 dissociation itself is unharmed and is in fact sharpest on the insect -- R2 0.887 recoverable, under
 3% of forward prediction error -- but **the sentence has to say "on the insect" or it is an
-overclaim on the quadruped.** See F159 for the per-family numbers.
+overclaim on the quadruped.** See F145 for the per-family numbers.
 
 
 Learn a latent action `z_t` from simulation video that **maps to a shared body-motion coordinate**
--- forward, lateral and yaw, the same physical quantities on both robots (F136) -- given no
+-- forward, lateral and yaw, the same physical quantities on both robots (F127) -- given no
 morphology label and no kinematics.
 
 **`z_t` itself is not body-blind, and saying it is contradicts our own measurement.** Body identity
 is decodable from `z` at **0.974** against a chance of 0.5, and at 0.732 with the coordinate term
-switched off (F160). **The agnosticism lives in the coordinate `z` maps to, not in `z`.** That is
-also the more coherent reading of the architecture: the decoders are per-body (F129), so `z` has to
+switched off (F146). **The agnosticism lives in the coordinate `z` maps to, not in `z`.** That is
+also the more coherent reading of the architecture: the decoders are per-body (F120), so `z` has to
 carry body identity for them to work at all, and removing it adversarially made transfer 1.2x worse
-(F24).
+(F21).
 
 Two claims, at two scopes, because they turned out to need different words:
 
 **Within the hexapod family** (Stage 1) the latent transfers to an unseen body **without
 retraining**: `m3d_cross` scores 3.44 deg and R² +0.81 on a held-out body. The mechanism is not
 what was expected -- the decoder reads the body from the frame and the latent carries the movement
-(F49, slide 5).
+(F42, slide 5).
 
 **Across embodiments** (Stage 2) the claim is **cheap adaptation, not zero-shot transfer**. A
-frozen forward model does not survive the change of robot (F51, 0.57-0.71x on the B1, worse than
+frozen forward model does not survive the change of robot (F44, 0.57-0.71x on the B1, worse than
 predicting no motion), and adapting it on target data was always the design -- the source method
 itself finetunes on 7,265 target trajectories. Measured: **one B1 clip clears break-even, nine
-clear it at every horizon tested, about 7x fewer target clips than starting cold** (F52).
+clear it at every horizon tested, about 7x fewer target clips than starting cold** (F45).
 
 **Closed loop, in physics** (Stage 2, 2026-08-26/27) is now the third scope and the strongest one.
 An **unseen hexapod body** is controlled with the world model **completely frozen** -- only the
 two-layer action projector refitted -- at survival **15/15**, behaviour **15/15**, median speed
-error **19.0%** over fifteen runs (F95). **With the ten warm-start steps removed** -- they replay
+error **19.0%** over fifteen runs (F85). **With the ten warm-start steps removed** -- they replay
 the goal clip's own actions -- it is **14/15 and 58.8%**: the result survives, its margin is
-partly inherited, and forward is the only behaviour that *improves* without the hint (F110).
+partly inherited, and forward is the only behaviour that *improves* without the hint (F101).
 
 A **quadruped** stands through every episode under the same planner after the world model is
 adapted on 24 of its clips, at behaviour-family 38-58% against a 28% chance rate, and **hits none of
-three speed targets** (F101).
+three speed targets** (F91).
 
 **Cross-embodiment control** is the fourth scope and the narrowest. Goal frames come from a
 hexapod clip, candidates stay B1 clips because only those are executable, and the driven robot is
@@ -162,7 +162,7 @@ without a motion decoder that generalises across bodies.
 **Every B1 number was withdrawn on 2026-08-29 and nothing has replaced it yet.** The set those
 numbers were measured on had four defects -- the robot clipped by the image edge in 61% of frames,
 an unpinned camera giving every clip its own background, a forward clip filed as the weakest turn
-level, and turns that ran opposite to the insect's (F113-F115, F117). The data is corrected and all
+level, and turns that ran opposite to the insect's (F104-F106, F108). The data is corrected and all
 three sets now turn the same way; **the checkpoints were deleted and stages 1-3 have to be rebuilt.**
 
 **What the withdrawn runs showed, kept because it shapes what to measure next**, and none of it is
@@ -181,7 +181,7 @@ spaces are 18-D and 12-D with nothing commensurable between them, and the corres
 by the projector rather than defined by a kinematic model. LAC-WM unifies quantities that already
 mean the same thing on both bodies; X-Morph retargets through a URDF; proprioceptive
 morphology-agnostic control is handed the kinematic graph. **A joint-space target is what makes the
-problem hard and what makes solving it worth something** (F82), and F83's conditional is the
+problem hard and what makes solving it worth something** (F99), and F73's conditional is the
 measured answer: it works within a robot unsupervised and crosses robots only with the body term.
 
 **So the defensible sentence names the behaviour and the limit**: a quadruped walks forward from a
@@ -193,7 +193,7 @@ Applied across families that fails in a specific way: the forward model improves
 and **discards the action channel entirely** -- its answer given the real action equals its answer
 given the mean action to three decimals, at every checkpoint of a 15k-step run. A contrastive term,
 which asks for the ranking a planner performs rather than the prediction MSE asks for, lifts
-quadruped selection from 30% to 57% with data, robot, architecture and budget unchanged (F98).
+quadruped selection from 30% to 57% with data, robot, architecture and budget unchanged (F88).
 **That term is ours and is the second thing this project contributes.**
 
 > Do not write "transfers to a new robot without retraining". It was measured and it is false --
@@ -211,7 +211,7 @@ quadruped selection from 30% to 57% with data, robot, architecture and budget un
 ## 1.1 Positioning update (2026-09-07) — current, supersedes the framing above pending a full rewrite
 
 > **Scope note.** Everything above this point in §1 predates the egocentric pivot and the
-> candidate-selection-vs-imagination-RL diagnostic arc (F150-F196) — it still references withdrawn
+> candidate-selection-vs-imagination-RL diagnostic arc (F141-F178) — it still references withdrawn
 > B1 numbers and deleted checkpoints from 2026-08-29. It has not been rewritten wholesale (that is
 > separate, larger work), but this section is the current positioning and should be read as
 > overriding it for anything about the thesis's actual claim and evidence status.
@@ -240,7 +240,7 @@ quadruped selection from 30% to 57% with data, robot, architecture and budget un
 
 ### What's confirmed — safe to write as results now
 
-- **[CONFIRMED]** A shared Froude body-motion coordinate transfers cross-embodiment (F136 and the
+- **[CONFIRMED]** A shared Froude body-motion coordinate transfers cross-embodiment (F127 and the
   closed-loop measurements built on it).
 - **[CONFIRMED]** Egocentric view fixes 1-step action-conditioning that allocentric view could not
   (GATE C, null/real 1.03→1.16) — the frozen video encoder can be made to carry the action, at
@@ -257,7 +257,7 @@ quadruped selection from 30% to 57% with data, robot, architecture and budget un
   **Together this is a viable controller signal at the coarse/family level** — the resolution this
   thesis's actual goal (cross-embodiment *behaviour* transfer) needs, as distinct from the
   fine-within-family magnitude discrimination that six independent, mechanistically distinct fixes
-  (F188, F192-F196) all failed to achieve and that this thesis explicitly parks as future work, not
+  (F173, F177-F178) all failed to achieve and that this thesis explicitly parks as future work, not
   a claim.
 - **[CONFIRMED, as prior art, not as our invention]** Frozen-encoder world model + policy learned
   in imagination is a validated paradigm elsewhere (DINO-WM, DreamerPro) — this thesis instantiates
@@ -272,7 +272,7 @@ quadruped selection from 30% to 57% with data, robot, architecture and budget un
   bars.
 - **[AIM, explicitly parked]** Fine-grained, within-family magnitude discrimination. Named as
   future/stretch work, not attempted as part of the core claim, per the six-null diagnostic arc
-  (F188, F192-F196) that closed this thread for this thesis's scope.
+  (F173, F177-F178) that closed this thread for this thesis's scope.
 
 ### Why the thesis is defensible even if the loop underdelivers
 
@@ -285,38 +285,38 @@ those results are true regardless of what Stage A/B show.
 
 ### Claim (3) does not need imagination-RL, and its controller has a hard scoring-space constraint (2026-09-08)
 
-**Resolved after a self-contradiction was flagged and checked against the actual F125-F136 text
+**Resolved after a self-contradiction was flagged and checked against the actual F116-F127 text
 (not memory of it).** Claim (3) — drive a body not in pretraining via the shared coordinate +
-motor babble — does not require long-horizon imagination-based value learning (the thing F197's
+motor babble — does not require long-horizon imagination-based value learning (the thing F179's
 whole arc, and PPO/GAMMA after it, failed to make work). It needs: babble → an empirically-learned
 action→Froude map for the new body → a controller that picks actions toward a Froude goal. That
 controller does not need to integrate reward over a 20-100 step imagined horizon; it needs to move
 the body in roughly the right direction/magnitude, which is coarse, short-horizon decision-making —
 exactly the resolution the FTM is independently confirmed good at (k≤10, rho 0.85+).
 
-**"Action-selection is dead" (F144/F125/F127) does NOT mean this controller is dead — the actual
+**"Action-selection is dead" (F135/F116/F118) does NOT mean this controller is dead — the actual
 failure was the scoring metric, not goal-directed FTM control, and this is a controlled, proven
 result, not an inference:**
 
-- F125/F127: candidate pool-selection scored by **embedding distance**
+- F116/F118: candidate pool-selection scored by **embedding distance**
   (`score(a) = ||rollout(a) − goal_embedding||`) never conditioned on the goal at all — under a
   mismatch control, picks tracked "what the robot is currently doing" (56-70% agreement with the
   demonstration) and scored *below chance* against the actual goal shown (18-23% vs. 28% chance).
-- F128/F131/F136: the **same pool-selection mechanism**, rescored by **Froude/body-motion
+- F119/F122/F127: the **same pool-selection mechanism**, rescored by **Froude/body-motion
   distance** — but the winning version (Mode D) is `score(a) = |body_head(proj(a)) − goal_froude|`,
   with **no FTM rollout at all**. Mode C (the rollout version, `body_head(rollout(a))`) was tested
   in the same pass and is *worse* (33-44% vs. Mode D's 68-70% pooled, and on 3 channels the rollout
-  actively *destroys* the turning signal, F136). Goal-conditioning appeared with the coordinate
+  actively *destroys* the turning signal, F127). Goal-conditioning appeared with the coordinate
   change and survived its own mismatch control: 76-86% same-robot, 35-38% cross-embodiment with 1
-  channel (F131), 70% cross-embodiment with 3 channels (F136) — **all via the no-rollout Mode D.**
+  channel (F122), 70% cross-embodiment with 3 channels (F127) — **all via the no-rollout Mode D.**
 
-**Important terminological correction, not to be blurred**: `body_head(proj(a))` — the actual F136
+**Important terminological correction, not to be blurred**: `body_head(proj(a))` — the actual F127
 winner — **is not a forward/world model.** It is a direct, single-step, stateless action→Froude
 regressor: given a recorded action alone, predict the resulting body motion, no rollout, no
 multi-step state, no FTM involved in the winning mechanism at all. It works, and it is not "using
 the world model to control" in the sense the rest of this plan (Stage A/B, the RL loop) means. Any
 description of claim (3)'s controller should say this precisely — "Froude-scored action regression"
-or similar — not "FTM-based control," which overstates what F136 actually validated.
+or similar — not "FTM-based control," which overstates what F127 actually validated.
 
 **Hard constraint on any future controller for claim (3), not a preference**: score in Froude/
 body-motion space, never embedding space, and prefer the no-rollout (Mode D-style) direct
@@ -324,15 +324,15 @@ action→Froude scoring over routing through the FTM — the FTM version is the 
 to be worse here, not merely untested.
 
 **What was never tested, and remains open**: short-horizon MPC, replanning every step — every prior
-attempt (F91-F136) picks from a **fixed, pre-recorded pool** of whole candidate behaviours, never
+attempt (F81-F127) picks from a **fixed, pre-recorded pool** of whole candidate behaviours, never
 continuously optimizes/replans a per-step action. Note this can be built either way given what's
 now confirmed: an FTM-free version (repeatedly query `body_head(proj(a))` over a small continuous
 action search each step, no rollout at all — extending the already-proven-best mechanism) or a
 classic FTM-based version (V-JEPA-2-AC style, rolling the world model forward each replanning step)
 — and given Mode D beat Mode C here, the FTM-free version is the one with evidence behind it, not
-just the untested one. F125/F127's "doesn't read the goal" finding is specific to the
+just the untested one. F116/F118's "doesn't read the goal" finding is specific to the
 embedding-metric pool-selection setup that was tested; it does not establish that either MPC variant
-would fail the same way, and the F128/F131 fix (change the scoring space, keep everything else)
+would fail the same way, and the F119/F122 fix (change the scoring space, keep everything else)
 gives good reason to expect a Froude-scored MPC controller to condition on the goal correctly too,
 plausibly better than a fixed pool (continuous replanning vs. picking from a finite discrete set).
 
@@ -341,8 +341,8 @@ no-rollout, direct action→Froude pool-selection (`body_head(proj(a))`) — pro
 bodies, modest (35-70% depending on channel width), not a world model; (b) the same direct
 scoring extended to short-horizon MPC (replan every step, no FTM) — untried, plausibly stronger,
 uses the same validated coordinate and the same no-rollout mechanism; (c) an FTM-based rollout
-version of either — already measured worse than the no-rollout version here (Mode C vs. D, F136),
-not the default choice. None of these need the long-horizon imagination-RL machinery that F197
+version of either — already measured worse than the no-rollout version here (Mode C vs. D, F127),
+not the default choice. None of these need the long-horizon imagination-RL machinery that F179
 onward spent the session on, and none of them are "world-model-based control" in that sense.
 
 ### The RL loop plan (DreamerPro read 2026-09-07 — citation and a deviation both corrected)
@@ -360,7 +360,7 @@ The mechanics themselves: imagination is seeded from real states encountered dur
 arbitrary starts); at each imagined step the actor's *stochastic* policy samples an action, the
 world model predicts both next state and reward, autoregressively; the actor maximises the
 **λ-return plus an entropy regulariser**, by backpropagating through the differentiable world model
-(the analytic/gradient path our own gradient-usefulness check, F196, supports being viable here);
+(the analytic/gradient path our own gradient-usefulness check, F178, supports being viable here);
 the critic regresses to that same λ-return with a squared loss.
 
 - Fixed world model = the FTM, `(e_t, z) -> next embedding`, already trained and validated to k=10
@@ -378,7 +378,7 @@ the critic regresses to that same λ-return with a squared loss.
 > policy, interleaved with imagination training. This plan keeps the FTM **frozen throughout** —
 > reasonable, since it is already validated, but it removes the exact mechanism that stops a policy
 > from exploiting world-model errors in state-action regions the frozen FTM never saw. **This is
-> the F137 off-manifold ghost in a new form**: policy explores -> reaches a region the fixed FTM
+> the F128 off-manifold ghost in a new form**: policy explores -> reaches a region the fixed FTM
 > predicts wrongly in -> policy learns to exploit the wrong prediction -> imagined reward that is
 > not real. Dreamer's re-grounding is precisely what would normally catch this, and this plan does
 > not have it.
@@ -387,7 +387,7 @@ the critic regresses to that same λ-return with a squared loss.
 
 1. **Imagined return** (does the policy improve inside imagination at all) — **necessary, not
    sufficient**. A rising imagined return alone proves nothing about the real system.
-2. **Real closed-loop performance on B1 vs the clone/direct baseline (F142/F184's ~54%)** — **the
+2. **Real closed-loop performance on B1 vs the clone/direct baseline (F133/F169's ~54%)** — **the
    actual gate.** Success = clears 54% on the real simulator, not just in imagination.
 
 **The pre-registered failure signature to watch for explicitly**: imagined return rising while real
@@ -397,8 +397,8 @@ rationalised after the fact if it appears. If that pattern shows up, the fix is 
 re-grounding (periodically re-collecting real data and correcting the FTM on it), which reopens
 co-training and is a materially bigger build than Stage A as scoped — not a tweak to try first.
 
-> **The whole arc below is retracted pending an optimizer fix — F197 (2026-09-07, merged finding,
-> supersedes the former separately-numbered F197-F201 stack).** Stage A0/A1 (frozen FTM), action
+> **The whole arc below is retracted pending an optimizer fix — F179 (2026-09-07, merged finding,
+> supersedes the former separately-numbered F179-F183 stack).** Stage A0/A1 (frozen FTM), action
 > regularization, a joint uncertainty penalty, and re-grounding (three budgets) were each tried in
 > turn and each appeared, at the time, to show something FTM-side (exploitation, wrong-quantity
 > penalty, unoptimizable penalty, re-grounding insufficient). All of them assumed the actor-critic
@@ -413,20 +413,20 @@ co-training and is a materially bigger build than Stage A as scoped — not a tw
 > the vanilla actor-critic (EMA target critic, no Dreamer V3-style return normalization) does not
 > climb even a static FTM surface — critic bootstrap divergence must be fixed before any FTM-side RL
 > question is askable again. Does not touch the coarse controller-signal finding (measured
-> independently, no actor-critic training involved — holds). Full trace in FINDINGS.md's F197.
+> independently, no actor-critic training involved — holds). Full trace in FINDINGS.md's F179.
 
 **Staged, gated — not built all at once (kept here as the plan shape; every diagnosis inside is
 retracted pending the optimizer fix above):**
-- **Stage A — RUN (2026-09-07), retracted (F197).** Frozen FTM: trained actor did worse than the
+- **Stage A — RUN (2026-09-07), retracted (F179).** Frozen FTM: trained actor did worse than the
   B1 clone baseline (92% of D_real, itself FAIL) in real closed loop, with an imagination/reality
   gap and negative correlation. Real gate-validity bug caught and fixed along the way (the "~54%"
   baseline was hexapod/allocentric, not B1 — a proper B1 clone baseline was built from scratch).
   *Read at the time as frozen-FTM exploitation; now confounded, see the retraction above.*
-- **Two cheap fixes tried, both null, retracted (F197).** Action regularization (BRAC/BCQ-style,
+- **Two cheap fixes tried, both null, retracted (F179).** Action regularization (BRAC/BCQ-style,
   swept lambda) and a joint (state,action) uncertainty penalty (MOReL-style, discrimination-checked
   first, swept beta) — both read at the time as informative nulls about which quantity to
   regularize; now confounded along with everything else in the arc.
-- **Re-grounding, tried at three budgets, retracted (F197).** 6, 24, and 48 cycles (cadence
+- **Re-grounding, tried at three budgets, retracted (F179).** 6, 24, and 48 cycles (cadence
   doubled, matched total actor-training iterations) — gap oscillated in the same range at every
   budget, read at the time as "re-grounding insufficient"; now confounded.
 - **The failure is documented, not a misapplication.** Actor-critic-in-imagination against a fixed
@@ -460,7 +460,7 @@ retracted pending the optimizer fix above):**
   does).** 0.272 vs. the 0.25 bar was close enough that the proxy alone didn't justify committing
   to a real reimplementation — so the two-hot actor was run in the same real closed loop as every
   other eval here, against the 92%-of-D_real clone baseline. **Result: FAIL, 19% of D_real** — but
-  notably not F197's original exploitation-and-fall signature: the actor stayed upright the entire
+  notably not F179's original exploitation-and-fall signature: the actor stayed upright the entire
   window, just barely moved (a frozen, over-conservative policy rather than a confidently-wrong
   one). Confirms the MC-check proxy was not overly strict — real performance backs up the 0.272
   verdict.
@@ -495,28 +495,28 @@ retracted pending the optimizer fix above):**
   confirmed coarse/short-horizon strength rather than pursuing long-horizon imagination-RL further —
   a real, mapped limitation of this specific FTM, not of any RL algorithm tried against it.
 - **A loss-reweighting version of (2) was scoped, then ruled out by direct measurement before being
-  built (F198).** The natural reading of `doc/literature_review2.md`'s Hu-citation — reconstruction
+  built (F180).** The natural reading of `doc/literature_review2.md`'s Hu-citation — reconstruction
   starves the body-motion/Froude term of gradient, so retrain with reconstruction demoted — assumed
-  a gradient imbalance that F149 had already shown didn't exist in the form claimed (F23's "99% of
-  gradient" was a loss-magnitude inference, not a measurement). Extending F149's own script to
-  include `lambda_state` (never measured before, since F149's checkpoint predates the flag) and
+  a gradient imbalance that F140 had already shown didn't exist in the form claimed (F20's "99% of
+  gradient" was a loss-magnitude inference, not a measurement). Extending F140's own script to
+  include `lambda_state` (never measured before, since F140's checkpoint predates the flag) and
   re-running on `beh12_state`/`teacher_state.pt` — the actual RL-arc checkpoint — on both bodies:
   **the state/Froude term already has the largest gradient share of any term (45.1% hexapod, 47.8%
   B1)**, not the smallest. No loss-reweighting fix is indicated. This converges with the
-  already-closed fine-magnitude calibration wall (F190-196) from a different angle: more gradient
+  already-closed fine-magnitude calibration wall (F175-196) from a different angle: more gradient
   into the representation was never the missing piece. Any further FTM-side fix has to be
   architectural (Koopman-style constraint) or target the calibration wall directly — not a lambda
   adjustment.
 - **A "Froude-forecasting FTM" (predict body-motion directly, not the next embedding) was also
-  verified against its stated premise before building, and the premise fails (F198 addendum).** The
-  idea: F188's action-lever (+0.055 real-z-vs-mean-z cosine gap, embedding space) might be an
+  verified against its stated premise before building, and the premise fails (F180 addendum).** The
+  idea: F173's action-lever (+0.055 real-z-vs-mean-z cosine gap, embedding space) might be an
   artefact of the appearance-dominated embedding target — predicting Froude directly might make the
   action a primary signal instead. Measured directly (same real-z-vs-mean-z logic, scored via the
-  existing, already-trained state head, no retraining): embedding-space gap replicates F188
+  existing, already-trained state head, no retraining): embedding-space gap replicates F173
   (+0.054 hexapod, +0.034 B1, confirming the measurement), but the **Froude-space gap is -0.051 on
   hexapod (the real action's code predicts the true change direction WORSE than a generic code) and
   only +0.042 on B1 (still below the embedding reference)**. Per the pre-registered rule: do not
-  build the Froude-forecasting FTM on this premise. This is a more basic failure than F190-196's
+  build the Froude-forecasting FTM on this premise. This is a more basic failure than F175-196's
   calibration/compression story — the FTM-predicted-delta → state-head pathway's directional
   sensitivity to the real action is weak-to-negative, independent of what it's asked to predict at
   the end. Three independent angles (gradient share, prediction target, directional lever) now all
@@ -527,13 +527,13 @@ retracted pending the optimizer fix above):**
   confirmed **stateless and single-step** — `forward(x_t, z, embodiment)`, no hidden state carried
   between calls, no recurrent cell. This is not Dreamer/DreamerV3's RSSM (recurrent state `h_t`
   carried across a sequence, action drives `h_t → h_{t+1}`) — this project adopted Dreamer's
-  actor-critic loop (F197) but never its world-model architecture. A cheap proxy (feed the frozen
+  actor-critic loop (F179) but never its world-model architecture. A cheap proxy (feed the frozen
   FTM two concatenated frames instead of one, out-of-distribution but architecturally valid since
   the attention blocks carry no positional embedding) found **no evidence** the action-lever
   improves with more temporal context (hexapod −0.051→−0.056, B1 +0.042→+0.044) — doesn't rule out
   the RSSM hypothesis (frozen, out-of-distribution weights aren't a real test), but gives no cheap
   support for it either. **The real RSSM build is comparable in size to or larger than the ActSWM
-  rebuild (F146-157)** — recurrent state, sequence-chunked data pipeline (a real change from today's
+  rebuild (F137-157)** — recurrent state, sequence-chunked data pipeline (a real change from today's
   independent-pair sampling), posterior/prior latents with a KL loss — a multi-day
   architecture-and-pipeline project. A deliberate go/no-go decision, not a default next step.
 - **The decision was made — a real, trained recurrent model was tested via a pre-registered
@@ -570,7 +570,7 @@ retracted pending the optimizer fix above):**
 - **The disentangling test — was the MC-check arc's failure critic-side or policy-drift-side?
   Resolved: critic-side, cleanly, unconfounded.** Every prior MC-check compared the critic to the
   FTM's own rollout under the TRAINED POLICY's trajectory — and that policy drifts ~1000x
-  off-distribution in real closed loop (F197), so the "ground truth" itself could have been
+  off-distribution in real closed loop (F179), so the "ground truth" itself could have been
   contaminated. Trained a fresh critic (PPO, GAMMA=0.9, effective horizon ~10, the validated
   coarse-good zone) and evaluated three ways: actor's own rollout (0.318, matches the prior ladder);
   on-distribution with each clip's own matched goal (8.655 — but flagged and not trusted, since this
@@ -584,7 +584,7 @@ retracted pending the optimizer fix above):**
   confirmed dead for a genuine, isolated reason — a value-learning/function-approximation problem,
   not measurement, not drift, not rollout realism.**
   **Important constraint on what "the path forward" means, corrected mid-session**: `body_head(proj(a))`
-  (F128/F131/F136) is proven and cheap, but it bypasses the FTM entirely — `proj(a) → body_head`, no
+  (F119/F122/F127) is proven and cheap, but it bypasses the FTM entirely — `proj(a) → body_head`, no
   rollout, no world model in the loop at all. Given the world model is this project's central,
   non-negotiable contribution, using that mechanism alone for claim (3) would quietly drop the one
   thing the thesis needs to demonstrate. **If claim (3) is to keep the FTM load-bearing, the
@@ -605,7 +605,49 @@ retracted pending the optimizer fix above):**
 addressed); Dreamer (co-training world model + policy — the recipe the frozen-FTM simplification
 deviated from, and the source of the re-grounding idea, itself retracted pending the critic fix);
 Dreamer v3 (percentile return normalization — the leading candidate fix for the critic divergence
-found in F197).
+found in F179).
+
+### 1.2 Where claim (3) actually stands (2026-09-10) — supersedes the Stage A/B/C gating above
+
+The Stage A/B/C plan above is **retired**: it gated the thesis result on an RL/critic fix, and the
+claim was subsequently reframed (F182-F189) away from "improve the controller" — which is settled —
+toward **"ground a body absent from pretrain."** Current status, tagged the same way as §1.1:
+
+| step | status | evidence |
+|---|---|---|
+| (1) pretrain WM on known bodies | **[CONFIRMED]** | — |
+| (2) babble on an unseen body → fit `a→z` | **[CONFIRMED] for B1** | F183: median ρ 0.264 → **0.572**, forward finally real |
+| (3) transfer a Froude goal, source → new body | **[CONFIRMED] for B1** | F184/F187: mode A and D both clear, vision-only goal costs nothing |
+| (4) control via direct-Froude selection | **[CONFIRMED], settled** | F188: 3/3 behaviour class, 17.4% median speed error |
+| (2)-(4) on gecko (babble-only, no expert library) | **[PARTIAL, and the ceiling is the camera]** | F189: two measurement bugs found and fixed; stage 4 now 0.970 (below 1.0 for the first time), projector-path rho 0.032 -> 0.249 |
+
+**The controller question is closed and should not be reopened.** The 2×2 ablation (F188) showed
+goal source explains none of the gap and candidate mechanism explains all of it; rollout fails
+same-robot too, which is F126/F118 reconfirmed. **No further rollout debugging is warranted.**
+
+**The one open technical question is Q20** (`OPEN_QUESTION.md`), and F189 moved it from a debugging
+question to a scoping one. Gecko's stage-4 failure was two measurement bugs, both now fixed: the
+stage-1 "gate" was read with the sign inverted (it is `hold/model`, so higher is better — and it is
+anti-correlated with downstream success anyway), and gecko's body frame was built on a body x axis
+that points almost straight up, scrambling forward, lateral and yaw together. Correcting the frame
+took yaw from dead (−0.042) to the strongest channel (+0.501); giving the projector 20 frames of
+action history instead of 1 took stage 4 to 0.970.
+
+What remains is a property of the robot, measured end to end: gecko's **actions** carry ρ 0.736, its
+**egocentric video** carries only **0.374**, and the pipeline delivers 0.249 — 67% of what the video
+allows. B1's video carries 0.747. Gecko's forward Froude is 0.038–0.048 against B1's 0.126 and is
+flat across gait frequencies, so it barely translates between frames while its legs fill the view.
+**The binding constraint is what the camera can see, which is a claim about the sensor, not about
+the shared coordinate.**
+
+**What the thesis can claim today, stated at true strength**: grounding and goal-conditioned
+control both work on a body genuinely absent from pretrain — using B1's own behaviour library, so
+this is the **near-morphology** version of claim (3). The **far** version (gecko, babble-only) is
+partially grounded and its remaining gap is measured and attributed: not the mechanism, not the
+data's information content, but how much of its own motion the robot's camera can see at Froude
+0.04. That is a scoped, measurable limitation — "the method grounds a novel body when that body's
+motion is visible to its own camera" — and it bounds which bodies the procedure handles rather than
+refuting the coordinate.
 
 ---
 
@@ -631,9 +673,9 @@ where proprioception can't be shared at all but vision (pixels) can.
   > **The 4-leg stick insect was the intended test body and it does not qualify.** It was built by
   > removing legs from the base scene, so its geometry is a training body's and its commands are
   > that body's corner columns bit-identically; the latent places it **0.578** from the body it was
-  > cut from against a chance level of 0.981 (F47). It tests a new *action space*, not a new
+  > cut from against a chance level of 0.981 (F41). It tests a new *action space*, not a new
   > embodiment. **The test body is now the B1 itself, held out entirely**: backbone trained on
-  > insects only, never a quadruped (F50, F52, slide 16). That is the only genuinely different
+  > insects only, never a quadruped (F43, F45, slide 16). That is the only genuinely different
   > robot in the project, and everything cross-embodiment rests on this single pair.
 
 **Terminology** — "disjoint action space" (Stage 2, B1) **≠** IK-retargeting (Stage 1). IK gives
@@ -785,32 +827,32 @@ goals — a head that fits cheaply on a new robot, and a forward model that pred
 met, the second by few-shot adaptation rather than frozen transfer.
 
 **A third goal opened, and is now met at one dimension.** The shared trunk acted as a switch rather
-than a common language (F55); no frame-level pairing exists to fix it the way Stage 1 was fixed
-(F56). What worked is a **body-motion head shared by both embodiments** (F58) on data where the
-insect's speed varies (F57, F60). Cross-robot speed transfer goes from **-7.08 to +0.54 / +0.68 /
+than a common language (F48); no frame-level pairing exists to fix it the way Stage 1 was fixed
+(F49). What worked is a **body-motion head shared by both embodiments** (F51) on data where the
+insect's speed varies (F50, F53). Cross-robot speed transfer goes from **-7.08 to +0.54 / +0.68 /
 +0.75** across three runs, against controls at -7.08 and -2.36, at **no measurable cost** at
-`lambda_body 0.1` (F65). Measured as direction agreement rather than R^2, the control reads
-**-0.01** and the treated runs **0.85 to 0.92** (F66).
+`lambda_body 0.1` (F58). Measured as direction agreement rather than R^2, the control reads
+**-0.01** and the treated runs **0.85 to 0.92** (F59).
 
 **The behaviour set that was blocking everything now exists.** `data/allocentric/beh12_*`: twelve conditions per
 robot, balanced 4/4/4 across speed, turn and sideways, forward matched to 4% and yaw to 2%, at a
 common 20 Hz and 66 frames. Building it exposed four defects in existing code -- a frame-rate
-mismatch that made a stored transition mean 20 ms on one robot and 50 ms on the other (F74), a sign
-flip that had the robots turning opposite ways under a magnitude-only match (F75), a
-proportional-only heading controller leaving a standing yaw bias on the B1 (F78), and a body target
+mismatch that made a stored transition mean 20 ms on one robot and 50 ms on the other (F65), a sign
+flip that had the robots turning opposite ways under a magnitude-only match (F66), a
+proportional-only heading controller leaving a standing yaw bias on the B1 (F69), and a body target
 differenced in the world frame, so "forward speed" was partly a rotation measurement once a robot
-turned (F79). **Three of the four are fixed; F75's is not** -- measured again on 2026-08-28, the B1's turn
+turned (F70). **Three of the four are fixed; F66's is not** -- measured again on 2026-08-28, the B1's turn
 conditions still read yaw +0.0146 / +0.0359 / +0.0760 against the insect's -0.0241 / -0.0372 /
--0.0878, so the two robots still turn opposite ways in `beh12_*` (F115). Every cross-embodiment
+-0.0878, so the two robots still turn opposite ways in `beh12_*` (F106). Every cross-embodiment
 turning result compares a left turn with a right turn and could not have succeeded; **every cross-embodiment number computed before 2026-08-22 was
 measured across at least the first of them.**
 
 **Untrained, the new channels still do not transfer** -- forward +0.36 +/- 0.10, lateral and yaw at
-zero (F76). That is the *before* condition and does not settle the question: forward speed itself
-reads 0.31 frozen against 0.85-0.92 trained (F66, F77). **The open question is what training does to
+zero (F67). That is the *before* condition and does not settle the question: forward speed itself
+reads 0.31 frozen against 0.85-0.92 trained (F59, F68). **The open question is what training does to
 yaw**, and three arms are running to answer it.
 
-**Reading the source paper properly (F67) reframes what to do next, and this is the current plan.**
+**Reading the source paper properly (F60) reframes what to do next, and this is the current plan.**
 LAC-WM is not a rival result to beat -- it already showed latent conditioning beats explicit, and
 its Figure 2 is our control experiment. Three things follow:
 
@@ -818,17 +860,17 @@ its Figure 2 is our control experiment. Three things follow:
    the divergence -- their label sizes differ per dataset too. **The divergence is the coordinate**:
    they decode into a shared physical space (wrist poses, fingertip positions), we decode into
    body-specific joint angles, which have no common referent across robots.
-2. **The obvious richer coordinate is the foot, and our own measurements rule it out (F69).** A
+2. **The obvious richer coordinate is the foot, and our own measurements rule it out (F60).** A
    foot's motion splits into the part that is body speed rewritten -- which adds nothing we do not
-   already have -- and the gait itself, which F41b measured transferring at **0.373, below chance**.
+   already have -- and the gait itself, which F35 measured transferring at **0.373, below chance**.
    Duty factor fails the other way, nearly identical on both robots (0.533 against 0.515) and so
    carrying nothing to learn. **What a hexapod and a quadruped share is at body level, not leg
    level.** The reason the shared head reached only one axis is that only one body channel *varies*
    in our data: lateral speed is zero in every B1 clip and yaw rate is constant per policy.
 3. **Their target is a change between frames; ours was a state** a single frame supplies at R^2
-   0.676. That is why their frame-conditioned head fails here (F64) and, on the other side, why the
+   0.676. That is why their frame-conditioned head fails here (F57) and, on the other side, why the
    alignment left the forward model unmoved at 1.42x against 1.42x -- aligning something the frame
-   already gives cannot inform a model that sees the frame. **F68 measured which target form fixes
+   already gives cannot inform a model that sees the frame. **F60 measured which target form fixes
    this and it is not their chunking**: short windows stay readable (0.670 at W=5), while a
    one-second *forward* displacement drops to 0.246.
 
@@ -837,7 +879,7 @@ target is an end-effector pose, so the obvious move is to predict foot positions
 angles. Two independent objections land on it:
 
 - **Ours, measured.** Foot motion splits into body speed rewritten -- which adds nothing we do not
-  already have -- and the gait itself, which transfers at **0.373, below chance** (F41b, F70).
+  already have -- and the gait itself, which transfers at **0.373, below chance** (F35, F61).
   Everything a foot target adds beyond body speed is the part that does not cross.
 - **Ajan Go's, structural (Week 12).** Cartesian targets require knowing the kinematic model and IK
   for every robot. *"หากนำไปใช้กับหุ่นยนต์ชีวภาพหรือสรีระแปลก ๆ ที่หา Kinematic Model ไม่ได้ ไปป์ไลน์นี้จะล้มทันที"* --
@@ -851,7 +893,7 @@ is its **joint count** -- a number read off the calibration clips, not a model.
 
 **What is left is therefore behavioural coverage, not a new coordinate**: steps 2j to 2n below. It is
 also the condition under which the published frame-conditioned motion decoder becomes runnable here
-rather than in the blinded variant F64 forced on us.
+rather than in the blinded variant F57 forced on us.
 
 **Two scope limits that no amount of retraining fixes.** The B1 side is **14 clips, 5 held out** --
 every quadruped number rests on that, and recollecting is the cheapest improvement available. And
@@ -882,10 +924,10 @@ source. IK is back to being the primary route; see the Step 0.5 section below fo
 | 1c | Train ITM + FTM + MD | `z_t`=64, fp16, trained on **long + short** only (medium held out) | implemented in `wm/`; 3 runs done | done |
 | 1d | Latent validation (two-sided) | behavior transfers **up** across legs **and** morphology decode **down** | **half passes** — behaviour transfer up (+0.11 to +0.22 macro-F1); morphology decode stays **~99%** across all 3 runs | done |
 | 1e | **EAC-WM analogue baseline** | latent-conditioned decoder vs one conditioned on the raw joint state | **☐ never run** — see the note below | open |
-| 1e′ | Invariance ablation | shrink `z_dim` / adversarial head / centring → does *forcing* invariance change transfer? | done — **three tried, none moved it** (F44); the objective did instead (F24) | done |
-| 1f | Transfer test, held-out body | frozen ITM+MD predicts `â_t` from the held-out body's own frames, scored against its real IK actions | done — `m3d_cross` **3.44 deg, R² +0.81**, control 3.67 / +0.79 (F49) | done |
-| 1g | **Mechanism, not error** | which pathway carries the answer: ablate the frame, ablate the latent, swap the latent between bodies | done — deleting the frame costs the cross-term run **9.6x** against the control's 0.4x; **swapping the latent moves the answer 0.04 deg** (F49, slide 5) | done |
-| 1h | **Coverage** | does filling the femur/tibia gap remove the failure or only soften it? | done — four bodies tying femur to tibia **12.67 deg, R² −0.78**; six decoupled at matched volume **3.27 deg, R² +0.89** (F49, slide 9) | done |
+| 1e′ | Invariance ablation | shrink `z_dim` / adversarial head / centring → does *forcing* invariance change transfer? | done — **three tried, none moved it** (F38); the objective did instead (F21) | done |
+| 1f | Transfer test, held-out body | frozen ITM+MD predicts `â_t` from the held-out body's own frames, scored against its real IK actions | done — `m3d_cross` **3.44 deg, R² +0.81**, control 3.67 / +0.79 (F42) | done |
+| 1g | **Mechanism, not error** | which pathway carries the answer: ablate the frame, ablate the latent, swap the latent between bodies | done — deleting the frame costs the cross-term run **9.6x** against the control's 0.4x; **swapping the latent moves the answer 0.04 deg** (F42, slide 5) | done |
+| 1h | **Coverage** | does filling the femur/tibia gap remove the failure or only soften it? | done — four bodies tying femur to tibia **12.67 deg, R² −0.78**; six decoupled at matched volume **3.27 deg, R² +0.89** (F42, slide 9) | done |
 
 > **Step 1e is the one Stage-1 item never done, and §9 lists it as required, not optional.**
 > Nothing here compares the latent against a decoder conditioned on the raw joint state. The frame
@@ -901,32 +943,32 @@ spaces, hexapod 18-D and B1 12-D, that one camera describes in the same coordina
 | # | Step | Tests / produces | Status | ~Week |
 |---|---|---|---|---|
 | 2a | B1 data | rollout (MuJoCo) → kinematic replay (CoppeliaSim), render-consistent with the insect | done — `data/allocentric/fwd_b1_50hz`, 14 clips | done |
-| 2b | 4-leg insect candidate | "middle-loss" variant, built by removing ML/MR from the base scene | **abandoned as the test body** — F47: the latent places it 0.578 from the body it was cut from against a chance of 0.981, so it tests a new *action space*, not a new embodiment | dropped |
-| 2c | Train latent WM across {insect, B1} | shared ITM/FTM backbone + **per-embodiment Motion Decoder head** (18-D / 12-D) | done — `stage2_clean` and variants; transfer works and the embodiment identity is passive (F43) | done |
-| 2d | **Hold the B1 out entirely** | backbone trained on insects only, never a quadruped; fit a 12-D head on a few B1 clips against the same head on a random backbone | done — **1.28x**, velocity-matched, and **all of it travels through `z`**: zeroing the latent gives 0.98x, identical to random weights (F50, slide 16) | done |
-| 2e | Cross-embodiment validation | does the shared trunk produce a shared code or a switch? | done — it produces a **switch**: Stage 1's pathology repeats and the adversary narrows but never reverses it (F43, F46) | done |
-| 2f | **Forward model across robots** | can a planner's forward model survive the change of robot? | done — **not frozen** (0.57–0.71x, worse than predicting no motion) and coverage does not fix it (5–8% against the decoder's 3.9x). Not architectural: trained on both robots it rolls the B1 at 1.34–1.53x (F51) | done |
-| 2g | **Few-shot adaptation of the forward model** | how few target clips does adapting one take, and is insect pretraining worth anything? | done — **one clip clears break-even, nine clear every horizon tested; ~7x fewer clips than from cold**, and the two curves separate rather than converge (F52, slide 16) | done |
-| 2h | **Control: dynamics or manifold?** | is the pretraining advantage learned locomotion, or just familiarity with V-JEPA2's feature space? | done — **both, and they separate**. Frozen, real time order beats shuffled on the B1 by 1.38x at one step; after a thousand adaptation steps the two are identical. Dynamics transfer but are overwritten; the foothold in the shared representation is what buys the 7x (F54) | done |
+| 2b | 4-leg insect candidate | "middle-loss" variant, built by removing ML/MR from the base scene | **abandoned as the test body** — F41: the latent places it 0.578 from the body it was cut from against a chance of 0.981, so it tests a new *action space*, not a new embodiment | dropped |
+| 2c | Train latent WM across {insect, B1} | shared ITM/FTM backbone + **per-embodiment Motion Decoder head** (18-D / 12-D) | done — `stage2_clean` and variants; transfer works and the embodiment identity is passive (F37) | done |
+| 2d | **Hold the B1 out entirely** | backbone trained on insects only, never a quadruped; fit a 12-D head on a few B1 clips against the same head on a random backbone | done — **1.28x**, velocity-matched, and **all of it travels through `z`**: zeroing the latent gives 0.98x, identical to random weights (F43, slide 16) | done |
+| 2e | Cross-embodiment validation | does the shared trunk produce a shared code or a switch? | done — it produces a **switch**: Stage 1's pathology repeats and the adversary narrows but never reverses it (F37, F40) | done |
+| 2f | **Forward model across robots** | can a planner's forward model survive the change of robot? | done — **not frozen** (0.57–0.71x, worse than predicting no motion) and coverage does not fix it (5–8% against the decoder's 3.9x). Not architectural: trained on both robots it rolls the B1 at 1.34–1.53x (F44) | done |
+| 2g | **Few-shot adaptation of the forward model** | how few target clips does adapting one take, and is insect pretraining worth anything? | done — **one clip clears break-even, nine clear every horizon tested; ~7x fewer clips than from cold**, and the two curves separate rather than converge (F45, slide 16) | done |
+| 2h | **Control: dynamics or manifold?** | is the pretraining advantage learned locomotion, or just familiarity with V-JEPA2's feature space? | done — **both, and they separate**. Frozen, real time order beats shuffled on the B1 by 1.38x at one step; after a thousand adaptation steps the two are identical. Dynamics transfer but are overwritten; the foothold in the shared representation is what buys the 7x (F47) | done |
 | 2j | **Widen the shared target from 1 DOF to 6** | `lambda_body` supervises forward speed alone. The full shared quantity is a **body pose delta** -- three translation, three rotation, dimensionless. **Joint angles stay as the per-embodiment target** (see the note below on why the task-space version was withdrawn) | open — needs 2k first, since five of the six are constants today |
-| 2k | **Behavioural coverage** | **done.** `--gait cpg` gives the hexapod a commandable gait with no IK, ported from the lab's Olaf scene: straight, `--spin` for turning, a sideways gait, and a speed range via `--cycles`, all at `--scale 0.65`. Its drive is a tripod; its contacts are not, and neither are the lab's own (F71, F73) | done (F71) |
-| 2k' | **Record body orientation for the hexapod** | **done 2026-08-21** -- `body_quat` per frame, off the abdomen. Head orientation and Euler angles were both tried first and both read straight walking as a large turn (F72) | done, but every clip before this date lacks it |
-| 2k'' | **Collect the matched set** | **done** — `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat`, 48 clips each. Hexapod `--spin` 0.05 / 0.15 / 0.29 / 0.56 against B1 `--wz` 0 / 0.055 / 0.139 / 0.294, matched within 3% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides. Speed matched by widening the hexapod's foot path rather than moving either robot's pace (F71, F72) | done |
-| 2k''' | **More distinct behaviours** | **partly addressed.** Effective n is the number of behaviours, not clips: within a condition the clips agreed to 2-10% of the between-condition spread. Running the B1's **two** policies at 2.00 and 1.67 Hz gives it genuinely different dynamics inside a condition (F80). The hexapod side still has one gait per condition | open, revisit if the screen stays underpowered |
-| 2k''''' | **Why do the channels compete?** | F83: adding yaw costs forward 68% and buys a yaw channel at +0.37 +/- 0.27. **"Yaw carries less signal" was tested and refuted** -- both channels have signal share 0.86 and yaw's between-condition spread is the larger. Capacity and optimisation remain. Cheapest test is widening the body head alone, holding the data fixed. **Separately**, yaw's signal is concentrated in ~6 of 12 conditions, which explains its +/-0.27 to +/-0.56 spread across condition-level splits -- evaluation leverage, not model instability, and more turn levels would tighten it without changing the trade. **And its noise floor cannot be cleaned**: the hexapod's yaw sd is 2.6x the B1's, giving the insect the same PI heading control makes it *worse* at every gain, so the gap is the gait rather than a missing controller (F85) | open |
-| 2k'''' | **Train the three arms** | control / body head forward-only / body head forward+yaw, on `data/allocentric/beh12_*`. Arm 2 re-tests F66's 0.85-0.92 on rate-fixed data (F74); arm 3 asks the question the collection was built for. Commands written; `body_channels` is a config field now. **fibo7, not the 2080 Ti** | **next** |
-| 2o | **A third embodiment** | **The single experiment that would make the scaling claim available, and it is not cheap.** LAC-WM's headline is that downstream performance rises with the number of pretraining embodiments while its explicit-action baseline degrades. **Two embodiments cannot produce that curve** (F82), so we currently declare it as a limitation. Pretraining on hexapod + B1 and few-shot adapting a **third** body would convert "our two robots transfer to each other" into "our two robots are pretraining data for a third". Nothing suitable is on disk -- `sim/assets/` holds only the B1 and the hexapod family, and `olaf` is another 18-DOF hexapod, which is within-family and solves the wrong problem. Cost is what the B1 cost: source a model, get a controller that walks, build a render-locked scene on the identical camera, calibrate matched conditions, collect. **Choose for topology, not convenience** -- the thesis argument is *incomparable* topology, so a body sharing topology with neither (a biped, or a different leg count) is worth far more than a second quadruped | open, weeks |
+| 2k | **Behavioural coverage** | **done.** `--gait cpg` gives the hexapod a commandable gait with no IK, ported from the lab's Olaf scene: straight, `--spin` for turning, a sideways gait, and a speed range via `--cycles`, all at `--scale 0.65`. Its drive is a tripod; its contacts are not, and neither are the lab's own (F62, F64) | done (F62) |
+| 2k' | **Record body orientation for the hexapod** | **done 2026-08-21** -- `body_quat` per frame, off the abdomen. Head orientation and Euler angles were both tried first and both read straight walking as a large turn (F63) | done, but every clip before this date lacks it |
+| 2k'' | **Collect the matched set** | **done** — `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat`, 48 clips each. Hexapod `--spin` 0.05 / 0.15 / 0.29 / 0.56 against B1 `--wz` 0 / 0.055 / 0.139 / 0.294, matched within 3% on dimensionless turn rate with Froude held at 0.12-0.13 on both sides. Speed matched by widening the hexapod's foot path rather than moving either robot's pace (F62, F63) | done |
+| 2k''' | **More distinct behaviours** | **partly addressed.** Effective n is the number of behaviours, not clips: within a condition the clips agreed to 2-10% of the between-condition spread. Running the B1's **two** policies at 2.00 and 1.67 Hz gives it genuinely different dynamics inside a condition (F71). The hexapod side still has one gait per condition | open, revisit if the screen stays underpowered |
+| 2k''''' | **Why do the channels compete?** | F73: adding yaw costs forward 68% and buys a yaw channel at +0.37 +/- 0.27. **"Yaw carries less signal" was tested and refuted** -- both channels have signal share 0.86 and yaw's between-condition spread is the larger. Capacity and optimisation remain. Cheapest test is widening the body head alone, holding the data fixed. **Separately**, yaw's signal is concentrated in ~6 of 12 conditions, which explains its +/-0.27 to +/-0.56 spread across condition-level splits -- evaluation leverage, not model instability, and more turn levels would tighten it without changing the trade. **And its noise floor cannot be cleaned**: the hexapod's yaw sd is 2.6x the B1's, giving the insect the same PI heading control makes it *worse* at every gain, so the gap is the gait rather than a missing controller (F75) | open |
+| 2k'''' | **Train the three arms** | control / body head forward-only / body head forward+yaw, on `data/allocentric/beh12_*`. Arm 2 re-tests F59's 0.85-0.92 on rate-fixed data (F65); arm 3 asks the question the collection was built for. Commands written; `body_channels` is a config field now. **fibo7, not the 2080 Ti** | **next** |
+| 2o | **A third embodiment** | **The single experiment that would make the scaling claim available, and it is not cheap.** LAC-WM's headline is that downstream performance rises with the number of pretraining embodiments while its explicit-action baseline degrades. **Two embodiments cannot produce that curve** (F99), so we currently declare it as a limitation. Pretraining on hexapod + B1 and few-shot adapting a **third** body would convert "our two robots transfer to each other" into "our two robots are pretraining data for a third". Nothing suitable is on disk -- `sim/assets/` holds only the B1 and the hexapod family, and `olaf` is another 18-DOF hexapod, which is within-family and solves the wrong problem. Cost is what the B1 cost: source a model, get a controller that walks, build a render-locked scene on the identical camera, calibrate matched conditions, collect. **Choose for topology, not convenience** -- the thesis argument is *incomparable* topology, so a body sharing topology with neither (a biped, or a different leg count) is worth far more than a second quadruped | open, weeks |
 | 2p | **Few-shot curve on the current model** | Slide 16's curve was measured with a Stage 1 backbone. Redoing it needs a **hexapod-only** run with the body head, since `beh12_body_fwd` trained on B1 clips and so cannot hold the B1 out. Smoke-tested: `--sources hexapod=data/allocentric/beh12_c10f10t10_flat --lambda_body 0.5 --body_dim 1 --body_channels 0` trains, 2779 pairs. Then `finetune_ftm.py --ckpt wm/runs/beh12_hexonly/best.pt --data data/allocentric/beh12_b1_flat`. **Asks something the original did not**: whether the body term's benefit survives to a robot the model has never seen | ready, 1 run |
-| 2l | **Re-test the published motion decoder** | with several futures available from one state, a still stops answering the question, so the frame-conditioned head (F64, −10.5 today) should become runnable and the forward model should move | open, follows 2k |
-| 2m | **Balance the data, not just the sampler** | after `clips_per_body hexapod=7` the training set is still **2.43:1 in frames** (2,780 against 1,143), and `balance_embodiments` closes that by repeating the B1 about 2.4 times an epoch. Repetition is not data: it invites memorisation on a validation split too small to detect it, which `config.py` already warns about. **Collect more B1 rather than capping the hexapod further** -- capping throws away bodies, and F13 says bodies are what matters | open, rides with 2l |
+| 2l | **Re-test the published motion decoder** | with several futures available from one state, a still stops answering the question, so the frame-conditioned head (F57, −10.5 today) should become runnable and the forward model should move | open, follows 2k |
+| 2m | **Balance the data, not just the sampler** | after `clips_per_body hexapod=7` the training set is still **2.43:1 in frames** (2,780 against 1,143), and `balance_embodiments` closes that by repeating the B1 about 2.4 times an epoch. Repetition is not data: it invites memorisation on a validation split too small to detect it, which `config.py` already warns about. **Collect more B1 rather than capping the hexapod further** -- capping throws away bodies, and F11 says bodies are what matters | open, rides with 2l |
 | 2n | **Make the measurement read the same data as training** | `body_motion_probe.py` and `plot_z_umap.py` read the whole directory and see **5.9:1**, where training sees 2.43:1. The probe fits each embodiment separately so its numbers are unaffected, but the UMAP layout is dominated by the larger set and every quoted ratio has to say which of the two it means. One data-selection path for both | open — do it *after* the current deck is presented, since it moves the quoted numbers |
-| 2i | **Training window** | is one timestep the right pair to train the forward model on? F87 measured the forward model barely reading the latent and ruled out the weighting as the cause | **Yes, and the alternative is worse.** `cfg.frame_stride` widens the ITM's pair and `cfg.action_chunk` widens the command target with it, both implemented and both measured (F88). At stride 10 the forward model's use of `z` **triples** -- 4.257 to 12.279 -- and the joint decoder falls **0.218 to 0.879** while cross-embodiment transfer goes to **zero**. The mechanism is that a wider pair turns `z` into a clip identifier: `probe` rises 0.94 to 0.997. **This confirms F54 and supplies the reason it never had.** The two flags stay in the code, default to off, and are used by nothing | **closed** -- the remaining route to a more useful latent is a shared target the frame does not already supply, not a harder prediction task |
+| 2i | **Training window** | is one timestep the right pair to train the forward model on? F77 measured the forward model barely reading the latent and ruled out the weighting as the cause | **Yes, and the alternative is worse.** `cfg.frame_stride` widens the ITM's pair and `cfg.action_chunk` widens the command target with it, both implemented and both measured (F78). At stride 10 the forward model's use of `z` **triples** -- 4.257 to 12.279 -- and the joint decoder falls **0.218 to 0.879** while cross-embodiment transfer goes to **zero**. The mechanism is that a wider pair turns `z` into a clip identifier: `probe` rises 0.94 to 0.997. **This confirms F47 and supplies the reason it never had.** The two flags stay in the code, default to off, and are used by nothing | **closed** -- the remaining route to a more useful latent is a shared target the frame does not already supply, not a harder prediction task |
 
-> **Frame rate — read before trusting any cross-embodiment number (F74, found 2026-08-22).**
+> **Frame rate — read before trusting any cross-embodiment number (F65, found 2026-08-22).**
 > The insect records at **20 Hz** and the B1 replay rendered one frame per 50 Hz rollout step, so a
 > stored transition was **50 ms on one robot and 20 ms on the other**. The ITM consumes `(e_t,
-> e_{t+1})`, so every number computed across the pair — F43/F46 sharing, F51 forward model, F58
-> channel AUCs, F45 pairing — compared latents describing 2.5x different durations. Fixed by
+> e_{t+1})`, so every number computed across the pair — F37/F40 sharing, F44 forward model, F51
+> channel AUCs, F39 pairing — compared latents describing 2.5x different durations. Fixed by
 > `--fps 20` on the replay (physics untouched at 50 Hz, frames subsampled). `data/allocentric/fwd_b1_50hz` still
 > carries the old rate and is kept only so published results stay reproducible.
 
@@ -1149,7 +1191,7 @@ require variance well above machine epsilon.
 ### Step 1.5 — Latent validation
 **Status** done. Behaviour transfer passes; morphology invariance does not.
 **Goal**: prove z_t maps to a shared body-motion coordinate before testing transfer. **Not** that
-`z_t` is body-blind -- it is not, and F160 measures how far from it (probe 0.974)
+`z_t` is body-blind -- it is not, and F146 measures how far from it (probe 0.974)
 
 | Task | Collect z_t from short + long + medium leg × 3 behaviors |
 |---|---|
@@ -1304,7 +1346,7 @@ volume rather than a line and a held-out body can be a combination no training b
 > strength setting recovers it — photometric jitter alone, which moves nothing in the image, is
 > still 2.10x the signal, so the frozen encoder is not invariant in the way cross-augmentation
 > assumes. Untested options: drop cross-augmentation and rely on the 64-d against 359,000-d
-> bottleneck, or augment in embedding space. FINDINGS.md F25.
+> bottleneck, or augment in embedding space. FINDINGS.md F20.
 
 ### Step 2.8 — The target the decoder could already see
 **Status** cause found and fixed; the corrected baseline is training.
@@ -1330,11 +1372,11 @@ volume rather than a line and a held-out body can be a combination no training b
 > sensitive to the second frame -- having it is simply worth only 11 to 19 percent, because most
 > of what the decoder needs is already in `e_t`.
 >
-> **One fact explains every earlier finding.** The FTM not needing `z` (F23), the decoder doing a
-> lookup (F19), `z` being 83-89 percent gait phase (F26), the pose improving while the distance
-> did not (F27) -- all follow from the target never having to travel through `z`.
+> **One fact explains every earlier finding.** The FTM not needing `z` (F20), the decoder doing a
+> lookup (F16), `z` being 83-89 percent gait phase (F22), the pose improving while the distance
+> did not (F23) -- all follow from the target never having to travel through `z`.
 > Confirmed independently: `lambda_recon 0` on real data leaves the reconstruction unchanged
-> (0.1025 against 0.0992) while the FTM's loss never moves from its initial value (F30).
+> (0.1025 against 0.0992) while the FTM's loss never moves from its initial value (F46).
 >
 > **The fix**: `cfg.action_lag`, now 1. The decoder is asked for the command that caused the
 > transition, which it cannot see, so the answer can only arrive through `z`. Consecutive
@@ -1354,7 +1396,7 @@ volume rather than a line and a held-out body can be a combination no training b
 ### Step 2.9 — Testing the diagnosis instead of asserting it
 **Status** done, and it is the strongest Stage 1 result. Four bodies tying femur to tibia score
 **12.67 deg, R² −0.78**; six decoupled bodies at matched data volume score **3.27 deg, R² +0.89**.
-Filling the named gap **removes** the failure rather than softening it (F49, slide 9).
+Filling the named gap **removes** the failure rather than softening it (F42, slide 9).
 **Goal**: turn "the failure has the shape of a gap in the data" into a prediction that can fail
 
 > Step 2.8 ends with an explanation. This step makes it falsifiable. In all four bodies the
@@ -1560,19 +1602,19 @@ were already only correct or incorrect relative to it, so it was recorded here t
 **State, 2026-08-26. The loop is closed on the hexapod and cannot be closed on the B1 as built.**
 
     hexapod    78% speed within 15%, 100% behaviour class, 100% survival over 56 planned steps,
-               three behaviours, nine runs (F92). Requires a warm start: from a standstill there
+               three behaviours, nine runs (F82). Requires a warm start: from a standstill there
                is no motion in the frame to read and it picks a turn, 1 in 5.
 
     B1         blocked. The planner's candidates are recorded action sequences; the B1's gait is
                a PPO policy reading state at 50 Hz, so its recorded actions are responses rather
-               than plans and 0 of 8 replay to the end (F93). Not a gap in the method -- ranking
+               than plans and 0 of 8 replay to the end (F83). Not a gap in the method -- ranking
                and selection are both measured on B1 latents and the forward model adapts to it
                in three clips. What fails is re-issuing a recorded sequence.
 
     held-out    `c08f09t09`, the body every Stage 1 result withholds, with the world model
     hexapod     entirely frozen. Refitting only the action projector -- a two-layer MLP, minutes,
                 no gradient through anything else -- gives **6/6 behaviour class, 6/6 survival,
-                median speed error 19.2%** against 37.1% with the trained body's projector (F95).
+                median speed error 19.2%** against 37.1% with the trained body's projector (F85).
                 Speed accuracy does not recover: 2/6 against 7/9. The expensive component
                 transfers; the cheap one needs clips of the new robot and nothing else.
 
@@ -1586,16 +1628,16 @@ second body.
 **What it can and cannot claim, decided in advance so the result is not over-read.**
 
 The forward model does roll the world forward -- 1.38x better than a frozen world at one step,
-1.47x at three, 1.20x at ten (F32) -- so candidate B has something to plan with. That was measured
+1.47x at three, 1.20x at ten (F46) -- so candidate B has something to plan with. That was measured
 only after we noticed we had been scoring the module on action reconstruction, which is not its
-job (F30, F32).
+job (F46, F46).
 
-But **F31 makes planning easy on this data for the wrong reason**: one frame nearly determines the
+But **F26 makes planning easy on this data for the wrong reason**: one frame nearly determines the
 joint command at every horizon out to 32 frames, because the gait is periodic and a single frame
 fixes the phase. A selector choosing between candidate latents therefore faces an almost
 deterministic problem. **A working demonstration here shows the loop closes; it does not show that
 planning is what made it work.** Distinguishing those needs data whose future is genuinely open --
-varying speed, turning, terrain, disturbance -- which is exactly the gap F31 identifies and the
+varying speed, turning, terrain, disturbance -- which is exactly the gap F26 identifies and the
 AMP policies in `amp/logs/` are a candidate source for.
 
 Two further constraints carried over: match candidate rollouts in **z-space, not `e`-space**, since
@@ -1682,11 +1724,11 @@ riskiest given what we now know about reward readability.
 4. **New experiment worth adding to Step 2** (cheap, data already collected):
    *does the Motion Decoder generalise across bodies?* Train MD on short + long, then ask it to decode
    `z_t` into joint commands for the medium body.
-   - Worth knowing either way, but **not a blocker**: F81 puts the MD outside the runtime path.
+   - Worth knowing either way, but **not a blocker**: F72 puts the MD outside the runtime path.
    - What a new body actually costs is the **action projector**, fitted on its own actions. "A new
      body needs only video" overstates it, and overstates LAC-WM too -- the source paper adapts
      "through finetuning". Video is what lets the world model span incomparable bodies; the
-     projector still needs target-robot actions, which F52 measured at one clip to break even.
+     projector still needs target-robot actions, which F45 measured at one clip to break even.
 
 ### What has to be built, and in what order (scoped 2026-08-22)
 
@@ -1698,7 +1740,7 @@ on "if I apply this, what happens next" -- the question a planner asks.
 
 **Two constraints set the order, and both are already measured.**
 
-*The encoder cannot run the loop.* F40: the vision path is **94.9 ms, 10.5 Hz** on a 2080 Ti,
+*The encoder cannot run the loop.* F34: the vision path is **94.9 ms, 10.5 Hz** on a 2080 Ti,
 against data at 20 Hz and legged control that wants 50. Vision-in-the-loop is therefore a research
 instrument, not a runtime configuration -- which is the argument for distillation, but distillation
 needs a teacher, and the teacher is the vision loop. **The slow loop has to be built first even
@@ -1707,15 +1749,15 @@ though it is not the deployable artefact.**
 *The fixed camera bounds an episode.* It sees about 2.1 m, which is why every collector carries a
 `--travel` gate. A closed-loop run is a few strides, not a traverse, until the camera moves onboard.
 
-**Before the loop, one measurement that re-presents what we already have (F82).** LAC-WM's section
+**Before the loop, one measurement that re-presents what we already have (F99).** LAC-WM's section
 5.2 conditions the forward model on observations from one embodiment while feeding action embeddings
 derived from **another**, and scores the generated frames in pixel space -- PSNR, LPIPS, FID, FVD.
 That is the same quantity as our cross-embodiment readout, in a medium that can be **looked at**:
 a B1 frame rolled forward by a hexapod's latent. With the body head at +0.76 against a control at
--28.9 (F83), the pixel version is the slide. The FTM and both datasets already exist, so this is a
+-28.9 (F73), the pixel version is the slide. The FTM and both datasets already exist, so this is a
 script rather than an experiment, and it does not wait on the closed loop.
 
-**Order of work, rebuilt around the action projector (F81):**
+**Order of work, rebuilt around the action projector (F72):**
 
 1. **Train the action projector.** `a_t -> z_t`, fitted so it matches `ITM(e_t, e_{t+1})` on the
    same transitions. Small network, data already collected, one per embodiment. **This is the piece
@@ -1728,10 +1770,10 @@ script rather than an experiment, and it does not wait on the closed loop.
    embeddings across bodies is confounded by shape.
 
    **And score at behaviour scale, not per frame.** `z_t` describes a *transition*, so its fast
-   component is where the robot is in its gait cycle -- and F56 measured that the two robots have no
+   component is where the robot is in its gait cycle -- and F49 measured that the two robots have no
    correspondence there at all (phase concentration 0.07-0.24 against 0.99-1.00). A planner matching
    latents frame by frame would be asking a quadruped to be at the same point of a hexapod's stride,
-   which is not a thing. F70 measured the consequence directly: forward reads **-1.45 per frame and
+   which is not a thing. F61 measured the consequence directly: forward reads **-1.45 per frame and
    +0.54 stride-averaged**. **What crosses is what the robot is doing, not how it is moving its
    legs** -- so the target robot supplies its own gait, and the claim is "the new body performs the
    same behaviour with its own gait", never "the new body walks like the source". The latter is
@@ -1741,7 +1783,7 @@ script rather than an experiment, and it does not wait on the closed loop.
    LAC-WM's finetuning step, and the honest cost of a new body. Only here does the OOD risk below
    apply.
 4. **Distil to a proprioception-only student.** The deployable artefact. The vision path runs at
-   **10.5 Hz** (F40) against control's 50, so vision-in-the-loop is a research instrument by
+   **10.5 Hz** (F34) against control's 50, so vision-in-the-loop is a research instrument by
    measurement, not by preference.
 
 **Two things this ordering drops**, both from an earlier scoping that assumed the Motion Decoder
@@ -1774,7 +1816,7 @@ reads the body's **actual** state every step, so phase cannot drift.
 - **maximize a task reward** — RL in imagination, adds reward model + Critic. This **is candidate A (Dreamer)**.
 - **behaviour-matching RL (2026-07-25, current preferred variant)** — feed the demo's `z_target`, execute on the
   new body, **re-encode the achieved transition with ITM → `z_achieved`**, and train the decoder by RL with
-  reward `r = −‖z_achieved − z_target‖²`. Two wins: supervision is in **`z`-space (a shared body-motion coordinate, not a body-blind one -- F160 → no
+  reward `r = −‖z_achieved − z_target‖²`. Two wins: supervision is in **`z`-space (a shared body-motion coordinate, not a body-blind one -- F146 → no
   cross-body confound)** and needs **no ground-truth `a_t` labels**. Cost: it is **RL, not backprop** — `a_t →
   e_{t+1}` is real physics (non-differentiable), and the FTM can't substitute (it is `z`-conditioned, not
   `a`-conditioned). Use a **sample-efficient** method (CEM / off-policy SAC), **not PPO** (on-policy, sample-hungry
@@ -1809,7 +1851,7 @@ ablation, not an assumption.**
 - LAC-WM baseline (EAC-WM) is manipulation-only, cannot port directly. **Note the structural
   resemblance**: EAC-WM is defined by per-embodiment action encoders, and our Stage 2 has
   per-embodiment output heads inside pretraining. The difference that matters is the *coordinate*
-  those heads decode into, not their existence -- see F67 and step 2j.
+  those heads decode into, not their existence -- see F60 and step 2j.
 - **AMP (RL-trained per-body controller), as a negative-result baseline**: documents that a plausible
   alternative to vision-latent + IK ground truth (train a policy per body against a shared gait prior)
   was tried and produced worse, less coordinated behaviour than the IK route — supports the case for the
@@ -1818,7 +1860,7 @@ ablation, not an assumption.**
 
 ---
 
-### The source method, read from the paper (F67)
+### The source method, read from the paper (F60)
 
 The full text is `doc/LATENT ACTION ROBOT FOUNDATION WORLD MODELS FOR CROSS-EMBODIMENT ADAPTATION.pdf`.
 Read it before writing anything that characterises the method; earlier text in this repo was written
@@ -1834,7 +1876,7 @@ from a summary and got three things wrong.
 - **Actions are chunked into 5-step sequences** before training.
 - **The motion decoder sees the current frame** (`â_t = MD(x_t, z_t)`, `z_t` as a cross-attention
   query over its visual tokens). Safe there because the target is a *delta*; unsafe for a state
-  target, which is F64.
+  target, which is F57.
 - **Per-embodiment mapping happens at finetuning**, via an action projector (raw action → latent),
   trained in three LoRA stages after `z` is already shaped.
 - **Cross-augmentation** (two independent augmentations, IDM on one pair, FDM predicting the other)
@@ -1860,12 +1902,12 @@ from a summary and got three things wrong.
 |---|---|---|
 | λ_recon, λ_motion | **open** | LAC-WM reports no numeric λ (nor LR, optimiser or schedule). Currently 1.0 / 1.0, but the terms sit on different scales — reconstruction ≈ 1.3, motion ≈ 0.002 — so equal weights do not mean equal influence. Ablate. |
 | `z_t` dimension | 64, following LAC-WM §4.2 | Also the lever for the invariance ablation: shrinking it should evict morphology first, since `e_t` already supplies body identity to both losses. |
-| Turn / stop behaviours | **collected, and it was not the lever** | `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat` hold twelve matched conditions per robot -- four speeds, four turn rates, two lateral levels each side -- forward matched to 4% and yaw to 2%. **Collecting them changed nothing on its own**: on the frozen encoder the new channels still read zero, and yaw only moves from -5.2 to +0.37 when a loss term supervises it. The variety bought the possibility; the term realises it (F83, slide 14). |
-| Step 2 evaluation metric | **settled and measured** | Sample efficiency, pretrained against from-scratch, at N = 1/3/5/7/9 clips rather than episodes -- the B1 set has 14 clips, so 10 is the largest budget that leaves a clean held-out four. Reported for the action head (F50) and the forward model (F52). |
+| Turn / stop behaviours | **collected, and it was not the lever** | `data/allocentric/beh12_c10f10t10_flat` and `data/allocentric/beh12_b1_flat` hold twelve matched conditions per robot -- four speeds, four turn rates, two lateral levels each side -- forward matched to 4% and yaw to 2%. **Collecting them changed nothing on its own**: on the frozen encoder the new channels still read zero, and yaw only moves from -5.2 to +0.37 when a loss term supervises it. The variety bought the possibility; the term realises it (F73, slide 14). |
+| Step 2 evaluation metric | **settled and measured** | Sample efficiency, pretrained against from-scratch, at N = 1/3/5/7/9 clips rather than episodes -- the B1 set has 14 clips, so 10 is the largest budget that leaves a clean held-out four. Reported for the action head (F43) and the forward model (F45). |
 | Baseline exact setup | **open, and it is Step 1e** | Section 9 calls an EAC-WM analogue required rather than optional, and it has never been run. Either run it or write down why it is out of scope. |
 | **Pipeline: Dreamer or candidate scoring** | **open, and it is the decision Week 13 asked for** | The advisor's note is that we are sitting between two designs and should commit. *Candidate scoring* needs an answer to "where do the candidates come from that is not itself a controller" -- ours is a recorded library, the source paper's is a pretrained VLA sampled with 500 noise seeds, and **both are circular**. *Dreamer / teacher-student* moves the search into training: the reward is *reach this latent*, so no library and no kinematics are needed, the run-time cost drops from twelve forward-model rolls to one, and the student is trained on the states it actually reaches rather than on recorded ones. **The evidence collected on 2026-08-26/27 points at the second**, with the caveat that it leans on long-horizon rollout accuracy, which is this project's weakest measurement -- so it should be started on the hexapod, where the forward model holds to half a second, not on the B1, where it does not. |
 | **Where candidate diversity comes from** | **answered for the source paper, open for us** | The advisor asked how a fixed policy yields several candidates. LAC-WM's answer, from their §6: they inject different noise seeds into a VLA's flow-matching head to produce **N=500** sequences, having found that *"random action sequence sampling... is inefficient for action optimization, especially for a difficult dexterous manipulation task"*. Ours is twelve recorded clips. **Motor babbling is the proposal that removes the dependency**, untested. |
-| **The research gap, stated in one place** | **open, and the most important item** | See §1 and F98. Draft: LAC-WM demonstrates cross-embodiment latent actions where a **shared task space already exists** -- end-effector pose is meaningful for every arm in their corpus, so the alignment problem is solved by choosing the coordinate. Locomotion across leg counts has no such space: 18 and 12 joint targets share no dimension. Two things follow that are not in the source work, and both are measured -- **(a)** a joint-space target crosses only when a shared body-motion term is present (-28.9 to +0.61), and **(b)** MSE adaptation is insufficient across families because the forward model discards the action channel; a discriminative term is required (19% to 57%). Confirm the framing with the advisor before building on it. |
+| **The research gap, stated in one place** | **open, and the most important item** | See §1 and F88. Draft: LAC-WM demonstrates cross-embodiment latent actions where a **shared task space already exists** -- end-effector pose is meaningful for every arm in their corpus, so the alignment problem is solved by choosing the coordinate. Locomotion across leg counts has no such space: 18 and 12 joint targets share no dimension. Two things follow that are not in the source work, and both are measured -- **(a)** a joint-space target crosses only when a shared body-motion term is present (-28.9 to +0.61), and **(b)** MSE adaptation is insufficient across families because the forward model discards the action channel; a discriminative term is required (19% to 57%). Confirm the framing with the advisor before building on it. |
 | LAC-WM source code | not released | Rejected ICLR 2026, accepted ICML 2026; no public code. |
 ---
 

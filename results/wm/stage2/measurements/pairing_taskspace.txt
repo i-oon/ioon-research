@@ -16,7 +16,7 @@ condition 3 -- does the label pin down the command within one robot?
   phase x Froude                   0.647     0.278
   phase alone                      0.895     0.303
 
-Compare with F45's contact labels, on the same three conditions:
+Compare with F39's contact labels, on the same three conditions:
   feet down 0-4       overlap 0.572  pairable 98.9%  intent 0.998 on the b1
   diagonal loaded     overlap 0.711  pairable  100%  intent 0.918 on the hexapod
   corner pattern      overlap 0.240  pairable 33.8%  intent 0.63 / 0.52

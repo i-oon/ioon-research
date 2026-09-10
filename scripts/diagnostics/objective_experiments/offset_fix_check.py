@@ -5,7 +5,7 @@
 `frame_vs_delta_classify.py` found the state head's actual input -- `delta.mean(1)`, the FTM's
 predicted change pooled over patch tokens -- reads embodiment identity at 0.977, and that an ORACLE
 per-embodiment mean removal (using the true label on the whole set) drops it to 0.114, pointing at
-F41's mechanism: an additive per-embodiment offset, not something distributed and adversarial-shaped.
+F35's mechanism: an additive per-embodiment offset, not something distributed and adversarial-shaped.
 
 **This is the non-oracle version.** The offset is fit on TRAIN clips only, applied by known
 embodiment id (available at train and inference alike -- this project already routes every

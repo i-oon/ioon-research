@@ -1,26 +1,26 @@
-"""Can the teacher rank actions, and at which scale? The characterisation of F144's failure.
+"""Can the teacher rank actions, and at which scale? The characterisation of F135's failure.
 
     .venv/bin/python3 scripts/diagnostics/planning/teacher_label_quality.py
 
-**F144 is not reopened by this.** The bar was pre-registered and failed; this asks only *why*, so
+**F135 is not reopened by this.** The bar was pre-registered and failed; this asks only *why*, so
 the negative result can be written with a mechanism instead of a guess.
 
 Two questions, deliberately at different scales:
 
   **coarse**  candidates are the recorded actions of the twelve conditions. Does the teacher pick
-              one from the goal's own behaviour family? F143 measured 85-90% inside `adapt3`; this
+              one from the goal's own behaviour family? F134 measured 85-90% inside `adapt3`; this
               repeats it through the *labelling* path so the two numbers are comparable.
 
-  **local**   candidates are Gaussian perturbations of the student's own action -- what the F144
+  **local**   candidates are Gaussian perturbations of the student's own action -- what the F135
               teacher actually ranked. **Judged in the simulator, not by the model**: the picked
               action and the student's own are each executed from the same state and the body motion
               each produces is compared against the goal. Anything else would let the teacher grade
               its own homework.
 
 **The reading.** Teacher's pick reliably closer than the student's own means the labels were good
-and F144 failed elsewhere. No better than the student's own means the teacher cannot order small
+and F135 failed elsewhere. No better than the student's own means the teacher cannot order small
 perturbations, which is the precise mechanism. **Coarse working while local does not** means it
-ranks behaviours and not amounts -- the same shape as F111 and F140's within-clip `/mean-z` 0.951 --
+ranks behaviours and not amounts -- the same shape as F102 and F131's within-clip `/mean-z` 0.951 --
 and that tells any future distillation scheme it must choose among behaviours, never refine within
 one.
 """
@@ -78,11 +78,11 @@ def main():
     ap.add_argument("--samples", type=int, default=32)
     ap.add_argument("--sigma", type=float, default=0.5,
                     help="perturbation size for `--candidates perturb`, in units of each joint's "
-                         "own sd. **F179 ran 0.5 and the resulting outcomes were 2.5% apart**; "
+                         "own sd. **F164 ran 0.5 and the resulting outcomes were 2.5% apart**; "
                          "raising it is the middle of the sweep between that and whole conditions.")
     ap.add_argument("--candidates", choices=("perturb", "conditions"), default="perturb",
                     help="**what the teacher is asked to rank, and it is the de-risking knob.** "
-                         "`perturb` is F144's and F179's setting. `conditions` uses the twelve "
+                         "`perturb` is F135's and F164's setting. `conditions` uses the twelve "
                          "recorded behaviours instead, so the outcomes differ by far more than "
                          "2.5%. If the teacher ranks those and not the perturbations, the limit is "
                          "the separation and no training objective fixes it; if it fails on these "
@@ -105,7 +105,7 @@ def main():
                          "default offset and pitch. **None of those are stored in the npz.**")
     ap.add_argument("--repeat_control", type=int, default=4,
                     help="**branch points where the student's own action is executed TWICE.** The "
-                         "insect's simulator does not repeat (F105), so the spread this produces is "
+                         "insect's simulator does not repeat (F95), so the spread this produces is "
                          "the noise floor the teacher-versus-student gap has to clear. A ranking "
                          "score reported without it cannot be read: 0 disables, and disabling it "
                          "means the run answers less than it appears to.")
@@ -171,7 +171,7 @@ def main():
     if tot == 0:
         raise SystemExit("coarse arm scored ZERO states -- nothing was measured, and a percentage "
                          "over zero would read as a result. Check --data and --cache.")
-    print(f"  {hit / max(tot, 1):.0%} of {tot} states   (chance 33% for `speed`; F143 read 95% "
+    print(f"  {hit / max(tot, 1):.0%} of {tot} states   (chance 33% for `speed`; F134 read 95% "
           f"inside adapt3)")
     if missed:
         print(f"  ({len(missed)} clips were not in {args.cache} and were encoded here)")
@@ -214,7 +214,7 @@ def main():
             g_t = torch.tensor(goal, dtype=torch.float32, device=device).unsqueeze(0)
             base = student.act(pooled(e_full), g_t)
             if args.candidates == "conditions":
-                # **Candidates that differ a LOT, judged by the same physics.** F179 ranked
+                # **Candidates that differ a LOT, judged by the same physics.** F164 ranked
                 # Gaussian perturbations at 0.5 sd and the two outcomes sat 2.5% apart. That leaves
                 # two causes tangled: a world model too insensitive to rank, or a separation too
                 # small for anything to rank. Swapping in the twelve recorded conditions moves the
@@ -245,7 +245,7 @@ def main():
                 # **Realizability, reported beside the separation because one without the other
                 # decides nothing.** A sigma that separates the outcomes by falling over, or by
                 # commanding joints the model never saw, has bought its separation with something
-                # unusable. F142's fall rule is reused rather than reinvented: the head must stay
+                # unusable. F133's fall rule is reused rather than reinvented: the head must stay
                 # above 0.6 of its own starting height for the whole window.
                 z0 = float(np.median(hh[:5, 2]))
                 upright.append(bool((hh[:, 2] >= 0.6 * z0).all()))
@@ -255,11 +255,11 @@ def main():
         d_t = float(np.linalg.norm(got["teacher"] - goal))
         wins += d_t < d_s
         ties += pick == 0
-        # **The simulator's own reproducibility, at the same branch point.** F105 records that
+        # **The simulator's own reproducibility, at the same branch point.** F95 records that
         # CoppeliaSim does not repeat: rerunning one configuration returns a different number. So
         # the identical action is executed a second time here and the movement in `d` that produces
         # is the floor any teacher-versus-student difference has to clear. **Without it a ranking
-        # score is unreadable** -- F145 reported 0.1304 against 0.1299 and had no way to say whether
+        # score is unreadable** -- F136 reported 0.1304 against 0.1299 and had no way to say whether
         # that gap was small or merely inside the noise.
         if len(rows) < args.repeat_control:
             _fr, _ac, _fo, hh, oo = run_to(int(bt), base[0].cpu().numpy())
@@ -284,7 +284,7 @@ def main():
           f"   = {sep:.1%} of the student's own distance   [candidates: {args.candidates}"
           + (f", sigma {args.sigma}" if args.candidates == "perturb" else "") + "]")
     print("  **The separation is the covariate, not a detail.** A win rate is only comparable "
-          "with\n  another run at a similar separation; F179 read 47% at 2.5%.")
+          "with\n  another run at a similar separation; F164 read 47% at 2.5%.")
     if repeats:
         floor = float(np.mean(repeats))
         print(f"  **the simulator's own noise floor**, the same action run twice at "
@@ -293,7 +293,7 @@ def main():
         print("\n  **Read the ranking score and this ratio together or report neither.** If the")
         print("  teacher-versus-student gap is not clearly larger than the floor, physics did not")
         print("  separate the candidates, and a score above 50% is measuring noise rather than")
-        print("  ranking. F145's 0.1304 against 0.1299 was reported without this and could not be")
+        print("  ranking. F136's 0.1304 against 0.1299 was reported without this and could not be")
         print("  read either way.")
     else:
         print("  **no noise floor measured** -- --repeat_control 0 was passed, so the ranking score")

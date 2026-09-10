@@ -1,6 +1,6 @@
 """Is the B1's joint command as determined by one frame as the insect's is?
 
-F31 measured that for the insect, a single frame predicts the joint command at every
+F26 measured that for the insect, a single frame predicts the joint command at every
 horizon tested, because the data is one gait at one speed and the phase fixes everything
 after it. That is why the forward transition model has nothing to do.
 
@@ -47,7 +47,7 @@ def main():
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--horizons", type=int, nargs="+", default=[0, 1, 2, 4, 8, 16, 32])
     # Pooling every body inflates the command spread with between-body variance, which is a
-    # different question from "how much of one body's command does a frame fix". F31 measured one
+    # different question from "how much of one body's command does a frame fix". F26 measured one
     # body; restrict here to reproduce that, leave the default to pool.
     ap.add_argument("--pattern", default="*.npz")
     args = ap.parse_args()

@@ -1,6 +1,6 @@
 """Does the second frame matter more when one frame cannot fix the gait phase?
 
-F31 measured that a single frame predicts the joint command at any horizon, and F29 that
+F26 measured that a single frame predicts the joint command at any horizon, and F25 that
 deleting the transition costs the trained model only 1.11-1.19x. The explanation offered is
 that six coordinated legs make the phase unambiguous: one leg at mid-stroke could be going
 either way, but the other five say which half of the cycle it is in.
@@ -152,7 +152,7 @@ def main():
               f'{accuracies[0]:9.3f} {accuracies[1]:7.3f}')
 
     print("\nIf hiding the legs is what restores the value of the transition, both gain columns "
-          "rise\nas the visible fraction falls. If they stay flat, the explanation in F31 is "
+          "rise\nas the visible fraction falls. If they stay flat, the explanation in F26 is "
           "wrong.")
 
 

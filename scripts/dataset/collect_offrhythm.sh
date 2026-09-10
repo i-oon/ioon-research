@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# F163. Is the action redundant because of the ENCODER, or because the DATA is a clean gait?
+# F149. Is the action redundant because of the ENCODER, or because the DATA is a clean gait?
 #
 #   bash scripts/dataset/collect_offrhythm.sh        # CoppeliaSim GUI, exactly ONE instance
 #
-# **The hypothesis nothing so far has tested.** F159 showed the insect's command is readable from a
-# single frame at R2 0.779; F162 showed a motion transform of the *representation* neither breaks
+# **The hypothesis nothing so far has tested.** F145 showed the insect's command is readable from a
+# single frame at R2 0.779; F148 showed a motion transform of the *representation* neither breaks
 # that nor survives it. **Neither touched the data.** On a steady gait the pose fixes the phase and
 # the phase predicts the next frame, so the action is redundant **by rhythm**. Off the rhythm it
 # should not be.

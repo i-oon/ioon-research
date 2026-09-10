@@ -2,8 +2,8 @@
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/embedding_speed_ceiling.py
 
-**What this isolates.** F187 found the state head confuses adjacent speeds (speed_c7.1 vs c8.8,
-etc.) on well-separated candidates. F188 found two architecture fixes to the FTM/predictor both
+**What this isolates.** F172 found the state head confuses adjacent speeds (speed_c7.1 vs c8.8,
+etc.) on well-separated candidates. F173 found two architecture fixes to the FTM/predictor both
 failed to help. Both of those measure the PIPELINE (encoder -> ITM/FTM -> head). This measures the
 ENCODER ALONE: raw, frozen V-JEPA2 embeddings, no ITM, no FTM, no trained head of any kind except
 the offline probe fit here. If a strong probe cannot separate the four physically distinct speeds
@@ -23,7 +23,7 @@ features, kNN on a 50-component PCA (curse-of-dimensionality control), and a sma
 (finds nonlinear structure neither kNN variant assumes) are fit and read together: if ALL THREE read
 near chance, that is a real null. If any one clears it clearly, the information is present.
 
-**Split by clip, not by frame** -- F76's leak (consecutive frames of one clip are near-duplicates)
+**Split by clip, not by frame** -- F67's leak (consecutive frames of one clip are near-duplicates)
 applies here exactly as it does everywhere else in this project.
 
 Classification: 4-way, chance 25%. Regression: predicts each clip's own achieved forward speed

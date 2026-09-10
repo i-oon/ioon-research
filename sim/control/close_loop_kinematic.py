@@ -6,11 +6,11 @@ by construction rather than by result.
 
 It exists because the dynamic loop is impossible on the B1 and the reason is the robot: its gait is
 a PPO policy reading state at 50 Hz, so a recorded action sequence is a *response* and re-issuing it
-open loop drops the robot in 72 to 289 steps (F93). That closes the execution half of the question
+open loop drops the robot in 72 to 289 steps (F83). That closes the execution half of the question
 and leaves the selection half untested across embodiments -- which is the half this measures.
 
     what it tests    does the planner keep choosing the right behaviour when the frames it sees
-                     next are produced by what it chose now. That is the covariate shift F92 found
+                     next are produced by what it chose now. That is the covariate shift F82 found
                      on the hexapod, and it has never been measured across robots.
 
     what it cannot   whether the chosen sequence is executable. Splicing two clips' motion gives a
@@ -89,7 +89,7 @@ def main():
     ap.add_argument("--candidates_dir", default="data/allocentric/beh12_b1_flat",
                     help="**`beh12_b1_flat`, not `beh12_b1_flat`.** The old set clips the robot in 61% "
                          "of frames, files the forward clip under `turn_wz0.00`, and turns the "
-                         "opposite way from the insect (F113-F115).")
+                         "opposite way from the insect (F104-F106).")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--horizon", type=int, default=5)

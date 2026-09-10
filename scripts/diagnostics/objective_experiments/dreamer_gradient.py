@@ -10,13 +10,13 @@
 backpropagating an imagined return through the world model into the actor. The infrastructure is
 standard; **the load-bearing assumption is not**. A model trained to *predict* is not automatically
 a model whose *gradient* points anywhere useful, and this one is accurate for about three to five
-steps (F138, F150). Nothing has tested the gradient.
+steps (F129, F141). Nothing has tested the gradient.
 
 The loop, per branch point and per horizon K:
 
   1. drive the recorded clip to the branch, take `e_0` from the frame there
   2. imagine K steps: `z_k = proj(a_k)`, `e_k+1 = FTM(e_k, z_k)`
-  3. imagined reward = the F136 body coordinate of the rolled transition against the goal
+  3. imagined reward = the F127 body coordinate of the rolled transition against the goal
   4. **backprop that reward into the action sequence** and take one normalised step
   5. **execute the stepped sequence in the simulator** and measure whether the real motion moved
      toward the goal, against executing the original
@@ -27,7 +27,7 @@ The loop, per branch point and per horizon K:
 random step of equal size improves the real motion as often, the gradient carried nothing and the
 improvement is the perturbation's.
 
-**The recorded command range.** F181 measured the ranking collapse when actions leave the range the
+**The recorded command range.** F166 measured the ranking collapse when actions leave the range the
 model was fitted on -- 33% of joints outside it at sigma 2.0 and the teacher below a coin. A
 gradient step that leaves that range has the same problem, so the fraction outside is reported
 beside every number.
@@ -186,7 +186,7 @@ def main():
 
     print("\n  **The gradient is only usable where it beats its own random control.** Any step")
     print("  changes the action, so `grad better` alone measures perturbation rather than")
-    print("  direction. **And a step that leaves the recorded command range is one F181 already")
+    print("  direction. **And a step that leaves the recorded command range is one F166 already")
     print("  showed the model cannot predict**, so a win bought there is not a win.")
     print("\n  Gradients improving the real motion out to K=3-5 would give a Dreamer actor a")
     print("  foundation. Failing at K=1-2 means the model predicts and its gradient misleads,")

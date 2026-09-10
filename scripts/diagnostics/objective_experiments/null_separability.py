@@ -7,7 +7,7 @@
 **A gate, not a report.** `null/real` contrasts a prediction under the real action with one under the
 null. **If the two latents are nearly the same vector, that contrast has nothing to measure** and a
 ratio near 1.0 would mean "these two identical things predict identically" rather than "the action is
-worthless" -- an F160-shaped confound, where the number cannot distinguish the hypothesis from an
+worthless" -- an F146-shaped confound, where the number cannot distinguish the hypothesis from an
 artefact of the setup.
 
 **It cannot be checked before training.** The only reading available beforehand feeds egocentric

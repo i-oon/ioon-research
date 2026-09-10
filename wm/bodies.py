@@ -4,7 +4,7 @@ Everything here was previously copy-pasted. Nine scripts carried their own hardc
 four defined their own contact threshold, and the walk check lived only in the collector, so
 nothing that consumed a dataset could re-check it. That is not a tidiness problem: a hardcoded
 list goes stale silently the moment a split changes, and `z_identity_ablation` once read 15.99 deg
-where the same checkpoint on its actual training bodies read 1.45 (FINDINGS.md F39).
+where the same checkpoint on its actual training bodies read 1.45 (FINDINGS.md F33).
 
 Import from here rather than redefining. This module deliberately depends on nothing heavier than
 numpy and `wm.config`, so the collector in `sim/` and the diagnostics in `scripts/` can both use it
@@ -47,7 +47,7 @@ def walk_check(head):
     Never collapse these into one distance. The earlier check used
     `norm(head[-1,:2] - head[0,:2])`, which is unsigned, and a body that tipped over and rotated on
     the spot read a healthy 0.46 m -- two such bodies reached the dataset and trained into every
-    Stage 2 run before anyone looked at the frames (FINDINGS.md F42). A body can also travel a long
+    Stage 2 run before anyone looked at the frames (FINDINGS.md F36). A body can also travel a long
     way forward while crabbing just as far sideways, which one number hides.
 
     A pass here still is not proof. No statistic distinguishes "walks oddly" from "fell over and is
@@ -82,7 +82,7 @@ def walks(path):
 # Geometry, not behaviour: each of these asks the IK for a foot target its legs cannot reach, so
 # the failure is a property of the body and holds in every dataset it appears in. Excluded
 # everywhere by default rather than by remembering to name the good ones -- the convention that
-# broke, since naming works only until something globs the directory instead (FINDINGS.md F42).
+# broke, since naming works only until something globs the directory instead (FINDINGS.md F36).
 EXCLUDED_BODIES = {
     "c06f06t10": "collapses and rotates on the spot; 208 mm dead zone, 29/30 clips fail",
     "c10f06t10": "collapses and travels backwards; 208 mm dead zone, 30/30 clips fail",

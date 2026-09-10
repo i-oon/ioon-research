@@ -23,7 +23,7 @@ The insect's middle legs have no counterpart. That is a real asymmetry between t
 defect in the measurement, and it is why only four legs are scored.
 
 Reported as balanced accuracy so an unbalanced duty cannot flatter the result, with the
-within-embodiment diagonal as the ceiling each cross cell is read against. Features follow F41:
+within-embodiment diagonal as the ceiling each cross cell is read against. Features follow F35:
 band-pooled patch tokens with each embodiment standardised by its own statistics, which removes
 the colour and apparent-size difference without touching the target.
 
@@ -64,7 +64,7 @@ def bands(tokens, grid=16, n=4):
     """Average within each of four horizontal bands of the patch grid.
 
     Averaging all 256 patches buries a quantity living in the few near the feet, and preserves a
-    constant offset between the two datasets that a fitted readout absorbs and mis-applies (F41).
+    constant offset between the two datasets that a fitted readout absorbs and mis-applies (F35).
     """
     t = tokens.reshape(len(tokens), grid, grid, -1)
     return t.reshape(len(tokens), n, grid // n * grid, -1).mean(2).flatten(1).numpy()

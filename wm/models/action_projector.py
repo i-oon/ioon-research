@@ -3,7 +3,7 @@
 **The inverse model cannot run in the loop, and this is the module that replaces it.**
 `z_t = ITM(e_t, e_{t+1})` needs the next frame, which at control time is the thing being decided.
 Every latent this project has measured was read off two ground-truth frames -- reconstruction, not
-control (F81). LAC-WM states the same constraint and the same answer: "since future observations,
+control (F72). LAC-WM states the same constraint and the same answer: "since future observations,
 required by the IDM, are unavailable at inference time, we train an action projector that maps
 explicit actions into the latent action space".
 
@@ -23,7 +23,7 @@ find its own body's route into it.
 
 **Fitted on the target robot's own actions**, which is the honest cost of a new body. "A new body
 needs only video" overstates it and overstates LAC-WM, whose abstract adapts "through finetuning".
-Video is what lets the world model span incomparable bodies; this module still needs actions. F52
+Video is what lets the world model span incomparable bodies; this module still needs actions. F45
 measured how cheap that is -- one B1 clip clears break-even.
 """
 import torch

@@ -6,27 +6,27 @@
 **Why this is now allowed, when `wm/adapt.py` deliberately leaves the motion decoder alone.** That
 file's reason is written down and was correct: the decoder "is an auxiliary loss during pretraining
 and plays no part at control time, so adapting it would cost time for a module the planner never
-calls". **F128 changed that premise** -- it scores candidates with `body_head(proj(a))`, so the head
+calls". **F119 changed that premise** -- it scores candidates with `body_head(proj(a))`, so the head
 is now on the control path, and the argument for leaving it unadapted no longer holds.
 
-**What is being tested, and the three outcomes are named in advance** (F130):
+**What is being tested, and the three outcomes are named in advance** (F121):
 
     B1 calibrates and the insect stays good   the shared coordinate is real and the head was simply
                                               never adapted -- no pretraining change needed
     B1 calibrates and the insect breaks       one head cannot serve both: `z` is swappable, not
-                                              shared, which is F83's channel competition in another
+                                              shared, which is F73's channel competition in another
                                               form
     B1 still fails                            the B1's latent carries no body-motion signal to read,
                                               and only a pretraining change can put one there
 
 **Everything is frozen but the head**, which is `z_dim -> body_hidden -> body_dim`, about 8k
 parameters. The latent comes from the checkpoint's own ITM on real consecutive frames, so this asks
-what is *in* `z`, not what the projector can reach -- the projector's own limits are F97's problem
+what is *in* `z`, not what the projector can reach -- the projector's own limits are F87's problem
 and would confound this one.
 
 **The split is by clip and the evaluation is on held-out clips only.** Consecutive frames of one
 clip are near-duplicates, so a frame-level split leaves the training data in the test set -- the
-leak that made yaw look like it transferred until it was held out by condition instead (F76).
+leak that made yaw look like it transferred until it was held out by condition instead (F67).
 """
 import argparse
 import glob
@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--ckpt", required=True, help="**the checkpoint the planner uses**, not the "
                                                   "pretrain: stage 1 moves what `z` means and the "
                                                   "head has to be fitted against the latent it "
-                                                  "will actually be shown (F129)")
+                                                  "will actually be shown (F120)")
     ap.add_argument("--data", required=True)
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--also", nargs="*", default=[], metavar="EMBODIMENT=DIR",
@@ -65,10 +65,10 @@ def main():
     ap.add_argument("--latent", choices=("itm", "projector", "both"), default="itm",
                     help="which latent the head is fitted against. **`itm` asks what is in `z`; "
                          "`projector` asks what the head will actually be shown at control time**, "
-                         "and they are not the same distribution -- `a -> z` is one-to-many (F97). "
+                         "and they are not the same distribution -- `a -> z` is one-to-many (F87). "
                          "Fitting on `itm` lifts the ITM path from +0.20 to +0.79 and leaves the "
                          "projector path at +0.44 while widening its range 2.5x, which made "
-                         "selection worse rather than better (F130). "
+                         "selection worse rather than better (F121). "
                          "**`both` is what a scored run actually needs**: the head is shown "
                          "`proj(a)` on the candidate side under mode D, the ITM's latent on the "
                          "candidate side under mode C, and the ITM's latent on the goal side under "
@@ -221,7 +221,7 @@ def main():
     report("after")
     print("\n  ratio is against predicting the target's mean: **below 1.0 on the held-out clips is")
     print("  the only line that means anything**, and a ratio near 1.0 there is a head that has")
-    print("  learned the dataset mean and nothing else -- which is what F129 measured this head")
+    print("  learned the dataset mean and nothing else -- which is what F120 measured this head")
     print("  doing on the B1 before any fitting.")
 
     if args.out:

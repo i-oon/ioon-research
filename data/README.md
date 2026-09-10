@@ -10,7 +10,7 @@
 
 **Bodies are named, never called "hexapod".** Two insect bodies with the same generic name cost a
 week: the pretraining body and the held-out body turned opposite ways and every table said
-"hexapod" (F117).
+"hexapod" (F108).
 
 ## The live sets
 
@@ -22,7 +22,7 @@ week: the pretraining body and the held-out body turned opposite ways and every 
 | `beh12_b1_flat_9clips` | 9 | symlinks into the above; the few-shot budget |
 
 **All three turn the same way**, anticlockwise on screen, since 2026-08-29. They did not before, and
-nothing that predates that can be compared across them (F115, F117). `beh12_b1_flat/README.md`
+nothing that predates that can be compared across them (F106, F108). `beh12_b1_flat/README.md`
 lists the four defects corrected on the quadruped side.
 
 ## Stage 1 sets, forward walking only
@@ -34,7 +34,7 @@ quadruped set the `s2_*` runs used.
 **The `fwd` prefix is the point.** Everything known about the shared body target was measured on
 these, so it was measured on **one behaviour**. `fwd_b1_50hz` also names its own defect: it was
 rendered at 50 Hz against the insect's 20, which made every cross-embodiment number computed with it
-span mismatched durations (F74).
+span mismatched durations (F65).
 
 Several are symlink farms into `fwd_hex8body` and `fwd_decoupled` -- cheap views, not copies.
 

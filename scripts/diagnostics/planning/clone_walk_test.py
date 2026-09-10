@@ -8,19 +8,19 @@
 **Every number egocentric improved is internal to the model; every behavioural number is unchanged
 or worse.** `null/real` 1.03 to 1.16, yaw readability 0.07 to 0.64 -- against ranking flat at chance,
 coarse ranking slightly down, and the command 14% harder to read back. **The one row that would
-settle it was never filled in**: F144 measured the *allocentric* clone walking 36% of the reference
+settle it was never filled in**: F135 measured the *allocentric* clone walking 36% of the reference
 distance, and no egocentric clone has ever been run in physics.
 
-**The bar is re-measured here rather than borrowed, and that matters.** F142's `D_real = 0.6566 m`
+**The bar is re-measured here rather than borrowed, and that matters.** F133's `D_real = 0.6566 m`
 was the reference clip replayed through the **base body** in the allocentric scene. This clone is
 `c08f09t09` -- shorter coxa, femur and tibia -- in its own scene. **Reusing 0.6566 would divide this
 body's distance by another body's reference**, which is the kind of borrowed denominator this project
 has had to withdraw numbers for. So the recorded actions are replayed first, in the same body, the
 same scene and the same camera configuration, and *that* is the denominator.
 
-**Read it against F144's 36%, and read the failure modes separately.** Upright the whole window and
+**Read it against F135's 36%, and read the failure modes separately.** Upright the whole window and
 short is a gait that does not travel; falling is a different failure and the pre-registered rule
-(F142) requires both to pass.
+(F133) requires both to pass.
 """
 import argparse
 import os
@@ -85,7 +85,7 @@ def main():
     _f, _a, _fo, heads_ref, _o = run(lambda obs, t: seed[min(t, len(seed) - 1)])
     d_real = float(np.linalg.norm(np.asarray(heads_ref)[-1, :2] - np.asarray(heads_ref)[0, :2]))
     print(f"  replayed reference in this body: D_real = {d_real:.4f} m   "
-          f"(F142's base body read 0.6566)")
+          f"(F133's base body read 0.6566)")
 
     # 2. the clone, driven from its own camera
     def policy(observation, t):
@@ -98,15 +98,15 @@ def main():
     print(f"  clone travelled {v['distance']:.4f} m = **{v['fraction']:.0%} of D_real**")
     print(f"  upright the whole window: {v['upright']}   "
           f"(min head z {v['min_z']:.4f} against {v['z0']:.4f} settled)")
-    print(f"  **{'PASS' if v['pass'] else 'FAIL'}** -- both upright and >= 50% are required (F142)")
+    print(f"  **{'PASS' if v['pass'] else 'FAIL'}** -- both upright and >= 50% are required (F133)")
 
-    print(f"\n  F144's allocentric clone, base body: 0.2349 m = 36%, upright, FAIL.")
+    print(f"\n  F135's allocentric clone, base body: 0.2349 m = 36%, upright, FAIL.")
     print("  **Above 36% is the first behavioural evidence that the viewpoint helps.** At or below")
     print("  it, the honest slide reads: the camera change made the model use the action and did")
     print("  not make the robot walk further -- which is reportable and stronger than not measuring.")
     print("\n  **The denominators differ by body**, so the metres are not comparable across the two")
     print("  runs and only the percentages are. That is why the reference was replayed here rather")
-    print("  than taken from F142.")
+    print("  than taken from F133.")
 
 
 if __name__ == "__main__":

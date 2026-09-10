@@ -5,7 +5,7 @@
         --pair forward=... turn=... side=...
 
 **The last de-risk gate, and the one every earlier number is upstream of.** `branch_divergence.py`
-measures millimetres and degrees; **the world model is never shown millimetres**. F158 and F159
+measures millimetres and degrees; **the world model is never shown millimetres**. F144 and F145
 established that these embeddings suppress information that is physically present -- the action is
 readable from a pose and contributes 3% of prediction -- so a counterfactual that is 13 degrees apart
 in the world may be a rounding error in `e`.
@@ -17,7 +17,7 @@ offset the prefix had already accumulated.
 
 **The noise floor is two runs of identical commands through the same encoder**, so encoder jitter,
 render noise and gait-phase drift are all inside it. Turning is the case to watch: it is weakest
-throughout this project (F136) and its physical divergence lives in heading, which a camera sees
+throughout this project (F127) and its physical divergence lives in heading, which a camera sees
 only as a change of shape.
 """
 import argparse

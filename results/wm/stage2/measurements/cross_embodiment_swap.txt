@@ -24,4 +24,4 @@
 
   READ: if 'WRONG' R2 is close to 'correct' R2, the offset/identity correction is not
   load-bearing for the prediction -- the leak is cosmetic. If 'WRONG' collapses sharply
-  (strongly negative, F64-shape), the correction matters and the leak is fatal.
+  (strongly negative, F57-shape), the correction matters and the leak is fatal.

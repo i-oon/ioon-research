@@ -46,7 +46,7 @@ from wm.evaluate import encode_clip  # noqa: E402
 
 # The bodies that walk. The earlier list held c10f10t06, which veers 0.43 m off course on a
 # 94.6 mm dead zone, so the "does the encoder share a space" question was partly asked of a
-# robot falling sideways (FINDINGS.md F42). wm.bodies.EXCLUDED_BODIES is the authority.
+# robot falling sideways (FINDINGS.md F36). wm.bodies.EXCLUDED_BODIES is the authority.
 INSECT_BODIES = bodies_in(os.path.join(ROOT, "data", "ik_walk_8body"))
 INSECT_EPS = [6, 20, 22]
 
@@ -55,7 +55,7 @@ def features(tokens, mode, grid=16):
     """Reduce [T, grid*grid, dim] patch tokens to one vector per frame.
 
     Averaging every patch is linear, so it keeps whatever is spread across many patches and
-    drowns whatever lives in few. Segment scale spans the whole body and survives it (F20);
+    drowns whatever lives in few. Segment scale spans the whole body and survives it (F17);
     which feet are loaded occupies perhaps 6-12 patches of 256 and is diluted 20-40x. The mode
     therefore has to be chosen for the quantity being read, and stated, since a weak result
     under `mean` says as much about the reduction as about the encoder.

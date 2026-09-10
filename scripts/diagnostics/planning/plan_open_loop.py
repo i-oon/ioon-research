@@ -17,7 +17,7 @@ Two numbers, and the second is the one to trust:
 
   exact      the chosen candidate is the demonstration's condition
   family     the chosen candidate is the right *behaviour* -- speed, turn or sideways -- whatever
-             the level. F90 measured level discrimination at 57.8% against a 25% chance, so a
+             the level. F80 measured level discrimination at 57.8% against a 25% chance, so a
              planner that gets the family right and the level wrong is behaving as measured rather
              than failing.
 
@@ -77,7 +77,7 @@ def main():
                          "66 frames of one behaviour, and on these robots the behaviour lives "
                          "largely in that mean -- a turning insect's average posture differs from "
                          "a walking one's -- so subtracting it took goal-following from 38.9% to "
-                         "22.1% (F125). `dataset` averages over `--center_clips` clips of each "
+                         "22.1% (F116). `dataset` averages over `--center_clips` clips of each "
                          "robot instead, which removes 'this is an insect' and keeps 'this clip "
                          "is a turn'.")
     ap.add_argument("--center_clips", type=int, default=12,

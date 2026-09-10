@@ -27,7 +27,7 @@ reasons, and the second is the one that matters:
   A planner that switched from one recorded sequence to another at mismatched phase would emit a
   discontinuous joint command, which is an execution artefact and not a decision.
 
-  **It is the regime the discrimination was measured in.** F90's phase-aligned rows -- 57.8%
+  **It is the regime the discrimination was measured in.** F80's phase-aligned rows -- 57.8%
   against a 25% chance level on four speeds of one behaviour -- are what this planner's accuracy
   should be read against. The free-phase rows are 15 points higher and describe a planner that
   could reject a candidate for being at the wrong point of its stride, which this one cannot,
@@ -43,6 +43,8 @@ from ..config import from_checkpoint
 from ..data.embodiment import REGISTRY, load
 from ..models.action_projector import ActionProjector, action_dims_from
 from ..models.ftm import ForwardTransitionModel
+from ..models.itm import InverseTransitionModel
+from ..models.motion_decoder import MotionDecoder
 
 
 def condition_of(path):
@@ -147,4 +149,206 @@ class LatentPlanner:
         cand = self.candidates[i]
         # the command at `t`, not at `t + action_lag`: the lag is how the *target* is defined for
         # scoring, and what the robot executes on this step is this step's command
+        return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores
+
+
+class DirectFroudePlanner:
+    """Scores candidates by `body_head(proj(a))` against a goal Froude vector -- no rollout, no
+    FTM, no encoder, no e_t at all.
+
+    **Why this exists.** `LatentPlanner` above rolls the forward model and compares raw embedding
+    distance; `score_by_body_motion.py`'s mode C (the same mechanism read through the shared body
+    coordinate instead of raw embedding distance) still failed to clear chance at any horizon on a
+    correctly-adapted checkpoint (F184) -- consistent with this project's repeated finding that the
+    rollout does not earn its place in selection (F126/F127). Mode A -- exactly this mechanism,
+    `score(a) = |body_head(proj(a)) - goal|` -- is the one that DID clear chance (F184, 38-46% vs
+    28%). This class is that mechanism, shaped as a drop-in replacement for `LatentPlanner` (same
+    `from_checkpoint`/`horizon_at`/`act` interface) so a closed-loop driver needs to swap only the
+    planner class, not its control loop.
+
+    The goal is a **fixed Froude vector**, not a per-step embedding -- consistent with mode A,
+    which read the goal as a recorded number rather than from frames (mode C, reading the goal from
+    frames via the ITM, is the version that failed). A real deployment states a goal as "achieve
+    this dimensionless speed", which is exactly this input.
+    """
+
+    def __init__(self, projector, md, candidates, embodiment, horizon=5, device="cuda"):
+        self.proj, self.md = projector, md
+        self.candidates = candidates
+        self.embodiment = embodiment
+        self.horizon = int(horizon)
+        self.device = torch.device(device)
+        self.action_lag = 1
+
+    @classmethod
+    def from_checkpoint(cls, ckpt_path, candidates_dir, embodiment="b1", projector_path="",
+                        horizon=5, per_condition=1, device="cuda"):
+        device = torch.device(device)
+        checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        cfg = from_checkpoint(checkpoint["config"])
+
+        cands = load_candidates(candidates_dir, embodiment, per_condition)
+        if not cands:
+            raise ValueError(f"no candidate clips in {candidates_dir}")
+        action_dim = cands[0]["actions"].shape[1]
+
+        md = MotionDecoder(cfg, {embodiment: action_dim}).to(device).eval()
+        md.load_state_dict(checkpoint["md"], strict=False)
+        if md.body_head is None:
+            raise ValueError("this checkpoint has no body_head (lambda_body was 0)")
+        for p in md.body_head.parameters():
+            p.requires_grad_(False)
+
+        projector_path = projector_path or ckpt_path
+        saved = torch.load(projector_path, map_location="cpu", weights_only=False)
+        proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
+        proj.load_state_dict(saved["projector"])
+        for p in proj.parameters():
+            p.requires_grad_(False)
+
+        planner = cls(proj, md, cands, embodiment, horizon, device)
+        planner.action_lag = max(1, cfg.action_lag)
+        planner.cfg = cfg
+        planner.channels = [int(c) for c in cfg.body_channels]
+        mean_s, std_s = checkpoint["body_stats"]
+        planner.mean_s = np.asarray(mean_s).ravel()[:len(planner.channels)]
+        planner.std_s = np.asarray(std_s).ravel()[:len(planner.channels)]
+        return planner
+
+    def standardize(self, goal_froude):
+        """Raw (forward, lateral, yaw) -> the standardised units `body_head` was fit to predict."""
+        return (np.asarray(goal_froude, dtype=np.float32) - self.mean_s) / self.std_s
+
+    def horizon_at(self, t):
+        room = min(len(c["actions"]) - t - self.action_lag for c in self.candidates)
+        return max(1, min(self.horizon, room))
+
+    @torch.no_grad()
+    def score(self, goal_std, t):
+        """Predicted-versus-goal error for every candidate, lower is better. `goal_std` is
+        ALREADY standardised (see `standardize`), same units `body_head` outputs."""
+        h = self.horizon_at(t)
+        goal = torch.as_tensor(goal_std, dtype=torch.float32, device=self.device)
+        out = []
+        for cand in self.candidates:
+            a = torch.as_tensor(cand["actions"][t + self.action_lag:t + self.action_lag + h],
+                                device=self.device)
+            z = self.proj(a, self.embodiment)
+            pred = self.md.body(None, z).mean(0)
+            out.append(float(((pred - goal) ** 2).mean()))
+        return np.asarray(out)
+
+    @torch.no_grad()
+    def act(self, goal_std, t):
+        """The command to execute now, plus which candidate produced it and every score."""
+        scores = self.score(goal_std, t)
+        i = int(np.argmin(scores))
+        cand = self.candidates[i]
+        return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores
+
+
+class RolloutFroudePlanner:
+    """`score_by_body_motion.py`'s mode C, live: the goal is read from the SOURCE robot's frames
+    via the ITM (never a recorded number), and each candidate is scored by rolling the FTM forward
+    from the CURRENT observed frame and reading the resulting transition, also via the ITM --
+    "frames and rollout only... the condition the project's claim actually needs" per that
+    script's own docstring. This is what `LatentPlanner` is not: `LatentPlanner` scores raw
+    embedding distance to a goal frame (the mechanism F116/F118 found failing under every
+    estimator tried); this reads both sides through the shared body-motion coordinate instead.
+
+    Needs `e_t`, the current observation's embedding, every step -- unlike `DirectFroudePlanner`,
+    which never looks at the frame at all. That is the whole methodological difference under test.
+    """
+
+    def __init__(self, itm, ftm, projector, md, candidates, embodiment, horizon=5, device="cuda"):
+        self.itm, self.ftm, self.proj, self.md = itm, ftm, projector, md
+        self.candidates = candidates
+        self.embodiment = embodiment
+        self.horizon = int(horizon)
+        self.device = torch.device(device)
+        self.action_lag = 1
+
+    @classmethod
+    def from_checkpoint(cls, ckpt_path, candidates_dir, embodiment="b1", projector_path="",
+                        horizon=5, per_condition=1, device="cuda"):
+        device = torch.device(device)
+        checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        cfg = from_checkpoint(checkpoint["config"])
+
+        cands = load_candidates(candidates_dir, embodiment, per_condition)
+        if not cands:
+            raise ValueError(f"no candidate clips in {candidates_dir}")
+        action_dim = cands[0]["actions"].shape[1]
+
+        itm = InverseTransitionModel(cfg).to(device).eval(); itm.load_state_dict(checkpoint["itm"])
+        ftm = ForwardTransitionModel(cfg).to(device).eval(); ftm.load_state_dict(checkpoint["ftm"])
+        md = MotionDecoder(cfg, {embodiment: action_dim}).to(device).eval()
+        md.load_state_dict(checkpoint["md"], strict=False)
+        if md.body_head is None:
+            raise ValueError("this checkpoint has no body_head (lambda_body was 0)")
+        for m in (itm, ftm, md.body_head):
+            for p in m.parameters():
+                p.requires_grad_(False)
+
+        projector_path = projector_path or ckpt_path
+        saved = torch.load(projector_path, map_location="cpu", weights_only=False)
+        proj = ActionProjector(cfg, action_dims_from(saved)).to(device).eval()
+        proj.load_state_dict(saved["projector"])
+        for p in proj.parameters():
+            p.requires_grad_(False)
+
+        planner = cls(itm, ftm, proj, md, cands, embodiment, horizon, device)
+        planner.action_lag = max(1, cfg.action_lag)
+        planner.cfg = cfg
+        planner.channels = [int(c) for c in cfg.body_channels]
+        mean_s, std_s = checkpoint["body_stats"]
+        planner.mean_s = np.asarray(mean_s).ravel()[:len(planner.channels)]
+        planner.std_s = np.asarray(std_s).ravel()[:len(planner.channels)]
+        return planner
+
+    def standardize(self, goal_froude):
+        """Raw (forward, lateral, yaw) -> the standardised units `body_head` was fit to predict.
+        Same convention as `DirectFroudePlanner.standardize` -- needed here too now that
+        `--goal_source physics` can pair with either candidate-scoring mechanism."""
+        return (np.asarray(goal_froude, dtype=np.float32) - self.mean_s) / self.std_s
+
+    def horizon_at(self, t):
+        room = min(len(c["actions"]) - t - self.action_lag for c in self.candidates)
+        return max(1, min(self.horizon, room))
+
+    @torch.no_grad()
+    def goal_from_frames(self, g0, g1):
+        """`body_head(ITM(g0, g1))` -- the goal robot's own frames, no recorded number involved.
+        `g0`, `g1` are single-frame embeddings (1, tokens, dim), any horizon apart."""
+        g0 = g0.to(self.device).float().unsqueeze(0) if g0.dim() == 2 else g0.to(self.device).float()
+        g1 = g1.to(self.device).float().unsqueeze(0) if g1.dim() == 2 else g1.to(self.device).float()
+        return self.md.body(None, self.itm(g0, g1)).reshape(-1)
+
+    @torch.no_grad()
+    def score(self, e_t, goal, t):
+        """Roll the FTM on each candidate from the CURRENT observation, read the transition with
+        the ITM, compare its body motion to `goal` (already in `body_head`'s output units)."""
+        h = self.horizon_at(t)
+        e_t = e_t.to(self.device).float()
+        if e_t.dim() == 2:
+            e_t = e_t.unsqueeze(0)
+        goal = goal.to(self.device).float()
+        out = []
+        for cand in self.candidates:
+            a = torch.as_tensor(cand["actions"][t + self.action_lag:t + self.action_lag + h],
+                                device=self.device)
+            z = self.proj(a, self.embodiment)
+            e = e_t
+            for i in range(len(z)):
+                e = self.ftm(e, z[i:i + 1])
+            pred = self.md.body(None, self.itm(e_t, e)).reshape(-1)
+            out.append(float(((pred - goal) ** 2).mean()))
+        return np.asarray(out)
+
+    @torch.no_grad()
+    def act(self, e_t, goal, t):
+        """The command to execute now, plus which candidate produced it and every score."""
+        scores = self.score(e_t, goal, t)
+        i = int(np.argmin(scores))
+        cand = self.candidates[i]
         return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores

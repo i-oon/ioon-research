@@ -15,7 +15,7 @@ CHOOSING PROPORTIONS
 
 Read this before picking scales. Two bodies already in `data/allocentric/fwd_hex8body` collapse and rotate
 on the spot rather than walking, and two more veer 0.40 m off course, all because of the one
-constraint below. See FINDINGS.md F42.
+constraint below. See FINDINGS.md F36.
 
 1. The hard constraint: the leg must reach its own trajectory
 ------------------------------------------------------------
@@ -45,7 +45,7 @@ real stick insect proportion. Holding the femur at 1.0 and moving the tibia:
 
 **The usable band is about 0.2 wide.** That is why every body in the dataset has the femur and
 tibia effectively tied together — a geometric constraint, not an oversight in dataset design, and
-the direct cause of the extrapolation limit in FINDINGS.md F33.
+the direct cause of the extrapolation limit in FINDINGS.md F27.
 
 Ratio above 1.0 is not itself a defect: bodies at 1.04, 1.07 and 1.10 walk normally. It only
 becomes one by pushing the dead zone past 92.5 mm. But femur longer than tibia inverts the

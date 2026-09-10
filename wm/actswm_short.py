@@ -17,15 +17,15 @@ it produce". Those are different questions and only the first is cheap.
 
 **Two of their settings are deliberately not copied.**
 
-`K`: they use 12. **Ours is 5**, because F140 and F150 measure the rolled prediction crossing
+`K`: they use 12. **Ours is 5**, because F131 and F141 measure the rolled prediction crossing
 "worse than a frozen frame" by five steps on this checkpoint. Hinging separation at horizons where
 the prediction is already broken trains on noise. Ready to drop to 3.
 
 `H`, context length: they use 32 frames. **Our forward model is conditioned on a single frame** --
 `FTM(e_t, z)`, 256 tokens, no temporal stack -- so 32 is not a hyperparameter here, it is a
-different architecture. Nothing in F138 or F150 implicates context length, so it stays at 1.
+different architecture. Nothing in F129 or F141 implicates context length, so it stays at 1.
 
-**The null is in latent space, not action space, and it has to be.** F148 established the null as
+**The null is in latent space, not action space, and it has to be.** F139 established the null as
 each body's standing *stance* -- an action. **Pretraining has no action projector**: `wm/train.py`
 drives the forward model with the ITM's `z`, and the projector is fitted afterwards against a frozen
 ITM. Mapping the stance into `z` is therefore impossible at this stage, and a hinge built on
@@ -88,7 +88,7 @@ def main():
     ap.add_argument("--clips", type=int, default=10)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log_every", type=int, default=25,
-                    help="the separation curve is the diagnostic, not the endpoint: F151 read "
+                    help="the separation curve is the diagnostic, not the endpoint: F141 read "
                          "0.019, 0.137, 0.496, 0.008 at 100-step spacing, which is an oscillation "
                          "that a coarser log would have shown as a single number")
     ap.add_argument("--tag", default="")
@@ -172,7 +172,7 @@ def main():
             torch.cuda.empty_cache()
         itm.train(); ftm.train()
 
-    report("BEFORE — the F150 baseline, re-read on this batch")
+    report("BEFORE — the F141 baseline, re-read on this batch")
     curve = []
     opt = torch.optim.Adam(list(itm.parameters()) + list(ftm.parameters()), lr=args.lr)
     rng = np.random.default_rng(args.seed)
@@ -199,7 +199,7 @@ def main():
             print(f"  step {step + 1:4d}  loss {l_val:.4f}  separation  "
                   + "  ".join(f"{n} {per[n]:.4f}" for n in names), flush=True)
     report("AFTER")
-    print("\n  separation, per body, over training — a working hinge holds it, F151's oscillated")
+    print("\n  separation, per body, over training — a working hinge holds it, F141's oscillated")
     for n in names:
         pts = [c[3] for c in curve if c[1] == n]
         block = max(1, len(pts) // 8)

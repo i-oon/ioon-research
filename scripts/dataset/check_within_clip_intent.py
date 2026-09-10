@@ -3,7 +3,7 @@
     .venv/bin/python3 scripts/dataset/check_within_clip_intent.py \\
         --data data/allocentric/beh12_c10f10t10_intent_flat --clean data/allocentric/beh12_c10f10t10_sweepn00_flat
 
-**A required gate, and it exists because everything else missed the failure.** F165's first
+**A required gate, and it exists because everything else missed the failure.** F151's first
 collection passed `--schedule` to a `--gait cpg` run, which discards it: eight of twelve conditions
 had no within-clip speed change at all. The command lines showed the flag, the log echoed it, the
 `walk_check` verdicts printed, the separability gate passed and the R2 tables came out clean.

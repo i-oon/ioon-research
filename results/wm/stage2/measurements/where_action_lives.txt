@@ -1,4 +1,4 @@
-where_action_lives.py -- 2026-09-04 -- diagnosis for the F179 fine-ranking wall
+where_action_lives.py -- 2026-09-04 -- diagnosis for the F164 fine-ranking wall
 Q: is the action stamped by the FTM, already in the frame, or carried by z?
 
 =========== EGOCENTRIC: teacher_ego.pt, held-out ego c08f09t09 ===========
@@ -15,7 +15,7 @@ wm/runs/beh12_ego/teacher_ego.pt
                  z = ITM(e_t, e_t+1)      0.612     0.01
   [e_t, z]  ceiling for the prediction      0.606      0.1
 
-  MEASUREMENT 2b -- is z itself readable from one frame  (F168 asked this)
+  MEASUREMENT 2b -- is z itself readable from one frame  (F153 asked this)
                             features       z R2    alpha
                   e_t  (frame alone)      0.407      0.1
                  e_t+1  GROUND TRUTH      0.501      0.1
@@ -42,7 +42,7 @@ wm/runs/beh12_hex-b1_body3/best.pt
                  z = ITM(e_t, e_t+1)      0.902     0.01
   [e_t, z]  ceiling for the prediction      0.937     0.01
 
-  MEASUREMENT 2b -- is z itself readable from one frame  (F168 asked this)
+  MEASUREMENT 2b -- is z itself readable from one frame  (F153 asked this)
                             features       z R2    alpha
                   e_t  (frame alone)      0.854     0.01
                  e_t+1  GROUND TRUTH      0.886     0.01

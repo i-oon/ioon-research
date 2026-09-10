@@ -2,9 +2,9 @@
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/state_head_readout_ablation.py
 
-**What this tests, and why now.** F191 found `real_z` alone (64-D, from ITM on true transitions)
+**What this tests, and why now.** F176 found `real_z` alone (64-D, from ITM on true transitions)
 separates the four speed conditions at 80% / R2 0.78 -- well above what the actual trained state
-head achieves downstream (F187: 68% win rate, low exact-pair accuracy). The state head's forward
+head achieves downstream (F172: 68% win rate, low exact-pair accuracy). The state head's forward
 pass is `head(pool(delta - offset) + z_proj(z))` (`wm/models/state_head.py`): a NAIVE MEAN-POOL over
 patch tokens, an ADDITIVE combination with z, and a fixed frozen per-embodiment OFFSET subtracted
 before any of it. Three design choices, each independently testable offline with a strong probe, no
@@ -14,9 +14,9 @@ retraining:
     2. does mean-pooling throw away spatial structure a different pooling operator would keep
     3. does the frozen offset subtraction help, hurt, or do nothing to FINE (not coarse) accuracy
 
-Same data, same held-out-by-clip split, same kNN/regression probes as F190/F191, so every number
+Same data, same held-out-by-clip split, same kNN/regression probes as F175/F176, so every number
 here reads directly against those. Predicts forward speed specifically (channel 0), the exact
-channel F187 found the trained head confusing between adjacent conditions.
+channel F172 found the trained head confusing between adjacent conditions.
 
 Diagnosis only; trains nothing, touches no checkpoint beyond reading `teacher_ego.pt` and the
 already-fit offset in `wm/runs/beh12_state/best_state.pt`.
@@ -127,7 +127,7 @@ def main():
             add("z+mean_pool_offset", np.concatenate([z_real, mean_pool_offset], axis=1))
             add("z+std_pool", np.concatenate([z_real, std_pool], axis=1))
 
-    print("forward-speed regression, held-out by clip, kNN k=15 (matches F190/F191 exactly):\n")
+    print("forward-speed regression, held-out by clip, kNN k=15 (matches F175/F176 exactly):\n")
     for key in ("z", "mean_pool_raw", "mean_pool_offset", "std_pool",
                "z+mean_pool_offset", "z+std_pool"):
         Xtr, str_, Xte, ste = feats[key]

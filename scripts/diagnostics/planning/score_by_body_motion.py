@@ -1,23 +1,23 @@
 """Score candidates by the body motion they produce, not by embedding distance.
 
 **Why a different coordinate at all.** The planner scores `||FDM(e_t, proj(a)) - e_goal||`, a raw
-distance in V-JEPA2 space. That was never a shared coordinate between two robots -- F125 measured
-the correction that would make it one failing under every estimator tried -- and F127 measured
+distance in V-JEPA2 space. That was never a shared coordinate between two robots -- F116 measured
+the correction that would make it one failing under every estimator tried -- and F118 measured
 something worse: the argmin does not track the goal even *within* one robot, scoring 18-23% against
 the behaviour it was shown against a 28% chance rate.
 
 This asks the same question in the one coordinate the two robots genuinely share. `lambda_body`
 trains a head that reads **body motion** off the latent, in dimensionless units both bodies are
-measured in (F58, F65, F66), so
+measured in (F51, F58, F59), so
 
     score(a) = | body_head(proj(a)) - body_motion(goal clip) |
 
 is goal-conditioned by construction: the goal enters as a physical quantity rather than as a
 picture that happens to contain the wrong robot.
 
-**The acceptance test is the mismatched column and nothing else** (F127). Scored against the
-demonstration, a rule can pass without reading the goal at all -- that is how F123's 55.8% and
-F126's 73% both survived until their controls were run. So this script computes matched *and*
+**The acceptance test is the mismatched column and nothing else** (F118). Scored against the
+demonstration, a rule can pass without reading the goal at all -- that is how F114's 55.8% and
+F117's 73% both survived until their controls were run. So this script computes matched *and*
 mismatched goals in the same pass and reports both, and the number that decides is the mismatched
 one: **above 28% or this is not planning either.**
 
@@ -133,7 +133,7 @@ def main():
 
     # cross-embodiment goals: one clip per (behaviour, level) of the other robot, and its measured
     # forward speed. Keyed on the recorded fields, never on the condition string -- the two robots
-    # name their conditions after their own controls and only the sideways names coincide (F125).
+    # name their conditions after their own controls and only the sideways names coincide (F116).
     cross, cross_e = {}, {}
     if args.goal_dir:
         for gp in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
@@ -197,7 +197,7 @@ def main():
     with torch.no_grad():
         for h in args.horizons:
             hit = {"matched": 0, "mm_demo": 0, "mm_goal": 0}
-            # **Per family as well as pooled.** A pooled number hides a reshuffle: F124 measured the
+            # **Per family as well as pooled.** A pooled number hides a reshuffle: F115 measured the
             # aggregate holding at 36% while turning rose 18 points and forward fell 20. The family
             # here is the *goal's*, since that is what the rule was asked for.
             per = {}
@@ -289,7 +289,7 @@ def main():
                   + "  ".join(f"{k} {v[0]/max(v[1],1):.0%}" for k, v in sorted(per.items())))
 
     print("\n  chance is 28%. **Only the last column decides** -- the first two are passable by a")
-    print("  rule that names the behaviour already visible and never reads the goal (F123, F127).")
+    print("  rule that names the behaviour already visible and never reads the goal (F114, F118).")
 
 
 if __name__ == "__main__":

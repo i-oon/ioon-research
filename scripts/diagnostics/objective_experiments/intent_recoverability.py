@@ -4,14 +4,14 @@
         --ckpt wm/runs/beh12_hex-b1_body3/best.pt --data data/allocentric/beh12_c10f10t10_intent_flat \\
         --embodiment hexapod
 
-**This is the control F164's random noise fails.** Jitter opens the single-frame-to-pair gap because
+**This is the control F150's random noise fails.** Jitter opens the single-frame-to-pair gap because
 a random component can only ever be seen in the transition -- which is true and useless. The
 question that decides Direction B is whether the recovered thing is a **command change** a
 controller could act on, or a **behaviour label** we already have and already rejected.
 
 Three targets under one protocol, ridge in the dual on the full embedding, split by clip:
 
-    a_t          the instantaneous command -- F159's quantity, for reference
+    a_t          the instantaneous command -- F145's quantity, for reference
     da = a_t+1 - a_t   **the intent**: what the command is about to do differently
     family       speed / turn / side, as a classification **control**
 

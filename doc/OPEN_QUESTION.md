@@ -5,14 +5,88 @@
 > Only genuinely open items. When a measurement settles one it moves to `FINDINGS.md` and leaves a single line in the settled table at the bottom, so no result is written out twice.
 
 Living doc. Supersedes the old "argue vs prove / terrain / leg-length" questions,
-which are now settled (see bottom). Updated 2026-08-22.
+which are now settled (see bottom). Updated 2026-09-10.
 
 Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
 this file carries only what is still undecided.
 
+## Q20. Gecko's remaining gap is the video, not the method -- is a body this slow inside the claim's scope? (2026-09-10, rewritten same day after F189)
+
+**This question's original three candidates (adaptation budget / yaw telemetry / physics noise) are
+all void.** They were reasoning from two measurement bugs, both since found and fixed (F189): the
+stage-1 "gate" was read with the sign inverted, and gecko's body frame was built on a near-vertical
+axis that scrambled forward, lateral and yaw at once. What is left is smaller and much better
+located.
+
+**Fixed, and their effect measured:**
+
+| fix | effect |
+|---|---|
+| body frame `-(body y)`, not body x | yaw ceiling **-0.042 (dead) -> +0.501**; heading jumps >90 deg/step 16.8% -> **0%** |
+| projector sees 20 action frames, not 1 | stage-4 held-out **1.016 -> 0.970** (below 1.0 for the first time), projector-path rho **0.032 -> 0.249** |
+
+**The chain, measured end to end by ridge on ground truth:** gecko's actions carry **0.736**, its
+egocentric video carries **0.374**, the pipeline delivers **0.249** (67% of what the video allows).
+B1's video carries 0.747. **The video is the binding constraint and the cause is physical**: gecko's
+forward Froude is **0.038-0.048** against B1's 0.126, and it is flat across gait frequencies 2-6 Hz,
+so the robot barely translates between frames while its legs fill the view.
+
+**The actual open question, and it is a scoping decision rather than a debugging one:**
+
+1. **Make gecko genuinely faster.** Frequency is ruled out by measurement. Stride length, joint
+   gains, or scene scale are untested. If gecko can be brought near B1's Froude, the video ceiling
+   should rise with it -- that is the prediction to pre-register. **Cheapest real test.**
+2. **Accept the ceiling and report gecko as a bounded case.** "The method grounds a novel body when
+   that body's motion is visible to its own camera; a body 2.6x slower than the reference sits below
+   that threshold" is a defensible, measured claim -- and it is a claim about the SENSOR, not about
+   the shared coordinate, which is the thesis's actual subject.
+3. ~~**Re-run the full pipeline on the corrected frame.**~~ **Done** (`wm/runs/gecko_fixed`):
+   stage 1 improves at every horizon for the first time, stage 4 lands at **1.004** with the K=1
+   projector the pipeline currently ships. **The frame fix alone does not rescue stage 4** -- the
+   windowed projector is what takes it to 0.970. Neither fix is sufficient alone, and together they
+   reach 0.970 against B1's 0.751, with the video ceiling (0.374) accounting for the remainder.
+   **The decision this leaves is whether to wire windowing into the real projector**, which touches
+   the validated B1 path (F183-F188) and so has not been done unilaterally.
+
+**Do not** re-collect babble for coverage: `babble_v3` was built for a frequency lever that does not
+exist, and it is measurably the WORSE dataset (action ceiling +0.146 vs the original's +0.736),
+because constant-gait clips remove the within-clip noise the mapping is actually fitted on.
+
+---
+
+## Q19. Distill the vision-based teacher into a proprioception-only student (new, 2026-09-09 — scoped, not started)
+
+Deployment step, downstream of F183-F188 (the direct-Froude controller now validated cross-
+embodiment, live, closed-loop). Not the same thing as the "proprioception cannot do this" claim
+already settled below (that's about the *comparison*; this is about *deploying* the working
+vision-based controller cheaply). Not the same thing as `sim/control/teacher_student_insect.py`'s
+existing `Student` either -- that one still takes a pooled VISION embedding as input, so it removes
+the planning loop but not the camera. This asks for a student with no camera in the loop at all.
+
+**Scope:**
+1. **Teacher**: the validated direct-Froude controller (`wm/runs/b1_adapt/body_head_b1_hex.pt`,
+   mode A/D) -- the only mechanism this project has shown actually works (F188).
+2. **Student input**: proprioception only -- `joint_pos`/`joint_vel` (already recorded), plus base
+   orientation/angular velocity if available. No vision embedding anywhere in the student's forward
+   pass -- a new architecture, not a reuse of `teacher_student_insect.py`'s `Student`.
+3. **Goal handling**: compute the goal once (vision or physics, matching mode A/D's own "fixed for
+   the whole episode" design), pass it as a fixed vector alongside proprioception every step. Vision
+   is allowed once, offline, before deployment -- never per-step.
+4. **Data**: roll the teacher's own closed loop (F185-F188's mechanism) across many episodes and
+   goals, recording `(proprioceptive state, teacher's chosen action)` pairs as behaviour-cloning
+   targets.
+5. **Training**: supervised regression, student mimics the teacher's picks -- same spirit as
+   `teacher_student_insect.py`'s `clone()`, new student class taking proprioception instead of
+   pooled embeddings.
+6. **Evaluation**: same S.R. metrics as F188 (survival / behaviour class / speed within 15%),
+   student vs. teacher, teacher's F188 numbers as the ceiling.
+
+No blocker identified -- working teacher, closed-loop scoring infra, and an architecturally-close
+(if wrong-input) `Student` to fork from all already exist. Not started.
+
 ## Q12. Which bodies belong in the dataset at all? (new, 2026-08-11 — blocking)
 
-Measured in **F42**: two of the nine bodies in `data/allocentric/fwd_hex8body` do not walk — one moves 0.057 m
+Measured in **F36**: two of the nine bodies in `data/allocentric/fwd_hex8body` do not walk — one moves 0.057 m
 in an episode, the other **walks backwards** — and two more crab sideways 2 to 6 times more than
 any sound body. Every Stage 2 run globs the whole directory, so about a fifth of the hexapod
 gradient went to a robot that does not locomote.
@@ -44,7 +118,7 @@ Open, in the order they have to be decided:
    thesis frames this as stick insects specifically, the honest range is ratio ≤ 1.
 
 **Resolved 2026-08-12.** Items 1 and 3 are done and `stage2_clean` has been trained and measured
-on two seeds — see F43. The data questions are closed; what they uncovered is not:
+on two seeds — see F37. The data questions are closed; what they uncovered is not:
 
 **Q13. RESOLVED 2026-08-12: drop it.** The cross-embodiment variance decomposition is not
 under-sampled, it is built on a phase label too coarse to be one. Stance fraction takes **8
@@ -54,7 +128,7 @@ never 2 x 6 x 6 = 72 cells; it was 24 to 36. The embodiment share therefore read
 bins and 12.0% at six**, same checkpoint, same data -- a 2.7x swing from a parameter that was
 supposed to be cosmetic.
 
-**F38's headline 33.0% came from this measurement.** Replace it everywhere with the probe (0.994 /
+**F32's headline 33.0% came from this measurement.** Replace it everywhere with the probe (0.994 /
 0.992 across seeds) and the identity ablation (1.03x / 1.04x against a random control), which
 reproduce to three decimals and say something stronger anyway: the identity is fully present and
 nothing uses it.
@@ -68,7 +142,7 @@ grid can use the timestep directly instead of inventing a shared phase label.
 
 `two_way` balances its grid to the smallest cell, which holds six latents, so the whole
 measurement rests on 72 points. Two seeds of one config give **12.0% and 6.7%** for the embodiment
-share. F38's headline 33.0% rested on the same 72 points and is in the deck.
+share. F32's headline 33.0% rested on the same 72 points and is in the deck.
 
 - `--bins 3` doubles the latents per cell. Does that make the seeds agree? One command, decides
   whether the measurement is under-sampled or unusable.
@@ -100,7 +174,7 @@ when the numbers are being redone, not before.
 ## Q0. What Stage 2 can and cannot claim, given Stage 1 (new, 2026-08-09)
 
 Stage 1 found that the decoder identifies the body from a code in `z` and looks up, rather than
-inferring morphology from the frame (FINDINGS F18-F22). Two claims were being run together and
+inferring morphology from the frame (FINDINGS F16-F19). Two claims were being run together and
 have to be separated, because Stage 1 supports one and predicts the other will fail.
 
 **Claim A — vision forms a shared model across incomparable joint spaces, proprioception cannot.**
@@ -111,13 +185,13 @@ model at all, so the asymmetry does not depend on transfer succeeding.
 
 **Claim B — that model transfers to an unseen embodiment.** Stage 1 predicts failure. Training on
 hexapod + B1 and testing on a 4-leg insect is two training points, which is the configuration F5
-and F17 show does not work, and a third embodiment cannot be generated the way extra bodies were.
+and F15 show does not work, and a third embodiment cannot be generated the way extra bodies were.
 
 **Step 3's sample-efficiency framing is not claim B.** Pretrain, fine-tune on N clips of the new
 embodiment, compare against from-scratch: the shared backbone carries gait phase and visual
 processing, so it can start ahead even when zero-shot fails. Untested and not contradicted.
 
-**Stage 2 has now been run once, and the premise did not hold on its own (F38).** One shared
+**Stage 2 has now been run once, and the premise did not hold on its own (F32).** One shared
 trunk across the hexapod and the B1, per-embodiment heads, no cross-embodiment term -- which is
 what the source method specifies. The latent came out **33.0% embodiment identity** against 39.6%
 gait phase, with embodiment decodable at 1.000. For comparison, `lambda_cross` holds the *body*
@@ -153,7 +227,7 @@ same intent. Two measurable stands-in, both available:
 Force sensors would be used to **build the pairs**, never as model input, so vision-only inference
 is unaffected -- the same standing as the ground-truth commands already used as targets. And the
 third row is available regardless: one frame identifies which feet are swinging at 0.815 against a
-chance of 0.5 (F31).
+chance of 0.5 (F26).
 
 **The real risk is not the sensor, it is that mis-paired frames are wrong labels**, not merely
 noisy ones. Stage 1's pairing is exact; part of why `L_cross` works may be that exactness. Across
@@ -162,7 +236,7 @@ a four-leg trot has no physically correct answer -- it is a design decision that
 and defended. ~~**This is the largest untested risk in Stage 2 and there is currently no plan for
 it.**~~
 
-**MEASURED 2026-08-14, and the answer is that none of the three rows works on current data (F45).**
+**MEASURED 2026-08-14, and the answer is that none of the three rows works on current data (F39).**
 The risk above is no longer untested. Per-leg contact was the most promising signal -- no shared
 period needed, corner legs correspond anatomically -- and it fails in a specific, informative way:
 
@@ -186,9 +260,9 @@ insect side at all.
 **So the plan is no longer "pick a pairing and defend it".** Either (a) accept that Stage 2
 follows the paper without a cross term -- which Q11 notes is what the source method actually does,
 making `lambda_cross` our addition rather than a missing piece -- or (b) broaden behavioural
-coverage first, since the overlap failure is partly the one-gait-one-speed constraint (F31)
+coverage first, since the overlap failure is partly the one-gait-one-speed constraint (F26)
 rather than a fact about hexapods and quadrupeds. Option (b) is the AMP-dataset question already
-open in Q11, and F45 is now a second, independent reason to take it seriously.
+open in Q11, and F39 is now a second, independent reason to take it seriously.
 
 Practical consequence: report claim A as the result, claim B as a measured limit with its
 mechanism, and treat sample efficiency as the transfer claim actually being made.
@@ -204,10 +278,10 @@ after the `action_lag` correction, the action's time index. Four differences rem
 
 | | paper | ours | worth acting on |
 |---|---|---|---|
-| **action chunking** | actions grouped into **5-step** sequences, stated to improve world-model learning | one step | **yes, and now quantified** -- F33: widening the gap to five steps nearly doubles the reconstruction target's real signal, and combined with dropping the crop it moves the signal-to-noise ratio from 0.24x to 0.89x |
+| **action chunking** | actions grouped into **5-step** sequences, stated to improve world-model learning | one step | **yes, and now quantified** -- F27: widening the gap to five steps nearly doubles the reconstruction target's real signal, and combined with dropping the crop it moves the signal-to-noise ratio from 0.24x to 0.89x |
 | latent dimension | 512 | 64 | maybe; ours is 8x tighter |
 | module size | ITM 47M, FTM 94M | about 5M each | probably not at this data scale |
-| behavioural diversity | 3 datasets, 150k trajectories, 22 object categories, a deliberate left-or-right choice in the task, 80 percent failures | one gait, one speed, forward only | this is the F31 constraint, restated |
+| behavioural diversity | 3 datasets, 150k trajectories, 22 object categories, a deliberate left-or-right choice in the task, 80 percent failures | one gait, one speed, forward only | this is the F26 constraint, restated |
 
 **One difference removes a risk rather than adding one.** The paper has **no cross-embodiment
 pairing term**: the shared latent space emerges from sharing the ITM, FTM and MD weights across
@@ -231,7 +305,7 @@ closes it. That is a regime the paper does not test, so this is an extension, no
 
 **The concrete proposal this points to**, to put to the professor rather than decide alone: rebuild
 the main experiment with a five-step gap and photometric jitter only, which is the first setting in
-which the forward model's target is mostly signal rather than augmentation noise (F33). Cost: the
+which the forward model's target is mostly signal rather than augmentation noise (F27). Cost: the
 Motion Decoder outputs 5 x 18 = 90 dimensions instead of 18, every number becomes incomparable with
 the runs recorded so far, and the copying shortcut the augmentation was there to block has to be
 re-measured rather than assumed away. That is a rebuild of Stage 1's main comparison, so it should
@@ -247,33 +321,33 @@ stricter than what the method claims. The sample-efficiency framing in Step 3 is
 ## Q14. Does behavioural overlap make a channel shareable? (open — three runs deciding it)
 
 The lever list of 2026-08-15 has been worked through and only one item is still standing:
-**make the two robots' behaviour distributions overlap**. Shared supervision is blocked by F45 (no
+**make the two robots' behaviour distributions overlap**. Shared supervision is blocked by F39 (no
 usable frame pairing), architecture was measured to sharpen per-robot codes rather than share them
-(F43, F46), three invariance methods moved nothing (F44), and leg-removal bodies read as the body
-they were cut from (F47).
+(F37, F40), three invariance methods moved nothing (F38), and leg-removal bodies read as the body
+they were cut from (F41).
 
 **Overlap in speed alone was tested and did not work.** Five matched speeds gave cross-embodiment
-readouts of -4.16 and -5.60; more diversity gave the trunk more to partition by (F57, F60).
+readouts of -4.16 and -5.60; more diversity gave the trunk more to partition by (F50, F53).
 
 **Overlap across three behaviours now exists** and the untrained answer is still no: on the frozen
-encoder, forward transfers at **+0.36 +/- 0.10** and lateral and yaw sit at zero (F76). But the
+encoder, forward transfers at **+0.36 +/- 0.10** and lateral and yaw sit at zero (F67). But the
 frozen encoder is the *before* condition, and forward speed itself reads **0.31 frozen against
-0.85-0.92 trained** (F66) -- so a frozen zero does not decide the question (F77).
+0.85-0.92 trained** (F59) -- so a frozen zero does not decide the question (F68).
 
 **What is open**, in the order it gets answered:
 
 1. **Does training on yaw make it transfer?** Three arms running: control, body head forward-only,
    body head forward+yaw. The middle arm is what makes the third attributable to the channel rather
    than to the new dataset.
-2. ~~**Does F66's 0.85-0.92 survive the frame-rate fix?**~~ **Settled, and re-asking it is a trap.**
+2. ~~**Does F59's 0.85-0.92 survive the frame-rate fix?**~~ **Settled, and re-asking it is a trap.**
    The runs give +0.701 / +0.667 by clip and +0.610 / +0.573 by condition, at the top of the old
    range and under a harder test -- but **the two datasets are not comparable** and three attempts to
-   force it each found a different confound (F84). The claim rests on the controlled within-dataset
+   force it each found a different confound (F74). The claim rests on the controlled within-dataset
    comparison instead: -16.7 to +0.70 from the body term alone.
-3. **Why do the channels compete?** Adding yaw costs forward 68% (F83). Three explanations were
+3. **Why do the channels compete?** Adding yaw costs forward 68% (F73). Three explanations were
    tested and rejected -- yaw carrying less signal (identical signal share, 0.86 both), a mismatched
-   length scale (an affine rescale cancels against a standardised target, F77), and a longer
-   smoothing window (degrades monotonically, F83). **Capacity is the remaining candidate and the
+   length scale (an affine rescale cancels against a standardised target, F68), and a longer
+   smoothing window (degrades monotonically, F73). **Capacity is the remaining candidate and the
    cheapest test is one training run with a wider body head**, data held fixed.
 4. **Is twelve behaviours enough to resolve effects of this size?** Held out by condition, about
    four test behaviours remain and the spreads run +/- 0.2 to 1.3. If the arms disagree weakly the
@@ -282,16 +356,16 @@ frozen encoder is the *before* condition, and forward speed itself reads **0.31 
    moment arm of a turn is where the feet meet the ground, and the two scales differ 4.4x in the
    ratio between the robots. It does not change what transfers -- an affine rescale cancels against
    a standardised target -- but it does change how much the channel identifies the robot, 0.637
-   against 0.571 (F77). Switching means re-solving the four `--spin` levels first, since the
+   against 0.571 (F68). Switching means re-solving the four `--spin` levels first, since the
    collection is matched on the height version.
 6. **Does pretraining on two embodiments make a third one cheap?** Unanswerable as things stand and
    the most valuable thing left. LAC-WM's scaling result -- downstream performance rising with the
    number of pretraining embodiments -- needs at least three, and we have two, so it is declared as
-   a limitation rather than attempted (F82, step 2o). A third body chosen for **incomparable
+   a limitation rather than attempted (F99, step 2o). A third body chosen for **incomparable
    topology** (a biped, or a different leg count) rather than for convenience would turn the claim
    from "these two robots transfer" into "these two are pretraining data". Costs what the B1 cost.
 7. **Is lateral permanently out of the target?** It fails the robot gate at 0.68 even with the
-   frame corrected, and half the B1 clips carry a per-policy lateral artefact (F79, F80). Excluded
+   frame corrected, and half the B1 clips carry a per-policy lateral artefact (F70, F71). Excluded
    for now; the exclusion is a measurement, not a principle.
 
 ---
@@ -309,7 +383,7 @@ frozen encoder is the *before* condition, and forward speed itself reads **0.31 
 **Lean:** (B) is the headline if we can produce a 4-leg walker (see Q2); (A) is the
 guaranteed-feasible fallback and a good first result. Likely do (A) first, then (B).
 
-**Update 2026-08-14 (F47): (B) was built, but the body chosen does not test composition.**
+**Update 2026-08-14 (F41): (B) was built, but the body chosen does not test composition.**
 The 4-leg is the *base* insect with the middle legs removed, so its geometry is `c10f10t10`'s --
 a training body's -- and its commands are that body's corner columns bit-identically. The latent
 sits 0.578 from the base body's against a chance of 0.981, so the model reads it as the base body
@@ -328,11 +402,11 @@ compositional claim needs at least two.
 
 **Cheapest correct fix, one collection run and no new tooling**: ghost-remove the middle legs from
 `c08f09t09`, already withheld from Stage 2 training, so geometry and leg count are both unseen.
-Only middle-loss walks (front-loss tips, hind-loss rears, F44), so the variant is forced, and the
+Only middle-loss walks (front-loss tips, hind-loss rears, F38), so the variant is forced, and the
 body must be rendered before collecting -- a geometry change can break a gait that worked on the
 base scene.
 
-**DONE 2026-08-14 (F48).** `data/ik_4leg_c08f09t09_clean10`, 10 clips from a 30-episode sweep.
+**DONE 2026-08-14 (F41).** `data/ik_4leg_c08f09t09_clean10`, 10 clips from a 30-episode sweep.
 The margin is **unchanged**: 2.85x against the base body's 2.86x (1.91 +/- 0.08 deg against a
 random backbone's 5.45 +/- 0.16). Geometry and leg count are now both novel and the claim holds.
 **Rows 1-3 of the table above are satisfied; rows 4 and 5 -- gait and appearance -- are not.**
@@ -422,7 +496,7 @@ comes from noise injection, not from the network being stochastic.
 | camera at run time | required | not required -- the student reads proprioception |
 
 **The world model is not the part in doubt.** Deleting the rollout from the scoring rule costs
-**24 points** of selection accuracy and lands within five of not using the goal at all (F100), so
+**24 points** of selection accuracy and lands within five of not using the goal at all (F90), so
 it is predicting rather than pattern-matching either way.
 
 **Decided 2026-08-28: teacher-student, and the reason is not efficiency.** Sampling `(vx, vy, wz)`
@@ -523,13 +597,13 @@ the wrong claim to put in front of a committee.
 
 | reported as | what was actually tested | what has never been tried |
 |---|---|---|
-| turning does not cross embodiments | the planner, the library, the scoring, three warm-start settings | **yaw has never been in the training target.** F83 moved it from -5.23 to +0.37 by supervising it, on a different checkpoint family, and that was never carried into a loop |
+| turning does not cross embodiments | the planner, the library, the scoring, three warm-start settings | **yaw has never been in the training target.** F73 moved it from -5.23 to +0.37 by supervising it, on a different checkpoint family, and that was never carried into a loop |
 | sideways is at or below chance | nine hypotheses: library coarseness, score blindness, amplitude, switch rate, gait phase, lock-in, camera angle, condition labels, joint replay | **all nine are on the deployment side.** Lateral has never been in the training target either |
 | the candidate library is recorded clips, so "a camera is the only thing it needs" is not earned | -- | **`rollout_b1_mujoco.py` takes `--vx --vy --wz`**, so a B1 library can be sampled without P'Jo's CPG -- but see below: this changes the prior rather than removing it |
 
 **The first two collapse into one run**: stage 2 on `beh12_c10f10t10_flat` + `beh12_b1_flat` with
 `body_channels ['0','1','2']` against a `lambda_body 0.0` control, then stage 3 and the loop on
-both. It is the run that would carry F83's mechanism into a controller for the first time, and it
+both. It is the run that would carry F73's mechanism into a controller for the first time, and it
 answers turning and sideways together. Heavy -- fibo7.
 
 **The third is cheap and runnable here, and it does not do what it first appears to.** Sampling
@@ -591,15 +665,15 @@ are in `FINDINGS.md` at the finding named; nothing is repeated here.
 
 | | question | what settled it | finding |
 |---|---|---|---|
-| **Q5** | Does removing the body code from `z` make the decoder read the frame? | Yes, and it does not help: the decoder used the frame 2x more and transfer got 1.21x worse. | F21 |
-| **Q6** | Can the decoder be given the view that works? | Yes, and it uses it 7.6x less. Access was never the constraint. | F22 |
-| **Q7** | Is the objective the constraint? | Yes. `lambda_cross` is the only intervention of six that improved transfer. | F24 |
-| **Q8** | What is the latent for, once the decoder stops needing it? | Gait, and only gait: 88.7% of its variance, with body down to 1.2%. | F26 |
-| **Q9** | Does the corrected target make the latent do its job? | It triples the transition's contribution (11% to 36%) and changes transfer not at all. The constraint is the data, not the target. | F29, F31 |
-| **Q10** | Is the forward model worth keeping? | Yes. It rolls the world forward 1.2-1.5x better than a frozen world out to ten steps; we had only ever scored it on a task the method does not assign it. | F32 |
-| **Q17** | Does the 4-leg body test a new embodiment? | No. The latent places it 0.578 from the body it was cut from, against a chance level of 0.981. It tests a new action space; the B1 held out entirely is the real test. | F47 |
-| **Q15** | Does anything transfer to a genuinely different robot? | Yes, and all of it travels through `z`: 1.28x on a held-out B1, dropping to 0.98x -- random weights -- when the latent is zeroed. The decoder's use of the frame carries nothing. | F50 |
-| **Q16** | Can the forward model be made to work on a new robot? | Not frozen (0.57-0.71x), and coverage does not fix it (5-8%). But **one target clip clears break-even and nine clear every horizon tested**, about 7x fewer clips than from cold. The claim is cheap adaptation, not zero-shot transfer. | F51, F52 |
+| **Q5** | Does removing the body code from `z` make the decoder read the frame? | Yes, and it does not help: the decoder used the frame 2x more and transfer got 1.21x worse. | F18 |
+| **Q6** | Can the decoder be given the view that works? | Yes, and it uses it 7.6x less. Access was never the constraint. | F19 |
+| **Q7** | Is the objective the constraint? | Yes. `lambda_cross` is the only intervention of six that improved transfer. | F21 |
+| **Q8** | What is the latent for, once the decoder stops needing it? | Gait, and only gait: 88.7% of its variance, with body down to 1.2%. | F22 |
+| **Q9** | Does the corrected target make the latent do its job? | It triples the transition's contribution (11% to 36%) and changes transfer not at all. The constraint is the data, not the target. | F25, F26 |
+| **Q10** | Is the forward model worth keeping? | Yes. It rolls the world forward 1.2-1.5x better than a frozen world out to ten steps; we had only ever scored it on a task the method does not assign it. | F46 |
+| **Q17** | Does the 4-leg body test a new embodiment? | No. The latent places it 0.578 from the body it was cut from, against a chance level of 0.981. It tests a new action space; the B1 held out entirely is the real test. | F41 |
+| **Q15** | Does anything transfer to a genuinely different robot? | Yes, and all of it travels through `z`: 1.28x on a held-out B1, dropping to 0.98x -- random weights -- when the latent is zeroed. The decoder's use of the frame carries nothing. | F43 |
+| **Q16** | Can the forward model be made to work on a new robot? | Not frozen (0.57-0.71x), and coverage does not fix it (5-8%). But **one target clip clears break-even and nine clear every horizon tested**, about 7x fewer clips than from cold. The claim is cheap adaptation, not zero-shot transfer. | F44, F45 |
 
 ---
 

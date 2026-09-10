@@ -10,11 +10,11 @@
 stage-1 pretrain and carries no projector; the missing parts were fitted separately and each is the
 one the gates were measured on:
 
-    itm, ftm     `beh12_ego/best.pt`      -- GATE B and GATE C (F172) are this model
-    projector    `projector_ego.pt`       -- GATE D2 (F173), rollout gap ratio 0.355 / 0.169
-    md           `md_refit.pt`            -- F174, held-out R2 0.847 insect / 0.778 B1
+    itm, ftm     `beh12_ego/best.pt`      -- GATE B and GATE C (F157) are this model
+    projector    `projector_ego.pt`       -- GATE D2 (F158), rollout gap ratio 0.355 / 0.169
+    md           `md_refit.pt`            -- F159, held-out R2 0.847 insect / 0.778 B1
 
-**Adapting with `wm/adapt3` first would put the F145 gate on a model nothing has measured**, and
+**Adapting with `wm/adapt3` first would put the F136 gate on a model nothing has measured**, and
 stage 3's seed ordering is still unresolved. Every number the gate will be read against was taken on
 these exact weights, so they are what gets assembled.
 

@@ -2,16 +2,16 @@
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/proj_z_delta_ablation.py
 
-**Why this is the test that actually decides the fix, not F192 alone.** F192 showed z + delta
+**Why this is the test that actually decides the fix, not F177 alone.** F177 showed z + delta
 underperforms z alone -- but that z came from `ITM(e_t, e_t+1)`, the true observed transition, an
-oracle unavailable at planning time. Ranking uses `proj(action)` instead (F191's "projected z").
-proj_z alone already reads R2 0.791 (F191) -- close to real_z's 0.781. What was never checked is
+oracle unavailable at planning time. Ranking uses `proj(action)` instead (F176's "projected z").
+proj_z alone already reads R2 0.791 (F176) -- close to real_z's 0.781. What was never checked is
 whether COMBINING proj_z with delta hurts the same way combining real_z with delta did. If it does,
 the state-head fix (drop delta, keep z) is confirmed for the path that is actually deployed. If
-proj_z + delta does NOT show the same drop, the F192 finding may be specific to the oracle z and
+proj_z + delta does NOT show the same drop, the F177 finding may be specific to the oracle z and
 would not justify the architecture change on its own.
 
-Same data, same held-out-by-clip split, same kNN probe as F190/F191/F192.
+Same data, same held-out-by-clip split, same kNN probe as F175/F176/F177.
 
 Diagnosis only; trains nothing.
 """
@@ -124,7 +124,7 @@ def main():
         score(key, Xtr, str_, Xte, ste)
 
     print("\nproj_z alone vs proj_z+mean_pool -> does combining hurt on the DEPLOYED z too,")
-    print("                                      or was F192's drop specific to the oracle ITM-z")
+    print("                                      or was F177's drop specific to the oracle ITM-z")
 
 
 if __name__ == "__main__":

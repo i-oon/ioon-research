@@ -1,6 +1,6 @@
-"""Does the ALREADY-TRAINED z-only state head (F192, `state_use_delta=false`,
-`wm/runs/beh12_state_zonly/teacher_zonly.pt`) clear the action-lever bar this session's whole F198
-arc has used -- a measurement F192's own real-retrain evaluation (`condition_confusion.py` ranking)
+"""Does the ALREADY-TRAINED z-only state head (F177, `state_use_delta=false`,
+`wm/runs/beh12_state_zonly/teacher_zonly.pt`) clear the action-lever bar this session's whole F180
+arc has used -- a measurement F177's own real-retrain evaluation (`condition_confusion.py` ranking)
 never ran? No training here; this is a free measurement on an existing checkpoint.
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/zonly_action_lever_check.py
@@ -50,7 +50,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
 print(f"loading {CKPT} -- the ALREADY-TRAINED z-only (state_use_delta=false) state head, jointly "
-     "trained on hexapod+B1 (F192)...")
+     "trained on hexapod+B1 (F177)...")
 ck, cfg, itm, ftm, md, proj = load_teacher(CKPT, device)
 print(f"cfg.state_use_delta = {getattr(cfg, 'state_use_delta', 'MISSING')}")
 channels = [int(c) for c in cfg.body_channels]

@@ -14,7 +14,7 @@ proprioception come from the MuJoCo rollout (where the policy actually walks).
 # clip carries its own background because the camera is never pinned, and a 24-degree view reaches
 # the far edge of the 15 m floor. `--cam_fov 24 --spawn 0 0 --floor_scale 3` is what
 # `data/allocentric/beh12_b1_flat` was built with, and anything rendered differently cannot be mixed with it
-# (F113). Pass `--cam_fov 15 --floor_scale 0` to reproduce the old, defective framing.
+# (F104). Pass `--cam_fov 15 --floor_scale 0` to reproduce the old, defective framing.
 import argparse
 import os
 import time
@@ -54,7 +54,7 @@ def main():
                          "edge. **`sim.scaleObjects` grows a box without moving its centre**, so a "
                          "3x floor lifts its surface from z=0.000 to z=+0.200 and the robot stands "
                          "20 cm below ground with its feet buried -- which is what the first "
-                         "attempt did. The surface is put back at z=0 here (F113).")
+                         "attempt did. The surface is put back at z=0 here (F104).")
     ap.add_argument("--cam_back", type=float, default=1.0,
                     help="multiply the camera's distance from the robot, keeping the scene's "
                          "authored angle. **Kept because it was tried and does not work, and "
@@ -63,14 +63,14 @@ def main():
                          "moving along the optical axis shrinks the robot without moving it in "
                          "frame, and the sideways clips stayed 100%% clipped at 1.7x. Widening "
                          "the angle is the only motion that adds room on the side the robot is "
-                         "leaving (F113). Left at 1.0 for every collected set.")
+                         "leaving (F104). Left at 1.0 for every collected set.")
     ap.add_argument("--cam_fov", type=float, default=24.0,
                     help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
                          "identical 15-deg cameras, and that is not the same as an identical view.** "
                          "The field is 2.11 m wide at the robot; the B1 is 1.29 m across and travels "
                          "up to 1.56 m, needing 2.85 m, while the insect needs 1.75 m and fits. "
                          "Matched camera parameters produced a quadruped clipped in 36-100%% of "
-                         "frames beside an insect clipped in none (F113). What has to match is that "
+                         "frames beside an insect clipped in none (F104). What has to match is that "
                          "both robots stay whole, not that the two numbers agree.")
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0), metavar=("X", "Y"),
                     help="replay from this world x y; use the same value as the insect collector")
@@ -199,7 +199,7 @@ def main():
         # `head - abdomen` and therefore always looks where the body points.
         #
         # `heading()` carries the B1's (w,x,y,z)-with-x-forward convention, which is not guessable
-        # and has cost this project a week before (F71, F117).
+        # and has cost this project a week before (F62, F108).
         if args.ego_forward is not None:
             fwd = args.ego_forward
         else:

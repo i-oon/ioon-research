@@ -36,7 +36,7 @@
             b1  Delta-state R2 +0.091
     leak on trained head's own pooled-delta input: 0.940  (pre-fine-tune 0.704; un-corrected pooled delta was 0.961-0.977; chance is the majority class fraction, ~0.50-0.51 with balanced embodiments)
 
-  READ: F64's collapse was -10.5/-57.2 -- catastrophically negative, not merely lower.
+  READ: F57's collapse was -10.5/-57.2 -- catastrophically negative, not merely lower.
   Both R2 well above 0 and comparable across embodiments, with leak still near chance,
   means transfer held under real gradient pressure. Either R2 deeply negative or leak
   reopening (rising back toward the un-corrected 0.977-0.961) means it did not.

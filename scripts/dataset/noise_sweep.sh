@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# F164. The largest command noise that still leaves twelve behaviours -- and does it still work?
+# F150. The largest command noise that still leaves twelve behaviours -- and does it still work?
 #
 #   bash scripts/dataset/noise_sweep.sh          # CoppeliaSim GUI, exactly ONE instance
 #
-# F163 found the redundancy is data-side: 0.05 rad of correlated command noise took single-frame
+# F149 found the redundancy is data-side: 0.05 rad of correlated command noise took single-frame
 # action R2 from 0.764 to 0.196 and doubled the pair-minus-single gap from +0.084 to +0.173. **And
 # it destroyed the dataset**: 24 of 66 condition pairs fell below 2x their own spread, against 0 of
 # 66 on the clean arm, so the twelve conditions stopped being twelve behaviours.
@@ -13,7 +13,7 @@
 # has not found anything -- it has collected one noisy condition twelve times. Read the separability
 # block first and only then the R2 table. This ordering is the point of the script.
 #
-# **A clean arm is recollected here even though F163 has one**, because F163's was a different
+# **A clean arm is recollected here even though F149 has one**, because F149's was a different
 # sitting. If it reproduces 0.764 / +0.084 that also retires the worry about comparing across
 # sittings; if it does not, that is worth knowing before anything else is read.
 #

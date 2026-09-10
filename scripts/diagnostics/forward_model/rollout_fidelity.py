@@ -5,7 +5,7 @@
         --embodiment hexapod
 
 **The bar a distilled policy would be trained against, and it is tighter than any measured so far.**
-F126 asked whether a rollout ranks behaviours correctly, which a model can do while its predicted
+F117 asked whether a rollout ranks behaviours correctly, which a model can do while its predicted
 state drifts anywhere. Teacher-student trains on states the model *imagines*, so what matters is
 whether the imagined embedding is the one the robot would actually have been in.
 
@@ -23,7 +23,7 @@ Three questions, deliberately separated, because the fix differs for each:
                     that stays near recorded behaviour is unaffected.
 
 **Actions are teacher-forced from the ITM on the true frames**, so this measures the forward model
-alone; the projector's own limits (F97) would otherwise be folded in.
+alone; the projector's own limits (F87) would otherwise be folded in.
 """
 import argparse
 import os
@@ -54,14 +54,14 @@ def main():
     ap.add_argument("--stride", type=int, default=5)
     ap.add_argument("--latent", choices=("itm", "projector"), default="itm",
                     help="which latent drives the roll. **`projector` is the path a distilled "
-                         "policy would use** and the one F119's `/mean-z` was measured on; `itm` "
+                         "policy would use** and the one F110's `/mean-z` was measured on; `itm` "
                          "is the teacher-forced upper bound. The forward model is action-sensitive "
-                         "only inside the projector's region (F139), so a sweep has to report the "
+                         "only inside the projector's region (F130), so a sweep has to report the "
                          "projector path or it measures a subspace nothing drives.")
     ap.add_argument("--mean_z", action="store_true",
                     help="also roll on a **mean latent**, and on two of them, because which mean "
                          "is used changes the answer by a factor of two. `wm/adapt3` averages "
-                         "latents from across the dataset, which is what F119's 0.49 measures: the "
+                         "latents from across the dataset, which is what F110's 0.49 measures: the "
                          "real action against an *average behaviour*. Averaging within the clip "
                          "instead asks whether the action matters *inside* one behaviour, and on "
                          "the same checkpoint that reads 0.95. **The second is the stricter "

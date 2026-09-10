@@ -14,7 +14,7 @@ different and more basic question: **does the raw, frozen V-JEPA2 embedding pair
 achieved physical change, independent of whether any of this project's trained heads can read it
 out?**
 
-This follows the exact methodology F190 already used successfully for the hexapod's fine
+This follows the exact methodology F175 already used successfully for the hexapod's fine
 speed-magnitude signal (`embedding_speed_ceiling.py`: raw embedding delta, off-the-shelf probes,
 held out by clip) -- applied here to B1, to the FULL 3-channel body-motion target, and to the
 actual quantity this arc cares about: the CHANGE (`bm_next - bm_t`), not just the achieved value.
