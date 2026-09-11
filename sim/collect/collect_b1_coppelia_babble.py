@@ -89,6 +89,26 @@ def babble_action_at(t, freq, thigh_amp, calf_amp, phase_lag, bias, turn_bias, s
     return action
 
 
+def generic_cpg_action_at(t, frequency, amplitudes, phases, noise, rng):
+    """Apply one morphology-agnostic oscillator equation independently to all 12 joints."""
+    return (amplitudes * np.sin(2.0 * np.pi * frequency * t + phases)
+            + rng.normal(0.0, noise, size=12)).astype(np.float32)
+
+
+def generic_stance_swing_action_at(t, frequency, amplitude, calf_ratio, noise, rng):
+    """Generic quadruped diagonal trot with an explicit planted/swing support cycle."""
+    action = np.zeros(12, np.float32)
+    leg_phase = np.asarray([0.0, np.pi, np.pi, 0.0])  # FL, FR, RL, RR
+    ramp = min(1.0, max(0.0, t / 1.0))
+    for li, offset in enumerate(leg_phase):
+        phase = 2.0 * np.pi * frequency * t + offset
+        action[li] = ramp * 0.1 * amplitude * np.sin(phase + np.pi / 2.0)
+        action[4 + li] = ramp * -amplitude * np.sin(phase)
+        action[8 + li] = ramp * calf_ratio * amplitude * max(0.0, np.sin(phase - np.pi / 2.0))
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--steps", type=int, default=160, help="matches b1_coppelia_cpg_controller.py's "
@@ -116,6 +136,21 @@ def main():
     ap.add_argument("--pivot-amp", type=float, default=0.0, help="genuine turning, hip channel, "
                     "front-vs-rear opposite sign, ONE side only -- fraction of --thigh-amp")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--cpg-mode", choices=("designed", "generic"), default="designed")
+    ap.add_argument("--generic-freq-min", type=float, default=0.5)
+    ap.add_argument("--generic-freq-max", type=float, default=2.0)
+    ap.add_argument("--generic-amp-min", type=float, default=0.10)
+    ap.add_argument("--generic-amp-max", type=float, default=0.80)
+    ap.add_argument("--generic-frequency", type=float, default=None,
+                    help="fixed shared frequency for a precommitted controlled grid")
+    ap.add_argument("--generic-amplitude", type=float, default=None,
+                    help="fixed shared base amplitude for a precommitted controlled grid")
+    ap.add_argument("--generic-phase-layout", choices=("random", "trot"), default="random",
+                    help="trot is one fixed diagonal quadruped phase table, never a behavior mode")
+    ap.add_argument("--generic-joint-role-layout", choices=("equal", "quadruped-trot"),
+                    default="equal", help="quadruped-trot uses generic hip/thigh/calf amplitude roles")
+    ap.add_argument("--generic-gait-shape", choices=("sine", "stance-swing"), default="sine")
+    ap.add_argument("--generic-calf-ratio", type=float, default=1.5)
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--pid-p", type=float, default=300.0, help="verified stable value, see "
                     "q22_handoff_prompt.md")
@@ -130,6 +165,8 @@ def main():
                     help="mount /vjepa_cam using the exact egocentric dataset convention")
     ap.add_argument("--ego-seed", type=int, default=0,
                     help="paired room/ground appearance seed for --ego")
+    ap.add_argument("--screen-only", action="store_true",
+                    help="skip camera/NPZ output; retain the YAML outcome for a fast parameter screen")
     ap.add_argument("--fall-height", type=float, default=0.35, help="same criterion "
                     "b1_coppelia_cpg_controller.py and collect_b1_cpg_babble.py both use")
     args = ap.parse_args()
@@ -151,9 +188,12 @@ def main():
     force_sensors = {sim.getObjectAlias(h): h
                      for h in sim.getObjectsInTree(sim.handle_scene, sim.object_forcesensor_type)}
     feet = [force_sensors[name] for name in FOOT_ALIASES_SDK]
-    cam = sim.getObject(SENSOR_ALIAS)
-    sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
-                            float(np.deg2rad(args.cam_fov)))
+    if args.screen_only and args.ego:
+        raise ValueError("--screen-only and --ego are mutually exclusive; rerun survivors with --ego")
+    cam = None if args.screen_only else sim.getObject(SENSOR_ALIAS)
+    if cam is not None:
+        sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle,
+                                float(np.deg2rad(args.cam_fov)))
 
     ego_room = None
     if args.ego:
@@ -215,12 +255,49 @@ def main():
 
     dt = float(sim.getSimulationTimeStep())
     rng = np.random.default_rng(args.seed)
+    generic_parameters = None
+    if args.cpg_mode == "generic":
+        if not (0 <= args.generic_amp_min <= args.generic_amp_max <= 1.0):
+            raise ValueError("generic amplitudes must satisfy 0 <= min <= max <= 1")
+        if not (0 < args.generic_freq_min <= args.generic_freq_max):
+            raise ValueError("generic frequencies must satisfy 0 < min <= max")
+        if args.generic_phase_layout == "trot":
+            # IL order is four hips, four thighs, four calves; within each group it is
+            # FL, FR, RL, RR. FL+RR and FR+RL are the two fixed diagonal pairs. Joint-type
+            # offsets create one cyclic leg motion without adding behavior-specific mechanisms.
+            leg_phase = np.asarray([0.0, np.pi, np.pi, 0.0])
+            phases = np.concatenate((leg_phase + np.pi / 2.0,
+                                     leg_phase,
+                                     leg_phase - np.pi / 2.0))
+        else:
+            phases = rng.uniform(-np.pi, np.pi, 12)
+        base_amplitude = (float(args.generic_amplitude) if args.generic_amplitude is not None else
+                          float(rng.uniform(args.generic_amp_min, args.generic_amp_max)))
+        if args.generic_joint_role_layout == "quadruped-trot":
+            amplitudes = base_amplitude * np.asarray([0.1] * 4 + [1.0] * 4 + [1.0] * 4)
+        else:
+            amplitudes = np.full(12, base_amplitude)
+        generic_parameters = {
+            "frequency": (float(args.generic_frequency) if args.generic_frequency is not None else
+                          float(rng.uniform(args.generic_freq_min, args.generic_freq_max))),
+            "amplitudes": amplitudes,
+            "phases": phases,
+        }
     positions, quaternions, uprights, joint_errors = [], [], [], []
-    actions, targets, actuals, contacts, frames = [], [], [], [], []
+    actions, targets, actuals, contacts, foot_positions, frames = [], [], [], [], [], []
     for step in range(args.steps):
-        action = babble_action_at(step * dt, args.freq, args.thigh_amp, args.calf_amp,
-                                  args.phase_lag, args.bias, args.turn_bias, args.strafe_amp,
-                                  args.pivot_amp, args.noise, rng)
+        if args.cpg_mode == "generic" and args.generic_gait_shape == "stance-swing":
+            action = generic_stance_swing_action_at(
+                step * dt, frequency=generic_parameters["frequency"],
+                amplitude=base_amplitude, calf_ratio=args.generic_calf_ratio,
+                noise=args.noise, rng=rng)
+        elif args.cpg_mode == "generic":
+            action = generic_cpg_action_at(step * dt, noise=args.noise, rng=rng,
+                                           **generic_parameters)
+        else:
+            action = babble_action_at(step * dt, args.freq, args.thigh_amp, args.calf_amp,
+                                      args.phase_lag, args.bias, args.turn_bias, args.strafe_amp,
+                                      args.pivot_amp, args.noise, rng)
         target = clip_sdk_targets(il_to_sdk(DEFAULT_IL + ACTION_SCALE * action))
         for handle, value in zip(joints, target):
             sim.setJointTargetPosition(handle, float(value))
@@ -239,10 +316,14 @@ def main():
         targets.append(target.copy())
         actuals.append(actual.copy())
         contacts.append((touch_sdk[TOUCH_SDK_TO_IL] > 1.0).astype(np.float32))
-        sim.handleVisionSensor(cam)
-        buf, res = sim.getVisionSensorImg(cam)
-        frame = np.frombuffer(buf, dtype=np.uint8).reshape(res[1], res[0], 3)
-        frames.append(np.flipud(frame).copy())
+        foot_positions.append(np.asarray([
+            sim.getObjectPosition(h, sim.handle_world) for h in feet
+        ], dtype=np.float32)[TOUCH_SDK_TO_IL])
+        if cam is not None:
+            sim.handleVisionSensor(cam)
+            buf, res = sim.getVisionSensorImg(cam)
+            frame = np.frombuffer(buf, dtype=np.uint8).reshape(res[1], res[0], 3)
+            frames.append(np.flipud(frame).copy())
         if step % 20 == 0:
             print(f"step={step:4d} xyz=({pos[0]:+.3f},{pos[1]:+.3f},{pos[2]:.3f}) "
                   f"up.z={upright:.3f} max|qerr|={joint_errors[-1]:.3f}", flush=True)
@@ -284,12 +365,23 @@ def main():
         "view": "egocentric" if args.ego else "allocentric",
         "claim_scope": "designed_cpg_primitives_not_undirected_babble",
     })
+    if args.cpg_mode == "generic":
+        config["claim_scope"] = "generic_normalized_joint_cpg"
+        config["sampled_cpg"] = {
+            "frequency": generic_parameters["frequency"],
+            "base_amplitude": base_amplitude,
+            "amplitudes": [float(v) for v in generic_parameters["amplitudes"]],
+            "phases": [float(v) for v in generic_parameters["phases"]],
+        }
     yaml_path = str(Path(out).with_suffix(".yaml"))
     with open(yaml_path, "w", encoding="utf-8") as fh:
         yaml.safe_dump(config, fh, sort_keys=False)
     print(f"saved run record: {yaml_path}")
-    if fell:
+    if fell and args.cpg_mode != "generic":
         print("  FELL -- rollout NPZ discarded; YAML retained for survival accounting")
+        return
+    if args.screen_only:
+        print("  SCREEN ONLY -- stable outcome recorded; rerun selected config with real frames")
         return
 
     np.savez_compressed(
@@ -297,13 +389,15 @@ def main():
         base_quat=quaternions.astype(np.float32), uprights=uprights,
         joint_errors=np.asarray(joint_errors), action=np.asarray(actions),
         body_motion=body_motion, foot_contact=np.asarray(contacts),
+        foot_pos=np.asarray(foot_positions),
         joint_targets=np.asarray(targets), joint_pos=np.asarray(actuals), dt=dt,
         expert_episode=np.int64(0),
-        condition=f"coppelia_babble_f{args.freq}_n{args.noise}_tb{args.turn_bias}"
-                  f"_st{args.strafe_amp}_pv{args.pivot_amp}_s{args.seed}",
+        condition=(f"coppelia_generic_cpg_s{args.seed}" if args.cpg_mode == "generic" else
+                   f"coppelia_babble_f{args.freq}_n{args.noise}_tb{args.turn_bias}"
+                   f"_st{args.strafe_amp}_pv{args.pivot_amp}_s{args.seed}"),
         joint_order_sdk=np.asarray(JOINT_ALIASES_SDK),
         view=np.asarray("egocentric" if args.ego else "allocentric"),
-        ego_seed=np.int64(args.ego_seed))
+        ego_seed=np.int64(args.ego_seed), fell=np.bool_(fell))
     print(f"saved -> {out}")
 
     if args.video:

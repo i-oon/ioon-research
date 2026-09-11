@@ -77,8 +77,68 @@ root, joint initialization, real frames, actions, contacts, and body-frame Froud
 
 It is **pilot infrastructure, not an approved collector**. Existing live-Bullet forward runs reach
 only Froude `0.0080–0.0094` (best earlier run `0.0101`), while useful positive hexapod goals reach
-`0.12–0.19`. Higher amplitude did not improve speed and `0.30–0.40` fell. A blind parameter sweep
-is therefore not justified; improve the controller first.
+`0.12–0.19`. This gap motivates deliberate over-collection with a broader, harder excitation
+envelope: tolerate and record falls, repeat settings, and retain the rare stable high-motion tail.
+Do not confuse this target-aware search with duplicating the same weak settings.
+
+Aggressive pilot completed 2026-09-12: 50 configurations x 3 repetitions, 150 full 160-step
+attempts (`coppelia_aggressive_pilot/{config.yaml,attempts.csv,ranking.csv}`). Overall survival was
+17/150. Forward: 10/60 survived, 8/60 remained forward-dominant, strongest stable forward Froude
+`0.0129`. Lateral: 7/54 survived, but 0/54 were lateral-dominant; target-scale lateral values only
+appeared during falls. Yaw: 0/36 survived. Thus brute over-collection with this open-loop waveform
+did not discover the required high-motion stable tail. The best forward config was rerun with the
+real egocentric setup; two attempts fell and the third survived at forward Froude `0.0100`, saved
+as `coppelia_aggressive_pilot/rendered/best_forward_try3.{npz,mp4,yaml}`. This pilot is screening
+evidence only and must not enter training.
+
+## Claim-honest generic babble rule and pilot (2026-09-12)
+
+The aggressive target-aware/designed-primitive sweep above is **not valid babble for the paper's
+claim**. It remains diagnostic only. Claim-honest babble is fixed to one equation on every
+normalized joint: `A*sin(2*pi*f*t + phase_j) + per_step_noise_j`; no behavior mechanisms,
+demonstrations, retargeting, target-Froude tuning, or outcome-based selection. Every precommitted
+attempt—including falls—must remain recorded. Froude is evaluation after collection, never a
+retention criterion.
+
+Implementation: `sim/collect/collect_b1_coppelia_generic_babble.py`, Bullet only. The first pilot
+was marked invalid because it mistakenly used independent per-joint frequencies. Corrected v2
+uses one shared frequency and amplitude plus per-joint phases and mandatory noise. Its unchanged
+four-seed precommit produced 2 upright and 2 fallen rollouts; all four NPZ/MP4/YAML artifacts were
+retained under `coppelia_generic_pilot_v2/`. Upright motions were weak and uncommanded, with mean
+Froude `[-0.0125,+0.0073,-0.0115]` and `[+0.0044,+0.0031,+0.0077]`. This is pilot evidence only,
+not approved training data.
+
+A subsequent fixed diagonal-trot phase pilot (`coppelia_generic_trot_pilot/`) tested the user's
+approved generic gait-cycle prior at shared `1–3 Hz`, without changing the amplitude distribution,
+seeds, retention, or Froude rules. All 4/4 fell. The equal-amplitude oscillator drives the
+ab/adduction hips as hard as the sagittal joints, causing lateral collapse (`|lateral Froude|
+0.071–0.142`) rather than a walkable trot. Phase coordination alone is therefore insufficient.
+The next possible prior is stronger and must be named honestly: generic **quadruped** joint-role
+structure with small/neutral hips and coordinated thigh/calf motion.
+
+That joint-role pilot (`coppelia_quadruped_trot_pilot/`) was then run with the same four-seed,
+retain-everything rule: hip amplitude `0.1x`, thigh/calf `1x`, diagonal phases, shared `1–3 Hz`.
+Three of four fell; seed 3 stayed upright but shuffled backward at forward Froude `-0.0102`.
+Therefore small hips plus phase offsets still do not make the symmetric sine a walkable gait. The
+remaining missing locomotion prior is an explicit stance/swing shape (e.g. slow planted push plus
+short lifted swing/rectified knee), which is stronger than the same-sine-per-joint premise and must
+be approved and named before testing.
+
+Approved stance/swing follow-up (`coppelia_stance_swing_pilot/`): two precommitted calf-lift ratios
+(`1.5x`, `2.0x`) x four unchanged seeds, rectified swing-only calf lift, 1 s ramp, all outcomes
+retained. Each ratio survived only 1/4 seeds. On the shared stable seed 3, higher lift improved
+forward Froude `0.0121 -> 0.0179` (~48%) with lateral/yaw near zero. This supports higher,
+swing-only calf lift but does not solve robustness or reach the pretraining range. Side-by-side
+allocentric replay: `coppelia_stance_swing_pilot/allocentric/seed3_calf_lift_comparison.mp4`.
+
+Controlled clearance grid (`coppelia_lift_frequency_grid/`): 18 fixed cells over frequency
+`1.5/1.75/2.0 Hz`, amplitude `0.14/0.18/0.22`, calf ratio `2.0/2.5`; 12/18 stayed upright. Best
+stable cell was `1.75 Hz, 0.18, 2.5x`, Froude `[+0.0243,+0.0011,-0.0085]`. Foot telemetry confirms
+the user's visual observation but identifies the mechanism: FL/FR world-height ranges were only
+~`0.4–2.1 mm` while rear ranges were ~`38–44 mm`, despite similar actual calf joint motion on all
+legs. Near the standing pose, front calf angle has almost no vertical leverage; more calf amplitude
+alone cannot fix front clearance. The next controller must reshape front thigh/calf coordination
+or command foot-space lift through IK.
 
 ## Required next work
 

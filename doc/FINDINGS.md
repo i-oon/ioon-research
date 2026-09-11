@@ -9743,8 +9743,15 @@ robot's first motion comes from without a recorded library and without reinforce
 point. And whether a repaired forward model would rescue candidate scoring, which F126 showed does
 not need a rollout at all.
 
-**Status: plan. Nothing here is measured.** The three-channel pretraining run it builds on is
-complete and evaluated (F125, F127).
+**Status: RUN, and it failed (F141).** This plan was executed in full -- the wiring checks, two
+short calibration runs, then the pre-registered fifty-epoch from-scratch rebuild on com7 -- and the
+rollout diverged past the frozen-frame baseline by a factor of four starting at horizon 2, worse
+than the pre-registered failure case, not better. A lag-3 frameskip follow-up (F141's own
+follow-up) was also tried and also failed. **Read F141 for the actual outcome and do not treat this
+entry's plan as untried** -- the mechanism found (a one-step prediction loss cannot anchor a
+multi-step hinge, so steps 2+ are unopposed and diverge) and F141's own final reading ("the limit is
+the representation, not the objective -- no frameskip reaches it, and the next move is the encoder
+or the prediction target, not another objective term") supersede everything below this line.
 
 ---
 

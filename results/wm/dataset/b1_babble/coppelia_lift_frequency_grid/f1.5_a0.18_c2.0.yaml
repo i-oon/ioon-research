@@ -1,0 +1,81 @@
+steps: 160
+warmup: 25
+freq: 0.5
+thigh_amp: 0.23
+calf_amp: 0.25
+phase_lag: -1.5707963267948966
+noise: 0.05
+bias: 0.0
+turn_bias: 0.0
+strafe_amp: 0.0
+pivot_amp: 0.0
+seed: 0
+cpg_mode: generic
+generic_freq_min: 0.5
+generic_freq_max: 2.0
+generic_amp_min: 0.1
+generic_amp_max: 0.8
+generic_frequency: 1.5
+generic_amplitude: 0.18
+generic_phase_layout: trot
+generic_joint_role_layout: quadruped-trot
+generic_gait_shape: stance-swing
+generic_calf_ratio: 2.0
+port: 23000
+pid_p: 300.0
+pid_d: 5.0
+out: results/wm/dataset/b1_babble/coppelia_lift_frequency_grid/f1.5_a0.18_c2.0.npz
+video: results/wm/dataset/b1_babble/coppelia_lift_frequency_grid/f1.5_a0.18_c2.0.mp4
+fps: 20.0
+cam_fov: 24.0
+floor_scale: 3.0
+ego: true
+ego_seed: 0
+screen_only: false
+fall_height: 0.35
+scene: sim/env/b1_flat_convex.ttt
+physics_engine: Bullet
+dt: 0.05
+status: upright
+min_height: 0.5197345810283414
+min_upright: 0.9965373998321437
+displacement_m:
+- 0.3248638301030046
+- 0.013169811866338917
+- 0.00024937612724185154
+mean_body_froude:
+- 0.01726500503718853
+- 0.001153933466412127
+- -0.00500570610165596
+dominant_family: forward
+view: egocentric
+claim_scope: generic_normalized_joint_cpg
+sampled_cpg:
+  frequency: 1.5
+  base_amplitude: 0.18
+  amplitudes:
+  - 0.018
+  - 0.018
+  - 0.018
+  - 0.018
+  - 0.18
+  - 0.18
+  - 0.18
+  - 0.18
+  - 0.18
+  - 0.18
+  - 0.18
+  - 0.18
+  phases:
+  - 1.5707963267948966
+  - 4.71238898038469
+  - 4.71238898038469
+  - 1.5707963267948966
+  - 0.0
+  - 3.141592653589793
+  - 3.141592653589793
+  - 0.0
+  - -1.5707963267948966
+  - 1.5707963267948966
+  - 1.5707963267948966
+  - -1.5707963267948966
