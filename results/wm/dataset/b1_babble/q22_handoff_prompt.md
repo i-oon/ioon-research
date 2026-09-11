@@ -91,65 +91,65 @@ real egocentric setup; two attempts fell and the third survived at forward Froud
 as `coppelia_aggressive_pilot/rendered/best_forward_try3.{npz,mp4,yaml}`. This pilot is screening
 evidence only and must not enter training.
 
-## Claim-honest generic babble rule and pilot (2026-09-12)
+## Generic motor-babble contract and pilots (2026-09-12)
 
-The aggressive target-aware/designed-primitive sweep above is **not valid babble for the paper's
-claim**. It remains diagnostic only. Claim-honest babble is fixed to one equation on every
-normalized joint: `A*sin(2*pi*f*t + phase_j) + per_step_noise_j`; no behavior mechanisms,
-demonstrations, retargeting, target-Froude tuning, or outcome-based selection. Every precommitted
-attempt—including falls—must remain recorded. Froude is evaluation after collection, never a
-retention criterion.
+The valid reference is Egocentric VSM: their collector uses a **structured sinusoidal gait seed**
+plus per-step Gaussian action noise. It is not independent random motor targets. We may use the
+same protocol, but not copy their Atlas-specific offsets/amplitudes or their stored gait vector.
 
-Implementation: `sim/collect/collect_b1_coppelia_generic_babble.py`, Bullet only. The first pilot
-was marked invalid because it mistakenly used independent per-joint frequencies. Corrected v2
-uses one shared frequency and amplitude plus per-joint phases and mandatory noise. Its unchanged
-four-seed precommit produced 2 upright and 2 fallen rollouts; all four NPZ/MP4/YAML artifacts were
-retained under `coppelia_generic_pilot_v2/`. Upright motions were weak and uncommanded, with mean
-Froude `[-0.0125,+0.0073,-0.0115]` and `[+0.0044,+0.0031,+0.0077]`. This is pilot evidence only,
-not approved training data.
+The claim-honest B1 collector is therefore a **predeclared generic quadruped CPG family + sampled
+CPG parameters + per-step motor noise**. Its fixed leg phases and hip/thigh/calf roles are a
+generic locomotion prior; it has no requested forward/lateral/yaw command, body-state feedback,
+demonstration, retargeting, or B1 outcome-dependent adjustment. Precommit the parameter
+distribution before collection. Retain every rollout, including falls. Log Froude only for
+post-collection reporting; never use it to select clips or alter a rollout.
 
-A subsequent fixed diagonal-trot phase pilot (`coppelia_generic_trot_pilot/`) tested the user's
-approved generic gait-cycle prior at shared `1–3 Hz`, without changing the amplitude distribution,
-seeds, retention, or Froude rules. All 4/4 fell. The equal-amplitude oscillator drives the
-ab/adduction hips as hard as the sagittal joints, causing lateral collapse (`|lateral Froude|
-0.071–0.142`) rather than a walkable trot. Phase coordination alone is therefore insufficient.
-The next possible prior is stronger and must be named honestly: generic **quadruped** joint-role
-structure with small/neutral hips and coordinated thigh/calf motion.
+Implementation: `sim/collect/collect_b1_coppelia_generic_babble.py` (shared-frequency sine) and
+`sim/collect/collect_b1_coppelia_stance_swing_babble.py` (generic diagonal stance/swing prior),
+Bullet only. The initial independent-frequency pilot is invalid and labelled as such. The corrected
+shared-frequency random-phase pilot (`coppelia_generic_pilot_v2/`) retained all 4 runs: 2 upright,
+2 falls, with weak uncommanded motion. Equal-amplitude diagonal sine (`coppelia_generic_trot_pilot/`)
+fell 4/4 because it excited hip ab/adduction too strongly. A generic quadruped joint-role prior
+(`coppelia_quadruped_trot_pilot/`: hip `0.1x`, thigh/calf `1x`) retained all four runs; one stood
+but shuffled backwards.
 
-That joint-role pilot (`coppelia_quadruped_trot_pilot/`) was then run with the same four-seed,
-retain-everything rule: hip amplitude `0.1x`, thigh/calf `1x`, diagonal phases, shared `1–3 Hz`.
-Three of four fell; seed 3 stayed upright but shuffled backward at forward Froude `-0.0102`.
-Therefore small hips plus phase offsets still do not make the symmetric sine a walkable gait. The
-remaining missing locomotion prior is an explicit stance/swing shape (e.g. slow planted push plus
-short lifted swing/rectified knee), which is stronger than the same-sine-per-joint premise and must
-be approved and named before testing.
+The original generic stance/swing diagnostic retained every result. The controlled 18-cell
+lift/frequency grid had 12 upright runs; its best cell (`1.75 Hz`, amplitude `0.18`, calf ratio
+`2.5`) logged Froude `[+0.0243,+0.0011,-0.0085]`. Foot telemetry explained the weakness: FL/FR
+height varied only ~`0.4–2.1 mm`, versus rear `38–44 mm`; front-calf amplitude alone has little
+vertical leverage at this pose.
 
-Approved stance/swing follow-up (`coppelia_stance_swing_pilot/`): two precommitted calf-lift ratios
-(`1.5x`, `2.0x`) x four unchanged seeds, rectified swing-only calf lift, 1 s ramp, all outcomes
-retained. Each ratio survived only 1/4 seeds. On the shared stable seed 3, higher lift improved
-forward Froude `0.0121 -> 0.0179` (~48%) with lateral/yaw near zero. This supports higher,
-swing-only calf lift but does not solve robustness or reach the pretraining range. Side-by-side
-allocentric replay: `coppelia_stance_swing_pilot/allocentric/seed3_calf_lift_comparison.mp4`.
+**Current working seed:** `collect_b1_coppelia_generic_duty_cycle_babble.py` fixes a generic
+diagonal duty-cycle CPG (65% planted stance, 35% raised return) with the same joint role/phase
+prior and per-step motor noise. It replaced the weak sinusoidal stance movement; it is not a
+forward/lateral/yaw controller. Across 10 live-Bullet development checks, `0.75–2.0 Hz` at
+amplitude `0.18–0.20`, calf ratio `2.5`, all remained upright. A paired rendered run at `1.5 Hz`,
+amplitude `0.18`, seed 0 traveled `0.46 m / 8 s`, with Froude `+0.0253` allocentric and `+0.0261`
+egocentric; see `coppelia_generic_duty_cycle_pilot/`. The higher-amplitude boundary (`0.24+`) fell.
+This makes the motor babble physically usable and honest, but still ~4–5x below the useful
+positive expert/pretraining forward range. These are development diagnostics, **not yet an
+approved training dataset**, because the final parameter distribution must be frozen before
+collection.
 
-Controlled clearance grid (`coppelia_lift_frequency_grid/`): 18 fixed cells over frequency
-`1.5/1.75/2.0 Hz`, amplitude `0.14/0.18/0.22`, calf ratio `2.0/2.5`; 12/18 stayed upright. Best
-stable cell was `1.75 Hz, 0.18, 2.5x`, Froude `[+0.0243,+0.0011,-0.0085]`. Foot telemetry confirms
-the user's visual observation but identifies the mechanism: FL/FR world-height ranges were only
-~`0.4–2.1 mm` while rear ranges were ~`38–44 mm`, despite similar actual calf joint motion on all
-legs. Near the standing pose, front calf angle has almost no vertical leverage; more calf amplitude
-alone cannot fix front clearance. The next controller must reshape front thigh/calf coordination
-or command foot-space lift through IK.
+Structured-sine check (`coppelia_trot_sine_diagnostic/`): explicitly tested the generic CPG the
+user proposed—diagonal leg phase, hip amplitude `0.05–0.10x`, thigh `1x`, swing-only calf
+`2.5x`, with a shared sine on every leg. At the stable setting it reached `+0.021–0.024` forward
+Froude. The calf phase sweep confirmed `-pi/2` is the useful sign: zero phase was stable but only
+`+0.0096`, `+pi/2` moved backward, and `pi` almost stalled. Raising shared amplitude/lift or
+frequency again caused falls. This validates the generic structured CPG form, but not an
+expert-speed gait.
 
 ## Required next work
 
 1. Build a genuinely good Coppelia-native expert controller: feedback/IK or fresh training using
    a trustworthy physics/task reward, not the failed WM reward.
-2. After the controller can reach the goal vocabulary, use the CPG collector only as a
-   randomized **designed-primitive** baseline; do not call it undirected babble.
+2. Freeze one generic CPG parameter distribution before final collection; then collect it without
+   Froude/outcome filtering. This is the no-demonstration babble condition.
 3. Collect expert and babble with identical scene, Bullet version, timestep, initialization,
    camera/room, duration, signs, seeds, and output schema.
-4. Target the measured goal-source vocabulary first: forward `0.12–0.19`, lateral
-   `-0.12–+0.07`; the current set has no useful yaw-dominant goal. Reject weak near-zero clips.
+4. Report the measured goal-source vocabulary alongside babble coverage: forward `0.12–0.19`,
+   lateral `-0.12–+0.07`; current data has no useful yaw-dominant goal. Do not reject babble clips
+   for weak/near-zero Froude.
 5. Render every candidate body/data source for user inspection and keep YAML beside every run.
 6. Fit/reuse a pilot checkpoint, then verify cross-family nearest-neighbour risk in **predicted**
    Froude (`body_head(proj(actions))`). True-Froude margin is not an acceptance substitute.

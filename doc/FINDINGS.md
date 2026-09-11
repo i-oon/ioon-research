@@ -16505,3 +16505,59 @@ Froude values directly as a learning signal rather than only reading them throug
 post-hoc `body_head`. Not started; no script exists yet.
 
 Scripts read: `wm/adapt3.py` (full). Reference: `doc/ref/literature_review3_infonce_modality_gap.md`.
+
+---
+
+### F198. The ConvGRU kill-gate at full training budget: still fails, closing the recurrent-architecture line
+
+**Why this was run.** F180's ConvGRU kill-gate (spatial-preserving recurrence, gap +0.069, best of
+four architecture variants) was the one cell in that arc with real positive evidence -- short of
+the 0.110 bar, but only ever tested on a 2000-iteration probe. Every other fix in this project's
+history (R0, the two non-spatial attempts, the pooled full-stochastic RSSM, F141's ActSWM hinge
+rebuild, F178's counterfactual targets) had already been run at full/exact strength and failed.
+This was the one lead left with headroom to test properly before calling the whole
+recurrent-architecture line closed.
+
+**Method, deliberately narrower than a full pretrain rebuild.** `SpatialRecurrentModel`
+(`wm/models/convgru_ftm.py`, the exact architecture extracted unchanged from the probe) trained
+from scratch for 20,000 iterations (10x the probe) on hexapod only, full 48-clip set, matching
+every prior probe's convention of testing one body at a time rather than jointly training both
+(R0 and the original ConvGRU probe trained B1 only; the full RSSM trained hexapod only -- none
+mixed bodies, to avoid conflating "does recurrence help" with "does joint cross-embodiment
+training help"). This is intentionally NOT the "real build" F180 scoped (ConvGRU wired into
+`wm.train`'s actual FTM slot, with the ITM/reconstruction/body losses it shares) -- that
+commitment is only warranted if this gate clears the bar, the same two-stage discipline every
+prior gate in this arc used.
+
+**Result: gap -0.006, FAIL** -- real median cosine 0.863, mean/generic median cosine 0.869, worse
+than the 2000-iteration probe's +0.069 and further from the 0.110 bar than the probe was.
+
+**A collapse check was run before trusting this**, because training loss reached 0.0000-0.0001 by
+the end -- exactly what this project's `moves` ratio convention exists to catch (a model that
+scores near-zero MSE by predicting no change at all, action-independent). `moves` ratio (predicted
+delta-Froude norm / true delta norm) came back **0.4504**, with per-channel prediction std at
+40-57% of the true std, not near-zero -- the model is genuinely modulating its output with real,
+non-degenerate variation, just under-shooting magnitude. **The near-zero training loss is ordinary
+overfitting on 48 clips over 20,000 iterations, not a collapse artefact, and the FAIL is real.**
+(`scripts/diagnostics/objective_experiments/convgru_collapse_check.py`, written specifically
+because `convgru_full_retrain.py` did not print this check itself and a near-zero loss cannot be
+trusted without it.)
+
+**This closes the recurrent-architecture line.** Counting every variant now tested at real/full
+strength: R0 (pooled GRU, gap +0.036), the ConvGRU probe (spatial+recurrent, +0.069, the best
+short-budget result), the full posterior/prior/KL RSSM (worst scorer measured in this project's
+history), and now full-budget ConvGRU (-0.006, worse than its own probe) -- **recurrence has never
+cleared the bar at any budget, on either body, in any of four architecturally distinct forms.**
+Combined with F141 (hinge) and F178 (counterfactual targets), the objective-level and
+architecture-level fix families for fine action-discrimination are now both exhausted: five
+independent, mechanistically distinct mechanisms tried, all null. Per this project's own standing
+rule for exactly this shape of result (memory `project-status-2026-09-07`, itself now corrected to
+point at the right finding numbers): the next move for this specific wall is writing it up as a
+fully characterized negative result, not a sixth mechanism.
+
+**What this does not close**: whether a from-scratch, full-pretrain-scale, ConvGRU-in-the-real-
+FTM-slot rebuild (with ITM, reconstruction, and body losses trained jointly, as F180 originally
+scoped) would behave differently -- untested, and now not warranted by this evidence, matching
+every prior kill-gate's own logic in this arc.
+
+Scripts: `wm/models/convgru_ftm.py`, `scripts/diagnostics/objective_experiments/{convgru_full_retrain,convgru_collapse_check}.py`. Checkpoint: `wm/runs/convgru_full/convgru_full.pt` (hexapod, 20,000 iterations, BIAS-2).

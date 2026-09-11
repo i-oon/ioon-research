@@ -112,6 +112,61 @@ def generic_stance_swing_action_at(t, frequency, amplitude, calf_ratio, noise, r
     return action
 
 
+def generic_trot_sine_action_at(t, frequency, amplitude, hip_ratio, calf_ratio,
+                                calf_phase, noise, rng):
+    """One structured generic quadruped sine CPG: hip < thigh < swing-only calf.
+
+    All four legs receive exactly the same three-joint waveform, shifted only by the fixed
+    diagonal leg phase.  There is no velocity/turn command or per-leg amplitude adjustment.
+    """
+    action = np.zeros(12, np.float32)
+    leg_phase = np.asarray([0.0, np.pi, np.pi, 0.0])  # FL, FR, RL, RR
+    ramp = min(1.0, max(0.0, t / 1.0))
+    for li, offset in enumerate(leg_phase):
+        phase = 2.0 * np.pi * frequency * t + offset
+        action[li] = ramp * hip_ratio * amplitude * np.sin(phase)
+        action[4 + li] = ramp * -amplitude * np.sin(phase)
+        action[8 + li] = ramp * calf_ratio * amplitude * max(0.0, np.sin(phase + calf_phase))
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
+def generic_duty_cycle_action_at(t, frequency, amplitude, calf_ratio, duty_factor,
+                                 swing_thigh_lift, noise, rng):
+    """Generic diagonal walk CPG: slow planted stroke, fast raised return.
+
+    Each leg uses the same phase waveform.  During the stance fraction, the calf is neutral and
+    the thigh performs a slow stroke; during the remaining swing fraction, the calf follows one
+    positive arch while the thigh returns.  The action contains no requested travel direction or
+    body feedback.  A final collection may randomise its CPG parameters, but must retain every
+    sampled rollout irrespective of its measured result.
+    """
+    if not 0.5 <= duty_factor < 1.0:
+        raise ValueError("generic duty factor must be in [0.5, 1.0)")
+    action = np.zeros(12, np.float32)
+    leg_phase = np.asarray([0.0, 0.5, 0.5, 0.0])  # FL, FR, RL, RR, in cycles
+    ramp = min(1.0, max(0.0, t / 1.0))
+    for li, offset in enumerate(leg_phase):
+        cycle = (frequency * t + offset) % 1.0
+        if cycle < duty_factor:
+            # Planted stroke: front to rear, spread across the longer stance interval.
+            thigh = amplitude * (1.0 - 2.0 * cycle / duty_factor)
+            calf = 0.0
+        else:
+            # Raised return: rear to front, with a single smooth clearance arch.
+            swing = (cycle - duty_factor) / (1.0 - duty_factor)
+            # A common swing-phase thigh bend coordinates the whole serial leg with the knee
+            # arch.  It is deliberately identical for every leg; this is not a front-leg fix.
+            thigh = (amplitude * (-1.0 + 2.0 * swing)
+                      + swing_thigh_lift * amplitude * np.sin(np.pi * swing))
+            calf = calf_ratio * amplitude * np.sin(np.pi * swing)
+        action[li] = ramp * 0.1 * amplitude
+        action[4 + li] = ramp * thigh
+        action[8 + li] = ramp * calf
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--steps", type=int, default=160, help="matches b1_coppelia_cpg_controller.py's "
@@ -152,8 +207,17 @@ def main():
                     help="trot is one fixed diagonal quadruped phase table, never a behavior mode")
     ap.add_argument("--generic-joint-role-layout", choices=("equal", "quadruped-trot"),
                     default="equal", help="quadruped-trot uses generic hip/thigh/calf amplitude roles")
-    ap.add_argument("--generic-gait-shape", choices=("sine", "stance-swing"), default="sine")
+    ap.add_argument("--generic-gait-shape", choices=("sine", "stance-swing", "trot-sine", "duty-cycle"),
+                    default="sine")
     ap.add_argument("--generic-calf-ratio", type=float, default=1.5)
+    ap.add_argument("--generic-hip-ratio", type=float, default=0.05,
+                    help="hip/thigh amplitude ratio for the generic trot-sine CPG")
+    ap.add_argument("--generic-calf-phase", type=float, default=-np.pi / 2.0,
+                    help="calf phase relative to thigh for the generic trot-sine CPG")
+    ap.add_argument("--generic-duty-factor", type=float, default=0.65,
+                    help="fixed stance fraction for the generic duty-cycle CPG")
+    ap.add_argument("--generic-swing-thigh-lift", type=float, default=0.0,
+                    help="uniform swing-only thigh bend as a multiple of base amplitude")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--pid-p", type=float, default=300.0, help="verified stable value, see "
                     "q22_handoff_prompt.md")
@@ -293,6 +357,19 @@ def main():
             action = generic_stance_swing_action_at(
                 step * dt, frequency=generic_parameters["frequency"],
                 amplitude=base_amplitude, calf_ratio=args.generic_calf_ratio,
+                noise=args.noise, rng=rng)
+        elif args.cpg_mode == "generic" and args.generic_gait_shape == "trot-sine":
+            action = generic_trot_sine_action_at(
+                step * dt, frequency=generic_parameters["frequency"],
+                amplitude=base_amplitude, hip_ratio=args.generic_hip_ratio,
+                calf_ratio=args.generic_calf_ratio, calf_phase=args.generic_calf_phase,
+                noise=args.noise, rng=rng)
+        elif args.cpg_mode == "generic" and args.generic_gait_shape == "duty-cycle":
+            action = generic_duty_cycle_action_at(
+                step * dt, frequency=generic_parameters["frequency"],
+                amplitude=base_amplitude, calf_ratio=args.generic_calf_ratio,
+                duty_factor=args.generic_duty_factor,
+                swing_thigh_lift=args.generic_swing_thigh_lift,
                 noise=args.noise, rng=rng)
         elif args.cpg_mode == "generic":
             action = generic_cpg_action_at(step * dt, noise=args.noise, rng=rng,
