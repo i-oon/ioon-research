@@ -1,0 +1,30 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  98%|█████████▊| 826/843 [00:00<00:00, 8231.10it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8254.25it/s]
+48 clips | fit on 9 (585 transitions) | test on 29 held-out clips (1885) | 12 candidate conditions from the holdout set
+  fit: ['b1_ep1.npz', 'b1_ep100.npz', 'b1_ep1001.npz', 'b1_ep1101.npz', 'b1_ep1300.npz', 'b1_ep1302.npz', 'b1_ep1303.npz', 'b1_ep2103.npz', 'b1_ep3.npz']
+  projector initialised from stage 2 (wm/runs/b1_adapt/projector_b1.pt)
+
+  step     train   /hold  /mean-z   moves   cond  family
+stage2    3.7516   0.682    0.981    0.73     7%     20%   <- before stage 3
+   250    3.3743   0.687    0.968    0.75     8%     23%
+   500    3.0200   0.696    0.972    0.75     8%     25%
+   750    2.8604   0.701    0.965    0.76     7%     22%
+  1000    2.7217   0.708    0.964    0.77     6%     29%
+  1250    2.6583   0.716    0.959    0.77     7%     25%
+  1500    2.5690   0.722    0.965    0.77     8%     28%
+  1750    2.5102   0.726    0.964    0.77     5%     26%
+  2000    2.4660   0.728    0.964    0.77     7%     26%
+  2250    2.4180   0.735    0.966    0.78     8%     26%
+  2500    2.3737   0.738    0.967    0.78     6%     25%
+  2750    2.3224   0.749    0.965    0.79     7%     24%
+  3000    2.2897   0.748    0.966    0.79     7%     28%
+
+`/hold` and `/mean-z` are ratios: below 1.0 beats the baseline. `moves` is predicted over
+actual displacement -- near 0 is the collapse where the model copies its input, which scores well
+on MSE and cannot control anything.
+
+`cond` picks 1 of 12 exactly (chance 8%); `family` allows the right behaviour at the
+wrong amplitude. **Chance for `family` is 27%, not 8%** -- the families hold unequal
+numbers of conditions, and an unadapted model scores the chance rate exactly. Selection is
+happening only if `family` clears it by a margin: 28% vs 27% is NOT selection.
+-> wm/runs/b1_adapt/stage3_nce_s0.pt

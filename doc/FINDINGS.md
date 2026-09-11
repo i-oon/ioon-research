@@ -9724,9 +9724,18 @@ something no checkpoint has shown.
 | **action-sensitivity across disjoint embodiments** | **the open question, and the contribution** |
 
 **The third row is ours and not ActSWM's.** They test within one body. **F134 is the measurement
-that makes the cross-embodiment version a real question**: the naive contrastive repair holds on the
-robot it was adapted to and collapses on another one, so "does this fix survive a change of body"
-has a documented negative answer for the obvious approach.
+that makes the cross-embodiment version a real question, but it is narrower than it was first read
+as (corrected by F197): F134 never built or tested a cross-embodiment correspondence.** `wm/adapt3`
+fits one embodiment's own condition labels against each other -- Froude values, and any second body,
+never enter that file. What F134 actually shows is that adapting the shared ITM/FTM to fit one
+body's condition-discrimination objective degrades a *different* body's fidelity through weight
+interference, not that a Froude-correspondence InfoNCE across bodies was tried and failed. **"Does a
+cross-embodiment correspondence design survive a change of body" is still untested, not answered
+negatively** -- see F197 and `doc/ref/literature_review3_infonce_modality_gap.md` for why the
+literature does not license reading F134 that broadly either. What F134 *does* establish, and what
+this plan's frozen readout is actually a fix for, stands unchanged: a single-body contrastive
+fine-tune that shares weights with other bodies can quietly cost them fidelity, so any repair needs
+to be checked cross-body before it is trusted, not because "contrastive doesn't transfer" in general.
 
 **Two things this plan does not address, named so they are not quietly folded in.** Where a target
 robot's first motion comes from without a recorded library and without reinforcement learning
@@ -14967,14 +14976,24 @@ held identical to every prior test in this arc.
 
 Sanity check reproduced exactly (+0.042 vs +0.042) before this gate was trusted. **Result: FAIL**,
 real-action median cosine 0.665, mean-action median cosine 0.596, gap +0.069 against the
-pre-registered >0.110 bar -- the widest margin from the bar of any variant tried, not the closest.
+pre-registered >0.110 bar. **Correction (2026-09-10): this sentence previously read "the widest
+margin from the bar of any variant tried, not the closest", which is backwards against the table
+directly above it** -- 0.069 is the CLOSEST of the four to the bar (0.041 short, against R0's
+0.074) and the only variant to beat the stateless 0.042 reference by a clear margin (1.6x). The
+numbers say the spatial+recurrent design is the best of the four and still short of the bar; they
+do not say it is the worst.
 
 **This is the clean kill the first two attempts could not honestly claim to be.** All three
 testable cells of {pooled, spatial-preserved} x {non-recurrent, recurrent} now fail, with the one
 design that genuinely satisfies frame-sequence (spatial) + command-sequence + real recurrent state
 + delta-Froude target simultaneously failing by the widest margin. **The session's reframed
 hypothesis -- that single-step action-insensitivity is fixable by adding temporal/sequence context
-in any cheaply-testable form -- is now ruled out, not merely unconfirmed.** Combined with F180's
+in any cheaply-testable form -- fails at this budget.** *(Softened 2026-09-10 from "ruled out, not
+merely unconfirmed", which rested on the inverted sentence corrected above. Read against the
+numbers rather than that sentence: three of four variants beat the stateless reference and the
+spatial+recurrent design beat it 1.6x, all while falling short of the 0.110 bar. "Ruled out" is
+not supportable on 2,000-iteration probes that trend in the hypothesis's own direction; "not
+demonstrated at this budget" is.)* Combined with F180's
 earlier addenda (loss target, gradient share, and the original stateless-vs-2-frame-proxy
 architecture check), every angle this session scoped on the FTM/state pathway's action-sensitivity
 -- training signal, architecture (recurrent and non-recurrent), and now the pooled-vs-spatial axis
@@ -16225,3 +16244,257 @@ be re-derived before it is cited**, including the Froude-calibration figures in
 - `results/wm/closed_loop/hex_unseen_turn_nowarm{,_c3}/` -- real turns with no warm start, `--commit` 1 and 3 (F101)
 - `results/wm/closed_loop/b1_hexgoal_speedrange/` -- seven hexapod forward goals spanning 1.72x in Froude (F102)
 - `results/wm/closed_loop/b1_hexgoal_arm{1,2,3,4}_*/` -- the four adaptation arms, four goal clips per condition (F103)
+
+---
+
+### F190. A genuine 3-family B1 babble CPG, and why the first two turn-primitive attempts were mathematically degenerate, not just mistuned
+
+**Q21/W15-1's own candidate source, built from scratch with no policy in the loop** (`sim/collect/collect_b1_cpg_babble.py`). Forward and lateral (strafe, hip-channel oscillation) were straightforward once `b1_flat_real.xml` replaced `b1_flat.xml` (the placeholder-physics file could not be walked forward by ANY hand-tuned sign/phase combination -- 8+ configs tried, all backward, plus a genuine -0.08m passive drift even standing still). Yaw took three attempts, and the failure mode of the first two is the actual finding.
+
+**Attempt 1 (sign-flip LEFT legs' swing) and attempt 2 (reverse LEFT legs' whole phase clock) are BOTH exactly zero net yaw, by construction, not by mistuning.** The diagonal trot's two phase groups are `(FL,RR)` and `(FR,RL)` -- each already contains one LEFT leg and one RIGHT leg, a half-cycle apart. Because `sin(ph+pi) = -sin(ph)`, negating a LEFT leg's own-phase signal (either its sign or its whole clock) makes that leg's new waveform land EXACTLY on its RIGHT diagonal partner's original waveform. The net effect is not "reversed propulsion" -- it is relabelling which physical leg sits in which diagonal group, which is a legal, still-forward-walking trot with zero left/right asymmetry BY CONSTRUCTION. Measured: yaw stayed ~0 (0.0001-0.016) at every thigh_amp tried (1.0/0.4/0.2/0.15), because it genuinely is zero, not noise. This generalizes: **any 2-way split of 4 legs into groups that each straddle both diagonal phase-groups is subject to this same degeneracy if implemented as an own-phase sign/clock flip.**
+
+**Working fix: move the differential to the HIP channel, front-vs-rear, on ONE side, keyed to a GLOBAL clock (not each leg's own phase).** `hip += pivot_amp * thigh_amp * (+1 if front else -1) * (-sin(2*pi*freq*t_elapsed))`, applied only to `{FL, RL}` (RIGHT hip untouched), superposed with unmodified strafe. A global (not per-leg-offset) clock avoids the same degeneracy since it carries no diagonal-group identity to relabel. Verified: `thigh_amp=0.6, pivot_amp=1.5, calf_amp=0.6` gives real, monotonic (not wobbling) heading change, +50 degrees over 10s, froude yaw=0.043 genuinely dominant over fwd=-0.025/lat=0.029, no fall.
+
+**`calf_amp` (lift height), not gait shape, was the main lever on the "heavily oscillating" bounce the user flagged by eye before any of this.** Lowering it from the generic 1.0 default to 0.4-0.6 cut vertical z_std roughly in half (0.045 down to ~0.02) across all three families, with no cost to family-dominance or fall risk. Never tuned to match B1's own measured Froude, per this file's own "generic, not B1-tuned" constraint -- verified only for stability/smoothness.
+
+**Collected**: `results/wm/dataset/b1_babble/batch2/`, 36 clips (12 fwd/12 lat/12 yaw, varied freq/pivot/seed, `--noise 0.03`). Forward and lateral are 12/12 and 12/12 correctly dominant on their intended family; yaw is 5/12 (the rest read as fwd/lat -- see F191, this is a real, acknowledged residual, not silently hidden).
+
+Scripts: `sim/collect/collect_b1_cpg_babble.py` (the CPG itself, with the degeneracy proof written into `--pivot_amp`'s own `help=` text so it cannot be silently reintroduced).
+
+---
+
+### F191. The full 4-stage babble refit, with hexapod rehearsal: forward fixed, lateral partially fixed, yaw untestable with this goal set
+
+**Ran `wm.finetune_new_body` stage 1-4 fresh on F190's diverse 36-clip batch** (`wm/runs/b1_babble_adapt2/`), base `wm/runs/beh12_hexonly_stopgrad/best.pt`, then re-ran stage 4 ONLY with `--also hexapod=data/egocentric/beh12_c10f10t10_ego_flat` (`body_head_b1_hex.pt`) -- the F186 rehearsal mechanism, now confirmed necessary a second time on an unrelated body/data combination, not a one-off B1-expert fix.
+
+**Stage 2's rollout-gap ratio (0.740, well below 1.0) and stage-4 held-out ratios (0.837 without rehearsal, 0.895 with) are all healthy** -- the pipeline itself is not broken; the residual problem below is a data/signal limitation, not a fitting failure.
+
+**Scoring both pools through the SAME checkpoint (fair, matching real deployment -- one fitted head, whichever candidates exist), mode A (physics goal), whole-clip-mean convention:**
+
+| pool | accuracy | fwd | lat | yaw |
+|---|---|---|---|---|
+| expert (12, `beh12_b1_ego_flat`) | 25% (3/12) | 0/8 | 3/4 | untestable* |
+| babble (36, F190's batch) | **83% (10/12)** | **8/8** | 2/4 | untestable* |
+
+*hexapod's 12-condition goal set (`beh12_c10f10t10_ego_flat`) has zero yaw-DOMINANT clips -- see F192 for why "untestable" is the right word and not "0% "). **Expert's own accuracy dropping from F184's 42% is not a regression**: this checkpoint's projector is fit to babble's action distribution, not the trained-policy distribution expert clips come from -- an expected cost of committing to a babble-only pipeline, not a new bug, and irrelevant to the actual deployment scenario (a genuinely unseen body has no expert clips to lose accuracy on).
+
+**Lateral goal-reading (mode D, vision-only): 4/4 broken (pre-rehearsal) -> 3/4 broken (post-rehearsal).** Per-condition, reading each hexapod side_* clip's own goal via ITM+`body_head_b1_hex.pt`:
+
+| condition | true family | vision-read family |
+|---|---|---|
+| side_L_lvl0 | lat | fwd (flip) |
+| side_L_lvl1 | lat | fwd (flip) |
+| side_R_lvl0 | lat | fwd (flip) |
+| side_R_lvl1 | lat | **lat (correct)** |
+
+Real, direction-correct progress (rehearsal fixed 1 of 4, cost nothing on the 8 fwd/turn conditions which stayed 8/8 correct throughout) but not a fix. See F192 for why this is not a horizon/averaging artifact.
+
+Checkpoints: `wm/runs/b1_babble_adapt2/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt`. Data: `results/wm/dataset/b1_babble/batch2_rendered/` (egocentric only, F193's allocentric note applies).
+
+---
+
+### F192. Hexapod's own lateral visual signal is genuinely weak, not a windowing artifact -- no horizon fixes it, and whole-clip averaging is not the cause
+
+**Two things had to be ruled out before concluding this is a real vision-reading limitation: (1) that whole-clip averaging of a candidate hides good local windows (true for babble candidates, established separately), and (2) that the wrong horizon was being used for the GOAL read.** Neither holds here.
+
+**(1) is not the mechanism on the goal side.** Per-window (horizon=5) family vote across the 4 lateral hexapod goal clips, on `body_head_b1_hex.pt`:
+
+| clip | fwd windows | lat windows | yaw windows | whole-clip-mean says |
+|---|---|---|---|---|
+| side_L_lvl0 | 34 | 24 | 3 | fwd |
+| side_L_lvl1 | **51** | 7 | 3 | fwd |
+| side_R_lvl0 | 32 | 20 | 9 | fwd |
+| side_R_lvl1 | 32 | 27 | 2 | **lat (correct)** |
+
+For 3 of 4 clips, per-window MAJORITY VOTE gives the same wrong answer as the whole-clip mean -- averaging is not hiding a hidden lateral majority. For `side_R_lvl1`, whole-clip averaging is actually the BETTER method: forward windows slightly outnumber lateral ones by raw count (32 vs 27), yet the vector mean correctly lands on lateral because the lateral windows carry larger magnitude -- averaging is implicitly (and here, correctly) weighting by signal strength, not hurting.
+
+**(2) A horizon sweep (1/3/5/10/15/20) rules out "wrong window size" as the cause.** Per-window accuracy against each window's own true local family:
+
+| horizon | overall (misleading -- 8/12 goals are fwd-family and read correctly almost always) | side_L_lvl0 | side_L_lvl1 | side_R_lvl0 | side_R_lvl1 |
+|---|---|---|---|---|---|
+| 1 | 77.6% | 32% | 32% | 31% | 54% |
+| 5 (current default) | 74.8% | 30% | 11% | 18% | 44% |
+| 20 | 76.4% | 41% | 33% | 28% | 37% |
+
+Random 3-way chance is ~33%. Lateral accuracy sits at or below chance **at every horizon tried**, with no monotonic trend and no horizon that clears it. `h=1` is marginally the least-bad; `h=5` (today's default) is one of the worst.
+
+**Consistent with a pre-existing, documented limitation, not a new bug.** The insect-to-B1 unrefitted linear-probe transfer numbers (Q2, this file's earlier section) show the same *shape* on a completely different test: lateral correlation (0.43 allocentric / 0.39 egocentric) sits well below forward's (0.63 / 0.50) in every view tested. Checking our OWN checkpoint's raw (not argmax'd) lateral channel confirms the same signature, not just an analogy: `side_R_lvl1`'s true lateral (-0.123) and vision-read lateral (-0.031, same sign, ~4x compressed) track correctly once true magnitude clears the noise floor; the two weakest clips (`side_L_lvl0`/`lvl1`, true lateral 0.015/0.068) lose sign entirely. **Weak-but-real, magnitude-compressed signal that degrades further as the true magnitude shrinks -- not zero, not fixable by picking a different horizon.**
+
+**What this rules out as the next move**: sweeping `--horizon` on `vision_goal()`, or "fix by averaging over more/fewer frames" more generally. **What it does not rule out**: whether more/better hexapod-lateral rehearsal data at stage 4 would improve it (untested), or whether this predates babble adaptation entirely (untested -- does the ORIGINAL hexapod-only or B1-expert-only checkpoint read hexapod's own lateral clips this badly too?).
+
+Scripts: the horizon-sweep and per-window-vote checks were one-off, not yet saved as a standalone script -- do that before re-running rather than re-deriving inline again.
+
+---
+
+### F193. `free_offset`: two real bugs found and fixed (a total freeze, then a catastrophic compounding drift), and the corrected mechanism gives a small, honest gain over locked -- not the large one either buggy version showed
+
+**The question**: `DirectFroudePlanner` never looks at a candidate's frames, only its actions (`body_head(proj(a))`), so there is no visual-continuity reason a candidate's scored window must start at the live episode's own step index `t` -- only the same physical-discontinuity risk F80 already measured and rejected for. `free_offset=True` (additive, default off, on `DirectFroudePlanner` and now `close_loop_direct_froude.py --free_offset`) lets the planner pick ANY offset `tau` within a candidate.
+
+**Bug 1 (found first): a total freeze.** `score_offsets` does not depend on `t`; calling it fresh every single step with an unchanging goal returns the IDENTICAL `(candidate, tau)` every time. The live closed loop had frozen onto one static instant (100% of 56 steps on one candidate, displacement drifting smoothly instead of showing a stride cycle). First fix attempt: replan only every `horizon` steps, then advance `tau` with elapsed time between replans -- this looked right (a stride cycle returned) and was carried into the isolated test scripts too.
+
+**Bug 2 (found second, from a video, not a table): the first fix was incomplete, and its failure mode is much worse than the bug it replaced.** `score_offsets` is still deterministic under an unchanging goal, so re-searching on ANY fixed schedule snaps back to the IDENTICAL `(candidate, tau0)` every time -- confirmed directly by calling it twice back to back. The body replayed the SAME 5-frame window over and over for a whole episode; that window's own net `dpos`/`dquat` over its 5 frames is not zero (measured: net dpos `[0.032, 0.018, -0.057]`, a real per-cycle sink and pitch), and replaying it ~11 times compounded into a full tip-over into the floor -- measured directly: `up.z` (upright-ness) 1.0 -> 0.40, height +0.43 -> **-0.09, below the ground plane**. This was invisible to every accuracy/distance number reported so far, because those never check orientation plausibility, only aggregate Froude match.
+
+**The real fix**: replan ONCE (after warm start / at the first step), then let `tau` advance CONTINUOUSLY for the rest of the episode -- never re-search on a schedule. Re-search again only when the current window would run past the candidate's own recorded length, which is the one principled reason to abandon progress. Verified directly after the fix: `up.z` stays 0.993-1.0 and height stays 0.385-0.475 for the same episode that previously flipped onto its back. Applied to `sim/control/close_loop_direct_froude.py`, `scripts/diagnostics/objective_experiments/final_2x2x2_test.py`, and `scripts/diagnostics/objective_experiments/free_offset_candidate_test.py` -- all three had the same re-search-on-a-schedule pattern.
+
+**Every free_offset number reported before this fix (this entry's own original version, and F194's original version) was measured on the buggy mechanism and is WRONG, not just imprecise.** The bug repeated one lucky snapshot many times, over-representing it in the aggregate rather than genuinely sampling different windows as `tau` advances. Corrected numbers, same checkpoints, both metrics (family accuracy and the continuous Froude-distance from F194's own follow-up):
+
+| pool | goal | locked (unaffected by either bug) | free_offset, buggy (WRONG, do not cite) | **free_offset, corrected** |
+|---|---|---|---|---|
+| expert | A | 96%, dist 0.0735 | 100%, dist 0.0745 | 100%, dist 0.0769 (unchanged within noise) |
+| expert | D | 100%, dist 0.0877 | 100%, dist 0.1072 | 100%, dist 0.1071 (unchanged) |
+| babble | A | 69%, dist 0.1133 | 92%, dist 0.1412 | **72%, dist 0.1285** |
+| babble | D | 60%, dist 0.0871 | 83%, dist 0.0830 | **70%, dist 0.0909** |
+
+**Honest conclusion, replacing every earlier one**: `free_offset` gives babble a small, real family-accuracy gain over locked (+3 to +10 points, not the +14 to +23 the bug showed) but is **still worse than locked on the continuous distance metric in both goal modes** (0.1285 > 0.1133 on A; 0.0909 > 0.0871 on D). Expert is essentially unaffected either way (already near-ceiling, little room to move). **The direction of F194's original conclusion (family accuracy overstates free_offset's benefit relative to genuine closeness) survives the correction; the specific magnitudes it was built on do not, and must not be quoted.**
+
+**Bug 1's own original fix also carried a second, separate defect**, fixed in the same pass: the closed loop's kinematic pose step read the chosen candidate's MOTION (`dpos`/`dquat`/`jpos`) at literal `t` even when the ACTION had been scored from a different `tau` -- posing the body along one point of a candidate's timeline while executing another. Fixed by threading `tau` through to the motion index too.
+
+**A related question, still correctly answered, unaffected by either bug**: does the per-transition data gathering (`wm/fit_projector.py`'s `gather()`) use random/mismatched action-z pairs? No -- every `(action, z)` row comes from a real, consecutive, index-aligned transition. The projector/`body_head` fit is order-independent (memoryless per-timestep MLPs, no sequence structure), so `free_offset` needs no re-fit -- but if this pipeline ever becomes genuinely recurrent (persistent hidden state across an episode), both `free_offset`'s offset-jumping and this shuffle-tolerant fitting convention would need revisiting. Deferred, not yet needed.
+
+Scripts: `wm/policy/planner.py` (`DirectFroudePlanner.free_offset`, `score_offsets`), `sim/control/close_loop_direct_froude.py` (`--free_offset`), `scripts/diagnostics/objective_experiments/{final_2x2x2_test,free_offset_candidate_test}.py`.
+
+---
+
+### F194. Q21's clean, pre-registered 2x2x2: babble substitutes for the teacher library on family accuracy, but not on the more trustworthy continuous distance metric -- the question is genuinely open
+
+**One script, one run, one log** (`scripts/run/b1_babble_clean_redo.sh`, output in `results/wm/dataset/b1_babble/clean_redo_log.txt`) -- collect a fresh 36-clip diverse babble batch (F190's params), render, 4-stage fit + hexapod rehearsal, then the windowed 2x2x2 (`final_2x2x2_test.py`: one scoring mechanism throughout, fit/candidate pairing never crossed, per-family breakdown, a `pool_chance` baseline, and -- added later the same day -- a continuous Froude-distance metric alongside family accuracy). Checkpoints: `wm/runs/b1_babble_clean/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt`. Data: `data/egocentric/b1_babble_ego_flat/` (graduated here from `results/wm/dataset/b1_babble/batch_clean_rendered/` once validated, matching `beh12_b1_ego_flat`'s/`beh12_c10f10t10_ego_flat`'s convention).
+
+**Pre-registered before running (`doc/OPEN_QUESTION.md` Q21): babble substitutes if it clears its own chance AND captures at least half of expert's own margin above chance (`capture_ratio = lift_babble / lift_expert >= 0.5`) -- expert is a reference/upper bound, not a bar babble must beat.**
+
+**Headline cell** (`goal=A physics, free_offset=False` -- locked mode, never touched by F193's free_offset bugs, both metrics trustworthy as originally measured):
+
+| metric | babble | expert | capture_ratio | verdict |
+|---|---|---|---|---|
+| family accuracy | 69% (chance 45%, lift +24) | 96% (chance 56%, lift +40) | **0.60** | clears 0.5 |
+| **Froude distance** (lower=better) | 0.1133 (chance 0.1518, lift 0.0385) | 0.0735 (chance 0.1584, lift 0.0849) | **0.45** | **fails 0.5** |
+
+**The verdict flips depending on which metric is trusted, and the continuous one is the more trustworthy of the two** -- family accuracy is a coarse, discrete proxy (same family = "correct" regardless of how close), while Froude distance measures what the goal-matching question actually asks. Per-family on the family-accuracy reading: fwd 78% (50/64), lat 50% (16/32) -- lateral is the weaker half, consistent with F192. **Step 1 (does babble substitute for the teacher library) is genuinely open, not resolved** -- see `doc/OPEN_QUESTION.md` Q21 for the current status.
+
+**Candidate-pool margin is the mechanism behind babble's weaker D-mode (vision goal) robustness, measured directly, independent of any free_offset bug.** Expert candidates have **0%** chance their nearest neighbour (in predicted-Froude space) is a different family -- perfectly separated, so vision noise can never flip a selection across a family boundary. Babble has **19%** of candidates sitting at a ZERO-margin family boundary (cross-family gap 0.0004-0.0005, identical to the "safe" same-family gap). A v2 attempt to fix this (`scripts/run/b1_babble_v2_redo.sh`, pushing lateral's strafe amplitude for a bigger margin) **failed**: margin was checked in TRUE/label Froude space, but the space that matters is the FITTED checkpoint's PREDICTED Froude, which does not preserve true-space distances linearly (F110: "direction right, extent wrong") -- cross-family risk came out **19%, identical to v1**, zero improvement, plus a real regression on one cell. Corrected rule, now standing (memory `babble-generation-rule-target-pretrain-range.md`, `collect_b1_cpg_babble.py`'s own docstring): margin must be checked through a fitted checkpoint's prediction, never raw motion alone.
+
+**`free_offset` (goal-source and locked-vs-free axes): see F193 for the full story, corrected there, not duplicated here.** Two real bugs were found and fixed in the mechanism itself (a total freeze, then a catastrophic compounding drift caught from a rendered video, not a table) -- every free_offset number this entry originally reported was measured on the buggy mechanism and has been superseded. Corrected: `free_offset` gives babble a small, real family-accuracy gain over locked (+3 to +10 points, not the +14 to +23 the bug showed) but is still worse than locked on the continuous distance metric in both goal modes. Read F193 for the numbers, not this entry.
+
+**Goal source (A vs D), unaffected by the free_offset bugs (this comparison is both `free_offset=False`):** babble gets worse under a vision goal (69% -> 60% family accuracy), consistent with F192's lateral goal-misread problem. Expert's D number at/above A (96% -> 100%) is NOT a goal-family-redistribution artefact as first suspected -- checked directly: exact top-1 picks change for 11 of 12 goals under vision noise (F187's "misread smaller than the gap" claim does not hold at this test's granularity), but the metric is family-level and 8 of 12 expert candidates are forward-family already, so a same-family reshuffle still reads as correct. The margin property above (0% vs 19% cross-family risk) is the real, load-bearing explanation.
+
+Full 8-cell table (accuracy, chance, distance, boundary/interior jump, per-family breakdown) is in `results/wm/dataset/b1_babble/clean_redo_log.txt` and `results/wm/dataset/b1_babble/corrected_free_offset_full_log.txt`, both reproducible from `scripts/run/b1_babble_clean_redo.sh` and `final_2x2x2_test.py` respectively.
+
+---
+
+### F195. F136's reward-quality wall generalises to B1: the current checkpoint's scoring function is at or below chance on local action perturbations, rebuilt in real MuJoCo physics
+
+**Why this needed a new script, not a re-run of F136's.** F136's test (`scripts/diagnostics/planning/teacher_label_quality.py`) is tied to the insect/teacher-student distillation pipeline (Q19) -- a specific student checkpoint that does not exist for B1, and the insect CoppeliaSim scene. Rebuilt on B1's own MuJoCo harness (`scripts/diagnostics/objective_experiments/reward_quality_gate_b1.py`), reusing `collect_b1_cpg_babble.py`'s exact control convention (`il_to_sdk(DEFAULT_IL + ACTION_SCALE * action)`) so the physics match what any B1 rollout actually executes.
+
+**Design, deliberately keeping babble out of it.** An earlier plan used a babble candidate's action as the "known good" baseline to perturb -- that would have quietly reintroduced "is babble good" into a test that is supposed to be about the reward function's own local discriminative power, independent of any candidate source (Q21 is still open on babble specifically). The baseline here is a recorded EXPERT clip's own action (`data/egocentric/beh12_b1_ego_flat/b1_ep0.npz`), replayed through MuJoCo to reach a real branch state (real qvel and contact dynamics, not a teleported qpos), snapshotted and restored between trials so every perturbation starts from the IDENTICAL state.
+
+**Method**: at 8 branch points, generate 16 Gaussian perturbations of the branch's own recorded action at three sigma levels (0.1, 0.3, 0.5, matching F136's 0.5 default at the middle), execute EVERY variant (17 per trial including the original) for a 3-step horizon in real physics, compute the TRUE resulting Froude (`body_velocity`/`yaw_rate`, this project's own functions, not reimplemented) against a fixed forward goal, and separately score every variant via the checkpoint's `body_head(proj(action))` against the same goal. A hit is the model's argmin action matching the true-physics argmin action.
+
+| | value |
+|---|---|
+| candidates per trial | 17 |
+| chance | 5.9% |
+| **overall hit rate** | **4.2% (1/24)** |
+| sigma=0.10 | 12.5% (1/8) |
+| sigma=0.30 | 0.0% (0/8) |
+| sigma=0.50 | 0.0% (0/8) |
+
+**At or below chance at every perturbation size, matching F136's insect-side shape almost exactly (33% vs 50% coin there; 4.2% vs 5.9% chance here) on a completely different body, checkpoint, and physics engine.** This is not "uninformative, could go either way" -- it is failing to discriminate at all, at a rate a coin flip would beat. **Direct implication for Q21's ordering**: the reward-quality gate that was supposed to be checked BEFORE building any RL controller (F179's whole arc was built on an unverified version of this same assumption and cost weeks) has now been checked, and it fails. Building an RL controller now, on this checkpoint, would very likely reproduce F179's collapse -- not from a bad architecture or bad training, but because the reward signal itself has no local gradient for PPO-style exploration to climb.
+
+**What this does not test**: whether a DIFFERENT checkpoint, objective, or fitting procedure could produce a locally-discriminative reward -- only that the current one, produced by this project's standing pipeline, does not. That is the next open question, not "try RL anyway."
+
+Scripts: `scripts/diagnostics/objective_experiments/reward_quality_gate_b1.py`. Log: `results/wm/dataset/b1_babble/reward_quality_gate_log.txt`.
+
+---
+
+### F196. B1 now stands and moves under native CoppeliaSim-Bullet dynamics; the prior collapse was an initialization bug
+
+**Root cause, measured rather than tuned around.** The imported convex scene stores all 12 joints
+at 0 rad. The standing probe set only `setJointTargetPosition(DEFAULT_IL)`, unlike the MuJoCo
+collector which explicitly initializes both `qpos` and control. Bullet therefore began with the
+straight 0.7 m legs intersecting the floor: trunk z jumped 0.600 -> 0.496 on the first step and the
+body collapsed. Initializing the actual joint state with `setJointPosition(DEFAULT_IL)` before
+starting dynamics removes that impulse.
+
+**100-step Bullet verification:** final z **0.5358 m**, minimum up.z **0.9998**, xy drift
+**0.0296 m**, final worst joint error **0.0182 rad**. Peak force reached the configured 93 Nm only
+transiently. This exceeds the pre-registered 60-100-step guardrail.
+
+Two suspected causes are also closed. CoppeliaSim's installed manual states that a force sensor is
+initially a rigid link; its exposed properties contain break/filter thresholds but no compliance
+setting. And CoppeliaSim PID values are not MuJoCo stiffness/damping values: its dynamic position
+controller generates a constrained motor command while `targetForce` is applied separately.
+
+**First CoppeliaSim-native controller:** a hand-designed diagonal-trot CPG, not either trained
+MuJoCo policy, ran for **160 steps / 8.0 s**, remained upright (z >= **0.535 m**, up.z >= **0.998**),
+advanced **0.177 m**, and had **0.015 m** net lateral drift with worst joint tracking error
+**0.046 rad**. A larger 1 Hz / 0.6-action-unit gait rolled over and reached 0.867 rad tracking
+error. An exact repeat from a fresh scene load produced **0.178 m** forward, **0.010 m** lateral,
+the same z/up.z bounds, and 0.049 rad worst error. The verified conservative default is therefore
+0.5 Hz / 0.2 thigh / 0.2 calf, with repeatability established across two launches.
+
+Scripts: `scripts/diagnostics/objective_experiments/b1_coppelia_dynamics_probe.py` and
+`scripts/diagnostics/objective_experiments/b1_coppelia_cpg_controller.py`. Scene:
+`sim/env/b1_flat_convex.ttt` (Bullet).
+
+---
+
+### F197. Stage 3's InfoNCE has never used Froude as its positive-pair signal, and never touched a second embodiment -- a prior claim on this ("has a specific history of not transferring across bodies") was overstated and is corrected here
+
+**What prompted this.** F134 measured stage-3 contrastive adaptation buying action-sensitivity on
+its own body and costing state fidelity on a body it was not adapted to (0.757 -> 1.052, worse than
+a frozen frame). In discussion this was mis-cited as evidence that "stage-3 InfoNCE has a specific
+history of not transferring across bodies, even when intended to be shared" -- implying a
+cross-embodiment correspondence had been tried and had failed. **Reading `wm/adapt3.py` end to end
+shows that claim is not supported**, and the corrected reading is below.
+
+**What `wm/adapt3.py` actually does (lines 70-98, 262-328).** One call to `gather()` loads clips from
+**one `--data` directory under one `--embodiment` name** -- there is no second embodiment anywhere
+in the file. The positive pair is `(e_t, the true recorded action a_t) -> e_t+1`, the transition
+that actually happened. The negative pool (`others`, built line 266-267) is drawn from **a different
+recorded condition label (e.g. `side_L_lvl0` vs `speed_2`), at the same time index, within the same
+body's own training clips**. **Froude values are never read, computed, or compared anywhere in this
+file.** They only exist downstream, in stage 4's `body_head`, a separate readout fit afterward on
+top of whatever latent stage 3 produced.
+
+**So the correspondence InfoNCE is actually built on is "same condition label, same timestep,
+single body" vs "different condition label, same timestep, single body" -- not "same Froude value,
+any body."** The cross-embodiment Froude-correspondence design this project's own claim rests on
+(hexapod Froude 0.1 <-> B1 Froude 0.1 = the same behaviour across bodies, usable as an InfoNCE
+positive pair, analogous to retargeting-based correspondence in cross-embodiment robotics) has
+**never been implemented, let alone tried and found to fail.** F134's cross-body fidelity drop is
+real but is a different phenomenon -- a single-body contrastive fine-tune perturbing weights
+(ITM/FTM) that a second body's fit also depends on, i.e. interference/forgetting -- not a
+correspondence-design failure. The two get conflated because both are called "stage 3 InfoNCE," but
+one has been measured and one has not been built.
+
+**The literature agrees this is an open, not a settled-negative, question.** Reviewed in
+`doc/ref/literature_review3_infonce_modality_gap.md` (prepared in response to this exact
+discussion): vanilla CLIP-style InfoNCE with independent encoders and naive negative sampling has a
+documented tendency to produce **modality gaps** -- instance-level pairs align while the two source
+distributions stay separated at the population level -- in multimodal contrastive learning generally
+(Liang et al.-style modality-gap analyses; "Closing the Modality Gap Aligns Group-Wise Semantics",
+[arXiv:2601.18525](https://arxiv.org/html/2601.18525v1); "On the modality gap and the contrastive
+loss in multi-modal foundation models", [arXiv:2607.10698](https://arxiv.org/html/2607.10698v1); "The
+Geometric Mechanics of Contrastive Learning", https://yichaocai.com/nce_geo.github.io/). Separately,
+robotics work on **latent cross-embodiment policies** shows InfoNCE-based alignment across distinct
+robot embodiments succeeding when paired with reconstruction losses, retargeted correspondence, and
+controlled negative sampling -- "Latent Cross-Embodiment Policies"
+([arXiv:2506.14608](https://arxiv.org/html/2506.14608v4)), reporting a 25.3% improvement from
+pairwise InfoNCE across retargeted action embeddings; cross-embodiment motion retargeting with
+triplet loss over InfoNCE when latent spaces are decoupled by body segment
+([arXiv:2601.15419](https://arxiv.org/html/2601.15419v1)). **Neither side of the literature supports
+the strong claim made in discussion.** The accurate summary, matching the review's own conclusion:
+vanilla InfoNCE with independent encoders and uncontrolled negatives tends to produce embodiment
+gaps; InfoNCE with a real correspondence signal, reconstruction terms, and controlled negative
+sampling has documented successes crossing embodiments. This project's `wm/adapt3.py` is the first
+kind (single-embodiment, condition-label negatives) and has not yet built or tested the second.
+
+**What this opens, not yet run.** A stage-3 variant whose positive pairs are genuinely
+cross-embodiment -- hexapod condition paired with a B1 condition at a matching Froude family/value,
+rather than same-body condition-identity -- would be the first real test of the correspondence
+hypothesis this project's Froude coordinate is supposed to license. It would also be the first place
+Q23's hexapod-CoppeliaSim-vs-B1-MuJoCo Froude-scale question becomes load-bearing during *training*
+rather than only at evaluation, since it is the first mechanism that would compare the two origins'
+Froude values directly as a learning signal rather than only reading them through a shared
+post-hoc `body_head`. Not started; no script exists yet.
+
+Scripts read: `wm/adapt3.py` (full). Reference: `doc/ref/literature_review3_infonce_modality_gap.md`.

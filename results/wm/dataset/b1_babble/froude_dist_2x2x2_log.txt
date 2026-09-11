@@ -1,0 +1,67 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+##### pool=expert  ckpt=wm/runs/b1_adapt/body_head_b1.pt  candidates=data/egocentric/beh12_b1_ego_flat #####
+
+=== goal A (physics)  free_offset=False ===
+  accuracy=96% (92/96)  chance=56%  boundary_jump median=1.0292 p95=3.3421  interior_jump median=0.3857
+  froude_dist (continuous, NOT hidden by family match) mean=0.0735  median=0.0643  chance(random pick)=0.1584
+    fwd  goals: 60/64 (94%)
+    lat  goals: 32/32 (100%)
+    yaw  goals: none in this goal set
+
+=== goal A (physics)  free_offset=True  ===
+  accuracy=100% (96/96)  chance=56%  boundary_jump median=2.4977 p95=4.1909  interior_jump median=0.5087
+  froude_dist (continuous, NOT hidden by family match) mean=0.0745  median=0.0631  chance(random pick)=0.1584
+    fwd  goals: 64/64 (100%)
+    lat  goals: 32/32 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  32%|███▏      | 270/843 [00:00<00:00, 2683.29it/s]Loading weights:  64%|██████▍   | 539/843 [00:00<00:00, 2606.70it/s]Loading weights:  97%|█████████▋| 820/843 [00:00<00:00, 2696.19it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2705.96it/s]
+=== goal D (vision)  free_offset=False ===
+  accuracy=100% (96/96)  chance=36%  boundary_jump median=0.6111 p95=1.2716  interior_jump median=0.3792
+  froude_dist (continuous, NOT hidden by family match) mean=0.0877  median=0.0900  chance(random pick)=0.1658
+    fwd  goals: 8/8 (100%)
+    lat  goals: 88/88 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8912.71it/s]
+=== goal D (vision)  free_offset=True  ===
+  accuracy=100% (96/96)  chance=36%  boundary_jump median=1.5515 p95=2.7017  interior_jump median=0.3757
+  froude_dist (continuous, NOT hidden by family match) mean=0.1072  median=0.1167  chance(random pick)=0.1658
+    fwd  goals: 8/8 (100%)
+    lat  goals: 88/88 (100%)
+    yaw  goals: none in this goal set
+
+--- babble (F194 validated v1) ---
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+##### pool=babble  ckpt=wm/runs/b1_babble_clean/body_head_b1_hex.pt  candidates=data/egocentric/b1_babble_ego_flat #####
+
+=== goal A (physics)  free_offset=False ===
+  accuracy=69% (66/96)  chance=45%  boundary_jump median=1.0742 p95=3.0348  interior_jump median=0.2558
+  froude_dist (continuous, NOT hidden by family match) mean=0.1133  median=0.1083  chance(random pick)=0.1518
+    fwd  goals: 50/64 (78%)
+    lat  goals: 16/32 (50%)
+    yaw  goals: none in this goal set
+
+=== goal A (physics)  free_offset=True  ===
+  accuracy=92% (88/96)  chance=45%  boundary_jump median=0.5286 p95=0.8950  interior_jump median=0.1978
+  froude_dist (continuous, NOT hidden by family match) mean=0.1412  median=0.1361  chance(random pick)=0.1518
+    fwd  goals: 64/64 (100%)
+    lat  goals: 24/32 (75%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  82%|████████▏ | 690/843 [00:00<00:00, 6898.51it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6884.37it/s]
+=== goal D (vision)  free_offset=False ===
+  accuracy=60% (58/96)  chance=49%  boundary_jump median=0.6547 p95=2.8442  interior_jump median=0.2521
+  froude_dist (continuous, NOT hidden by family match) mean=0.0871  median=0.0875  chance(random pick)=0.1063
+    fwd  goals: 50/88 (57%)
+    lat  goals: 8/8 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  80%|████████  | 677/843 [00:00<00:00, 6768.76it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6672.05it/s]
+=== goal D (vision)  free_offset=True  ===
+  accuracy=83% (80/96)  chance=49%  boundary_jump median=0.4238 p95=0.8214  interior_jump median=0.1955
+  froude_dist (continuous, NOT hidden by family match) mean=0.0830  median=0.0829  chance(random pick)=0.1063
+    fwd  goals: 72/88 (82%)
+    lat  goals: 8/8 (100%)
+    yaw  goals: none in this goal set
+

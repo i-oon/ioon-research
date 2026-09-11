@@ -640,6 +640,37 @@ flat across gait frequencies, so it barely translates between frames while its l
 **The binding constraint is what the camera can see, which is a claim about the sensor, not about
 the shared coordinate.**
 
+### 1.3 What Week 15's advisor review changes (2026-09-10)
+
+`feedbacks/feedback_ajan_go.md` Week 15 moved the goalposts, and the move is fair. Recorded here
+because §1.2 above describes what is *measured*; this describes what is now *required*.
+
+**The hole he found:** every closed-loop number in §1.2 scores candidates drawn from **B1's own
+recorded expert clips**. A body that has never had a controller has no such clips. So "control
+works on a body absent from pretrain" is true only for a body that arrives with a behaviour
+library — which is not the interesting case, and is exactly the gecko case that fails (F189).
+
+**What he asked for:** stop at ranking, or go all the way to a **Controller** — a policy that takes
+state in and emits joint actions, no library. He recommends turning the WM's Froude error into a
+**reward term for vanilla PPO in the real simulator** (no imagined rollout), and pinning the
+contribution to **Vanilla RL vs WM-guided RL** on sample efficiency and cross-embodiment transfer.
+
+**This does not contradict F179.** F179 killed policy learning *inside the FTM's imagination*
+(compounding rollout error). The proposal never rolls the FTM — real physics steps the world, the
+WM only scores the step. Untested, and not ruled out.
+
+**Order of work, and it is not his order** (full reasoning in `OPEN_QUESTION.md` Q21):
+
+| # | step | why here |
+|---|---|---|
+| 1 | **B1 motor babble as the candidate source** | cheapest, reuses the whole existing loop, and **B1 is the only body where the answer can be graded** (it has both babble and ground truth) |
+| 2 | reward-quality gate | F136 measured this reward ranking local perturbations at 33% vs a 50% coin — and PPO explores by local perturbation |
+| 3 | RL controller + WM reward | only if 2 clears |
+| 4 | history-state ablation | independent; would improve 3's reward if it works |
+
+**Deliberately not doing:** building the RL controller first. F179's arc was built on an assumption
+never checked and cost weeks; step 2 exists so that does not recur.
+
 **What the thesis can claim today, stated at true strength**: grounding and goal-conditioned
 control both work on a body genuinely absent from pretrain — using B1's own behaviour library, so
 this is the **near-morphology** version of claim (3). The **far** version (gecko, babble-only) is

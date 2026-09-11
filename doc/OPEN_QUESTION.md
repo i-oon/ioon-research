@@ -10,6 +10,411 @@ which are now settled (see bottom). Updated 2026-09-10.
 Stage 1 measurements that constrain everything below are in **[FINDINGS.md](FINDINGS.md)**;
 this file carries only what is still undecided.
 
+## Q23. Does the vision-goal pathway carry a hexapod-CoppeliaSim-vs-B1-MuJoCo physics-origin bias, separate from a generically weak signal? (new, 2026-09-11 — not started)
+
+**User-raised, sharper than Q22's framing, not yet tested.** Q22 asked whether the frozen encoder
+is sensitive to physics-engine signature in general. This is a more specific, more dangerous
+version of that question, aimed at exactly the pathway that matters: **`vision_goal()`** (used in
+mode D throughout this session's B1 work) reads a hexapod goal clip's froude value from frames that
+were genuinely, dynamically simulated in **CoppeliaSim/Bullet** (`sim/collect/collect_ik.py`).
+Every B1 candidate's own froude, by contrast, traces back to **MuJoCo**-computed motion. Both get
+mapped into the same froude number line by the same `body_head`. **If that mapping carries a
+systematic (not random-noise) bias tied to which physics engine originally produced the motion, no
+amount of B1 candidate-selection quality can close the resulting gap** -- B1's froude values could
+be structurally unable to reach the hexapod-goal's froude scale, independent of whether the right
+candidate was picked.
+
+**Distinguishes two hypotheses this session's `vision_goal` findings (F192) never separated**:
+F192 attributed hexapod's own weak lateral vision-signal to a generically weak/compressed channel.
+This raises a second, different candidate explanation for the SAME symptom: not "the signal is
+weak everywhere," but "the signal is fine for hexapod-on-hexapod, and the mismatch specifically
+appears when a MuJoCo-sourced body's froude is compared against it" -- a physics-origin bias in the
+goal-reading pathway itself, not a general representation weakness.
+
+**Partial mitigation already in place, not yet verified sufficient**: stage 4's rehearsal fitting
+(F186/F191, `--also hexapod=data/egocentric/beh12_c10f10t10_ego_flat`) fits `body_head` jointly on
+BOTH bodies' data, which would absorb a bias if it is a simple, linear scale/offset -- but would
+NOT fully correct a bias that is a nonlinear function of the source engine's specific signature.
+Whether the rehearsal fit's known-partial fix (F191: lateral misread 4/4 -> 3/4, not 0/4) reflects
+a residual weak-signal problem or a residual physics-origin-bias problem is exactly what is
+undetermined here.
+
+**Not yet tested, first step**: check whether a candidate's REAL froude distance to a goal (using
+`beh12_b1_ego_flat`'s own EXPERT clips, which -- like B1's babble -- also trace back to MuJoCo, per
+`sim/collect/rollout_b1_mujoco.py`) shows the same lateral degradation pattern F192 found for
+hexapod's own goal-reading, or whether it is specifically worse/different when the CANDIDATE side
+is MuJoCo-sourced and the GOAL side is CoppeliaSim-sourced (the actual cross-origin case) versus
+when checking hexapod-goal-reading against hexapod-sourced candidates alone (same-origin,
+untested this way so far). This isolates origin-bias from generic weak-signal without needing any
+new simulator engineering (unlike Q22) -- it is a re-analysis of data and checkpoints that already
+exist.
+
+**Second, related, and not yet started: a genuinely cross-embodiment stage-3 InfoNCE has never been
+built, so it cannot be the explanation for anything measured so far (see FINDINGS.md F197).**
+`wm/adapt3.py`'s positive/negative pairs are drawn entirely from one embodiment's own recorded
+condition labels at matching timesteps -- Froude values are never read inside that file. The
+Froude-correspondence idea this project's own claim rests on (hexapod Froude 0.1 <-> B1 Froude 0.1
+as an InfoNCE positive pair, the retargeting-style correspondence used in
+[Latent Cross-Embodiment Policies](https://arxiv.org/html/2506.14608v4)) has not been implemented.
+If it were, this file's origin-bias question would become load-bearing at *training* time (does a
+cross-origin Froude match actually correspond to the same behaviour, or does hexapod-Bullet-Froude
+vs B1-MuJoCo-Froude carry a scale/engine bias that would teach the wrong positive pairs) rather than
+only at evaluation, as it is today. Building and testing this is the concrete next step for this
+question; no script exists yet. See `doc/ref/literature_review3_infonce_modality_gap.md` for the
+literature this design should follow (reconstruction + contrastive hybrid, controlled/mixed negative
+sampling across embodiments, not vanilla independent-encoder InfoNCE).
+
+## Q22. Obsolete as a reward-gap test; B1-in-CoppeliaSim engineering continues for future native RL (settled 2026-09-11)
+
+**Progress update, same day, from a parallel session** (full detail in
+`results/wm/dataset/b1_babble/q22_handoff_prompt.md`, kept current there, not duplicated here):
+the standing failure diagnosed earlier turned out to be a simple initialization bug, not a
+gain/force-sensor problem -- the imported scene stores every joint at 0 rad, motor TARGETS were
+being set correctly but the ACTUAL joint positions were never initialized to match before
+`startSimulation()`, so Bullet started with straight legs punched through the floor. Fixed
+(`sim.setJointPosition` before dynamics start); stable 100-step stand confirmed
+(final z=0.5358m, up.z>=0.9998). A hand-designed native CPG controller (not a MuJoCo-policy
+transplant) now survives 160 steps for forward/lateral/yaw presets -- forward is solid, lateral and
+yaw are weak/coupled (same shape of problem as F190's original MuJoCo babble). **Explicitly not
+yet done**: a real Coppelia-native expert controller, a proper (non-family-targeted) babble
+collector, and any new 2x2x2 rerun -- do not treat the working CPG presets as ready data. See the
+handoff file for the complete, currently-accurate status and required next steps.
+
+**The original Q22 is no longer the reason for this work.** The current vision+action pipeline
+does not mix live physics engines: CoppeliaSim only kinematically displays B1 trajectories already
+computed by MuJoCo, and candidate scoring is action-only. A physics-signature gap can matter once
+training needs live simulator feedback, but it does not explain F195 in the present pipeline.
+Also, `rollout_b1_mujoco.py` already documents that transplanting the MuJoCo-trained policy into
+CoppeliaSim was tried and failed. Do not repeat that experiment. See F196 for the now-working
+Bullet stand and the first CoppeliaSim-native hand-designed controller.
+
+**Current engineering result:** the apparent 0.23 m standing collapse was caused by a missing
+initial condition, not force-sensor compliance or weak motors. The imported scene stores all
+joints at zero; `setJointTargetPosition` does not set the initial joint state. Initializing each
+joint with `setJointPosition(DEFAULT_IL)` before starting Bullet gives a stable 100-step stand.
+The base force sensor is documented by CoppeliaSim as an initially rigid link, and its exposed
+properties contain break thresholds but no stiffness setting. CoppeliaSim's position PID is also
+not MuJoCo kp/kv: it drives a constrained motor command while `targetForce` is separate.
+
+The first native diagonal-trot CPG (`b1_coppelia_cpg_controller.py`) stayed upright for 160 steps
+(8 s), advanced 0.177 m, drifted 0.015 m laterally, held z >= 0.535 m and up.z >= 0.998, with
+worst joint tracking error 0.046 rad. This establishes a conservative controllable baseline for
+future environment/reset/action plumbing; it does not revive the blocked WM-reward RL plan.
+
+**User-raised, confirmed factually in code (not yet tested for actual effect).** The hexapod/insect
+pretraining data (`sim/collect/collect_ik.py`) is genuinely, dynamically simulated IN CoppeliaSim:
+`sim.setJointTargetPosition()` (a motor target) followed by `sim.step()` in a live simulation loop
+-- real gravity, contact, compliance, computed by CoppeliaSim's own physics engine. B1's data (all
+of this session's babble/closed-loop work) is different: MuJoCo computes the entire trajectory,
+and CoppeliaSim only poses the result kinematically for rendering ("KINEMATIC: the body is posed,
+not simulated. It cannot fall" -- printed on every B1 closed-loop run). B1's own motion is
+genuinely physically simulated too, just by a DIFFERENT engine than the one that renders it.
+
+**The open question**: MuJoCo's and CoppeliaSim's contact solvers are different numerical
+implementations. Even for the same commanded gait, the resulting motion's fine-grained signature
+(foot-slip pattern, bounce frequency, compliance-driven jitter) could genuinely differ between
+engines. The frozen encoder was pretrained exclusively on CoppeliaSim-physics-signature motion; B1's
+fine-tuning data carries MuJoCo's signature instead. If the encoder is sensitive to this
+engine-specific fingerprint, that is a real, previously invisible domain gap -- distinct from the
+"pretrain representation is generically coarse" story (F102/F110/old-F136's type-vs-magnitude wall)
+-- and could be a contributing cause of F195's reward-quality-gate failure and the broader
+B1-adaptation difficulty this session's work sits on top of.
+
+**Not yet tested, and a real build, not a quick check**: B1 has no motorized/dynamic setup in
+`b1_flat.ttt` currently, only kinematic posing. A first test would need B1 implemented natively as
+a dynamic body in CoppeliaSim (motorized joints, `sim.step()`, matching the hexapod's own collection
+method) for a handful of already-collected MuJoCo gaits, then comparing the resulting motion's
+low-level signature and/or the encoder's own embedding statistics against the MuJoCo-then-
+kinematically-posed version of the same commanded gait.
+
+**Considered and NOT recommended**: moving B1's physics wholesale to CoppeliaSim, replacing MuJoCo
+entirely. MuJoCo's contact solver is the standard, more battle-tested choice for legged-robot RL
+specifically (matching Unitree's own `unitree_mujoco` tooling), not an accidental detour to correct.
+The recommended path is testing the SIGNATURE GAP directly on a small scale, not replacing the
+physics engine project-wide.
+
+**Feasibility investigation, 2026-09-11: real progress, not yet a working stand.** Checked whether
+an existing pre-tuned quadruped (Laikago or similar) ships with CoppeliaSim to skip this work --
+it does not (only `hexapod.ttm`/`ant hexapod.ttm`, matching the insect body already in this
+project); a paper simulating Laikago in CoppeliaSim almost certainly did the same URDF-import +
+tuning work from scratch, not from a ready asset. Diagnosed, not guessed:
+
+1. **Bullet + non-convex collision shapes hangs** (`Detected dynamically enabled, non-convex
+   shapes` warning) -- switching the scene's dynamic engine to Newton
+   (`sim.setInt32Param(sim.intparam_dynamic_engine, 3)`) removes the hang; ran 60 steps without
+   freezing.
+2. **Default joint PID gains are far too weak** (`pid_p=0.1` on every joint vs MuJoCo's kp
+   550-970 for the same joints) -- explains an early attempt sinking steadily instead of holding
+   a standing pose. Setting matched gains stopped the steady sink but produced bouncing
+   instability instead (0.54->0.34->0.22->0.43->0.36->0.24 m over 60 steps) -- not a clean stand
+   either.
+3. **Mass import is correct** -- summed only the `_respondable` (dynamic/collision) shapes:
+   62.574 kg, matching the MuJoCo XML's 62.58 kg almost exactly. The `_visual` shapes also carry
+   nonzero mass values but are confirmed `static=1` (kinematic, non-dynamic), so they do not
+   double-count into the physics -- checked directly, not assumed.
+4. **The base connection is a force sensor, not a plain joint or rigid weld**: the hierarchy is
+   `base_visual` (dynamic, top, no parent) -> `floating_base` (object type 12 = FORCE SENSOR,
+   confirmed via `sim.getObjectType`) -> `trunk_respondable` (dynamic, the body actually carrying
+   the leg/joint chain). A force sensor link can be configured rigid or compliant/breakable --
+   which this one is has NOT been checked yet, and is the most likely remaining cause of the
+   bouncing instability (a compliant or under-configured link between the tracked root and the
+   actual dynamic body would look exactly like this).
+
+**Stopped here, not because it is unsolvable, but because it had become an open-ended,
+multi-layered sim-engineering investigation** (engine choice, then gain magnitude, then mass
+fidelity, then hierarchy/force-sensor rigidity) rather than a bounded check, and continuing to
+iterate without a firm diagnosis budget was starting to look like guessing.
+
+**Critical correction, caught before more work was wasted on it (user-flagged, verified
+immediately): switching to Newton to dodge the Bullet/non-convex hang INVALIDATES the whole
+comparison.** Checked directly: the hexapod pretraining scene (`sim/env/medauroidea_c10f10t10.ttt`)
+uses engine=0 (**Bullet**), not Newton. If B1's dynamic test ran on Newton while hexapod's
+pretraining ran on Bullet, any difference found would conflate TWO confounds -- engine choice
+(Bullet vs Newton) and the actual thing Q22 wants to isolate (dynamic-vs-kinematic-render) -- and
+the result would say nothing trustworthy about either one. **The comparison must run B1 on
+Bullet, matching hexapod exactly.** This makes the convex-decomposition path (fixing the actual
+non-convex-collision cause of the hang, not routing around it with a different engine) a REQUIRED
+step, not an optional alternative -- Newton is not a valid substitute for this test.
+
+**Next concrete step, precisely scoped**: run convex decomposition (CoppeliaSim's own
+`Convex decomposition hacd.lua` add-on, already loaded in every scene this project uses) on B1's
+collision meshes, re-verify the standing test on BULLET specifically, then separately still check
+`floating_base`'s force-sensor rigidity (that diagnosis stands regardless of engine). Script:
+`scripts/diagnostics/objective_experiments/b1_coppelia_dynamics_probe.py` -- must be re-run with
+`intparam_dynamic_engine` left at 0 (Bullet) once the collision meshes are fixed, never switched
+to Newton for this specific comparison.
+
+**Convex decomposition done, saved, and it fixed the hang -- new state, same day.**
+`sim.convexDecompose(handle, 25, [1,650,400,4,0,0,0,0,0,0], [0.01,30.0,0.25,0,0,0,0,0,0,0])`
+(the HACD method, code 25 -- exact parameter counts and values found via web search, not guessed)
+applied to all of B1's `*_respondable` shapes that weren't already convex (trunk + all four legs'
+hip/thigh/calf; rotor and foot shapes were already convex). Saved as a new scene,
+`sim/env/b1_flat_convex.ttt` -- use this file, not `b1_flat.ttt`, for any further Q22 dynamics
+work, so the decomposition never has to be redone. **Result on Bullet (engine=0, correctly matching
+hexapod), MuJoCo-matched PID gains, `trunk_respondable` tracked instead of the disconnected
+`base_visual`**: no hang, no chaotic bouncing -- the body settles cleanly to a STABLE but WRONG
+height (0.60m start -> 0.23m by step 20, then flat 0.2286-0.2321 for the remaining 40 steps). This
+is real progress: convex decomposition fully resolved the instability/hang (confirms that
+diagnosis was correct), and the remaining problem is now a clean, isolated one -- the standing
+pose is not being held against real gravity, not numerical chaos. **Foot-ground friction checked
+and ruled out** (`bullet_body_friction`: foot 0.5, floor 1.0 -- both reasonable, not the cause).
+**Not yet found**: why MuJoCo's own kp/kv values don't hold the pose here when they hold it in
+MuJoCo itself -- candidates not yet checked are (a) `floating_base`'s force-sensor rigidity
+(diagnosed earlier, still unfixed), (b) whether CoppeliaSim's PID gain units/scaling actually
+correspond 1:1 to MuJoCo's kp/kv the way this session assumed, (c) whether the DEFAULT_IL pose's
+centre of mass is genuinely balanced over the feet once real Bullet contact geometry (the new
+convex hulls, not MuJoCo's exact collision geometry) is in play. **Stopped here for this session**
+-- the handoff prompt (`results/wm/dataset/b1_babble/q22_handoff_prompt.md`) has been updated to
+match this exact state for whoever continues it next.
+
+**Second engine-precision concern, user-flagged, NOT resolved (2026-09-11).** This install has TWO
+Bullet library versions (`libsimBullet-2-78.so`, `libsimBullet-2-83.so`). Checked whether they
+could reintroduce the SAME confound the Newton mistake did (Q22's whole point is a controlled
+comparison, so a sub-version mismatch between hexapod's scenes and B1's scene would be just as
+invalidating as an engine-family mismatch). **Could not confirm which sub-version is active for
+either scene**: `sim.intparam_dynamic_engine`'s enum has only ONE "Bullet" value
+(`physics_bullet=0`, confirmed via `dir(sim)`/`getattr`), no separate 2.78/2.83 slot; both `.so`
+files are loaded into every CoppeliaSim process regardless of scene (checked via `/proc/<pid>/maps`
+grep, both present) so that doesn't distinguish which is ACTIVE; no plaintext version string found
+in either `.ttt` file via `strings`. **This is a genuinely open, unresolved uncertainty, not
+something ruled out** -- the most likely explanation (this CoppeliaSim version has deprecated the
+2.78/2.83 choice at the scripting-API level and defaults everything to 2.83, keeping 2.78 only for
+loading old scenes) is a guess, not a checked fact. **Before trusting any Q22 comparison result,
+verify this properly** -- likely needs the GUI's scene "Common properties" dialog checked visually
+(`DISPLAY=:0`), or CoppeliaSim's own release notes/source for when this became a single choice, not
+a remote-API check.
+
+## Q21. Week 15 advisor review: the candidate source is the bottleneck, and the ask is a real Controller (new, 2026-09-10 — blocking, and it reorders everything below)
+
+Source: `feedbacks/feedback_ajan_go.md`, Week 15. Four asks landed, and they change what "done"
+means for this thesis. Recorded here because they are decisions, not results.
+
+**What P'Nine identified, and he is right.** The closed-loop result (Slide 30, F188) scores
+candidates drawn from **B1's own recorded expert clips**. On a body that has never had a controller
+there are no such clips, so the mechanism as demonstrated does not transfer. His question -- *where
+do candidates come from on an unseen body?* -- has no answer in the current pipeline. The gecko arc
+(F189) is the same problem from the other side: gecko has only babble, no expert library at all.
+
+**His two options, and what we already hold of each:**
+
+| option | what it needs | what exists already |
+|---|---|---|
+| 1. Action selection + candidate generator | CPG/noise candidates for the unseen body | **`collect_gecko_dataset.py` IS this** — CPG + noise, no controller. Also matches Egocentric VSM's own published method (CPG + 50 noised copies, FTM ranks, argmax) |
+| 2. **RL policy + WM reward** (he recommends) | Froude error from the WM as a reward term in vanilla PPO | nothing built |
+
+**Option 2 is NOT the thing F179 killed, and the distinction is the whole point.** F179 trained the
+policy *inside* the FTM's imagination -- roll the forward model ~100 steps, bootstrap a critic
+through it -- and died of compounding prediction error (MC-check 0.281, and four Dreamer critic
+variants plus PPO all landed on the same ~0.27-0.28 wall). **Option 2 never rolls the FTM at all**:
+real physics supplies the next state, the WM supplies only the per-step reward. It sidesteps
+exactly the failure that killed F179 and is genuinely untested.
+
+### The ordering, and why it is not the order he gave
+
+**1. B1 motor babble first (his own W15-5 ask) -- cheapest, and it is the only test that can be
+graded.** B1 is the one body with **both** a babble option and ground truth, so it is the only place
+"do babble candidates work as well as expert-library candidates?" can be asked *and checked*. Run the
+existing loop twice on the same goals, changing only the candidate source. If babble candidates hold
+up, the bottleneck dissolves and option 2 may be unnecessary; if they do not, that is the evidence
+that justifies option 2 rather than following advice on faith.
+
+> **Trap, verified in the repo:** `scripts/dataset/recollect_b1_noisy.py` is **not** babble -- it is
+> B1's trained PPO policy plus `--cmd_noise 0.0137`. Using it would reproduce the exact "ground
+> truth + noise" flaw P'Nine flagged. A CPG/random collector for B1 has to be written, mirroring
+> `collect_gecko_dataset.py`.
+
+**2. Reward-quality gate -- CHECKED (2026-09-11, F195), and it FAILS.** F136 measured the insect
+teacher ranking *local perturbations of one action* at 33% against a 50% coin. Rebuilt on B1's own
+MuJoCo physics (F136's own script is tied to the insect/teacher-student pipeline and could not be
+reused directly), judged in real physics not by the model: **4.2% hit rate against 5.9% chance,
+at or below chance at every perturbation size tested (sigma 0.1/0.3/0.5).** Same shape as F136, on
+a different body, checkpoint, and physics engine. **Do not build the RL controller (step 3) on
+this checkpoint** -- the reward has no local gradient for PPO-style exploration to climb, and
+doing so now would very likely reproduce F179's collapse. **F179's whole arc was built on an
+unverified version of exactly this assumption and cost weeks; this gate existing and being
+checked before step 3, not after, is the fix for that mistake.** What is still open: whether a
+different checkpoint, objective, or fitting procedure could produce a locally-discriminative
+reward -- not attempted yet, and the natural next question rather than proceeding to step 3.
+
+**3. RL controller + WM reward** (W15-2) -- **blocked**, step 2 failed. Do not start this until a
+reward is found that clears step 2's gate.
+
+**4. History-state ablation** (W15-4) -- runs independently of the above, and would improve the
+reward in (3) if it works. See the contradiction note below before scoping it.
+
+### The contradiction that has to be resolved before either is written up
+
+The Week 15 notes say history-state "clearly improved" prediction. `FINDINGS.md`'s sequence-context
+kill-gates say all four architectures **failed**. Both readings come from the same numbers:
+
+| architecture | gap | vs stateless baseline 0.042 | vs pre-registered bar 0.110 |
+|---|---|---|---|
+| R0: mean-pool -> GRU | 0.036 | worse | fail |
+| full token grid + self-attention | 0.048 | better | fail |
+| attention-pool -> GRU | 0.058 | better | fail |
+| **ConvGRU (spatial + recurrent)** | **0.069** | **1.6x** | fail, **by the smallest margin** |
+
+**And `FINDINGS.md` states this backwards**: it calls ConvGRU *"the widest margin from the bar of
+any variant tried, not the closest"* when 0.069 is the **closest** of the four (0.041 from the bar).
+The "ruled out, not merely unconfirmed" verdict rests on that inverted sentence. **What is not in
+dispute: every kill-gate was a 2,000-iteration probe on one body, not a full pretrain** -- so
+whether a properly-resourced sequence model clears 0.110 is genuinely unknown, and the ablation the
+Week 15 notes propose is a real open question rather than a reopened dead one.
+
+### Status as of 2026-09-11: step 1 (B1 motor babble) is substantially done, three real sub-problems found, next is a clean redo not more patching
+
+**A genuine, no-policy CPG babble source for B1 now exists and covers all three families** (F190) --
+`sim/collect/collect_b1_cpg_babble.py`, forward/lateral solid (12/12, 12/12 on `batch2`), yaw real
+but weaker (5/12 whole-clip-dominant, the rest a real, acknowledged residual from a genuinely narrow
+gait-degeneracy fight, not swept under the rug). This closes the "does a babble collector even exist
+for B1" half of step 1.
+
+**The full 4-stage refit + hexapod rehearsal (F191) gives an honest, mixed verdict, not a clean
+pass**: forward fixed (100%), lateral real-but-partial (4/4 broken goal-reads -> 3/4, F186's
+rehearsal mechanism confirmed necessary a second time), yaw untestable with the current hexapod
+goal set (F192 explains why "untestable" and not "0%" is correct -- hexapod's own turning is
+forward-dominant, not a spin, at every measured condition). **The lateral goal-reading problem is
+real and NOT fixable by more horizon-tuning** (F192's sweep: at or below chance at every horizon 1
+to 20) -- it is a weak-but-real, magnitude-compressed visual signal, consistent with this project's
+own earlier insect-to-B1 probe transfer numbers (lateral correlation 0.39-0.43 against forward's
+0.50-0.63 in every view tested).
+
+**A second mechanism, `free_offset`, was built and tested (F193) and is a SEPARATE axis from
+goal-reading, not a fix for it.** It only changes which window of a *candidate's* actions gets
+scored -- it cannot repair a goal that was already misread. **Two real bugs were found and fixed in
+this mechanism, the second one from a rendered video, not a table** (a total freeze, then a
+catastrophic compounding drift that tipped a body onto its back over ~60 steps) -- read F193 for
+the numbers and do not quote any free_offset figure from before that entry's correction. Corrected
+conclusion: a small, real family-accuracy gain for babble over locked, but still worse than locked
+on the continuous distance metric in both goal modes -- opt-in flag on both `DirectFroudePlanner`
+and `close_loop_direct_froude.py --free_offset`, off by default.
+
+**Why the next move is a clean redo, not another one-off patch.** Across this arc, two different
+"free_offset=False, mode A, expert-fit+expert-candidate" numbers were produced by two different
+scripts (42% whole-clip-mean vs 96% windowed) and treated as the same cell before the mismatch was
+caught (F193). That is exactly the failure mode a scattered set of one-off diagnostic scripts
+produces. **The next experiment is a single, clean, end-to-end 2x2x2, built and run as one
+reproducible pipeline (one bash script, one saved log), not assembled after the fact from whatever
+scripts happened to exist:**
+
+| axis | values |
+|---|---|
+| fit/candidate pipeline (never crossed -- expert-fit only scored on expert candidates, babble-fit only on babble candidates) | expert-fit + expert-cand / babble-fit + babble-cand |
+| goal source | A (physics, privileged) / D (vision, via ITM) |
+| free_offset | False (locked) / True |
+
+All 8 cells measured with the SAME scoring mechanism throughout (windowed, matching what
+`DirectFroudePlanner` actually does -- not the older whole-clip-mean convention, which stays a
+separate, previously-reported number and must not be mixed into this table). Per-family (fwd/lat/
+yaw) breakdown reported for every cell, not just the aggregate, per F192's own lesson about
+aggregates hiding a channel-specific failure. The babble-fit leg of this should start from a fresh,
+from-scratch 4-stage fit (collection -> render -> stage 1-4 -> rehearsal -> scoring) run as one
+script, so the exact data/checkpoint provenance behind every one of the 8 numbers is reproducible
+and logged, not reconstructed from memory across several ad-hoc runs the way this session's numbers
+were.
+
+**Deferred, not blocking**: whether a future recurrent/persistent-history architecture would need
+`free_offset` and the current shuffle-tolerant per-transition fitting convention revisited (F193's
+closing note) -- explicitly not in scope until the adjacent-frame (current, memoryless) pipeline is
+finished being characterized.
+
+**CLOSED, 2026-09-11: babble is left open, not passed or failed -- and the methodology itself has a
+problem beyond the numbers, so no further babble-generation tuning is planned.** Two independent
+signals converge:
+
+1. **The numbers are ambiguous and metric-sensitive.** Family-match accuracy gives
+   `capture_ratio = 0.60` (clears 0.5); the continuous Froude-distance metric -- the more
+   trustworthy of the two, since family-match is a coarse proxy that was shown to actively hide a
+   real quality regression from `free_offset` (F193, confirmed on the corrected, bug-fixed numbers
+   too) -- gives `capture_ratio = 0.45` (fails 0.5) on the identical cell.
+2. **Watching the actual rendered closed-loop video (not the numbers), babble looks visually
+   unstable** -- worse in lateral than forward, and `free_offset` does not reliably fix or
+   correlate with the visual quality either. Neither the family-accuracy nor the Froude-distance
+   metric was ever built to catch this (both only check aggregate speed/direction, never joint
+   motion smoothness or stability), so this is a real, independent negative signal the numbers
+   cannot see or contradict.
+3. **The generation methodology quietly drifted from its own stated premise.** F190's own
+   constraint was "generic babble, no prior knowledge, not tuned to B1's known dynamics" (matching
+   gecko's/Egocentric VSM's CPG+noise method). In practice, reliably producing three DISTINCT,
+   LABELLED behaviour families required designing three SEPARATE, family-targeted mechanisms (a
+   strafe hip channel for lateral, a hip differential for yaw) -- injecting knowledge of how
+   quadruped locomotion produces different motion directions, even though no B1-specific tuning
+   was ever done. **This is a materially weaker claim than "undirected babbling produces usable
+   candidates"** -- it is closer to "three hand-designed motion primitives," which is a
+   per-body-designed library, not a body-agnostic no-prior-knowledge generator, and doesn't answer
+   the question Q21 originally asked.
+
+**Conclusion: stop tuning the babble generator further** (three iterations already tried -- CPG
+redesign F190, margin-fix v2, free_offset bugfix -- each ambiguous or negative) **and do not
+proceed to the reward-quality gate / RL controller work on the strength of the old 0.60 number.**
+Re-opening babble later would need either a genuinely undirected generation method (no
+family-targeted mechanisms at all) or an honest reframing of the claim to "designed motion
+primitives," not a resumption of parameter tuning.
+
+**Follow-up, same day: root-caused the D-mode gap as candidate-pool margin (expert 0% cross-family
+nearest-neighbour risk vs babble 19%), then tried and FAILED to fix it (v2 attempt, F194).**
+Pushing lateral's amplitude for a better margin measured in true/label Froude space did not move
+the real number at all -- margin has to be checked through a fitted checkpoint's PREDICTED Froude,
+not raw motion (the projector/body_head does not preserve true-space distances linearly). This is
+now a corrected standing rule (see memory), not resolved -- fixing the margin for real remains
+open and would need a margin-in-predicted-space-aware collection loop, not attempted yet.
+
+**Pre-registered bar for `scripts/run/b1_babble_clean_redo.sh`, before running (2026-09-11).**
+**Headline (this IS step 1's answer, read on its own, first)**: babble substitutes for the teacher
+library if `(babble, goal=A, free_offset=False)` >= `(expert, goal=A, free_offset=False)` AND
+clears `pool_chance()`, both numbers from this same script/run -- not F184's old whole-clip-mean
+42%, which is a different convention (F193). A good result in any OTHER cell does not substitute
+for this comparison. **Secondary reads, informative but not the headline**: (a) does
+`free_offset=True` help babble more than it helps expert -- the pre-registered test of the
+babble-messiness hypothesis (a messier candidate pool may need the free-offset search more than a
+clean one does); if babble only matches expert WITH free_offset, that is "babble needs free_offset
+to compete," a weaker claim than "babble replaces teacher," and must be reported as such, not
+folded into the headline. (b) does the vision goal (D) hold up against the physics goal (A) on
+each pipeline. When results land: report the full 8-cell table, but state the headline verdict
+from its own cell explicitly, separate from the two secondary reads.
+
+---
+
 ## Q20. Gecko's remaining gap is the video, not the method -- is a body this slow inside the claim's scope? (2026-09-10, rewritten same day after F189)
 
 **This question's original three candidates (adaptation budget / yaw telemetry / physics noise) are

@@ -2906,3 +2906,57 @@ gecko **+0.736** ≈ B1 +0.770 → พอให้ประวัติคำส
 **ทำความสะอาด FINDINGS.md ด้วย**: เรียงเลขใหม่ต่อเนื่อง F1-F189 (เดิมมีถึง F207 แต่มี 23 ตัวเป็น stub
 "Folded into FXXX" ที่ว่างเปล่า) และเขียนการอ้างอิง 1,113 จุดทั่ว repo ใหม่ทั้งหมดในพาสเดียว ตรวจแล้ว
 ไม่มีเลขซ้ำ ไม่มีช่องว่าง ไม่มี reference ค้าง (ตารางแปลงเลขเก่า→ใหม่อยู่ต้นไฟล์ FINDINGS.md)
+
+---
+
+## 31. รีวิว Week 15 จากพี่นาย/พี่แฮป — คอขวดคือแหล่ง candidate และโจทย์ใหม่คือ Controller (2026-09-10)
+
+**สรุปหนึ่งบรรทัด**: ผลปิดลูปทั้งหมดของเราใช้ candidate จาก**คลิปครูของ B1 เอง** ซึ่งหุ่นที่ไม่เคยมี
+controller จะไม่มี — พี่นายจี้จุดนี้ และเสนอให้ทำไปถึง **Controller (RL policy) จริง ๆ**
+
+**สิ่งที่พี่นายชี้ (ถูกต้อง)**: closed-loop ที่รายงานไป (Slide 30, F188) ให้คะแนน candidate ที่ดึงมาจาก
+คลิป expert ของ B1 เอง → **บน unseen body ไม่มีคลิปพวกนี้** กลไกที่โชว์ไปจึงยังย้ายไปหุ่นใหม่ไม่ได้
+(ซึ่งตรงกับปัญหา gecko ใน F189 พอดี แค่มองจากคนละด้าน)
+
+**ทางเลือกที่เขาให้ 2 ทาง**: (1) หา candidate generator เอง (CPG/noise) — **เรามีแล้วครึ่งหนึ่ง**
+เพราะ `collect_gecko_dataset.py` คือสิ่งนี้เป๊ะ และตรงกับวิธีของ Egocentric VSM ที่อ่านมา
+(2) **RL policy + WM reward** (เขาแนะนำ) — เอา Froude error เป็น reward term ใน PPO ธรรมดา
+
+**จุดที่ต้องแยกให้ชัด — ข้อ 2 ไม่ใช่สิ่งที่ F179 ฆ่าไปแล้ว**: F179 เทรน policy **ในจินตนาการของ FTM**
+(roll ~100 step, critic bootstrap ผ่านมัน) และตายเพราะ error สะสม — **ข้อเสนอนี้ไม่ roll FTM เลย**
+physics จริงเป็นคนเดินโลก WM แค่แจก reward ต่อ step → เลี่ยงกำแพงที่ฆ่า F179 ได้ทั้งหมด **ยังไม่เคยทดสอบ**
+
+**ลำดับที่เลือก (ไม่ใช่ลำดับที่เขาให้ — เหตุผลเต็มใน Q21)**:
+1. **B1 motor babble ก่อน** — ถูกสุด ใช้ลูปเดิมทั้งหมด และ **B1 เป็นหุ่นเดียวที่ตรวจคำตอบได้** (มีทั้ง
+   babble และ ground truth) ถ้า babble candidate ใช้ได้ คอขวดหายไปเลย ถ้าไม่ได้ ก็เป็นหลักฐานหนุนข้อ 3
+   - **กับดักที่เจอตอนเช็ครีโป**: `recollect_b1_noisy.py` **ไม่ใช่ babble** มันคือ PPO policy ที่เทรนแล้ว
+     + noise ถ้าเอามาใช้จะทำผิดโจทย์ซ้ำรอยเดิม ต้องเขียนตัวเก็บแบบ CPG สำหรับ B1 ใหม่
+2. **วัดคุณภาพ reward ก่อนสร้าง RL** — F136 วัดไว้ว่า teacher จัดอันดับ perturbation เล็ก ๆ ได้ 33%
+   เทียบเหรียญ 50% และ **PPO สำรวจด้วย perturbation เล็ก ๆ พอดี**
+3. RL controller + WM reward (ถ้าข้อ 2 ผ่าน)
+4. History-state ablation (แยกอิสระ)
+
+**แก้ข้อผิดพลาดใน FINDINGS.md ด้วย**: ประโยคที่ว่า ConvGRU *"fails by the widest margin from the bar,
+not the closest"* **ขัดกับตารางบรรทัดถัดไปของตัวเอง** — 0.069 คือ**ใกล้เกณฑ์ที่สุด**ในสี่ตัว (ห่าง 0.041)
+และเป็นตัวเดียวที่ชนะ baseline 0.042 แบบชัด (1.6 เท่า) ข้อสรุป *"ruled out"* ที่ตั้งอยู่บนประโยคนี้จึง
+ถูกปรับเป็น **"fails at this budget"** แทน เพราะ kill-gate ทั้งหมดเป็น probe 2,000 iteration บนหุ่นตัวเดียว
+ไม่ใช่ full pretrain — **ยังไม่มีใครรู้ว่าเทรนเต็มที่จะข้ามเกณฑ์ได้ไหม**
+
+**เอกสารที่แก้**: `feedbacks/feedback_ajan_go.md` (จัดฟอร์แมต Week 15 + เพิ่ม W13-1/2, W15-1..5 ใน
+ตาราง action items), `doc/OPEN_QUESTION.md` (Q21), `doc/direction_plan.md` (§1.3), `doc/FINDINGS.md`
+(แก้ประโยคที่อ่านตัวเลขกลับด้าน)
+
+---
+
+## 32. B1 ยืนและขยับด้วย CoppeliaSim-Bullet จริงได้แล้ว (2026-09-11)
+
+แก้ root cause ของการยุบเหลือ 0.23 m ได้: scene import เก็บ joint ทุกตัวที่ 0 rad แต่ probe ตั้งแค่
+motor target ไม่ได้ตั้ง initial joint position ทำให้ขาตรงทะลุพื้นตอน Bullet เริ่ม กำหนด
+`setJointPosition(DEFAULT_IL)` ก่อน start simulation แล้วผ่าน stand 100 steps (z สุดท้าย 0.5358 m,
+up.z ต่ำสุด 0.9998)
+
+เพิ่ม native diagonal-trot CPG ที่ไม่ใช้ policy จาก MuJoCo และผ่าน 160 steps / 8 s: เดินหน้า 0.177 m,
+ลื่นด้านข้าง 0.015 m, z >= 0.535 m, up.z >= 0.998. ค่า default ที่ผ่านคือ 0.5 Hz, thigh/calf
+amplitude 0.2 action units. รันซ้ำจาก scene ใหม่ได้ 0.178 m / drift 0.010 m ด้วย stability เท่าเดิม
+จึงไม่ใช่ผลครั้งเดียว. รายละเอียดเต็มอยู่ F196. งานถัดไปคือ reset/action/observation และ
+stop/forward/turn primitives สำหรับ simulator environment; ยังห้ามเริ่ม WM-reward RL เพราะ F195 ไม่ผ่าน gate.

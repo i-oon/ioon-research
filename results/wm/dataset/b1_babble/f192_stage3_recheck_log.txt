@@ -1,0 +1,13 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8888.87it/s]
+=== BEFORE stage3 ===
+  side_L_lvl0     true=[-0.013  0.015 -0.014] (lat)   vision=[0.03  0.076 0.015] (lat)  correct
+  side_L_lvl1     true=[ 0.012  0.068 -0.001] (lat)   vision=[0.012 0.055 0.005] (lat)  correct
+  side_R_lvl0     true=[-0.011 -0.023  0.02 ] (lat)   vision=[ 0.072 -0.011  0.03 ] (fwd)  FLIP
+  side_R_lvl1     true=[ 0.019 -0.123 -0.005] (lat)   vision=[ 0.014 -0.063  0.005] (lat)  correct
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  79%|███████▉  | 664/843 [00:00<00:00, 6625.03it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6451.27it/s]
+=== AFTER stage3 ===
+  side_L_lvl0     true=[-0.013  0.015 -0.014] (lat)   vision=[0.063 0.069 0.019] (lat)  correct
+  side_L_lvl1     true=[ 0.012  0.068 -0.001] (lat)   vision=[0.04  0.055 0.003] (lat)  correct
+  side_R_lvl0     true=[-0.011 -0.023  0.02 ] (lat)   vision=[ 0.077 -0.014  0.024] (fwd)  FLIP
+  side_R_lvl1     true=[ 0.019 -0.123 -0.005] (lat)   vision=[ 0.039 -0.052  0.006] (lat)  correct

@@ -172,17 +172,29 @@ class DirectFroudePlanner:
     this dimensionless speed", which is exactly this input.
     """
 
-    def __init__(self, projector, md, candidates, embodiment, horizon=5, device="cuda"):
+    def __init__(self, projector, md, candidates, embodiment, horizon=5, device="cuda",
+                free_offset=False):
         self.proj, self.md = projector, md
         self.candidates = candidates
         self.embodiment = embodiment
         self.horizon = int(horizon)
         self.device = torch.device(device)
         self.action_lag = 1
+        # **Additive, default-off.** `free_offset=False` (the default) reproduces the exact
+        # behaviour this class always had -- every candidate read at the SAME index `t` as the
+        # live episode, one score per candidate. This was a deliberate choice (F80/module
+        # docstring): free-phase distractors score 15 points HIGHER on the hexapod library, but
+        # were rejected because switching to a candidate at a mismatched phase emits a
+        # discontinuous joint command -- "an execution artefact, not a decision." `free_offset=True`
+        # revisits that specifically for candidates whose FRAMES are never used (only `actions`,
+        # via `body_head(proj(a))`) -- there is no visual-continuity reason offset must equal `t`,
+        # only the same physical discontinuity risk F80 flagged. Kept as an opt-in flag, not a
+        # replacement, so the original mechanism is always one flag away, not gone.
+        self.free_offset = bool(free_offset)
 
     @classmethod
     def from_checkpoint(cls, ckpt_path, candidates_dir, embodiment="b1", projector_path="",
-                        horizon=5, per_condition=1, device="cuda"):
+                        horizon=5, per_condition=1, device="cuda", free_offset=False):
         device = torch.device(device)
         checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         cfg = from_checkpoint(checkpoint["config"])
@@ -206,7 +218,7 @@ class DirectFroudePlanner:
         for p in proj.parameters():
             p.requires_grad_(False)
 
-        planner = cls(proj, md, cands, embodiment, horizon, device)
+        planner = cls(proj, md, cands, embodiment, horizon, device, free_offset=free_offset)
         planner.action_lag = max(1, cfg.action_lag)
         planner.cfg = cfg
         planner.channels = [int(c) for c in cfg.body_channels]
@@ -226,7 +238,15 @@ class DirectFroudePlanner:
     @torch.no_grad()
     def score(self, goal_std, t):
         """Predicted-versus-goal error for every candidate, lower is better. `goal_std` is
-        ALREADY standardised (see `standardize`), same units `body_head` outputs."""
+        ALREADY standardised (see `standardize`), same units `body_head` outputs.
+
+        `free_offset=False` (default): one score per candidate, its window fixed at `t` -- the
+        original behaviour, unchanged. `free_offset=True`: one score per candidate, but the BEST
+        of every valid offset within that candidate -- see `score_offsets` for the per-offset
+        detail this collapses. `act` uses that detail to know which offset won, `score` alone
+        cannot express it (kept this way so `score`'s return shape never changes)."""
+        if self.free_offset:
+            return np.asarray([np.min(row) for row in self.score_offsets(goal_std)])
         h = self.horizon_at(t)
         goal = torch.as_tensor(goal_std, dtype=torch.float32, device=self.device)
         out = []
@@ -239,12 +259,63 @@ class DirectFroudePlanner:
         return np.asarray(out)
 
     @torch.no_grad()
+    def score_offsets(self, goal_std):
+        """`free_offset=True` only: every candidate scored at EVERY valid start offset tau (not
+        just `t`) -- candidates never expose their frames to this planner, only `actions`, so
+        there is no visual-continuity reason a candidate's window must start at the live episode's
+        own step index. Returns one array of per-offset scores per candidate (ragged: candidates
+        need not share a length).
+
+        **Batched per candidate, one forward pass instead of one per offset.** `ActionProjector`
+        and `body_head` are plain per-timestep MLPs (no recurrence), so they broadcast over any
+        leading batch dim -- stacking every offset's window into one (n_taus, horizon, action_dim)
+        tensor and calling both once per candidate is exactly the same computation as the original
+        per-offset python loop, just not re-tracing the model n_taus times. Measured necessary, not
+        cosmetic: the per-offset loop made even a 40-goal/12-candidate sweep too slow to finish in
+        two minutes."""
+        goal = torch.as_tensor(goal_std, dtype=torch.float32, device=self.device)
+        out = []
+        for cand in self.candidates:
+            n = len(cand["actions"])
+            h = max(1, min(self.horizon, n - self.action_lag))
+            n_taus = max(1, n - self.action_lag - h + 1)
+            windows = np.stack([cand["actions"][tau + self.action_lag:tau + self.action_lag + h]
+                               for tau in range(n_taus)])           # (n_taus, h, action_dim)
+            a = torch.as_tensor(windows, device=self.device)
+            z = self.proj(a, self.embodiment)                        # (n_taus, h, z_dim)
+            pred = self.md.body(None, z).mean(1)                     # (n_taus, body_dim)
+            out.append(((pred - goal) ** 2).mean(-1).cpu().numpy())
+        return out
+
+    @torch.no_grad()
     def act(self, goal_std, t):
-        """The command to execute now, plus which candidate produced it and every score."""
+        """The command to execute now, plus which candidate produced it, every score, and the
+        candidate-internal index `tau` the command actually came from.
+
+        **Always returns a 4-tuple** `(action, i, scores, tau)` -- `free_offset=False` sets
+        `tau == t` (the original behaviour, unchanged), `free_offset=True` sets `tau` to whichever
+        offset scored best, independent of `t`. A caller that only reads a candidate's own
+        recorded MOTION (not just its action) at decision time -- e.g. a kinematic closed-loop
+        driver posing the body from `motion[i][t]` -- MUST index that motion by `tau`, not `t`,
+        under free_offset, or it will execute the wrong candidate's timeline while scoring a
+        different one. This is not a hypothetical: `close_loop_direct_froude.py`'s main loop did
+        exactly this before `tau` was threaded through.
+
+        `free_offset=True` is the mechanism F80 measured as 15 points more accurate and rejected
+        for the discontinuous joint command it can produce; call `action_jump`-style diagnostics
+        alongside this to see the size of that discontinuity before trusting the accuracy number
+        alone."""
+        if self.free_offset:
+            rows = self.score_offsets(goal_std)
+            i = int(np.argmin([np.min(r) for r in rows]))
+            tau = int(np.argmin(rows[i]))
+            cand = self.candidates[i]
+            return (cand["actions"][min(tau, len(cand["actions"]) - 1)], i,
+                   np.asarray([np.min(r) for r in rows]), tau)
         scores = self.score(goal_std, t)
         i = int(np.argmin(scores))
         cand = self.candidates[i]
-        return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores
+        return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores, t
 
 
 class RolloutFroudePlanner:

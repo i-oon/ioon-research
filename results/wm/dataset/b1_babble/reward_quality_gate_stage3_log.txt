@@ -1,0 +1,5 @@
+n_candidates per trial=17  chance=5.9%
+overall hit rate: 20.8%  (5/24)
+  sigma=0.10  hit rate=12.5%  (1/8)
+  sigma=0.30  hit rate=25.0%  (2/8)
+  sigma=0.50  hit rate=25.0%  (2/8)

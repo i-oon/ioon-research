@@ -155,6 +155,12 @@ def main():
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
     ap.add_argument("--horizon", type=int, default=5)
+    ap.add_argument("--free_offset", action="store_true", help="--mechanism direct only: let "
+                    "DirectFroudePlanner pick ANY offset within a candidate, not just the one "
+                    "matching the live step -- see wm/policy/planner.py's DirectFroudePlanner "
+                    "docstring. F80 measured this ~15pts more accurate and rejected it for the "
+                    "discontinuous joint command it can cause; off by default so the original, "
+                    "already-validated mechanism is the one you get unless you ask for this.")
     ap.add_argument("--steps", type=int, default=66)
     ap.add_argument("--warm_start", type=int, default=10)
     ap.add_argument("--travel", type=float, default=2.0)
@@ -188,7 +194,7 @@ def main():
     if args.mechanism == "direct":
         planner = DirectFroudePlanner.from_checkpoint(
             ckpt_path, os.path.join(ROOT, args.candidates_dir), args.embodiment, proj_path,
-            horizon=args.horizon, device=str(device))
+            horizon=args.horizon, device=str(device), free_offset=args.free_offset)
     else:
         planner = RolloutFroudePlanner.from_checkpoint(
             ckpt_path, os.path.join(ROOT, args.candidates_dir), args.embodiment, proj_path,
@@ -326,14 +332,50 @@ def main():
 
     frames, chosen, heads, quats, all_scores, ego_frames = [], [], [], [], [], []
     observation, ego_observation = pose(demo_motion["jpos"][0])
+    replan_t = replan_i = replan_tau0 = replan_sc = None
     for t in range(steps):
+        motion_idx = t   # overridden below only for --mechanism direct with free_offset=True
         if t < args.warm_start:
             i, label = demo_index, f"warm:{want}"
             src = demo_motion
             all_scores.append(np.full(len(planner.candidates), np.nan, np.float32))
         else:
             if args.mechanism == "direct":
-                _, i, sc = planner.act(goal, t)
+                # **`tau` is the candidate-internal index the chosen ACTION actually came from --
+                # under free_offset=True it is NOT `t`.** Reading this candidate's MOTION at `t`
+                # while its ACTION was scored/executed from `tau` would pose the body along one
+                # candidate's timeline while believing it is executing another point of it -- a
+                # real bug caught while wiring this through, not a hypothetical.
+                if args.free_offset:
+                    # `score_offsets` (and therefore `act`) does not depend on `t` at all, so
+                    # calling it fresh on any fixed schedule with an UNCHANGING goal returns the
+                    # IDENTICAL (candidate, tau0) every single time -- confirmed directly by
+                    # calling it twice back to back. **Re-searching on a periodic schedule (every
+                    # `horizon` steps) therefore does not advance anything -- it snaps back to the
+                    # same tau0 each time**, so the body replays the SAME short window (here, 5
+                    # frames) over and over for the whole episode. That window's own net dpos/dquat
+                    # over its 5 frames is not zero (measured: net dpos [0.032, 0.018, -0.057], a
+                    # real per-cycle sink and pitch) -- replaying it ~11 times compounds into a
+                    # catastrophic, smooth tip-over into the floor (measured: up.z 1.0 -> 0.40,
+                    # height +0.43 -> -0.09, below ground). Found from a video, not a table.
+                    #
+                    # Fix: replan ONCE (right after warm start), then let `tau` advance
+                    # CONTINUOUSLY for the rest of the episode -- never re-search on a schedule,
+                    # which is what caused the snap-back. Only re-search when the CURRENT window
+                    # actually runs out of the candidate's own recorded length, which is the one
+                    # principled reason to abandon progress and pick a new (candidate, tau0).
+                    if replan_t is None:
+                        _, replan_i, replan_sc, replan_tau0 = planner.act(goal, t)
+                        replan_t = t
+                    tau = replan_tau0 + (t - replan_t)
+                    if tau >= len(motion[replan_i]["dpos"]) - 1:
+                        _, replan_i, replan_sc, replan_tau0 = planner.act(goal, t)
+                        replan_t = t
+                        tau = replan_tau0
+                    i, sc = replan_i, replan_sc
+                else:
+                    _, i, sc, tau = planner.act(goal, t)
+                motion_idx = tau
             else:
                 # egocentric only -- the allocentric `observation` is for the saved video alone
                 e_t = encode_clip(encoder, np.asarray(ego_observation)[None], 1).float()
@@ -343,11 +385,12 @@ def main():
             all_scores.append(np.asarray(sc, np.float32))
             label = planner.candidates[i]["condition"]
             src = motion[i]
+        motion_idx = min(motion_idx, len(src["dpos"]) - 1, len(src["jpos"]) - 2)
         chosen.append(label)
-        pos = pos + quat_wxyz_to_R(quat) @ src["dpos"][t]
-        quat = quat_mul(quat, src["dquat"][t])
+        pos = pos + quat_wxyz_to_R(quat) @ src["dpos"][motion_idx]
+        quat = quat_mul(quat, src["dquat"][motion_idx])
         quat = quat / np.linalg.norm(quat)
-        observation, ego_observation = pose(src["jpos"][t + 1])
+        observation, ego_observation = pose(src["jpos"][motion_idx + 1])
         frames.append(observation)
         if ego_observation is not None:
             ego_frames.append(ego_observation)

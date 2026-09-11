@@ -1,5 +1,41 @@
 # Closed-loop runs
 
+**STALE WARNING (2026-09-11): the "Current runs" table below documents directories that no
+longer exist on disk** (`hex_trained`, `hex_unseen_zeroshot`, `b1_selfgoal_commit1`,
+`b1_hexgoal_arm1_frozen`, etc. -- none of these are present). What IS actually on disk right now
+and NOT described anywhere in this file:
+
+- `direct_froude/` -- the A/B/C/D mode-comparison grid, cited directly in FINDINGS.md (F187/F188).
+  **Do not touch.**
+- `b1_hexgoal_mse_s0_c*_hexapod_ep*/`, `b1_hexgoal_nce_s0_c*_hexapod_ep*/`,
+  `b1_mse_s0_c1_b1_ep*/`, `b1_nce_s0_c1_b1_ep*/` (60 directories, dated 2026-08-30) -- raw
+  per-episode evidence for the MSE-vs-InfoNCE stage-3 adaptation comparison documented in
+  `PROGRESS.md` (non-overlapping forward-progress ranges, MSE best 38% vs InfoNCE worst 71%;
+  turning stays at/below chance for both -- F93's headline "the objective, not the architecture,
+  is what makes cross-embodiment transfer work"). **Verified against PROGRESS.md/FINDINGS.md
+  (F93/F107/F110/F134) 2026-09-11 -- the numbers are captured in prose there, so these raw files
+  are no longer needed for the current pipeline. Moved to `_archive/` the same day.** InfoNCE
+  itself is not gone -- it is `wm.adapt3` (stage 3) in the current `wm.finetune_new_body`
+  pipeline, gated automatically by stage 2's rollout-gap ratio, and legitimately inactive for
+  babble-CPG actions (built for a PPO policy's one-to-many collapse, which babble doesn't have --
+  see F183, and F134 for why forcing it on cross-body would cost more than it buys).
+- `b1_babble_v2/` -- the closed-loop render from the 2026-09-11 babble-margin experiment (see
+  FINDINGS.md F194's v2 follow-up).
+- A handful of loose root-level `.npz` files (`a1_diagnostic*`, `f142_*`, `f144_*`,
+  `rl_loop_isolation_test*`, `ppo_p0_*`, `r0_regrounding_curve*`, `v5_twohot_closed_loop.npz`,
+  `ondist_disentangle.npz`) and `plan_without_library/`, `f142_video/` -- likely evidence for the
+  Dreamer/RL-wall investigation (F179 area) by naming convention (symlog, mc_check, hard_target,
+  twohot are all Dreamer-critic terms), but **not verified against FINDINGS.md citations yet --
+  treat as unconfirmed, do not archive or trust the table below for these.**
+- `_archive/` -- 2026-09-11 confirmed-safe-to-remove-from-top-level outputs: bug-hunting dirs
+  whose findings are already in F193, one abandoned render with a fabricated goal clip, and the
+  60 MSE/NCE directories above (verified against PROGRESS.md/FINDINGS.md before moving, not
+  guessed).
+
+**The table below is kept for its per-run methodology notes (what `--demo_dir` means, how to read
+S.R. vs median error) even though its specific directory names are gone -- read it for the
+concepts, verify any specific path against `ls` before trusting it points to something real.**
+
 Every run here is a `.npz` per episode holding the frames, the candidate chosen at each step, every
 candidate's score, and the body trace. Score them with
 

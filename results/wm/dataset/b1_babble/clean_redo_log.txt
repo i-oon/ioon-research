@@ -1,0 +1,513 @@
+=== stage 0: collect a diverse babble batch (forward/lateral/yaw, F190's validated params) ===
+steps=100  x_travel=+0.266m  y_drift=+0.029m  min_z=0.384  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.0_s0.npz
+steps=100  x_travel=+0.222m  y_drift=-0.008m  min_z=0.384  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.0_s1.npz
+steps=100  x_travel=+0.186m  y_drift=+0.068m  min_z=0.386  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.0_s2.npz
+steps=100  x_travel=+0.196m  y_drift=+0.065m  min_z=0.384  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.0_s3.npz
+steps=100  x_travel=+0.618m  y_drift=+0.057m  min_z=0.384  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.5_s0.npz
+steps=100  x_travel=+0.699m  y_drift=-0.006m  min_z=0.387  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.5_s1.npz
+steps=100  x_travel=+0.624m  y_drift=+0.163m  min_z=0.393  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.5_s2.npz
+steps=100  x_travel=+0.587m  y_drift=-0.113m  min_z=0.392  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f1.5_s3.npz
+steps=100  x_travel=+0.583m  y_drift=-0.097m  min_z=0.404  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f2.0_s0.npz
+steps=100  x_travel=+1.026m  y_drift=+0.048m  min_z=0.397  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f2.0_s1.npz
+steps=100  x_travel=+0.946m  y_drift=-0.073m  min_z=0.403  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f2.0_s2.npz
+steps=100  x_travel=+0.702m  y_drift=-0.089m  min_z=0.404  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/fwd_f2.0_s3.npz
+steps=100  x_travel=+0.090m  y_drift=-0.243m  min_z=0.378  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f0.8_s0.npz
+steps=100  x_travel=+0.052m  y_drift=-0.256m  min_z=0.380  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f0.8_s1.npz
+steps=100  x_travel=+0.087m  y_drift=-0.262m  min_z=0.379  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f0.8_s2.npz
+steps=100  x_travel=+0.076m  y_drift=-0.238m  min_z=0.379  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f0.8_s3.npz
+steps=100  x_travel=+0.154m  y_drift=-0.278m  min_z=0.376  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.0_s0.npz
+steps=100  x_travel=+0.211m  y_drift=-0.326m  min_z=0.372  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.0_s1.npz
+steps=100  x_travel=+0.124m  y_drift=-0.221m  min_z=0.369  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.0_s2.npz
+steps=100  x_travel=+0.114m  y_drift=-0.288m  min_z=0.371  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.0_s3.npz
+steps=100  x_travel=-0.098m  y_drift=-0.343m  min_z=0.369  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.2_s0.npz
+steps=100  x_travel=-0.055m  y_drift=-0.296m  min_z=0.370  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.2_s1.npz
+steps=100  x_travel=-0.128m  y_drift=-0.317m  min_z=0.369  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.2_s2.npz
+steps=100  x_travel=-0.069m  y_drift=-0.252m  min_z=0.368  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/lat_f1.2_s3.npz
+steps=100  x_travel=+0.155m  y_drift=+0.085m  min_z=0.379  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.2_s0.npz
+steps=100  x_travel=-0.030m  y_drift=+0.158m  min_z=0.381  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.2_s1.npz
+steps=100  x_travel=+0.165m  y_drift=+0.097m  min_z=0.381  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.2_s2.npz
+steps=100  x_travel=+0.153m  y_drift=+0.119m  min_z=0.383  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.2_s3.npz
+steps=100  x_travel=+0.076m  y_drift=+0.076m  min_z=0.374  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.5_s0.npz
+steps=100  x_travel=+0.097m  y_drift=+0.055m  min_z=0.371  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.5_s1.npz
+steps=100  x_travel=+0.209m  y_drift=+0.022m  min_z=0.377  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.5_s2.npz
+steps=100  x_travel=+0.116m  y_drift=+0.103m  min_z=0.376  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.5_s3.npz
+steps=100  x_travel=+0.131m  y_drift=+0.095m  min_z=0.370  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.8_s0.npz
+steps=100  x_travel=+0.086m  y_drift=+0.110m  min_z=0.371  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.8_s1.npz
+steps=100  x_travel=+0.046m  y_drift=+0.052m  min_z=0.375  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.8_s2.npz
+steps=100  x_travel=-0.014m  y_drift=+0.000m  min_z=0.373  walked
+saved -> results/wm/dataset/b1_babble/batch_clean/yaw_p1.8_s3.npz
+collected 36 clips
+=== stage 0b: render egocentric video for every clip (needed for stage 1's ITM/FTM fit) ===
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.7
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.0_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.4
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.0_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.6
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.0_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.5
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.0_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.2
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.5_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.5_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.9
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.5_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.6
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f1.5_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.9
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f2.0_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f2.0_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f2.0_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/fwd_f2.0_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 113.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f0.8_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 113.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f0.8_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 113.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f0.8_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 113.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f0.8_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.2
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.0_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.8
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.0_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.6
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.0_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.5
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.0_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.0
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.2_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.2_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.2_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/lat_f1.2_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.2_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.2
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.2_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.6
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.2_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 117.7
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.2_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.5_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.2
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.5_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.8
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.5_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 116.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.5_s3.npz
+    yaw aligned: start heading -1.0 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.8_s0.npz
+    yaw aligned: start heading -0.9 -> +0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 115.1
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.8_s1.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.7
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.8_s2.npz
+    yaw aligned: start heading -0.9 -> -0.0 deg
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+    ego camera: {'forward': [1.0, -0.0, -0.018], 'position': [0.389, -0.0, 0.923]}
+    floor x3.0: surface +0.000 -> +0.000
+    ground randomised, seed 0, applied to 18 shape(s)
+rendered (100, 256, 256, 3) from 100 traj steps  mean px 114.3
+saved -> results/wm/dataset/b1_babble/batch_clean_rendered/yaw_p1.8_s3.npz
+=== stage 1-2: wm.finetune_new_body (ITM/FTM adapt, then projector fit; stage 3 skipped 
+    per its own rollout-gap gate; default, non-rehearsed stage 4 also produced here) ===
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  78%|███████▊  | 655/843 [00:00<00:00, 6548.05it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6414.47it/s]
+
+adapted on 9 clips of b1, 1000 updates, final loss 4.1290
+  horizon   before    after    moves
+        1     1.56     1.82     0.51
+        3     1.57     1.85     0.55
+        5     1.58     1.85     0.57
+       10     1.57     1.83     0.60
+
+Ratios are against holding the frame still; 1.0 means no better than predicting no
+motion. `moves` is predicted displacement over actual -- near 0 would be a model that
+learned to sit still, which scores 1.0 by construction.
+-> wm/runs/b1_babble_clean/adapted_b1.pt
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+==============================================================================
+STAGE 1 -- adapt ITM+FTM to b1, everything else frozen
+==============================================================================
+
+$ /home/aria/ioon-research/.venv/bin/python3 -m wm.adapt --ckpt wm/runs/beh12_hexonly_stopgrad/best.pt --data results/wm/dataset/b1_babble/batch_clean_rendered --embodiment b1 --clips 9 --test_clips 10 --steps 1000 --lr 0.0001 --out /home/aria/ioon-research/wm/runs/b1_babble_clean/adapted_b1.pt
+
+
+==============================================================================
+STAGE 2 -- fit the action projector against the ADAPTED itm
+==============================================================================
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  83%|████████▎ | 700/843 [00:00<00:00, 6957.46it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6906.17it/s]
+-> /home/aria/ioon-research/wm/runs/b1_babble_clean/teacher_b1.pt
+         itm  from /home/aria/ioon-research/wm/runs/b1_babble_clean/adapted_b1.pt
+         ftm  from /home/aria/ioon-research/wm/runs/b1_babble_clean/adapted_b1.pt
+          md  from /home/aria/ioon-research/wm/runs/b1_babble_clean/adapted_b1.pt
+   projector  from /home/aria/ioon-research/wm/runs/b1_babble_clean/projector_b1.pt
+
+  **This is a merge of measured parts, not a trained model.** Stage 3 was deliberately
+  not run: every gate this teacher will be judged against was measured on these weights.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  80%|████████  | 676/843 [00:00<00:00, 6748.58it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6626.77it/s]
+36 clips, 1386 of 7128 transitions held out (7 clips)
+held out: ['fwd_f1.5_s2.npz', 'fwd_f1.5_s3.npz', 'fwd_f2.0_s0.npz', 'lat_f0.8_s1.npz', 'yaw_p1.2_s1.npz', 'yaw_p1.5_s0.npz', 'yaw_p1.5_s3.npz']
+
+fitting 8835 parameters, everything else frozen
+  before   train     MSE 1.9763   predicting the mean 1.1904   ratio 1.660
+  before   held out  MSE 1.3908   predicting the mean 0.9915   ratio 1.403
+  epoch  100  train 1.0230
+  epoch  200  train 0.9886
+  epoch  300  train 0.9620
+  epoch  400  train 0.9318
+  after    train     MSE 0.9315   predicting the mean 1.1904   ratio 0.782
+  after    held out  MSE 0.8378   predicting the mean 0.9915   ratio 0.845
+
+  ratio is against predicting the target's mean: **below 1.0 on the held-out clips is
+  the only line that means anything**, and a ratio near 1.0 there is a head that has
+  learned the dataset mean and nothing else -- which is what F120 measured this head
+  doing on the B1 before any fitting.
+
+-> /home/aria/ioon-research/wm/runs/b1_babble_clean/body_head_b1.pt
+b1: 36 clips, 3564 transitions gathered
+b1: 36 clips, 693 of 3564 transitions held out
+epoch   50  train 3.1470
+epoch  100  train 2.8887
+epoch  150  train 2.7759
+epoch  200  train 2.6927
+
+embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
+b1              3.2815      0.660        0.1376      0.715
+
+Ratio below 1.0 beats predicting the mean z; the rollout column is what a
+planner/selector actually consumes.
+-> wm/runs/b1_babble_clean/projector_b1.pt
+
+(stage 3 skipped -- stage 2's rollout gap ratio was 0.715; turn on --stage3 if this looks bad, near or above 1.0)
+
+==============================================================================
+merging stage 1 + stage 2 (wm.assemble_teacher) -- wm.fit_body_head needs one checkpoint carrying both
+==============================================================================
+
+$ /home/aria/ioon-research/.venv/bin/python3 -m wm.assemble_teacher --base /home/aria/ioon-research/wm/runs/b1_babble_clean/adapted_b1.pt --projector /home/aria/ioon-research/wm/runs/b1_babble_clean/projector_b1.pt --out /home/aria/ioon-research/wm/runs/b1_babble_clean/teacher_b1.pt
+
+
+==============================================================================
+STAGE 4 -- refit the shared body_head against the latent it will actually be shown
+==============================================================================
+
+$ /home/aria/ioon-research/.venv/bin/python3 -m wm.fit_body_head --ckpt /home/aria/ioon-research/wm/runs/b1_babble_clean/teacher_b1.pt --data results/wm/dataset/b1_babble/batch_clean_rendered --embodiment b1 --latent both --epochs 400 --out /home/aria/ioon-research/wm/runs/b1_babble_clean/body_head_b1.pt
+
+
+==============================================================================
+DONE
+==============================================================================
+stage 1 (adapted itm/ftm)  -> wm/runs/b1_babble_clean/adapted_b1.pt
+stage 2 (projector)       -> wm/runs/b1_babble_clean/projector_b1.pt
+merged/stage 3 checkpoint -> wm/runs/b1_babble_clean/teacher_b1.pt
+stage 4 (body_head)       -> wm/runs/b1_babble_clean/body_head_b1.pt
+=== stage 4b: refit body_head WITH hexapod rehearsal (F186's mechanism -- confirmed 
+    necessary a second time in F191, not optional) ===
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  35%|███▍      | 291/843 [00:00<00:00, 2863.94it/s]Loading weights:  69%|██████▊   | 578/843 [00:00<00:00, 2753.81it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2925.17it/s]
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  88%|████████▊ | 741/843 [00:00<00:00, 7406.28it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7174.16it/s]
+also fitting on 3098 transitions from ['hexapod=data/egocentric/beh12_c10f10t10_ego_flat']
+36 clips, 1386 of 7128 transitions held out (7 clips)
+held out: ['fwd_f1.5_s2.npz', 'fwd_f1.5_s3.npz', 'fwd_f2.0_s0.npz', 'lat_f0.8_s1.npz', 'yaw_p1.2_s1.npz', 'yaw_p1.5_s0.npz', 'yaw_p1.5_s3.npz']
+
+fitting 8835 parameters, everything else frozen
+  before   train     MSE 1.9763   predicting the mean 1.1904   ratio 1.660
+  before   held out  MSE 1.3908   predicting the mean 0.9915   ratio 1.403
+  epoch  100  train 2.1928
+  epoch  200  train 2.0939
+  epoch  300  train 1.9825
+  epoch  400  train 1.8865
+  after    train     MSE 1.0127   predicting the mean 1.1904   ratio 0.851
+  after    held out  MSE 0.8885   predicting the mean 0.9915   ratio 0.896
+
+  ratio is against predicting the target's mean: **below 1.0 on the held-out clips is
+  the only line that means anything**, and a ratio near 1.0 there is a head that has
+  learned the dataset mean and nothing else -- which is what F120 measured this head
+  doing on the B1 before any fitting.
+
+-> wm/runs/b1_babble_clean/body_head_b1_hex.pt
+=== stage 5: the corrected, single-mechanism 2x2x2 (F193's fix -- windowed scoring 
+    throughout, fit/candidate pairing never crossed, per-family breakdown always shown) ===
+
+--- expert-fit + expert-candidates ---
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+##### pool=expert  ckpt=wm/runs/b1_adapt/body_head_b1.pt  candidates=data/egocentric/beh12_b1_ego_flat #####
+
+=== goal A (physics)  free_offset=False ===
+  accuracy=96% (92/96)  chance=56%  boundary_jump median=1.0292 p95=3.3421  interior_jump median=0.3857
+    fwd  goals: 60/64 (94%)
+    lat  goals: 32/32 (100%)
+    yaw  goals: none in this goal set
+
+=== goal A (physics)  free_offset=True  ===
+  accuracy=100% (96/96)  chance=56%  boundary_jump median=2.4977 p95=4.1909  interior_jump median=0.5087
+    fwd  goals: 64/64 (100%)
+    lat  goals: 32/32 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  33%|███▎      | 281/843 [00:00<00:00, 2791.07it/s]Loading weights:  67%|██████▋   | 561/843 [00:00<00:00, 2791.96it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 2804.41it/s]
+=== goal D (vision)  free_offset=False ===
+  accuracy=100% (96/96)  chance=36%  boundary_jump median=0.6111 p95=1.2716  interior_jump median=0.3792
+    fwd  goals: 8/8 (100%)
+    lat  goals: 88/88 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  91%|█████████ | 765/843 [00:00<00:00, 7644.05it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7669.79it/s]
+=== goal D (vision)  free_offset=True  ===
+  accuracy=100% (96/96)  chance=36%  boundary_jump median=1.5515 p95=2.7017  interior_jump median=0.3757
+    fwd  goals: 8/8 (100%)
+    lat  goals: 88/88 (100%)
+    yaw  goals: none in this goal set
+
+--- babble-fit + babble-candidates (this run's own fresh checkpoint) ---
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+##### pool=babble  ckpt=wm/runs/b1_babble_clean/body_head_b1_hex.pt  candidates=results/wm/dataset/b1_babble/batch_clean_rendered #####
+
+=== goal A (physics)  free_offset=False ===
+  accuracy=69% (66/96)  chance=45%  boundary_jump median=1.0742 p95=3.0348  interior_jump median=0.2558
+    fwd  goals: 50/64 (78%)
+    lat  goals: 16/32 (50%)
+    yaw  goals: none in this goal set
+
+=== goal A (physics)  free_offset=True  ===
+  accuracy=92% (88/96)  chance=45%  boundary_jump median=0.5286 p95=0.8950  interior_jump median=0.1978
+    fwd  goals: 64/64 (100%)
+    lat  goals: 24/32 (75%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8755.68it/s]
+=== goal D (vision)  free_offset=False ===
+  accuracy=60% (58/96)  chance=49%  boundary_jump median=0.6547 p95=2.8442  interior_jump median=0.2521
+    fwd  goals: 50/88 (57%)
+    lat  goals: 8/8 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  89%|████████▉ | 754/843 [00:00<00:00, 7537.58it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 7599.19it/s]
+=== goal D (vision)  free_offset=True  ===
+  accuracy=83% (80/96)  chance=49%  boundary_jump median=0.4238 p95=0.8214  interior_jump median=0.1955
+    fwd  goals: 72/88 (82%)
+    lat  goals: 8/8 (100%)
+    yaw  goals: none in this goal set
+
+=== DONE ===
+data:      results/wm/dataset/b1_babble/batch_clean, results/wm/dataset/b1_babble/batch_clean_rendered
+checkpoints: wm/runs/b1_babble_clean/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt
+log:       whatever you piped this script's stdout/stderr to (see this file's Usage line)

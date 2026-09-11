@@ -9,6 +9,8 @@ be read as a tracker rather than re-read as minutes.
 | Week 5 | Phase 1 detail |
 | Week 7 | defending V-JEPA2, storytelling, slide corrections |
 | **Week 11** | **diagram, cross-embodiment head, occlusion, emergent property, action metric, next steps** |
+| Week 13-14 | first-person view, compute limits, base-walk validation, teacher rigor, joint vs Cartesian |
+| **Week 15** | **imagination-RL fails, Froude/detach/staged fixes, and the candidate-source bottleneck -> build a Controller** |
 
 ## Action items and status
 
@@ -26,6 +28,13 @@ be read as a tracker rather than re-read as minutes.
 | **W11-5** | **Design your own action-evaluation metric — the source paper only plots t-SNE/UMAP** | **done, and it is a contribution.** Per-leg contact transfer, identity ablation against a random-direction control, forward-model rollout against hold-still and constant-velocity, physical replay. All of it is ours; none of it is in LAC-WM |
 | W11-6 | Next: use the world model to accelerate policy training, show sample efficiency | **not started** — this is the deployment step |
 | W11-7 | Lab synthesis table: Beam (IRL) / Pram (Flow Matching) / Ioon (World Model) — which framework for which data | **not done** |
+| W13-1 | Run the full pipeline in sim and prove it holds up ONE robot walking, before any cross-body claim | **done, and it is Slide 30.** Live rendered closed loop on B1, 2x2 ablation A/B/C/D. Caveat he did not ask about but matters: it is kinematic replay, so it cannot fall — see W15-1 |
+| W13-2 | Send the git repo + slides so he can review the pre-training objective/loss | status unknown from these notes |
+| **W15-1** | **Candidate library is built from B1 ground-truth actions + noise — where do candidates come from on a genuinely unseen body?** | **the central open problem, and he is right.** Our own gecko work confirms it: gecko has no expert library at all, only babble |
+| **W15-2** | **Go all the way to a Controller (RL policy), not just ranking a library** | **not started.** He recommends option 2: Froude error from the WM becomes a reward term in vanilla PPO — no candidate library, no long imagined rollout |
+| **W15-3** | **Set the baseline now: Vanilla RL vs World-Model-Guided RL, to show sample efficiency + cross-embodiment transfer** | **not started, and it is the contribution claim.** Partial evidence exists: the clip-budget curve shows pretrained beats scratch at every budget (1-9 clips) on grounding — but that is grounding, not RL |
+| **W15-5** | **ลอง Motor Babbling บน B1 ก่อน แล้วดูว่าโมเดลเลือก candidate รอบ ๆ ได้ถูกไหม** | **ยังไม่ได้ทำ และเป็นตัวที่ถูกที่สุดที่ตอบ W15-1 ได้ตรงที่สุด.** B1 เป็นหุ่นเดียวที่มีทั้ง babble และ ground truth พร้อมกัน จึงตรวจคำตอบได้ — ต่างจาก gecko ที่ตรวจไม่ได้. **ข้อควรระวัง: `recollect_b1_noisy.py` ที่มีอยู่ ไม่ใช่ babble** (เป็น PPO policy + noise) ต้องเขียนตัวเก็บแบบ CPG/สุ่มใหม่ |
+| **W15-4** | **History State / Markov: pipeline should take a history, not one frame — then run a formal Single-step vs History ablation** | **open, and it collides with our own record.** The kill-gates say all four history architectures failed a 0.110 bar (best 0.069); the meeting note says history "clearly improved". Both readings are defensible from the same numbers — see the ⚠️ note in Week 15 §3. **What is certain: those were 2,000-iteration probes, not full pretrains, so the ablation is genuinely unresolved** |
 
 **Two of his asks are already answered by work done since**: W11-2 by the 4-leg few-shot result,
 and W11-5 by the measurement toolkit. Those should lead the next update rather than be buried.
@@ -259,3 +268,119 @@ and W11-5 by the measurement toolkit. Those should lead the next update rather t
 *   **ร่วมรีวิวฟังก์ชัน Objective ของ Pre-training:** พี่แฮปได้ขอให้ไออุ่นส่งลิงก์ Git Repository และไฟล์สไลด์นำเสนอมาให้หลังการประชุม เพื่อที่พี่แฮปจะเอาไปช่วยเปิดดูโค้ดการทำงานลึก ๆ และตรวจสอบว่าสมการ Objective / Loss ฟังก์ชันที่ใช้ในฝั่ง Pre-training ตอนนี้ใส่เงื่อนไขอะไรเอาไว้บ้าง เพื่อที่จะได้ช่วยวิเคราะห์หาสาเหตุและแก้ไขระบบร่วมกันต่อไปครับ
 
 ---
+
+
+
+
+### **Meeting Summary: P'Nine, P'Hap, Ioon (Week 15)**
+
+จากการประชุม **"p'nine (week 15).m4a"** ซึ่งไออุ่นได้นำเสนอผลการทดสอบเปรียบเทียบระบบควบคุม 2 รูปแบบหลัก ได้แก่ **Imagination RL (Dreamer-style)** และ **Action Selection (Direct/Rollout)** รวมถึงรายงานผลการดีบั๊กระบบครั้งใหญ่ที่ทำให้ Cross-Embodiment แม่นยำขึ้นมาก
+
+---
+
+## **ส่วนที่ 1 — สิ่งที่นำเสนอ (What was presented)**
+
+### **1. ผลการทดสอบ Imagination RL (Dreamer) และปัญหา Critic ไม่ลู่เข้า**
+*   **รูปแบบการทำงาน:** นำ World Model มาทำหน้าที่เป็น Critic (หรือ State Value Estimator) เพื่อประเมินคะแนน/รีวอร์ด แล้วส่ง Gradient กลับไปอัปเดตตัว Actor ให้เลือก Action ที่ถูกต้อง
+*   **ปัญหาที่พบ:** ตัว Critic **ไม่ยอมลู่เข้า (Not Converging)** ไม่สามารถสอน Actor ให้เลือก Action ได้ถูกต้อง ทั้งการใช้ **Gradient-based** และ **Sampling-based** ผลลัพธ์ไปติดสะดุด (Stuck) อยู่ที่ค่าเดียวกันประมาณ **0.27–0.28**
+*   **การพิสูจน์เทียบกับ Monte Carlo:** เมื่อเทียบกับค่า True Return แบบ Monte Carlo (เกณฑ์ผ่านคือ error ต่ำกว่า 0.25) พบว่าทั้งสองวิธียังห่างจากค่าที่ควรทำได้จริง
+*   **การทดสอบแช่แข็งค่าน้ำหนัก (Freeze Test):** ลองแช่แข็งพารามิเตอร์ทุกตัวใน World Model แล้วปล่อยให้อัปเดตเฉพาะ Actor ตัวเดียว ผลลัพธ์ Return ก็ยังติดสลักอยู่ที่เดิม
+*   **ข้อสรุป:** ปัญหาไม่ได้มาจากตัวอัลกอริทึม RL แต่มาจาก **ความสามารถของ World Model/Representation ที่ยังคายค่าประเมินได้ไม่ดีพอ**
+
+### **2. การค้นพบสำคัญและการแก้ไขระบบ (Key Breakthroughs & Technical Fixes)**
+*   **A. เปลี่ยนเป้าหมายการประเมินจาก Frame ไปเป็น Froude Number:** การบังคับให้ World Model ทำนายที่ **ภาพอนาคต (Next Frame)** ตรง ๆ เกิด Error และ Noise สูงมาก เพราะภาพแอบเก็บข้อมูลที่ไม่เกี่ยวกับไดนามิกการเดิน เช่น สี พื้นผิว สิ่งแวดล้อม — เปลี่ยนมาใช้ **Froude Number** (`Fr = v / sqrt(g·h)`) ซึ่งเป็นความเร็วไร้มิติที่สเกลตามความสูงฮิปและแรงโน้มถ่วง ทำให้หุ่นต่างขนาด (Stick Insect vs. B1) มีมิติเป้าหมายร่วมกันได้ **ผลคือ Cross-Embodiment Generalization ดีขึ้นชัดเจน**
+*   **B. ป้องกัน Gradient รั่วไหลไปยัง `z` (Latent Action):** Network ตัวแปลง Froude ส่ง Gradient กลับไปกระทบ `z` ทำให้ `z` เสียความสามารถแยกแยะท่าทาง — แก้ด้วยการ **Detach** ไม่ให้ Gradient จาก Head ตัวนี้ย้อนกลับไปอัปเดต `z` **ผลคือ `z` กลับมาแยกแยะความต่างละเอียด (speed/angle) ได้ดีขึ้นถึง 9 เท่า**
+*   **C. ลำดับการ Fine-tuning บน B1 (Staged Fine-tuning Protocol):** เดิม Fine-tune ทุกโมดูลพร้อมกัน ยิ่งทำยิ่งแย่กว่า Zero-shot — แก้ด้วยการล็อกและปล่อยทีละสเต็ป เริ่มจาก Freeze ตัวอื่นแล้ว Fine-tune Inverse & Forward Transition ก่อน แล้วค่อยขยับไป Action Projector **ผลคือ Correlation ที่เคยติดลบพลิกเป็นบวกสูงทันที**
+*   **D. Direct Action Projector vs. Rollout:** *Direct* = ยิงตรงจาก Goal/Froude ผ่าน Action Projector Head ไปเป็น Action; *Rollout* = ป้อน Frame + `z` เข้า World Model เพื่อเดา Next Frame แล้วค่อยถอดหา Action — **ผลคือ Direct ดีกว่า Rollout ชัดเจน** เพราะ Rollout ผ่านภาพอนาคตหลายสเต็ปมี Error สะสมและเลือกพฤติกรรมผิด
+*   **E. Vision vs. Proprioception ในการประเมิน Froude:** Froude ที่ประมาณผ่าน **Vision (กล้อง)** ให้ผลเลือก Action แม่นยำใกล้เคียงกับการคำนวณผ่าน **Physically-derived (Proprioceptive/IMU)** **สรุปได้ว่าตัดความจำเป็นในการพึ่ง Physical Sensor/Estimator บนตัวหุ่นออกได้**
+
+### **3. ข้อจำกัดของ Single-Step และการทดลองป้อน History State (Markov Assumption)**
+*   **ข้อจำกัดของการใช้ Single Step:** ไออุ่นชี้ว่างานวิจัยฝั่ง Locomotion ส่วนใหญ่จะไม่ทำนายโดยใช้เพียงสเต็ปปัจจุบันสเต็ปเดียว (Single-step) เหมือนที่เคยทำมา เนื่องจากในความเป็นจริง **ข้อมูลเพียงเฟรมเดียวไม่เพียงพอที่จะระบุสถานะทางกายภาพและความต่อเนื่องของการเคลื่อนที่ได้อย่างสมบูรณ์** (การสมมติว่าเป็น Markovian ด้วยข้อมูลสเต็ปเดียวนั้นไม่เพียงพอ)
+*   **ผลการทดสอบเบื้องต้น (Probing Test):** ทดลองปรับ Input ให้ป้อน **History State (เก็บสะสมข้อมูลย้อนหลังหลายไทม์สเต็ป)** เข้าไปด้วย ผลลัพธ์ปรากฏว่าประสิทธิภาพการทำนายและการประเมินพฤติกรรมดีขึ้นอย่างเห็นได้ชัด
+*   **ข้อสรุปและแผนถัดไป:** ไออุ่นยอมรับว่าการมองข้าม History State ในช่วงแรกเป็นข้อผิดพลาดในดีไซน์เดิม แผนถัดไปคือพัฒนาให้ Pipeline หลักรองรับ History State อย่างเต็มรูปแบบ เพื่อทำ **Ablation Study** เทียบ Single-step กับ History State อย่างเป็นทางการ
+
+> **⚠️ หมายเหตุจากการตรวจสอบกับ `doc/FINDINGS.md` (2026-09-10) — ข้อความนี้ขัดกับข้อสรุปที่บันทึกไว้ ต้องเคลียร์ก่อนเข้าเล่ม.**
+> การทดสอบ history/sequence-context ที่บันทึกไว้จริง (kill-gate 4 สถาปัตยกรรม, วัดด้วย action-lever gap, เกณฑ์ผ่าน **> 0.110**):
+>
+> | สถาปัตยกรรม | spatial? | recurrent? | gap |
+> |---|---|---|---|
+> | stateless single-step (baseline เดิม) | — | — | 0.042 |
+> | R0: mean-pool → GRU | ไม่ | ใช่ | **0.036** (แย่กว่า baseline) |
+> | full token grid + self-attention | ใช่ | ไม่ | 0.048 |
+> | attention-pool → GRU | ไม่ | ใช่ | 0.058 |
+> | **ConvGRU: spatial state + recurrent** | **ใช่** | **ใช่** | **0.069** (ดีสุด = 1.6x baseline) |
+>
+> **อ่านได้สองแบบ และทั้งคู่มีมูล:** (ก) *"ดีขึ้นชัดเจน"* — 3 ใน 4 แบบชนะ baseline 0.042 และตัวที่ดีที่สุดได้ 1.6 เท่า
+> (ข) *"ตกทั้งหมด"* — ไม่มีตัวไหนแตะเกณฑ์ 0.110 ที่ตั้งไว้ล่วงหน้าเลย
+>
+> **สิ่งที่ต้องแก้ก่อน:** `FINDINGS.md` เขียนว่า ConvGRU *"fails by the widest margin from the bar, not the closest"* ซึ่ง **ขัดกับตัวเลขในตารางของตัวเอง** — 0.069 คือ **ใกล้เกณฑ์ที่สุด** ในสี่ตัว (ห่าง 0.041) ไม่ใช่ไกลที่สุด ข้อสรุปที่ว่า *"ruled out, not merely unconfirmed"* จึงตั้งอยู่บนประโยคที่อ่านตัวเลขกลับด้าน
+>
+> **ข้อเท็จจริงที่ยังยืนอยู่แน่นอน:** kill-gate ทั้งหมดเป็น probe สั้น **2,000 iteration บนหุ่นตัวเดียว ไม่ใช่ full pretrain** เพราะฉะนั้น **ยังไม่มีใครรู้ว่าถ้าเทรนเต็มรูปแบบจะข้ามเกณฑ์ได้หรือไม่** — ซึ่งทำให้ Ablation Study ที่เสนอในหัวข้อนี้เป็นสิ่งที่ **ควรทำจริง** และเป็นการปิดคำถามที่ค้างอยู่ ไม่ใช่การรื้อของที่ตัดจบไปแล้ว
+
+
+### **4. สถานะ Motor Babbling: ทำไมยังไม่ได้ลองบน B1 ก่อน**
+*   **ติดปัญหาเทคนิคการ Import โมเดล B1:** ไออุ่นชี้แจงว่าเกิดจากปัญหาโมเดล B1 ที่นำเข้ามาในระบบแล้วยังรัน Babbling ไม่ได้ในขณะนั้น
+*   **ขยับไปลองกับ Gecko แทน:** จึงย้ายไปทดสอบ Motor Babbling กับ Gecko ก่อน เนื่องจากมองว่า **Gecko เป็นตัวแทนของ Unseen Body ที่ใกล้เคียงที่สุด เพราะไม่มี Controller หรือ Prior Knowledge มาก่อน** จึงลองฟิตสัญญาณ Sine wave และแอด Noise เพื่อสร้างคลัง Candidate Actions ขึ้นมา
+*   **ข้อเสนอจากพี่นายและการปรับแผน:** พี่นายตั้งคำถามว่า **ทำไมถึงไม่ลองทำ Motor Babble บน B1 ดูก่อน** ซึ่งไออุ่นเห็นด้วยและรับปากว่าจะกลับไปลองทำ Motor Babbling บน B1 ก่อน เพื่อดูว่าโมเดลเลือก Candidate Actions รอบ ๆ ได้ถูกต้องหรือไม่
+
+> **หมายเหตุ (2026-09-10): ข้อเสนอนี้แก้จุดอ่อนที่พี่นายเองชี้ไว้ใน §8 ได้ตรงจุดที่สุด และถูกกว่าทุกทางเลือกอื่น.**
+> เหตุผลเชิงวิธีวิจัย: **B1 คือหุ่นตัวเดียวที่เรามีทั้ง babble และ ground truth พร้อมกัน** — จึงเป็นที่เดียวที่ตอบได้ว่า
+> *"ถ้าเปลี่ยน candidate จากคลังคลิปครูไปเป็น babble ล้วน ๆ ระบบยังเลือกถูกอยู่ไหม"* โดยยังตรวจคำตอบได้
+> ถ้าทดสอบบน Gecko อย่างเดียว **จะไม่มีอะไรให้เทียบเลยว่าที่เลือกนั้นถูกหรือผิด**
+>
+> **สิ่งที่มีอยู่แล้วในรีโป และสิ่งที่ยังขาด — อย่าสับสนกัน:**
+> | | คืออะไร | นับเป็น motor babble ไหม |
+> |---|---|---|
+> | `scripts/dataset/recollect_b1_noisy.py` | **PPO policy ที่เทรนแล้ว + noise** (`--cmd_noise 0.0137`) | **ไม่** — ยังต้องพึ่ง controller ที่ทำงานได้อยู่แล้ว ซึ่งคือสิ่งที่ unseen body ไม่มี |
+> | `sim/collect/collect_gecko_dataset.py` | **CPG + noise ไม่มี controller เลย** | **ใช่** |
+>
+> เพราะฉะนั้น **"B1 babble" ตามที่พี่นายขอ ยังไม่มีจริงในรีโป** — ต้องเขียนตัวเก็บแบบ CPG/สุ่มสำหรับ B1 ใหม่
+> (แบบเดียวกับที่ `collect_gecko_dataset.py` ทำ) ไม่ใช่ใช้ `recollect_b1_noisy.py` ที่มีอยู่
+
+---
+
+## **ส่วนที่ 2 — ฟีดแบคและข้อถกเถียง (P'Nine & P'Hap Feedback)**
+
+### **5. ข้อสงสัยเรื่อง Imagination RL (Dreamer-style)**
+*   **การเปลี่ยน Objective ของ Critic:** พี่นายตั้งข้อสังเกตว่า หากนำ World Model มาทำหน้าที่เป็น Critic (ตัวประเมิน State Value) แทนการพ่นภาพอนาคต ตัว Objective ของ World Model จะต้องถูกปรับเปลี่ยนตามไปด้วย
+*   **การขยายความเรื่อง Critic ใน PPO:** พี่นายสอบถามเพื่อความชัดเจนว่า World Model นี้จะเข้าไป **Replace** ตัว Critic เดิมใน PPO ทั้งหมดเลย หรือเป็นเพียงมุมมองการให้ Reward Term เสริมในระบบ
+*   **จุดที่มีการอัปเดต Gradient:** พี่นายซักถามเชิงลึกว่าในขั้นตอนคำนวณ Loss เราเทียบกับ Froude Number หรือ next embedding frame/rollout และ Gradient ย้อนกลับไปอัปเดตพารามิเตอร์ที่จุดไหนบ้าง (Head ตัว Froude หรือใน World Model)
+*   **การ Freeze พารามิเตอร์เพื่อแยกแยะปัญหา:** ไออุ่นชี้ว่ามีการทดสอบแช่แข็ง World Model และตัวอื่น ๆ แล้วปล่อยให้อัปเดตเฉพาะ Actor — หาก Critic ประเมินถูกต้องแล้ว Actor ควรเรียนรู้ได้ดีขึ้น **แต่ผล Return ยังออกมาไม่ดีและห่างจาก True Return ของ Monte Carlo จึงพิสูจน์ได้ว่าปัญหาอยู่ที่ World Model/Critic เองที่ยังประเมินได้ไม่ดีพอ**
+
+### **6. การซักถามเรื่อง Staged Fine-tuning และ Direct vs. Rollout**
+*   **ลำดับการ Fine-tune กับ B1:** พี่นายสอบถามถึงข้อค้นพบและลำดับการปรับจูนว่าเหตุใดการ Fine-tune ทุกโมดูลพร้อมกันจึงได้ผลแย่กว่า Zero-shot และต้องเรียงลำดับ Freeze/Unfreeze อย่างไร
+*   **ความจำเป็นของ Action Projector:** ในประเด็นที่ Direct Projection อย่างเดียวให้ผลดีกว่า Rollout ไออุ่นเน้นย้ำเชิงโครงสร้างว่า ในการใช้งานจริง (Real Deployment) ระบบ**จะไม่มีภาพอนาคต (Next Frame) มาป้อนให้ Inverse Transition Model** ดังนั้นจึงจำเป็นต้องใช้ Action Projector ในการแปลง Action ของหุ่น
+*   **ข้อจำกัดกับ Unseen Body:** ไออุ่นระบุว่าหากนำไปใช้กับหุ่นตัวใหม่ (Unseen Morphology) ระบบจำเป็นต้องมีและ Fine-tune **Action Projector ตัวใหม่สำหรับหุ่นตัวนั้นเสมอ**
+
+### **7. ฟีดแบคเรื่อง Vision vs. Proprioceptive Sensors**
+*   **ตัวแปร Baseline ทางฟิสิกส์:** พี่นายสอบถามว่าตัวแปรที่ใช้คำนวณ Froude ทางฟิสิกส์ (Physically-derived) มีอะไรบ้าง ซึ่งประกอบด้วย **ความเร็วบอดี้, แรงโน้มถ่วง, และความสูงฮิป**
+*   **การยอมรับประสิทธิผลของ Vision:** พี่นายเห็นพ้องว่าการที่ข้อมูล Visual จากกล้องประเมิน Froude ได้ดีเทียบเท่า Proprioceptive Sensors **ช่วยตัดความซับซ้อนในการต้องสร้าง Sensor Estimator บนตัวหุ่นจริงออกไปได้**
+
+### **8. จุดคอขวดสำคัญที่สุด: Candidate Actions กับ Unseen Body**
+*   **จุดหลอกในการทดสอบ (Closed-loop Test Flaw):** พี่นายชี้ประเด็นคอขวดที่สำคัญที่สุดว่า ในการทดสอบ Action Selection ปัจจุบัน ไออุ่นใช้ **Ground Truth Action ของ B1 มาแอด Noise** เพื่อสร้าง Candidate Library ให้ World Model เลือก
+*   **คำถามจี้จุดเรื่องการใช้งานจริง:** หากนำไปใช้กับ **Unseen Body ที่ไม่มี Ground Truth Action มาก่อนในชีวิตจริง เราจะไปเอา Candidate Actions จากไหนมาให้ World Model เลือก Ranking?** — ประเด็นนี้เป็นจุดถกเถียงสำคัญที่สุดของสัปดาห์ที่ 15
+*   **ข้อกังวลของไออุ่นเอง:** วิธี Action Selection ที่ทำอยู่เป็นเพียงการดึง Candidate ที่มีอยู่แล้วในคลังมาต่อกันทีละสเต็ปเพื่อดูว่าโมเดลเลือก/เรียงลำดับได้ถูกหรือไม่ **ซึ่งยังไม่ใช่ Controller หรือ Policy ที่แท้จริง** ที่รับ State เข้ามาต่อเนื่องแล้วพ่น Joint Action ออกมาควบคุมหุ่นได้ด้วยตัวเอง
+
+### **9. ข้อเสนอของพี่นาย: ต้องทำไปให้ถึง Controller (RL Policy)**
+พี่นายเห็นด้วยว่า Controller ที่สมบูรณ์ควรป้อน Input เข้ามาเรื่อย ๆ แล้วคาย Action ออกมาควบคุมหุ่นได้เอง จึง **สนับสนุนให้ทำไปจนถึงการสร้าง Controller ใน Simulation** เพื่อปิด Loop งานวิจัยให้สมบูรณ์ โดยเปรียบเทียบ 2 แนวทาง:
+
+*   **แนวทางที่ 1: Action Selection + Candidate Generator (ทางที่ยากกว่า)**
+    *   ต้องหาวิธีสุ่มสร้างคลัง Candidate Actions (เช่น ใช้ **CPG**, Morphology Backbone หรือสุ่ม Noise รอบ ๆ สัญญาณกลาง) สำหรับ Unseen Body ให้อยู่ในช่วงใกล้เคียง Optimal
+    *   แล้วให้ World Model เลือกว่าจะหยิบ Action ไหนในคลังมาต่อกันทีละสเต็ป
+    *   *ข้อเสีย:* ต้องใช้การ Sampling เยอะมาก และไออุ่นไม่เคยทำแนวทางนี้มาก่อน
+*   **แนวทางที่ 2: RL Policy + World Model Reward (พี่นายแนะนำ — ง่ายและรัดกุมกว่า)**
+    *   **ไม่ต้องมีคลัง Candidate Action ใด ๆ ทั้งสิ้น** และไม่ต้องทำ Rollout ยาว ๆ แบบ Dreamer
+    *   นำ **Froude Number Error / Score** ที่ได้จาก World Model ไปแปลงเป็น **Reward Term** ใน RL Loop (เช่น Vanilla PPO) โดยตรง
+    *   ปล่อยให้ RL Actor เรียนรู้การพ่น Action ควบคุมหุ่นด้วยตัวเอง โดยมี World Model คอยให้ Reward Guide ว่าพฤติกรรมตรงกับ Goal หรือไม่
+
+### **10. คำแนะนำเรื่อง Baseline และ Contribution ของงานวิจัย**
+*   **การพิสูจน์คุณค่าของ World Model:** พี่นายเน้นย้ำให้รีบกำหนด Baseline ที่ชัดเจนเพื่อเปรียบเทียบผลลัพธ์
+*   **ข้อเสนอเปรียบเทียบ Baseline:** เทียบระหว่าง **Vanilla RL** (เทรน PPO จากศูนย์ ไม่มี World Model / Prior Knowledge) กับ **World Model Guided RL** (เทรน PPO โดยใช้ Pre-trained World Model + Froude Guide)
+*   **เป้าหมาย Contribution:** แสดงตัวเลขให้เห็นชัดว่า World Model ช่วย **ลด Training Time, เพิ่ม Sample Efficiency, และช่วยให้เกิด Cross-Embodiment Transfer** ได้ดีกว่าการเริ่มเทรนใหม่จากศูนย์อย่างไร
+
+### **11. สรุปแผนการดำเนินงานตามที่พี่นายสรุปให้**
+1.  **เลือกแนวทาง RL Policy + World Model Reward:** เพราะใช้ Effort น้อยกว่า (ไออุ่นคุ้นเคยกับ RL อยู่แล้ว) และไม่ต้องปวดหัวกับการสุ่มสร้าง Candidate Library
+2.  **ทดสอบใน Simulation:** ให้ RL Actor เรียนรู้ควบคุม B1 / Unseen Body โดยมี World Model เป็นตัวแจก Reward แล้วดูว่า Actor ลู่เข้าและเดินได้ตาม Goal หรือไม่
+3.  **วัดผลเทียบกับ Baseline:** เปรียบเทียบกับ **Vanilla RL** เพื่อแสดงว่า World Model ช่วยให้ Controller เรียนรู้เร็วขึ้น (Sample Efficiency) และช่วยถ่ายทอดพฤติกรรมข้ามร่างได้จริง
+
+หากทำ RL Policy ใน Simulation ด้วยวิธีนี้สำเร็จ จะสามารถเคลมผลงานวิจัยได้อย่างแข็งแกร่งว่าเป็น **Controller ที่ใช้งานได้จริง**

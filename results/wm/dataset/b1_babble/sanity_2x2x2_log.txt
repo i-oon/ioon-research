@@ -1,0 +1,29 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+##### pool=babble  ckpt=wm/runs/b1_babble_adapt2/body_head_b1_hex.pt  candidates=results/wm/dataset/b1_babble/batch2_rendered #####
+
+=== goal A (physics)  free_offset=False ===
+  accuracy=50% (24/48)  boundary_jump median=0.3582 p95=1.3345  interior_jump median=0.2216
+    fwd  goals: 18/32 (56%)
+    lat  goals: 6/16 (38%)
+    yaw  goals: none in this goal set
+
+=== goal A (physics)  free_offset=True  ===
+  accuracy=67% (32/48)  boundary_jump median=0.6569 p95=0.8950  interior_jump median=0.2070
+    fwd  goals: 24/32 (75%)
+    lat  goals: 8/16 (50%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  77%|███████▋  | 653/843 [00:00<00:00, 6527.08it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6441.50it/s]
+=== goal D (vision)  free_offset=False ===
+  accuracy=58% (28/48)  boundary_jump median=0.3347 p95=2.6953  interior_jump median=0.2614
+    fwd  goals: 24/44 (55%)
+    lat  goals: 4/4 (100%)
+    yaw  goals: none in this goal set
+
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights:  82%|████████▏ | 692/843 [00:00<00:00, 6905.27it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 6748.36it/s]
+=== goal D (vision)  free_offset=True  ===
+  accuracy=58% (28/48)  boundary_jump median=0.7507 p95=1.0040  interior_jump median=0.2314
+    fwd  goals: 24/44 (55%)
+    lat  goals: 4/4 (100%)
+    yaw  goals: none in this goal set
+
