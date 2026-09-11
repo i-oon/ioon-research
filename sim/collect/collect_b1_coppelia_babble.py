@@ -1,4 +1,4 @@
-"""Randomized, designed-primitive CPG pilot for B1 under live CoppeliaSim Bullet dynamics.
+"""CPG collection pilots for B1 under live CoppeliaSim Bullet dynamics.
 
     .venv/bin/python3 sim/collect/collect_b1_coppelia_babble.py --seed 1 \\
         --out data/b1_babble_coppelia/b1_1.npz
@@ -18,14 +18,12 @@ plumbing (scene, joint init, PID gains, camera, telemetry). **Nothing about the 
 below is re-derived -- every constant is imported or copied verbatim from whichever of the two
 files already measured it.**
 
-**Scope, stated honestly.** A diagonal trot plus separate strafe and pivot mechanisms injects
-locomotion knowledge for each requested family. This can test whether simple designed primitives
-make a useful candidate library; it cannot establish that undirected, no-prior-knowledge babble
-does so. Before expanding a pilot into a dataset, tune collection effort toward the goal-source
-Froude vocabulary (currently hexapod forward [0.12, 0.19], lateral [-0.12, +0.07], and no truly
-yaw-dominant goal), reject weak near-zero/barely-dominant clips, then fit/reuse a checkpoint and
-check cross-family nearest neighbours in *predicted* Froude space. True-Froude coverage alone is
-not an acceptance test.
+**Scopes, stated honestly.** `--cpg-mode designed` contains the old forward/lateral/yaw
+mechanisms and is diagnostic only: it is not undirected babble. `--cpg-mode generic` follows the
+Egocentric-VSM-style collection protocol: a predeclared quadruped CPG family, randomized CPG
+parameters, and Gaussian motor noise at every step. It has no command or behaviour-family input.
+It retains every rollout, including falls. Froude is logged for later reporting, never used to
+retain, reject, or tune an individual generic rollout.
 
 **Real rendered frames, unlike the MuJoCo version.** `collect_b1_cpg_babble.py` stores a `(steps,
 4, 4, 3)` placeholder because nothing downstream of it reads vision. This file captures real
@@ -90,13 +88,18 @@ def babble_action_at(t, freq, thigh_amp, calf_amp, phase_lag, bias, turn_bias, s
 
 
 def generic_cpg_action_at(t, frequency, amplitudes, phases, noise, rng):
-    """Apply one morphology-agnostic oscillator equation independently to all 12 joints."""
+    """Apply one shared-frequency sinusoidal CPG plus independent motor noise."""
     return (amplitudes * np.sin(2.0 * np.pi * frequency * t + phases)
             + rng.normal(0.0, noise, size=12)).astype(np.float32)
 
 
 def generic_stance_swing_action_at(t, frequency, amplitude, calf_ratio, noise, rng):
-    """Generic quadruped diagonal trot with an explicit planted/swing support cycle."""
+    """Generic quadruped diagonal stance/swing CPG plus independent motor noise.
+
+    This is a locomotion prior, not a behaviour controller: no requested velocity, turn, strafe,
+    body state, or outcome feeds into it. Its fixed phase table and hip/thigh/calf roles must be
+    held fixed across the collection; only predeclared sampled parameters and motor noise vary.
+    """
     action = np.zeros(12, np.float32)
     leg_phase = np.asarray([0.0, np.pi, np.pi, 0.0])  # FL, FR, RL, RR
     ramp = min(1.0, max(0.0, t / 1.0))
@@ -366,7 +369,8 @@ def main():
         "claim_scope": "designed_cpg_primitives_not_undirected_babble",
     })
     if args.cpg_mode == "generic":
-        config["claim_scope"] = "generic_normalized_joint_cpg"
+        config["claim_scope"] = "generic_quadruped_cpg_plus_per_step_motor_noise"
+        config["retention_policy"] = "retain_every_rollout_including_falls; no_froude_or_outcome_selection"
         config["sampled_cpg"] = {
             "frequency": generic_parameters["frequency"],
             "base_amplitude": base_amplitude,
