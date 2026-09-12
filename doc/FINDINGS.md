@@ -16689,6 +16689,40 @@ breakdown, and it was not checked against the reference config before the real 5
 launched. Verify every loss term against a reference checkpoint's saved config before a real run,
 not only that the run doesn't crash.
 
+**Unblocked and tested (2026-09-12): the fix does not propagate to B1's reward-quality gate.**
+`beh12_hinge_multistep_anchor_v2` (same settings, `lambda_body=0.5, body_dim=3, body_channels=[0,1,2]`
+added) retrained clean -- `body` term present and decreasing (0.9953->0.5091), everything else
+matching this entry's original shape. Adapted to B1 (4-stage pipeline, stage 3 correctly skipped --
+stage 2's own rollout-gap ratio was healthy at 0.270), then scored on F195's exact gate
+(`reward_quality_gate_b1.py`, same expert data `beh12_b1_ego_flat`):
+
+| | hit rate | chance |
+|---|---|---|
+| F195, expert-fit (old pretrain, `beh12_hexonly_stopgrad`) | 16.7% (4/24) | 5.9% |
+| F195, babble-fit (old pretrain) | 4.2% (1/24) | 5.9% |
+| **this checkpoint, expert-fit (hinge-multistep-anchor pretrain)** | **8.3% (2/24)** | 5.9% |
+
+**Same expert data as F195's own expert-fit row, so this is a direct, apples-to-apples comparison
+-- and it is not an improvement.** 8.3% sits between babble's 4.2% and expert's 16.7%, closer to
+neither than the other at this sample size (n=24, ~1.4 expected by chance), and does not clear a
+real margin over chance either way. **The honest reading: F199's hexapod-level fix, despite passing
+all three of its own pre-registered criteria there, does not carry through to a working B1
+reward-quality gate.** This closes the propagation question this entry's "blocked" status was left
+on, and it closes negative.
+
+**Checked, not assumed: `v2` is not a weaker hexapod checkpoint than the original -- it is a
+stronger one.** Before trusting the B1 result above, re-ran this entry's own verification
+(`rollout_fidelity.py --mean_z --family_mean`) on `beh12_hinge_multistep_anchor_v2` directly, since
+two full 50-epoch runs are never bit-identical and a weaker `v2` would have confounded the B1
+reading entirely. Result: `/mean-z` within-family **0.757 / 0.736 / 0.550 / 0.526 / 0.631** at
+horizons 1/2/3/5/10 -- lower (more action-sensitive) than the original run's 0.938/0.886/0.892/
+0.888/0.893 at every single horizon, some by a wide margin (0.892->0.550 at h=3). Raw prediction
+ratio is also modestly better (0.495-0.552 vs 0.516-0.576), still no divergence. **This rules out
+"the B1 result is confounded by a weaker v2" and makes the propagation-failure conclusion above more
+robust, not less**: a hexapod checkpoint that is MORE action-sensitive than the one that already
+passed F199's gate still failed to produce a usable B1 reward function. The bottleneck is
+specifically in B1's own adaptation stage, not in pretrain quality.
+
 ---
 
 ### F200. Current native-Coppelia B1 babble status: claim-honest and visibly walkable as a preview, but still below the pretraining Froude band
@@ -16722,3 +16756,37 @@ Coppelia controller remains undone.
 Scripts: `sim/collect/collect_b1_coppelia_babble.py`,
 `sim/collect/collect_b1_coppelia_fast_duty_preview.py`. Handoff:
 `results/wm/dataset/b1_babble/q22_handoff_prompt.md`.
+
+---
+
+### F201. Six independent, mechanistically distinct fixes for B1's reward-quality gate have now failed; the wall is characterized, not unmapped
+
+**The question this closes**: can `body_head(proj(action))` be made to discriminate real actions
+from perturbations well enough for PPO-style RL to explore (F195's gate, chance 5.9%)? Every
+distinct mechanism this project has for improving action-discrimination has now been tried, at
+real or exact strength, and scored against this same gate or an equivalent one:
+
+| # | fix | mechanism | result |
+|---|---|---|---|
+| 1 | stage-3 contrastive (`wm.adapt3`) | single-body condition-ID InfoNCE, full 15k-step budget | `family` 30% vs chance 27% -- not selection |
+| 2 | F141 hinge (no anchor) | rollout-level real-vs-null separation | diverged 3-4x past a frozen-frame baseline |
+| 3 | F178 counterfactual targets | remove the copy-the-input shortcut, exact B1 MuJoCo state-resume | null |
+| 4 | recurrence, 4 variants (R0, ConvGRU probe, full RSSM, ConvGRU full budget) | more temporal context | all fail (F198); full-budget ConvGRU worse than its own probe |
+| 5 | F199 hinge + multi-step anchor | fixes F141's actual diagnosed cause, passes its own 3 criteria on hexapod | **propagation to B1 fails** (this entry's coda): 8.3% vs F195's 16.7%/4.2%/5.9% chance, no real margin either way |
+
+**The pattern across all six**: mechanisms that operate entirely within B1's own adaptation stage
+(#1, #2, #3) fail outright. The one mechanism that produced a real, if modest, improvement (#5) did
+so at the PRETRAINING level, on hexapod -- and that improvement does not survive B1's own adaptation
+pipeline. This is consistent with, and sharpens, F142's original diagnosis: the action's causal
+weight on the next frame is under 3%, and every fix tried either doesn't touch that ratio at all
+(no propagation) or touches it and breaks something else (divergence). No fix has yet reshaped B1's
+own instance of this problem specifically.
+
+**Per this project's own standing rule for this shape of result** (converging, independently-
+confirmed nulls across mechanistically distinct approaches): the next move is writing this up as a
+fully characterized negative result, not a seventh mechanism. `doc/OPEN_QUESTION.md` Q21's step 3
+(RL controller) stays blocked on this. The fallback the thesis does not depend on this resolving:
+grounding and goal-conditioned selection (no RL, no rollout) already work on B1 using its own
+recorded behaviour library (F119-F127), unaffected by anything in this arc.
+
+Scripts/checkpoints: see F195, F198, F199 for each row's own detail.

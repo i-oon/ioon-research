@@ -278,14 +278,19 @@ checked before step 3, not after, is the fix for that mistake.**
 been attempted, five independent ways, at real/exact strength (F195, F197-F199).** Stage-3
 contrastive (`wm.adapt3`, full 15k-step budget) stays at chance; F141's hinge (without a matching
 multi-step anchor) diverges; F178's counterfactual targets fail exactly on B1; all four recurrent-
-architecture variants fail (closed above). **The one that worked: F199, adding the multi-step
-reconstruction anchor F141's own diagnosis called for but never tested** -- passes all three of
-F141's pre-registered criteria on hexapod pretraining, though the `/mean-z` gain is modest and a
-follow-up ceiling check shows it's close to what the data allows, not a large fix. **Blocked right
-now by a launch mistake** (the run omitted `--lambda_body`, so it has no `body_head` and can't be
-adapted to B1 yet) -- being redone. The decisive open question once unblocked: does this
-pretraining-level fix propagate through to the actual reward-quality gate on B1, or does B1's own
-adaptation stage reintroduce the same wall. Not yet known.
+architecture variants fail (closed above). **F199 (the multi-step reconstruction anchor F141's own
+diagnosis called for) passed all three of F141's pre-registered criteria on hexapod pretraining --
+but does NOT propagate to B1 (F199's coda, F201): 8.3% on F195's gate, no real margin over F195's
+5.9% chance and not an improvement on its own 16.7%/4.2% expert/babble baselines.**
+
+**CLOSED, 2026-09-12 (F201): six independent, mechanistically distinct fixes have now failed to
+produce a B1 reward function that clears its own gate.** Contrastive (stage-3), hinge without an
+anchor, counterfactual targets, four recurrence variants, and the anchored hinge that worked on
+hexapod but not B1 -- all null on the actual target. Per this project's standing rule for this shape
+of result: **do not attempt a seventh mechanism; step 3 (RL controller) stays blocked, and this is
+now a write-up-worthy characterized negative result, not an open engineering problem.** The fallback
+this thesis does not depend on resolving: grounding and goal-conditioned selection (no RL, no
+rollout) already work on B1 via its own recorded library (F119-F127).
 
 **3. RL controller + WM reward** (W15-2) -- **blocked**, step 2 failed. Do not start this until a
 reward is found that clears step 2's gate.

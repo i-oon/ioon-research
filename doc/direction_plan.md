@@ -50,13 +50,16 @@ mechanistically distinct fixes have now been tried at real/exact strength:
 | recurrence, 4 variants (R0, ConvGRU probe, full RSSM, ConvGRU at full budget) | give the model more temporal context | **F198: all fail.** Full-budget ConvGRU (-0.006 gap) is *worse* than its own 2000-iteration probe (+0.069); the field-standard full RSSM (pooled + stochastic, matching DreamerV3's own recipe) scored worst of every scorer measured in this project's history |
 | **F141's own missed fix: multi-step recon anchor + hinge** | `recon` extended to match the hinge's horizon (not just step 1), using existing `lambda_rollout` -- zero new code | **F199: passes all 3 of F141's pre-registered criteria for the first time.** No divergence, `/mean-z` within-family 0.886-0.938 and holds flat across horizon, separation rises and holds. A follow-up ceiling check (F199 coda) shows this is close to what the data allows (natural family separation in `z` is itself near 1.0) — real, modest, not a weak model leaving signal on the table |
 
-**F199 is the one live, promising thread.** Status right now: **blocked by a launch mistake** — the
-hexapod pretrain that produced it omitted `--lambda_body`, so it has no `body_head` module at all
-and B1 adaptation cannot proceed. Being redone (`beh12_hinge_multistep_anchor_v2`, same settings
-plus the missing flags); once it exists, the B1 adaptation chain needs a full redo too (stage 1
-depends on the pretrain checkpoint, not just stage 4). Next decisive step once unblocked: adapt to
-B1, rerun `reward_quality_gate_b1.py` (F195) — does a pretraining-level fix that works on hexapod
-propagate to the actual body this whole line is chasing.
+**Resolved, 2026-09-12, and it closes negative (F199's coda, F201).** The launch mistake was fixed
+and the full chain rerun: `beh12_hinge_multistep_anchor_v2` (with `lambda_body`) → full B1 adaptation
+→ `reward_quality_gate_b1.py`. Result: **8.3%, no real margin over F195's 5.9% chance, not an
+improvement on the 16.7%/4.2% expert/babble baselines already on record.** F199's fix is real on
+hexapod pretraining but does not propagate to B1. **This makes six independent, mechanistically
+distinct fixes (contrastive, hinge without an anchor, counterfactual targets, four recurrence
+variants, and now the anchored hinge) that have all failed to produce a usable B1 reward function
+(F201).** Per this project's standing rule for this shape of result: stop trying fixes, write this
+up as a characterized negative result. `doc/OPEN_QUESTION.md` Q21 step 3 (RL controller) stays
+blocked, permanently for this checkpoint family, not pending another attempt.
 
 **A separate, corrected understanding, not yet acted on (F197).** A prior claim in this project's
 own reasoning — that stage-3 InfoNCE "has a specific history of not transferring across bodies" —
