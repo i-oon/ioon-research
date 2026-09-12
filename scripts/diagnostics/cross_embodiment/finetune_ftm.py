@@ -74,7 +74,7 @@ def build(ckpt, pretrained, device):
     return cfg, itm, ftm
 
 
-def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
+def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
     One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
@@ -88,6 +88,15 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
     the 7-clip cell costs the same as the 1-clip cell and every cell gets the same number of
     updates -- which is also the comparison the table wants, since `pretrained` and `scratch` have
     to be given equal optimisation to be read against each other.
+
+    **`lambda_hinge` (off by default, 0.0): a single-step real-vs-null separation term, added
+    because plain MSE adaptation was measured to erode a pretrain's hinge-built action-sensitivity
+    by 38-62% over this same 1000-step B1 fine-tune** (`b1_adaptation_sep_check.py`, F199's B1
+    propagation-failure follow-up). Deliberately K=1, not the pretrain's K=2 -- `wm/train.py`'s
+    hinge diverged at K>1 without a matching multi-step reconstruction anchor (F141), and this
+    function's loss is already one-step, so a K=1 hinge is anchored by the exact same step the
+    MSE term already covers. Extending to K=2 would need this function's batching restructured
+    into multi-step windows first, which is a separate, bigger change -- not done here.
     """
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
@@ -103,11 +112,20 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8):
         e_t = e_cpu[s:t].to(device)
         e_next = e_cpu[s + 1:t + 1].to(device)
         z = itm(e_t, e_next)
-        loss = torch.nn.functional.mse_loss(ftm(e_t, z), e_next)
+        pred = ftm(e_t, z)
+        loss = torch.nn.functional.mse_loss(pred, e_next)
+        if lambda_hinge > 0:
+            z_null = itm(e_t, e_t)
+            null = ftm(e_t, z_null)
+            sep = 1 - torch.nn.functional.cosine_similarity(
+                pred.flatten(1), null.flatten(1), dim=1).mean()
+            hinge = torch.nn.functional.relu(hinge_margin - sep)
+            loss = loss + lambda_hinge * hinge
+            del z_null, null, sep, hinge
         loss.backward()
         opt.step()
         last = loss.item()
-        del e_t, e_next, z, loss
+        del e_t, e_next, z, pred, loss
     itm.eval(); ftm.eval()
     return last
 

@@ -114,6 +114,14 @@ def main():
                          "are nine distinct conditions, three per family.")
     ap.add_argument("--steps", type=int, default=1000, help="optimiser updates, not epochs")
     ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--lambda_hinge", type=float, default=0.0,
+                    help="off by default. A single-step (K=1) real-vs-null separation term, "
+                         "added because plain MSE adaptation measurably erodes a pretrain's "
+                         "hinge-built action-sensitivity (38-62% drop measured over this same "
+                         "1000-step budget, b1_adaptation_sep_check.py). Only turn on when "
+                         "adapting a checkpoint that was itself pretrained with lambda_hinge>0 -- "
+                         "there is nothing for this term to preserve otherwise.")
+    ap.add_argument("--hinge_margin", type=float, default=0.1)
     ap.add_argument("--horizons", type=int, nargs="+", default=[1, 3, 5, 10])
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--chunk", type=int, default=4)
@@ -152,7 +160,8 @@ def main():
     ftm.load_state_dict(checkpoint["ftm"])
 
     before, _ = rollout(itm, ftm, test_e, args.horizons, device)
-    loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device)
+    loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device,
+                lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin)
     after, moved = rollout(itm, ftm, test_e, args.horizons, device)
 
     print(f"\nadapted on {len(train)} clips of {args.embodiment}, {args.steps} updates, "
