@@ -6,8 +6,9 @@ This is no longer a Q22 test. The work only establishes a usable B1 model under 
 CoppeliaSim–Bullet dynamics and begins controller/babble development for a future clean F194
 2x2x2 rerun.
 
-**Important:** no clean/expert controller exists yet. The present CPG is experimental and is not
-yet an approved babble generator or dataset.
+**Important:** no clean/expert controller exists yet. The generic duty-cycle CPG is now a usable
+claim-honest babble preview, but it is **not the final babble dataset**: forward Froude is still
+well below the pretraining/expert band, and the final collection distribution has not been frozen.
 
 ## What is fixed
 
@@ -56,7 +57,8 @@ undirected motor babble.
 ## What is not done
 
 - **No Coppelia-native clean/expert policy or controller.**
-- **No valid Coppelia babble dataset.** Current presets are only feasibility probes.
+- **No final Coppelia babble dataset.** Current best is a valid preview seed, not a frozen
+  collection.
 - No robust behavior bank across both signs, magnitudes, and repeated seeds.
 - Lateral/yaw separation is weak; predicted-Froude margin has not been checked.
 - No environment-grade reset, command, observation, termination, or batch collection interface.
@@ -73,13 +75,13 @@ root, joint initialization, real frames, actions, contacts, and body-frame Froud
 
 - supports the exact egocentric camera/room convention;
 - writes a YAML record for every attempt, including falls, so survival rate remains measurable;
-- identifies itself as designed CPG primitives, not undirected/no-prior-knowledge babble.
+- separates designed diagnostic primitives from generic CPG + noise babble.
 
-It is **pilot infrastructure, not an approved collector**. Existing live-Bullet forward runs reach
-only Froude `0.0080–0.0094` (best earlier run `0.0101`), while useful positive hexapod goals reach
-`0.12–0.19`. This gap motivates deliberate over-collection with a broader, harder excitation
-envelope: tolerate and record falls, repeat settings, and retain the rare stable high-motion tail.
-Do not confuse this target-aware search with duplicating the same weak settings.
+It is **usable pilot infrastructure**, not the final dataset collector. Earlier designed forward
+runs reached only Froude `0.0080–0.0101`; the current generic duty-cycle preview reaches `0.0328`
+upright in egocentric render. Useful positive hexapod/expert goals are still around `0.10–0.20`,
+so the gap remains. Final collection must freeze the generic parameter distribution first, then
+retain every rollout including falls; do not select clips by measured Froude.
 
 Aggressive pilot completed 2026-09-12: 50 configurations x 3 repetitions, 150 full 160-step
 attempts (`coppelia_aggressive_pilot/{config.yaml,attempts.csv,ranking.csv}`). Overall survival was
@@ -119,17 +121,28 @@ lift/frequency grid had 12 upright runs; its best cell (`1.75 Hz`, amplitude `0.
 height varied only ~`0.4–2.1 mm`, versus rear `38–44 mm`; front-calf amplitude alone has little
 vertical leverage at this pose.
 
-**Current working seed:** `collect_b1_coppelia_generic_duty_cycle_babble.py` fixes a generic
-diagonal duty-cycle CPG (65% planted stance, 35% raised return) with the same joint role/phase
-prior and per-step motor noise. It replaced the weak sinusoidal stance movement; it is not a
-forward/lateral/yaw controller. Across 10 live-Bullet development checks, `0.75–2.0 Hz` at
-amplitude `0.18–0.20`, calf ratio `2.5`, all remained upright. A paired rendered run at `1.5 Hz`,
-amplitude `0.18`, seed 0 traveled `0.46 m / 8 s`, with Froude `+0.0253` allocentric and `+0.0261`
-egocentric; see `coppelia_generic_duty_cycle_pilot/`. The higher-amplitude boundary (`0.24+`) fell.
-This makes the motor babble physically usable and honest, but still ~4–5x below the useful
-positive expert/pretraining forward range. These are development diagnostics, **not yet an
-approved training dataset**, because the final parameter distribution must be frozen before
-collection.
+**Current best preview seed:** `collect_b1_coppelia_fast_duty_preview.py` fixes a generic diagonal
+duty-cycle CPG (65% planted stance, 35% raised return) at `2.0 Hz`, amplitude `0.24`, calf ratio
+`2.5`, noise `0.03`. It is not a forward/lateral/yaw controller and uses no policy, demo,
+retargeting, body feedback, or outcome selection. Egocentric render:
+`coppelia_fast_duty_candidate/f2.0_a0.24_s9_ego.mp4`. Result: upright 8 s, displacement
+`+0.596 m`, mean Froude `[+0.0328,+0.0026,-0.0062]`.
+
+Prior stable duty-cycle seed: `collect_b1_coppelia_generic_duty_cycle_babble.py` at `1.5 Hz`,
+amplitude `0.18`, seed 0 traveled `0.46 m / 8 s`, Froude `+0.0253` allocentric and `+0.0261`
+egocentric; see `coppelia_generic_duty_cycle_pilot/`.
+
+The old MuJoCo-scale sine amplitudes were tested in Coppelia. They can produce
+larger instantaneous motion but mostly dump energy into lateral roll and fall. Added fixed generic
+phase/sign-convention knobs for `trot-sine` and `duty-cycle` diagnostics:
+`--generic-trot-pairing`, `--generic-thigh-sign-layout`, `--generic-calf-sign-layout`. The best
+signed sine variants reached forward Froude `~0.03–0.05` briefly but lost height before 8 s. The
+harder duty-cycle edge at amplitude `0.30` reached `[+0.0366,+0.0029,-0.0115]` allocentric, but
+the paired egocentric rerun fell, so use `0.24` as the current safe preview.
+
+Status: babble is now visibly walkable and claim-honest as a preview, but still below the
+pretraining/expert forward range (`~0.10–0.20`). Do not treat it as the final babble dataset until
+the parameter distribution is frozen and collected without outcome filtering.
 
 Structured-sine check (`coppelia_trot_sine_diagnostic/`): explicitly tested the generic CPG the
 user proposed—diagonal leg phase, hip amplitude `0.05–0.10x`, thigh `1x`, swing-only calf
@@ -138,6 +151,202 @@ Froude. The calf phase sweep confirmed `-pi/2` is the useful sign: zero phase wa
 `+0.0096`, `+pi/2` moved backward, and `pi` almost stalled. Raising shared amplitude/lift or
 frequency again caused falls. This validates the generic structured CPG form, but not an
 expert-speed gait.
+
+## Actuator-vs-dynamics diagnosis (2026-09-12, continuation)
+
+Before spending more effort on CPG parameter sweeps, checked whether the frozen preview
+(`collect_b1_coppelia_fast_duty_preview.py`, forward Froude `+0.0316-0.0328`) is actually
+actuator-limited — the same question that, for gecko this session, turned out to have a real,
+fixable answer (a too-weak position-PID gain, not the gait shape). **For B1 the answer is
+different: it is not actuator-limited.**
+
+Measured directly from one run's own `joint_targets`/`joint_pos` (SDK order, `seed=9`):
+
+- Commanded joint range per cycle is small (thigh `~0.13-0.18 rad` peak-to-peak) and the required
+  tracking velocity implied by it is well under `1 rad/s` — nowhere near saturating any joint's
+  rated speed, unlike gecko's `~20 rad/s` demand against a `6 rad/s` cap.
+- Achieved/commanded range ratio is `0.61-0.85` across the 12 joints — a real but modest
+  tracking shortfall, not gecko's severe `~0.5x` saturation.
+- **Raising `--pid-p 300->500 --pid-d 5->8` at the identical frozen config did not close the gap
+  and instead caused a fall** (`up.z` collapsed from `0.995` to `-0.998` around step 140, worst
+  joint error jumped to `0.68 rad`) — tighter tracking under contact disturbances traded away
+  stability rather than adding authority, the same failure mode found and rejected for gecko's
+  active joints earlier this session (raising P without matched damping fights the very
+  disturbance it needs to absorb).
+
+**Read: the forward-Froude ceiling here is a genuine open-loop dynamic-balance limit, not an
+actuator-authority problem.** This independently confirms (with a mechanism, not just the
+empirical "amplitudes 0.30-0.40 rolled over" observation already on record) that Required next
+work #1 — a real feedback/IK controller — is the correct next step. Further CPG amplitude/gain
+sweeps on the open-loop controller are very unlikely to close the `0.03` vs `0.10-0.20` gap; that
+gap needs balance feedback, not a better-tuned open-loop waveform.
+
+## Amplitude/duty-factor push (2026-09-12, second continuation)
+
+User's direction: focus on generic babble, not the expert controller yet, and push the CPG
+harder even at fall risk (accepting open-loop instability as expected). A real multi-seed sweep
+(2-3 seeds per cell, `--screen-only`, fast iteration -- single-shot results are not trustworthy
+here, see the actuator-vs-dynamics section above) rather than more single-run guesses.
+
+**Amplitude alone, at the frozen shape (duty=0.65): survival collapses fast past ~0.28.**
+`0.28`: 2/3 upright. `0.32`: 1/3. `0.36`: 0/3. `0.40`: 0/3. Every fall past 0.28 is
+**lateral-dominant**, with a suspiciously consistent lateral Froude (~0.12-0.13) across very
+different configs -- almost certainly the signature of a fully-flipped resting pose, not
+meaningfully different physics each time (same pattern found for gecko's own fallen-state
+artifact earlier this session).
+
+**Hip channel ruled out as the driver.** Tested `--generic-gait-shape trot-sine
+--generic-hip-ratio 0.0` (hip fully zeroed) at amplitude 0.30-0.40: fell 6/6, same ~0.125-0.128
+lateral signature. The lateral instability comes from the thigh/calf trot mechanics themselves,
+not hip ab/adduction -- disproves the natural first hypothesis. `trot-sine` (pure sine) is also
+simply less stable than `duty-cycle` at every amplitude tested, confirming duty-cycle as the
+right base shape (already suspected, now confirmed by a losing counter-test).
+
+**`duty_factor` (stance/swing split) is the real lever, same mechanism as gecko's wave-gait
+fix.** Swept at amplitude 0.32 (partial-survival zone): `0.55`/`0.60` made it worse (0/2 each,
+more lateral). `0.70`: 1/2. **`0.75`: 3/3 upright** (confirmed with a third seed), forward-
+dominant, lateral Froude down to `~0.006` from `0.03-0.13` -- a real, large stability
+improvement from more of the cycle spent with feet planted (bigger support margin), not a
+speed increase. Same principle as gecko's diagonal-trot-to-wave-gait fix earlier this session.
+
+**But the ceiling itself did not move.** Re-swept amplitude at the improved `duty=0.75`:
+`0.32` survives (3/3, forward Froude `0.024-0.028`, close to the old best `0.0316-0.0328`, not
+higher). `0.34`: 1/3. `0.36`: 0/3. `0.38`: 1/3 (inconsistent). Past `~0.34`, falls return with
+the same ~0.12+ lateral signature regardless of the duty-factor fix. **Forward Froude tops out
+around `0.024-0.034` across every stable configuration found in this entire push, both before
+and after the duty-factor improvement.** The extra amplitude headroom `duty=0.75` bought went
+into stability margin, not speed.
+
+**Read.** This independently reinforces the actuator-vs-dynamics diagnosis above with a much
+larger sweep (not one config): the `~0.03` forward-Froude ceiling is a real wall for this
+open-loop CPG family, not an artifact of one under-tuned parameter set. `duty=0.75, amp=0.32` is
+a genuine improvement over the old frozen preview (same speed, better survival, 10x less lateral
+drift) and is worth adopting as the new default generic preview config -- but it does not close
+the gap to the `0.10-0.20` target. Further amplitude/duty/shape tuning on an open-loop controller
+is very unlikely to close it; this is now evidence from a real sweep, not a single-run guess.
+
+**New default preview**: `sim/collect/collect_b1_coppelia_wide_stance_preview.py` fixes this
+config (`freq=2.0, amp=0.32, duty=0.75, calf_ratio=2.5`). Full egocentric render across 4 more
+seeds (not screen-only, real frames/video, `results/wm/dataset/b1_babble/
+coppelia_wide_stance_preview/`): **3/4 upright** (seeds 6,7,8; forward Froude `0.0276-0.0283`,
+lateral `0.0013-0.0079`), **1/4 fell** (seed 5, kept as evidence, not discarded -- forward
+`0.0208`, lateral `0.0551` before falling). Consistent with the sweep's own survival rate; this
+config is meaningfully more reliable than the old preview but still not risk-free, matching the
+genuine open-loop marginal-stability story throughout this section.
+
+## Coupled joint mechanism, ported from Egocentric VSM's actual reference code (2026-09-12, third continuation)
+
+User pushback, correctly: assuming a competing paper secretly used closed-loop feedback (to
+explain why their open-loop CPG is stable) without checking is not a finding, it's an excuse.
+Their reference implementation is available locally (`doc/ref/Egocentric_VSM/env_agent.py`,
+`move_altas`) and was read directly rather than assumed.
+
+**Their "CPG" is not a per-joint sinusoid at all.** It is a 3-phase discrete cycle where only ONE
+number per leg is actually randomized (hip); the other two joints are fixed LINEAR functions of
+it (`knee = 0.6 - hip`, `ankle = -(hip+knee)`) that keep the foot's orientation coherent through
+the whole stride, by construction. This is a design-time kinematic prior, not real-time feedback
+-- it never reads robot state. Every B1 gait shape tried before this (including the
+`duty=0.75, amp=0.32` config adopted above) independently modulates hip/thigh/calf with separate
+sines/ratios/phases; nothing enforced the calf staying kinematically coherent with the thigh's
+own swing.
+
+**Ported directly**: `generic_coupled_action_at` (`sim/collect/collect_b1_coppelia_babble.py`),
+`calf = -coupling_ratio * thigh`, pure coupling, no independent calf motion at all. Tested first:
+only `coupling_ratio=0.6` survived (of 0.3/0.6/1.0/1.5), and even that barely moved (forward
+Froude `0.0039`) -- the foot never actively lifts, so it likely drags the whole stride.
+
+**`generic_coupled_duty_action_at`: coupling during stance, one active clearance arc during
+swing** (the same stance/swing split as the duty-cycle shape, but the calf follows the thigh
+algebraically while planted instead of staying at a fixed neutral). This is the real result:
+
+- `coupling_ratio=0.6, duty_factor=0.65, freq=2.0`, amplitude swept 0.20-0.30, 4 seeds each.
+- **Amplitude 0.20-0.28: 20/20 upright.** Lateral Froude consistently under `0.003` across
+  every single run -- roughly 10-40x straighter than any uncoupled config in the amplitude/
+  duty-factor push above (lateral there ranged `0.006-0.13`). Forward Froude `0.017-0.026`.
+- Amplitude 0.29-0.30: survival starts dropping (6/8) -- a real, sharp edge, not a gradual one.
+- **This does not break the `~0.03` forward-Froude ceiling** -- speed is comparable to, not
+  higher than, the uncoupled best. The win is reliability and straightness, not raw speed.
+
+Confirmed with real egocentric render, not just screen-only: 3/3 more seeds (10,11,12) upright,
+`results/wm/dataset/b1_babble/coppelia_coupled_duty_preview/`. **New default preview**:
+`sim/collect/collect_b1_coppelia_coupled_duty_preview.py`
+(`freq=2.0, amp=0.28, coupling_ratio=0.6, duty=0.65`) -- 23/23 survival across every render and
+sweep run at this setting, the most reliable generic config found in this entire investigation.
+
+**Read.** The coupling mechanism is real and load-bearing for stability -- confirms the user's
+instinct that Egocentric VSM's method was worth copying, once actually read rather than assumed.
+It does not, on its own, close the `0.03` vs `0.10-0.20` speed gap; that gap's diagnosis (real
+open-loop dynamic-balance ceiling, actuator-vs-dynamics section above) still stands. Next test
+worth running: does the coupling mechanism's stability margin allow a HIGHER frequency (more
+strides/second at the same safe amplitude) to close some of the speed gap, since frequency was
+not yet swept combined with coupling.
+
+## Frequency push on the coupled-duty gait (2026-09-12, fourth continuation)
+
+User's direction: Froude has to actually match or close the gap toward the target distribution,
+not just be reliable. The coupled gait's stability margin (previous section) had not yet been
+spent on speed -- pushed frequency next, since amplitude alone was already shown to plateau.
+
+**Frequency, at the reliable amp=0.28: real gains, then a sharp wall.** 2.5/3.0/3.5/4.0/4.5 Hz
+all 3/3 upright with forward Froude climbing smoothly (`0.024 -> 0.027 -> 0.031 -> 0.032 ->
+0.036`). **5.0 Hz: falls outright (0/3)**, a sharp edge, not gradual. 4.6 Hz confirmed as the
+reliable ceiling at this amplitude (3/3, Froude `0.034-0.037`).
+
+**Trading amplitude for frequency unlocked a real, substantial jump.** Lower amplitude bought
+back stability margin at higher frequency: `amp=0.22, freq=5.0` -- 3/3 upright, Froude
+`0.046-0.050`, a genuine step up, not noise. Below that (amp `0.15-0.18`) frequency alone stopped
+helping (Froude fell back to `0.016-0.037`) -- confirms this is a real sweet spot, not a
+monotonic amplitude-down/frequency-up trend. Refined around it: `amp=0.24, freq=5.0` -> Froude
+`0.053-0.054` (3/3). **`amp=0.26, freq=5.0` -> Froude `0.055-0.058`** (3/3 on the first seed
+batch). `amp=0.28` at this frequency falls outright (0/3) -- confirms `0.26-0.28` is the real edge
+at `freq=5.0`, matching the same kind of sharp cliff found throughout this whole investigation.
+
+**Honest correction, not held back**: a second seed batch (20-22) at the `amp=0.26, freq=5.0`
+"best" point only survived **1/3**, not 3/3 -- combined across both batches this is
+**4/6 (67%) survival**, not the clean win the first batch suggested. Genuine seed-to-seed
+non-determinism (same root cause characterized in the actuator-vs-dynamics section: Bullet's
+contact solver, amplified by this gait being right at its stability edge) means this specific
+peak is real but not fully reliable. Froude at this setting, across all 6 seeds tried:
+`0.043-0.058`.
+
+**Read.** Forward Froude nearly doubled from the original `~0.03` ceiling to `0.05-0.06` at the
+best point found (`amp=0.26, freq=5.0`) -- genuine, substantial progress toward the `0.10-0.20`
+target, not there yet but meaningfully closer. The speed/reliability trade-off is now real and
+explicit: `amp=0.28, freq=4.6` is the reliable choice (Froude `~0.035`, high survival across
+every seed tried), `amp=0.26, freq=5.0` is the fast choice (Froude `~0.05`, `~67%` survival).
+Given this project's own retain-every-rollout babble philosophy, the faster/less-reliable point
+may still be an acceptable final distribution choice -- falls are valid data, not discarded --
+but that is a real decision to make explicitly, not a free win.
+
+## Airtime (duty-factor) beats amplitude as the speed lever (2026-09-12, fifth continuation)
+
+User's instinct, directly correct: "higher amp or airtime." Amplitude alone (previous section)
+found a real but unreliable peak (`amp=0.26, freq=5.0, duty=0.65`: 4/6, 67%). Tested airtime
+(lowering `duty_factor` -- more swing/less stance) at the same frequency instead of pushing
+amplitude further.
+
+**`duty=0.55/0.60` at the already-reliable `amp=0.22, freq=5.0`: better speed AND better
+reliability than pushing amplitude.** 8/8 upright (both duty values, 4 seeds each), Froude
+`0.052-0.056`, lateral drift tiny (`0.002-0.010`) -- beats the amplitude-pushed peak on every
+axis at once. `duty=0.50` (max airtime) actually gave slightly LESS speed (`0.045-0.049`) than
+0.55/0.60 -- confirms `~0.55-0.60` is a real local optimum, not "more airtime is always better."
+
+**Combined with amplitude back up: the actual best config found in this whole investigation.**
+`amp=0.26, duty=0.55, freq=5.0, coupling_ratio=0.6`: **11/11 upright** across every seed tested
+(8 screen-only + 3 full egocentric renders, not just fast screening) -- fully reliable, not a
+lucky batch. **Forward Froude 0.050-0.063.** `amp=0.28` at `duty=0.55` starts failing again
+(1/4) -- the amplitude ceiling itself did not move, but duty=0.55 lets amp=0.26 be reliably used
+where duty=0.65 could not.
+
+**New default preview**: `sim/collect/collect_b1_coppelia_fast_air_preview.py`. Rendered,
+`results/wm/dataset/b1_babble/coppelia_coupled_duty_air_preview/`.
+
+**Read.** Forward Froude has now roughly DOUBLED from the original uncoupled ceiling (`~0.03` ->
+`0.05-0.06`), fully reliably, not as an unstable peak. Still short of the `0.10-0.20` target, but
+this is the closest and most solid point found across this entire investigation. Lateral/yaw
+drift (`0.006-0.028`) is higher than the straightest configs (duty=0.65's `~0.003`) but still far
+below anything the uncoupled gaits produced (`0.03-0.13`) -- a real, worthwhile trade for the
+speed gained.
 
 ## Required next work
 

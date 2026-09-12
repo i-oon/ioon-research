@@ -11,14 +11,15 @@ b1_deployment/deploy_mujoco.py.
   python3 sim/collect/rollout_b1_mujoco.py --vx 0.4 --schedule "1@0.4 0@0.2 1@0.4" --steps 300 ...
 """
 import argparse
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 import mujoco
 
-MODEL = "/home/aria/Sim2Real-B1/b1_ws/src/b1_mujoco/model/b1_flat.xml"
-CKPT = ("/home/aria/Sim2Real-B1/ppo_policy/logs/ppo_b1/sysid_real/"
-        "with_ideal_gain/base_gait3/model_600.pt")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL = os.path.join(ROOT, "sim/assets/b1_mujoco/b1_flat.xml")
+CKPT = os.path.join(ROOT, "sim/assets/b1_policy/base_gait3/model_600.pt")
 
 IL_TO_SDK = np.array([3, 0, 9, 6,  4, 1, 10, 7,  5, 2, 11, 8])
 def sdk_to_il(v): return np.asarray(v)[IL_TO_SDK]

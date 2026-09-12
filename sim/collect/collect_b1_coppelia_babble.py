@@ -112,27 +112,69 @@ def generic_stance_swing_action_at(t, frequency, amplitude, calf_ratio, noise, r
     return action
 
 
+def generic_trot_pair_phases(pairing):
+    """Return FL, FR, RL, RR leg phases for one fixed generic gait.
+
+    `diagonal`/`left-right`/`front-rear` are 2-group gaits: exactly 2 legs share each phase, so
+    at most 2 feet are ever down at once (a diagonal trot's own structural ceiling -- see
+    `q22_handoff_prompt.md`'s reaction-torque/support-margin discussion). `wave` is a genuinely
+    different structure: each leg offset by a quarter cycle (the standard real-quadruped walk
+    footfall order, LF -> RH -> RF -> LH), so a high enough duty factor keeps 3+ feet down almost
+    always -- the biggest support base this generic family can produce, same principle as
+    gecko's own diagonal-trot-to-wave-gait fix earlier this session. Still a fixed, predeclared
+    phase table -- no feedback, no behaviour-family input.
+    """
+    if pairing == "diagonal":
+        return np.asarray([0.0, np.pi, np.pi, 0.0])
+    if pairing == "left-right":
+        return np.asarray([0.0, np.pi, 0.0, np.pi])
+    if pairing == "front-rear":
+        return np.asarray([0.0, 0.0, np.pi, np.pi])
+    if pairing == "wave":
+        # FL, FR, RL, RR phases for footfall order LF(0) -> RH(RR, 1/4) -> RF(1/2) -> LH(RL, 3/4)
+        return np.asarray([0.0, np.pi, 0.5 * np.pi, 1.5 * np.pi])
+    raise ValueError(f"unknown generic trot pairing: {pairing}")
+
+
+def generic_leg_signs(layout):
+    """Fixed coordinate sign maps in IL leg order FL, FR, RL, RR."""
+    if layout == "same":
+        return np.asarray([1.0, 1.0, 1.0, 1.0])
+    if layout == "left-right":
+        return np.asarray([1.0, -1.0, 1.0, -1.0])
+    if layout == "front-rear":
+        return np.asarray([1.0, 1.0, -1.0, -1.0])
+    if layout == "diagonal":
+        return np.asarray([1.0, -1.0, -1.0, 1.0])
+    raise ValueError(f"unknown generic sign layout: {layout}")
+
+
 def generic_trot_sine_action_at(t, frequency, amplitude, hip_ratio, calf_ratio,
-                                calf_phase, noise, rng):
+                                calf_phase, pairing, thigh_sign_layout,
+                                calf_sign_layout, noise, rng):
     """One structured generic quadruped sine CPG: hip < thigh < swing-only calf.
 
     All four legs receive exactly the same three-joint waveform, shifted only by the fixed
     diagonal leg phase.  There is no velocity/turn command or per-leg amplitude adjustment.
     """
     action = np.zeros(12, np.float32)
-    leg_phase = np.asarray([0.0, np.pi, np.pi, 0.0])  # FL, FR, RL, RR
+    leg_phase = generic_trot_pair_phases(pairing)
+    thigh_sign = generic_leg_signs(thigh_sign_layout)
+    calf_sign = generic_leg_signs(calf_sign_layout)
     ramp = min(1.0, max(0.0, t / 1.0))
     for li, offset in enumerate(leg_phase):
         phase = 2.0 * np.pi * frequency * t + offset
         action[li] = ramp * hip_ratio * amplitude * np.sin(phase)
-        action[4 + li] = ramp * -amplitude * np.sin(phase)
-        action[8 + li] = ramp * calf_ratio * amplitude * max(0.0, np.sin(phase + calf_phase))
+        action[4 + li] = ramp * thigh_sign[li] * -amplitude * np.sin(phase)
+        action[8 + li] = ramp * calf_sign[li] * calf_ratio * amplitude * max(
+            0.0, np.sin(phase + calf_phase))
     action += rng.normal(0.0, noise, size=12).astype(np.float32)
     return action
 
 
 def generic_duty_cycle_action_at(t, frequency, amplitude, calf_ratio, duty_factor,
-                                 swing_thigh_lift, noise, rng):
+                                 swing_thigh_lift, pairing, thigh_sign_layout,
+                                 calf_sign_layout, noise, rng):
     """Generic diagonal walk CPG: slow planted stroke, fast raised return.
 
     Each leg uses the same phase waveform.  During the stance fraction, the calf is neutral and
@@ -144,7 +186,9 @@ def generic_duty_cycle_action_at(t, frequency, amplitude, calf_ratio, duty_facto
     if not 0.5 <= duty_factor < 1.0:
         raise ValueError("generic duty factor must be in [0.5, 1.0)")
     action = np.zeros(12, np.float32)
-    leg_phase = np.asarray([0.0, 0.5, 0.5, 0.0])  # FL, FR, RL, RR, in cycles
+    leg_phase = generic_trot_pair_phases(pairing) / (2.0 * np.pi)
+    thigh_sign = generic_leg_signs(thigh_sign_layout)
+    calf_sign = generic_leg_signs(calf_sign_layout)
     ramp = min(1.0, max(0.0, t / 1.0))
     for li, offset in enumerate(leg_phase):
         cycle = (frequency * t + offset) % 1.0
@@ -161,8 +205,88 @@ def generic_duty_cycle_action_at(t, frequency, amplitude, calf_ratio, duty_facto
                       + swing_thigh_lift * amplitude * np.sin(np.pi * swing))
             calf = calf_ratio * amplitude * np.sin(np.pi * swing)
         action[li] = ramp * 0.1 * amplitude
-        action[4 + li] = ramp * thigh
-        action[8 + li] = ramp * calf
+        action[4 + li] = ramp * thigh_sign[li] * thigh
+        action[8 + li] = ramp * calf_sign[li] * calf
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
+def generic_coupled_action_at(t, frequency, amplitude, coupling_ratio, pairing,
+                              thigh_sign_layout, noise, rng):
+    """Generic quadruped CPG with the calf ALGEBRAICALLY COUPLED to the thigh, not independently
+    driven -- the actual mechanism found in Egocentric VSM's own reference implementation
+    (`doc/ref/Egocentric_VSM/env_agent.py`'s `move_altas`), not a per-joint feedback controller.
+    Their Atlas gait only randomizes ONE number per leg per phase (hip); knee and ankle are fixed
+    linear functions of it (`knee = 0.6 - hip`, `ankle = -(hip+knee)`) that keep the foot's
+    orientation coherent through the whole stride, by construction, not by reading robot state.
+
+    Every B1 gait shape above independently modulates hip/thigh/calf with separate sines/ratios/
+    phases -- nothing enforces the calf stays kinematically coherent with the thigh's own swing,
+    which is a real candidate explanation for this project's own measured lateral-roll instability
+    (`q22_handoff_prompt.md`'s amplitude/duty-factor push: ruled out the hip channel, ruled out
+    duty-factor alone raising the ceiling -- an uncoupled calf/thigh relationship was never tested).
+
+    This is a design-time structural prior (same category as the diagonal-trot phase table or the
+    duty-cycle shape already used elsewhere in this file), not real-time feedback -- it never reads
+    robot state. `calf = -coupling_ratio * thigh` keeps the foot pointed roughly the same way
+    throughout the thigh's swing, the same role Atlas's fixed knee/ankle relationship plays.
+    """
+    action = np.zeros(12, np.float32)
+    leg_phase = generic_trot_pair_phases(pairing) / (2.0 * np.pi)
+    thigh_sign = generic_leg_signs(thigh_sign_layout)
+    ramp = min(1.0, max(0.0, t / 1.0))
+    for li, offset in enumerate(leg_phase):
+        phase = 2.0 * np.pi * (frequency * t + offset)
+        thigh = -amplitude * np.sin(phase)
+        calf = -coupling_ratio * thigh   # foot-orientation-preserving coupling, not independent
+        action[4 + li] = ramp * thigh_sign[li] * thigh
+        action[8 + li] = ramp * thigh_sign[li] * calf
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
+def generic_coupled_duty_action_at(t, frequency, amplitude, coupling_ratio, duty_factor,
+                                   clearance_ratio, pairing, thigh_sign_layout, noise, rng,
+                                   hip_ratio=0.0, hip_bias=None):
+    """Duty-cycle stance/swing shape (propulsion) with the calf ALGEBRAICALLY COUPLED to the
+    thigh during stance (Egocentric-VSM-style foot-orientation coupling, for the stability
+    `generic_coupled_action_at` showed but without its own near-zero forward speed -- that
+    version never lifts the foot, so it likely drags the whole stride). During swing the
+    coupling is broken by one added clearance arc, the same role Atlas's own 3-phase cycle
+    plausibly plays implicitly. Still no robot-state feedback of any kind.
+
+    **`hip_ratio`/`hip_bias`: the real trained B1 expert (`data/egocentric/beh12_b1_ego_flat`)
+    was checked directly (not assumed) and drives hip at a std comparable to or LARGER than
+    thigh (0.1-0.6 across several episodes) plus a real per-leg static offset -- every gait shape
+    in this file before this addition left hip at exactly 0. This is a design-time prior derived
+    from the real controller's own recorded statistics, not feedback: hip oscillates on the SAME
+    phase clock as thigh/calf, `hip_ratio * amplitude` in magnitude, plus an optional fixed
+    per-leg bias (4 values, FL/FR/RL/RR order, matching the real data's own asymmetric offsets).
+    """
+    if not 0.5 <= duty_factor < 1.0:
+        raise ValueError("generic duty factor must be in [0.5, 1.0)")
+    action = np.zeros(12, np.float32)
+    leg_phase = generic_trot_pair_phases(pairing) / (2.0 * np.pi)
+    thigh_sign = generic_leg_signs(thigh_sign_layout)
+    ramp = min(1.0, max(0.0, t / 1.0))
+    bias = hip_bias if hip_bias is not None else np.zeros(4)
+    for li, offset in enumerate(leg_phase):
+        cycle = (frequency * t + offset) % 1.0
+        if cycle < duty_factor:
+            thigh = amplitude * (1.0 - 2.0 * cycle / duty_factor)
+            calf = -coupling_ratio * thigh   # coupled: foot orientation follows thigh, planted
+        else:
+            swing = (cycle - duty_factor) / (1.0 - duty_factor)
+            thigh = amplitude * (-1.0 + 2.0 * swing)
+            # coupling still holds (keeps returning toward the same foot orientation) PLUS one
+            # clearance arc so the foot actually leaves the ground during the return.
+            calf = (-coupling_ratio * thigh
+                    + clearance_ratio * amplitude * np.sin(np.pi * swing))
+        hip = ramp * (bias[li] + thigh_sign[li] * hip_ratio * amplitude
+                      * np.sin(2.0 * np.pi * cycle))
+        action[li] = hip
+        action[4 + li] = ramp * thigh_sign[li] * thigh
+        action[8 + li] = ramp * thigh_sign[li] * calf
     action += rng.normal(0.0, noise, size=12).astype(np.float32)
     return action
 
@@ -207,13 +331,37 @@ def main():
                     help="trot is one fixed diagonal quadruped phase table, never a behavior mode")
     ap.add_argument("--generic-joint-role-layout", choices=("equal", "quadruped-trot"),
                     default="equal", help="quadruped-trot uses generic hip/thigh/calf amplitude roles")
-    ap.add_argument("--generic-gait-shape", choices=("sine", "stance-swing", "trot-sine", "duty-cycle"),
+    ap.add_argument("--generic-gait-shape",
+                    choices=("sine", "stance-swing", "trot-sine", "duty-cycle", "coupled",
+                             "coupled-duty"),
                     default="sine")
     ap.add_argument("--generic-calf-ratio", type=float, default=1.5)
+    ap.add_argument("--generic-coupling-ratio", type=float, default=0.6, help="coupled gait shape "
+                    "only: calf = -coupling_ratio * thigh, algebraic not independent (see "
+                    "generic_coupled_action_at's docstring)")
+    ap.add_argument("--generic-clearance-ratio", type=float, default=1.5, help="coupled-duty gait "
+                    "shape only: swing clearance arc as a multiple of base amplitude")
     ap.add_argument("--generic-hip-ratio", type=float, default=0.05,
-                    help="hip/thigh amplitude ratio for the generic trot-sine CPG")
+                    help="hip/thigh amplitude ratio for the generic trot-sine CPG; also used by "
+                    "coupled-duty when > 0 to actively drive hip on the same phase clock (see "
+                    "generic_coupled_duty_action_at's docstring -- the real B1 expert's own "
+                    "recorded actions use hip at a magnitude comparable to thigh, not zero)")
+    ap.add_argument("--generic-hip-bias", type=float, nargs=4, default=None,
+                    help="coupled-duty only: fixed per-leg hip offset, FL FR RL RR order, added "
+                    "on top of the oscillation -- matches the real expert's own static asymmetry")
     ap.add_argument("--generic-calf-phase", type=float, default=-np.pi / 2.0,
                     help="calf phase relative to thigh for the generic trot-sine CPG")
+    ap.add_argument("--generic-trot-pairing",
+                    choices=("diagonal", "left-right", "front-rear", "wave"), default="diagonal",
+                    help="fixed quadruped phase convention. wave is a genuine 4-phase gait (each "
+                    "leg 1/4 cycle apart, real quadruped walk footfall order), not a 2-group one "
+                    "-- needs duty_factor >= 0.75 to guarantee 3+ feet down at once")
+    ap.add_argument("--generic-thigh-sign-layout",
+                    choices=("same", "left-right", "front-rear", "diagonal"), default="same",
+                    help="fixed joint-axis sign convention for generic trot-sine thighs")
+    ap.add_argument("--generic-calf-sign-layout",
+                    choices=("same", "left-right", "front-rear", "diagonal"), default="same",
+                    help="fixed joint-axis sign convention for generic trot-sine calves")
     ap.add_argument("--generic-duty-factor", type=float, default=0.65,
                     help="fixed stance fraction for the generic duty-cycle CPG")
     ap.add_argument("--generic-swing-thigh-lift", type=float, default=0.0,
@@ -363,6 +511,9 @@ def main():
                 step * dt, frequency=generic_parameters["frequency"],
                 amplitude=base_amplitude, hip_ratio=args.generic_hip_ratio,
                 calf_ratio=args.generic_calf_ratio, calf_phase=args.generic_calf_phase,
+                pairing=args.generic_trot_pairing,
+                thigh_sign_layout=args.generic_thigh_sign_layout,
+                calf_sign_layout=args.generic_calf_sign_layout,
                 noise=args.noise, rng=rng)
         elif args.cpg_mode == "generic" and args.generic_gait_shape == "duty-cycle":
             action = generic_duty_cycle_action_at(
@@ -370,7 +521,28 @@ def main():
                 amplitude=base_amplitude, calf_ratio=args.generic_calf_ratio,
                 duty_factor=args.generic_duty_factor,
                 swing_thigh_lift=args.generic_swing_thigh_lift,
+                pairing=args.generic_trot_pairing,
+                thigh_sign_layout=args.generic_thigh_sign_layout,
+                calf_sign_layout=args.generic_calf_sign_layout,
                 noise=args.noise, rng=rng)
+        elif args.cpg_mode == "generic" and args.generic_gait_shape == "coupled":
+            action = generic_coupled_action_at(
+                step * dt, frequency=generic_parameters["frequency"],
+                amplitude=base_amplitude, coupling_ratio=args.generic_coupling_ratio,
+                pairing=args.generic_trot_pairing,
+                thigh_sign_layout=args.generic_thigh_sign_layout,
+                noise=args.noise, rng=rng)
+        elif args.cpg_mode == "generic" and args.generic_gait_shape == "coupled-duty":
+            action = generic_coupled_duty_action_at(
+                step * dt, frequency=generic_parameters["frequency"],
+                amplitude=base_amplitude, coupling_ratio=args.generic_coupling_ratio,
+                duty_factor=args.generic_duty_factor,
+                clearance_ratio=args.generic_clearance_ratio,
+                pairing=args.generic_trot_pairing,
+                thigh_sign_layout=args.generic_thigh_sign_layout,
+                noise=args.noise, rng=rng,
+                hip_ratio=args.generic_hip_ratio,
+                hip_bias=(np.asarray(args.generic_hip_bias) if args.generic_hip_bias else None))
         elif args.cpg_mode == "generic":
             action = generic_cpg_action_at(step * dt, noise=args.noise, rng=rng,
                                            **generic_parameters)
@@ -462,7 +634,7 @@ def main():
         print("  FELL -- rollout NPZ discarded; YAML retained for survival accounting")
         return
     if args.screen_only:
-        print("  SCREEN ONLY -- stable outcome recorded; rerun selected config with real frames")
+        print("  SCREEN ONLY -- outcome recorded; rerun useful config with real frames")
         return
 
     np.savez_compressed(

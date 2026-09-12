@@ -272,9 +272,20 @@ a different body, checkpoint, and physics engine. **Do not build the RL controll
 this checkpoint** -- the reward has no local gradient for PPO-style exploration to climb, and
 doing so now would very likely reproduce F179's collapse. **F179's whole arc was built on an
 unverified version of exactly this assumption and cost weeks; this gate existing and being
-checked before step 3, not after, is the fix for that mistake.** What is still open: whether a
-different checkpoint, objective, or fitting procedure could produce a locally-discriminative
-reward -- not attempted yet, and the natural next question rather than proceeding to step 3.
+checked before step 3, not after, is the fix for that mistake.**
+
+**Update, 2026-09-12: the "different checkpoint/objective/fitting procedure" question above has now
+been attempted, five independent ways, at real/exact strength (F195, F197-F199).** Stage-3
+contrastive (`wm.adapt3`, full 15k-step budget) stays at chance; F141's hinge (without a matching
+multi-step anchor) diverges; F178's counterfactual targets fail exactly on B1; all four recurrent-
+architecture variants fail (closed above). **The one that worked: F199, adding the multi-step
+reconstruction anchor F141's own diagnosis called for but never tested** -- passes all three of
+F141's pre-registered criteria on hexapod pretraining, though the `/mean-z` gain is modest and a
+follow-up ceiling check shows it's close to what the data allows, not a large fix. **Blocked right
+now by a launch mistake** (the run omitted `--lambda_body`, so it has no `body_head` and can't be
+adapted to B1 yet) -- being redone. The decisive open question once unblocked: does this
+pretraining-level fix propagate through to the actual reward-quality gate on B1, or does B1's own
+adaptation stage reintroduce the same wall. Not yet known.
 
 **3. RL controller + WM reward** (W15-2) -- **blocked**, step 2 failed. Do not start this until a
 reward is found that clears step 2's gate.
@@ -294,12 +305,18 @@ kill-gates say all four architectures **failed**. Both readings come from the sa
 | attention-pool -> GRU | 0.058 | better | fail |
 | **ConvGRU (spatial + recurrent)** | **0.069** | **1.6x** | fail, **by the smallest margin** |
 
-**And `FINDINGS.md` states this backwards**: it calls ConvGRU *"the widest margin from the bar of
-any variant tried, not the closest"* when 0.069 is the **closest** of the four (0.041 from the bar).
-The "ruled out, not merely unconfirmed" verdict rests on that inverted sentence. **What is not in
-dispute: every kill-gate was a 2,000-iteration probe on one body, not a full pretrain** -- so
-whether a properly-resourced sequence model clears 0.110 is genuinely unknown, and the ablation the
-Week 15 notes propose is a real open question rather than a reopened dead one.
+**CLOSED, 2026-09-12 (F198): the "genuinely unknown at full budget" gap this section flagged has
+been filled, and the answer is no.** ConvGRU (the closest of the four to the bar) was retrained at
+10x the probe's budget (20,000 iterations, hexapod, full clip set, not a 2,000-iteration probe) and
+came back **worse**, not better: gap -0.006, below even its own short probe's +0.069. A collapse
+check ruled out a degenerate model (moves ratio 0.4504, real non-zero prediction variation) --
+the result is real. Combined with the pooled full-stochastic RSSM (already the worst scorer measured
+in this project's history) and R0, **all four recurrent-architecture variants have now failed at
+real/full strength, on both bodies.** The history-state ablation (W15-4) this section's contradiction
+was about is answered: it does not fix the reward-quality gate's problem, and building it further on
+this specific hypothesis is not warranted by the evidence. The one thing that DID work is a
+different mechanism entirely -- F199, a multi-step reconstruction anchor added to F141's hinge
+rebuild (not a sequence-context/recurrence fix at all) -- see the reward-quality-gate section below.
 
 ### Status as of 2026-09-11: step 1 (B1 motor babble) is substantially done, three real sub-problems found, next is a clean redo not more patching
 
@@ -868,7 +885,17 @@ gait is fully valid (V-JEPA2 sees a hexapod walking either way). **Lean: keep CS
 
 ---
 
-## Q16. Dreamer or candidate scoring — the pipeline has to commit (new, Week 13 — blocking)
+## Q16. Dreamer or candidate scoring — the pipeline has to commit (Week 13, superseded 2026-09-12)
+
+**The "Decided 2026-08-28: teacher-student" verdict below did not hold and should not be cited as
+current.** F179's whole arc (Dreamer-style actor-critic trained in FTM imagination) was run to
+completion and killed for a genuine, isolated reason -- a value-learning/function-approximation
+problem confirmed across two structurally unrelated algorithms (a Dreamer-style critic ladder and
+PPO), not a fixable detail. The project moved twice since: first to direct, no-rollout Froude-space
+action scoring (`body_head(proj(a))`, F119-F127, no world-model imagination in the loop at all),
+then to Q21's current ordering (babble candidates -> reward-quality gate -> a Controller trained
+against real physics with the WM only supplying a per-step reward, never rolled -- see Q21). Kept
+below for the reasoning trail, not as the standing decision.
 
 **The advisor's framing.** We are sitting between two designs and should pick the one that spends
 its effort where it pays.

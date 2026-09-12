@@ -1702,6 +1702,16 @@ turns on is the floor in *command* space, which is unaffected.
 
 ### F32. The shared trunk produces a switch, not a shared language
 
+> **Headline withdrawn by F37, not merely caveated.** The 33.0% embodiment-share number below was
+> measured on `stage2_balanced`, a dataset with a 10.5:1 class imbalance repaired only by repeating
+> B1 data ~10x/epoch -- which manufactures a spurious phase/embodiment correlation (F37: 75% of all
+> frames sitting at one phase bin are B1, so "phase" and "embodiment" are half the same variable in
+> this decomposition). The clean measurement (F37) reverses the substantive claim: embodiment
+> identity is **fully decodable (0.99) but not load-bearing** -- removing it costs less than
+> removing a random direction. Read F37 for the number to cite; the 33.0%/"a third of the latent is
+> a code for which robot this is" framing below is superseded, kept only for how the mistake was
+> found.
+
 Stage 2 trained for the first time: one ITM, one FTM and one decoder backbone shared across an
 18-DOF hexapod and a 12-DOF quadruped, with a per-embodiment output head. No cross-embodiment
 term -- the source method has none, and claims the shared latent emerges from weight sharing alone.
@@ -10499,7 +10509,7 @@ different experiment.
 
 ## The measurement path, pinned before the run
 
-F131 was withdrawn for comparing across two latent paths, so this is stated in advance and checked
+F130 was withdrawn for comparing across two latent paths, so this is stated in advance and checked
 against the code rather than asserted. **`action_necessity.py` constructs the ITM and the FTM and
 nothing else** -- grepping it for `body_head`, `MotionDecoder` or `md` returns no lines -- and
 `gather` reads only `embedding_offsets` from the checkpoint, which `offset_for` supplies regardless
@@ -13864,6 +13874,14 @@ trains and tunes nothing.
 
 ### F173. Two architecture fixes for the action lever, both flat -- and one of them still helped something else
 
+> **The "frozen-encoder ceiling" inference below is overturned by F175, not just weakened.** F175
+> tested the claim directly (an untrained kNN probe on the raw frozen embedding delta) rather than
+> inferring it from two architecture fixes landing flat, and found the fine speed signal clearly
+> present in the untouched encoder output (49-51% four-way accuracy against 25% chance, R2 +0.403).
+> **This overturns F173's inference, not its measurements** -- the two architecture fixes below did
+> land flat, but the reason is not an encoder-geometry ceiling; the wall is downstream (calibration/
+> data-sparsity, per F176 onward). Do not cite the ceiling framing below as the explanation.
+
 **F172 left the action-lever metric exactly where it was**: real-z vs mean-z cosine on the FTM's
 own predicted direction, flat-to-decaying with horizon (0.054 / 0.062 / 0.042 / 0.026 at k=1/2/5/10,
 `action_lever_vs_horizon.py` on `teacher_ego.pt`). Two independent fixes were tried, each a cheap
@@ -16629,3 +16647,78 @@ Scripts: `scripts/diagnostics/objective_experiments/family_z_ceiling.py`. Traini
 existing `wm/train.py` flags only (`--lambda_hinge 0.5 --lambda_readout 1.0 --lambda_rollout 1.0
 --hinge_K 2 --hinge_margin 0.1 --lambda_recon 1.0`), no new training code. Checkpoint:
 `wm/runs/beh12_hinge_multistep_anchor/best.pt` (hexapod, 50 epochs, BIAS-2).
+
+**Coda, same day: does the modest `/mean-z` gain show up in actual candidate selection?**
+`scripts/diagnostics/objective_experiments/hexapod_pretrain_discriminate.py` -- a `discriminate()`
+adapted from `wm/adapt3.py` for a raw pretrain checkpoint, which has no `ActionProjector` (stage 2
+fits that afterward against a frozen ITM). Candidates are real z's from OTHER conditions' own real
+transitions rather than actions through a projector -- an easier test than pure action-
+conditioning, since a candidate's z already carries its own true observed motion, not only its
+action; read as a softer proxy, not a clean isolation of action-use.
+
+| checkpoint | exact condition (chance 9.1%) | family (chance 29.7%) | margin |
+|---|---|---|---|
+| `beh12_hexonly_stopgrad` (old pretrain) | 33.3% | 80.7% | +51.0% |
+| `beh12_hinge_multistep_anchor` (this finding) | 41.0% | 86.3% | +56.7% |
+
+n=300 held-out picks each, same script, same candidate pool. **A real, modest, consistent
+improvement on every metric** (+7.7pt exact, +5.6pt family, +5.7pt margin) -- not large, matching
+the "near ceiling but genuinely better than baseline" reading `/mean-z` already gave, and not noise
+in one direction. Both checkpoints already clear the +15-point selection bar easily on this
+easier-than-`adapt3`'s-own test, but the new checkpoint is ahead on all three numbers.
+
+**Decision this unlocks**: worth the bigger step -- adapt `beh12_hinge_multistep_anchor` to B1
+(the standard 4-stage pipeline) and rerun `reward_quality_gate_b1.py` (F195), to check whether this
+pretraining-level fix propagates to the actual target this whole line was chasing.
+
+**Correction, found during the B1 adaptation attempt: this checkpoint was trained with
+`lambda_body` left at its default 0, so it has no `body_head` module at all (structural, not just
+untrained -- `MotionDecoder` only builds the head when `lambda_body > 0`), and stage 4 cannot run
+against it.** The launch command that produced `beh12_hinge_multistep_anchor` omitted
+`--lambda_body`/`--body_dim`/`--body_channels`; the reference pretrain (`beh12_hexonly_stopgrad`)
+uses `lambda_body=0.5, body_dim=3, body_channels=[0,1,2]`. **Everything measured above (`/mean-z`,
+the discrimination coda) is unaffected** -- both are read off `z`/the FTM's rollout directly, never
+off `body_head`, and this project's own stop-gradient convention (`wm/train.py`: "L_body no longer
+shapes z... L_body only reads") means `body_head` never feeds back into what was measured. But B1
+adaptation is blocked until this is fixed, and it needs a full hexapod pretrain redo (`--name
+beh12_hinge_multistep_anchor_v2`, same settings plus the missing three flags) since `body_head` is
+part of the pretrain's own architecture, not something `wm.fit_body_head` can construct from
+nothing on a checkpoint that never had one. **Process gap, not a one-off slip**: the 1-epoch smoke
+test that validated this run's wiring already showed the missing `body` term in its printed loss
+breakdown, and it was not checked against the reference config before the real 50-epoch run was
+launched. Verify every loss term against a reference checkpoint's saved config before a real run,
+not only that the run doesn't crash.
+
+---
+
+### F200. Current native-Coppelia B1 babble status: claim-honest and visibly walkable as a preview, but still below the pretraining Froude band
+
+**What changed since F196.** The native CoppeliaSim-Bullet B1 work now has a usable generic motor-
+babble preview, not only a standing/dynamics probe. The current safe seed is a fixed generic
+diagonal duty-cycle CPG: 65% planted stance, 35% raised return, `2.0 Hz`, amplitude `0.24`, calf
+ratio `2.5`, and per-step Gaussian motor noise `0.03`. It uses no trained policy, no retargeting,
+no demonstrations, no body-feedback controller, and no forward/lateral/yaw command. This keeps the
+claim line intact: generic CPG + exploration noise, not an expert or behaviour primitive.
+
+**Best safe rendered run.** `results/wm/dataset/b1_babble/coppelia_fast_duty_candidate/f2.0_a0.24_s9_ego.{npz,mp4,yaml}`
+ran upright for 160 steps / 8 s in the egocentric setup, moved `+0.596 m`, and logged mean
+body-frame Froude `[+0.0328,+0.0026,-0.0062]` (forward-dominant, low lateral/yaw leakage). The
+harder edge, `f2.0_a0.30_s10_allo`, reached `[+0.0366,+0.0029,-0.0115]` allocentric, but the paired
+egocentric rerun fell, so `0.24` is the current safe preview setting.
+
+**What was ruled out.** Replaying old MuJoCo-scale sine amplitudes in Coppelia can generate larger
+instantaneous motion, but it mostly dumps energy into lateral roll and falls. Added diagnostic
+phase/sign-convention knobs (`--generic-trot-pairing`, `--generic-thigh-sign-layout`,
+`--generic-calf-sign-layout`) showed that some signed sine variants briefly reach forward Froude
+`~0.03-0.05`, but they lose height before the full 8 s. The support-biased duty-cycle waveform is
+currently the robust open-loop option.
+
+**Current status.** The babble is now physically usable and honest as a visual preview, but it is
+**not yet the final babble dataset**: its stable forward Froude is still roughly 3-6x below the
+useful pretraining/expert region (`~0.10-0.20`), and the final collection still requires a frozen
+parameter distribution with every sampled rollout retained, including falls. The clean/expert
+Coppelia controller remains undone.
+
+Scripts: `sim/collect/collect_b1_coppelia_babble.py`,
+`sim/collect/collect_b1_coppelia_fast_duty_preview.py`. Handoff:
+`results/wm/dataset/b1_babble/q22_handoff_prompt.md`.

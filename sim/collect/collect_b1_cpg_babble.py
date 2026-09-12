@@ -93,7 +93,8 @@ import os
 import numpy as np
 import mujoco
 
-MODEL = "/home/aria/Sim2Real-B1/b1_ws/src/b1_mujoco/model/b1_flat_real.xml"
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL = os.path.join(ROOT, "sim/assets/b1_mujoco/b1_flat_real.xml")
 DEFAULT_IL = np.array([0.061, -0.066, 0.058, -0.054,
                        1.064,  1.060, 1.077,  1.068,
                       -1.914, -1.935, -1.914, -1.913])
