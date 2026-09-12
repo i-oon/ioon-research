@@ -16561,3 +16561,71 @@ scoped) would behave differently -- untested, and now not warranted by this evid
 every prior kill-gate's own logic in this arc.
 
 Scripts: `wm/models/convgru_ftm.py`, `scripts/diagnostics/objective_experiments/{convgru_full_retrain,convgru_collapse_check}.py`. Checkpoint: `wm/runs/convgru_full/convgru_full.pt` (hexapod, 20,000 iterations, BIAS-2).
+
+---
+
+### F199. F141's own missing piece -- a multi-step reconstruction anchor matching the hinge's horizon -- passes all three pre-registered criteria for the first time in this arc, and a follow-up ceiling check shows the result is close to what the data allows
+
+**What F141 diagnosed but never tried.** F141's full ActSWM rebuild diverged (rollout 3-4x worse
+than a frozen frame by horizon 2) because `recon` only anchors step 1 while the hinge acts at
+steps 1-3 -- steps 2-3 have nothing opposing the hinge, so the cheapest way to satisfy it is to
+diverge. F141's own stated fix -- **"a hinge over K steps needs a prediction loss over the same K
+steps"** -- was never run; the arc pivoted to a frameskip alternative (F143/lag-3) instead, which
+failed for an unrelated reason (representation ceiling).
+
+**What was run.** `wm.train`'s existing `lambda_rollout` term (`rollout_loss`, a 2-step
+auto-regressive consistency loss, already wired and unrelated to the hinge until now) provides
+exactly the missing 2-step reconstruction anchor with zero new code -- only a combination of
+existing flags nobody had turned on together. `hinge_K` reduced from F141's 3 to 2 to match what
+`lambda_rollout` actually covers (a 3rd step would need a new dataset change, not attempted here).
+`lambda_recon` left at its default 1.0, not F141's tripled 3.0 -- no longer needed once step 2 has
+its own real anchor. 50 epochs, hexapod only, BIAS-2, `wm/runs/beh12_hinge_multistep_anchor/`.
+
+**Result: passes all three of F141's pre-registered criteria simultaneously, for the first time.**
+
+| criterion | F141 (no multi-step anchor) | this run |
+|---|---|---|
+| prediction healthy | **fails** -- diverges 3-4x past frozen-frame by horizon 2 | **passes** -- ratio 0.52-0.58 flat across horizons 1-10, divergence horizon **>10** |
+| `/mean-z` down | not reached (prediction had already collapsed) | **passes** -- within-family 0.938/0.886/0.892/0.888/0.893 at horizons 1/2/3/5/10, stays flat instead of climbing toward 1.0 with horizon (the Context Collapse signature) |
+| separation holding | collapses (0.019, 0.137, 0.496, 0.008 in the short runs) | **passes** -- rises from 0.0007 to 0.347 over 50 epochs and holds, no collapse |
+
+**Read against F133/F134's own reference point (contrastive fine-tuning on one body, a different
+mechanism): 0.53-0.58 there vs. 0.89-0.94 here.** This pretraining-level fix is real but weaker in
+raw `/mean-z` terms than the best number this project has produced by a different route -- though
+it achieves it without contrastive fine-tuning's cross-body fidelity cost (F134: 0.757->1.052) and
+without ever diverging, which the contrastive route also never guaranteed.
+
+**Follow-up, prompted by a direct methodological challenge (is 0.89-0.94 weak sensitivity or a
+data ceiling?): the family's own real z's are barely more separated than repeats of one
+condition.** `scripts/diagnostics/objective_experiments/family_z_ceiling.py` measures, on REAL
+observed transitions only (`z = ITM(e_t, e_t+1)`, no FTM, no prediction): `within` = MSE between
+two different clips of the SAME condition (the noise floor), `across` = MSE between different
+conditions of the SAME family, `ceiling ratio = within / across`. Near 1.0 means the family's
+conditions are not naturally separated in `z` at all -- even a perfect forward model could not push
+`/mean-z` much below what is already measured, because the target itself does not spread out.
+
+| checkpoint | side_L | side_R | speed | turn | overall |
+|---|---|---|---|---|---|
+| `beh12_hexonly_stopgrad` (old pretrain) | 0.995 | 0.933 | 1.226 | 0.807 | **0.983** |
+| `beh12_hinge_multistep_anchor` (this run) | 1.094 | 0.918 | 0.956 | 1.031 | **~1.001** |
+
+**Two independently-trained checkpoints agree: the ceiling is essentially 1.0.** The hinge
+rebuild's 0.886-0.938 is close to what this data allows, not evidence of a weak model leaving
+signal on the table. **The honest caveat this check cannot resolve on its own**: a ceiling near 1.0
+is ambiguous between "the task is genuinely redundant here" and "`z`'s large action-irrelevant
+content swamps a real but small action-relevant difference" -- the same big-signal/small-signal
+story F142 measured one level upstream, at the level of raw `z` rather than the FTM's prediction.
+The consistency across two unrelated checkpoints (0.983, ~1.001) favours "a property of the
+data/ITM" over "a checkpoint-specific artefact," but does not fully settle which of the two
+explanations is true.
+
+**What this changes about F142's story.** F142 measured the action's causal weight on `e_{t+1}` at
+under 3%. This finding adds: even the coarser, already-compressed `z` -- the ITM's own summary of a
+real transition -- does not spread out much across a family's magnitude range either. The
+bottleneck is not unique to the FTM's prediction step; it is visible one step earlier, in what the
+ITM extracts from a real transition in the first place.
+
+Scripts: `scripts/diagnostics/objective_experiments/family_z_ceiling.py`. Training combined
+existing `wm/train.py` flags only (`--lambda_hinge 0.5 --lambda_readout 1.0 --lambda_rollout 1.0
+--hinge_K 2 --hinge_margin 0.1 --lambda_recon 1.0`), no new training code. Checkpoint:
+`wm/runs/beh12_hinge_multistep_anchor/best.pt` (hexapod, 50 epochs, BIAS-2).
