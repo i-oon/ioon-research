@@ -1,0 +1,721 @@
+=== clip 0 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 0, applied to 18 shape(s)
+step=   0 xyz=(+0.077,+0.009,0.504) up.z=0.999 max|qerr|=0.103
+step=  20 xyz=(+0.181,+0.021,0.517) up.z=0.999 max|qerr|=0.115
+step=  40 xyz=(+0.700,+0.044,0.496) up.z=0.994 max|qerr|=0.193
+step=  60 xyz=(+1.151,+0.123,0.508) up.z=0.995 max|qerr|=0.168
+step=  80 xyz=(+1.642,+0.250,0.506) up.z=0.992 max|qerr|=0.160
+step= 100 xyz=(+2.120,+0.346,0.499) up.z=0.993 max|qerr|=0.170
+step= 120 xyz=(+2.571,+0.398,0.494) up.z=0.997 max|qerr|=0.189
+step= 140 xyz=(+3.059,+0.425,0.509) up.z=0.995 max|qerr|=0.141
+duration=8.00s displacement=(+3.412,+0.435,-0.000)m
+z: min=0.490 final=0.503; up.z: min=0.989; worst_joint_error=0.223rad; UPRIGHT
+body-frame mean Froude: forward=+0.2060 lateral=+0.0022 yaw=+0.0016
+motion quality: joint_acc_rms=54.013 jerk_rms=1933.069 contact_switches/s=6.54 support_mean=2.46 support_<=1=0.12
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s0.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s0.npz
+=== clip 1 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 1, applied to 18 shape(s)
+step=   0 xyz=(+0.080,+0.002,0.504) up.z=0.998 max|qerr|=0.099
+step=  20 xyz=(+0.194,+0.007,0.514) up.z=0.998 max|qerr|=0.134
+step=  40 xyz=(+0.661,+0.001,0.501) up.z=0.994 max|qerr|=0.165
+step=  60 xyz=(+1.081,+0.030,0.507) up.z=0.997 max|qerr|=0.125
+step=  80 xyz=(+1.534,+0.077,0.504) up.z=0.995 max|qerr|=0.144
+step= 100 xyz=(+1.981,+0.141,0.505) up.z=0.994 max|qerr|=0.172
+step= 120 xyz=(+2.401,+0.237,0.504) up.z=0.996 max|qerr|=0.168
+step= 140 xyz=(+2.829,+0.256,0.509) up.z=0.996 max|qerr|=0.142
+duration=8.00s displacement=(+3.225,+0.299,-0.003)m
+z: min=0.493 final=0.501; up.z: min=0.991; worst_joint_error=0.207rad; UPRIGHT
+body-frame mean Froude: forward=+0.1907 lateral=+0.0040 yaw=+0.0032
+motion quality: joint_acc_rms=50.337 jerk_rms=1808.816 contact_switches/s=5.03 support_mean=2.42 support_<=1=0.17
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s1.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s1.npz
+=== clip 2 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 2, applied to 18 shape(s)
+step=   0 xyz=(+0.078,+0.002,0.505) up.z=0.999 max|qerr|=0.097
+step=  20 xyz=(+0.159,+0.000,0.513) up.z=0.998 max|qerr|=0.142
+step=  40 xyz=(+0.557,+0.001,0.506) up.z=0.996 max|qerr|=0.148
+step=  60 xyz=(+0.998,-0.057,0.502) up.z=0.996 max|qerr|=0.147
+step=  80 xyz=(+1.418,-0.083,0.504) up.z=0.996 max|qerr|=0.134
+step= 100 xyz=(+1.830,-0.085,0.505) up.z=0.997 max|qerr|=0.153
+step= 120 xyz=(+2.279,-0.049,0.505) up.z=0.997 max|qerr|=0.136
+step= 140 xyz=(+2.694,-0.022,0.506) up.z=0.997 max|qerr|=0.148
+duration=8.00s displacement=(+3.014,-0.029,+0.003)m
+z: min=0.496 final=0.509; up.z: min=0.993; worst_joint_error=0.187rad; UPRIGHT
+body-frame mean Froude: forward=+0.1792 lateral=+0.0029 yaw=-0.0012
+motion quality: joint_acc_rms=44.173 jerk_rms=1588.762 contact_switches/s=9.94 support_mean=2.12 support_<=1=0.24
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s2.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s2.npz
+=== clip 3 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 3, applied to 18 shape(s)
+step=   0 xyz=(+0.075,-0.005,0.507) up.z=0.999 max|qerr|=0.102
+step=  20 xyz=(+0.173,-0.004,0.508) up.z=0.998 max|qerr|=0.134
+step=  40 xyz=(+0.482,-0.018,0.505) up.z=0.997 max|qerr|=0.155
+step=  60 xyz=(+0.818,-0.012,0.505) up.z=0.993 max|qerr|=0.153
+step=  80 xyz=(+1.159,+0.006,0.508) up.z=0.996 max|qerr|=0.168
+step= 100 xyz=(+1.495,+0.052,0.502) up.z=0.997 max|qerr|=0.142
+step= 120 xyz=(+1.856,+0.097,0.502) up.z=0.997 max|qerr|=0.151
+step= 140 xyz=(+2.171,+0.165,0.508) up.z=0.998 max|qerr|=0.136
+duration=8.00s displacement=(+2.444,+0.261,-0.002)m
+z: min=0.496 final=0.505; up.z: min=0.993; worst_joint_error=0.198rad; UPRIGHT
+body-frame mean Froude: forward=+0.1444 lateral=+0.0012 yaw=+0.0082
+motion quality: joint_acc_rms=39.696 jerk_rms=1431.397 contact_switches/s=7.04 support_mean=1.76 support_<=1=0.46
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s3.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s3.npz
+=== clip 4 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 4, applied to 18 shape(s)
+step=   0 xyz=(+0.071,+0.008,0.506) up.z=0.998 max|qerr|=0.101
+step=  20 xyz=(+0.207,+0.018,0.508) up.z=0.999 max|qerr|=0.139
+step=  40 xyz=(+0.833,+0.037,0.498) up.z=0.992 max|qerr|=0.195
+step=  60 xyz=(+1.371,+0.078,0.505) up.z=0.995 max|qerr|=0.171
+step=  80 xyz=(+1.918,+0.082,0.505) up.z=0.993 max|qerr|=0.144
+step= 100 xyz=(+2.445,+0.078,0.501) up.z=0.993 max|qerr|=0.178
+step= 120 xyz=(+2.942,+0.132,0.500) up.z=0.994 max|qerr|=0.175
+step= 140 xyz=(+3.467,+0.193,0.508) up.z=0.993 max|qerr|=0.170
+duration=8.00s displacement=(+3.906,+0.214,+0.000)m
+z: min=0.487 final=0.507; up.z: min=0.983; worst_joint_error=0.229rad; UPRIGHT
+body-frame mean Froude: forward=+0.2319 lateral=+0.0047 yaw=+0.0012
+motion quality: joint_acc_rms=60.552 jerk_rms=2159.261 contact_switches/s=3.77 support_mean=2.60 support_<=1=0.11
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s4.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s4.npz
+=== clip 5 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 5, applied to 18 shape(s)
+step=   0 xyz=(+0.077,-0.000,0.506) up.z=0.999 max|qerr|=0.101
+step=  20 xyz=(+0.204,+0.006,0.516) up.z=0.999 max|qerr|=0.140
+step=  40 xyz=(+0.746,+0.001,0.500) up.z=0.991 max|qerr|=0.180
+step=  60 xyz=(+1.218,-0.044,0.503) up.z=0.995 max|qerr|=0.172
+step=  80 xyz=(+1.706,-0.121,0.500) up.z=0.996 max|qerr|=0.168
+step= 100 xyz=(+2.199,-0.210,0.498) up.z=0.991 max|qerr|=0.190
+step= 120 xyz=(+2.681,-0.278,0.499) up.z=0.992 max|qerr|=0.166
+step= 140 xyz=(+3.148,-0.368,0.502) up.z=0.991 max|qerr|=0.170
+duration=8.00s displacement=(+3.508,-0.486,+0.002)m
+z: min=0.490 final=0.508; up.z: min=0.988; worst_joint_error=0.222rad; UPRIGHT
+body-frame mean Froude: forward=+0.2113 lateral=+0.0073 yaw=-0.0085
+motion quality: joint_acc_rms=57.650 jerk_rms=2063.899 contact_switches/s=5.03 support_mean=2.53 support_<=1=0.11
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s5.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s5.npz
+=== clip 6 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 6, applied to 18 shape(s)
+step=   0 xyz=(+0.078,+0.001,0.504) up.z=0.999 max|qerr|=0.094
+step=  20 xyz=(+0.168,+0.011,0.511) up.z=0.999 max|qerr|=0.119
+step=  40 xyz=(+0.650,+0.008,0.502) up.z=0.994 max|qerr|=0.160
+step=  60 xyz=(+1.138,-0.022,0.504) up.z=0.992 max|qerr|=0.174
+step=  80 xyz=(+1.586,-0.086,0.496) up.z=0.993 max|qerr|=0.181
+step= 100 xyz=(+2.022,-0.145,0.508) up.z=0.996 max|qerr|=0.135
+step= 120 xyz=(+2.464,-0.191,0.507) up.z=0.996 max|qerr|=0.165
+step= 140 xyz=(+2.922,-0.254,0.502) up.z=0.997 max|qerr|=0.173
+duration=8.00s displacement=(+3.289,-0.314,+0.002)m
+z: min=0.491 final=0.506; up.z: min=0.991; worst_joint_error=0.217rad; UPRIGHT
+body-frame mean Froude: forward=+0.1961 lateral=+0.0053 yaw=-0.0040
+motion quality: joint_acc_rms=51.903 jerk_rms=1859.637 contact_switches/s=7.55 support_mean=2.39 support_<=1=0.16
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s6.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s6.npz
+=== clip 7 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 7, applied to 18 shape(s)
+step=   0 xyz=(+0.080,+0.000,0.505) up.z=0.999 max|qerr|=0.108
+step=  20 xyz=(+0.191,-0.003,0.510) up.z=0.999 max|qerr|=0.143
+step=  40 xyz=(+0.678,-0.023,0.511) up.z=0.994 max|qerr|=0.160
+step=  60 xyz=(+1.152,-0.080,0.496) up.z=0.994 max|qerr|=0.187
+step=  80 xyz=(+1.603,-0.188,0.503) up.z=0.994 max|qerr|=0.165
+step= 100 xyz=(+2.057,-0.364,0.505) up.z=0.995 max|qerr|=0.168
+step= 120 xyz=(+2.433,-0.592,0.502) up.z=0.991 max|qerr|=0.181
+step= 140 xyz=(+2.849,-0.835,0.503) up.z=0.992 max|qerr|=0.164
+duration=8.00s displacement=(+3.193,-1.105,-0.005)m
+z: min=0.491 final=0.500; up.z: min=0.989; worst_joint_error=0.208rad; UPRIGHT
+body-frame mean Froude: forward=+0.2021 lateral=+0.0134 yaw=-0.0195
+motion quality: joint_acc_rms=53.371 jerk_rms=1909.485 contact_switches/s=5.03 support_mean=2.51 support_<=1=0.14
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s7.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s7.npz
+=== clip 8 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 8, applied to 18 shape(s)
+step=   0 xyz=(+0.075,+0.006,0.506) up.z=0.999 max|qerr|=0.101
+step=  20 xyz=(+0.170,+0.018,0.513) up.z=0.998 max|qerr|=0.118
+step=  40 xyz=(+0.569,+0.037,0.507) up.z=0.997 max|qerr|=0.143
+step=  60 xyz=(+1.023,+0.042,0.502) up.z=0.995 max|qerr|=0.175
+step=  80 xyz=(+1.448,+0.046,0.506) up.z=0.997 max|qerr|=0.162
+step= 100 xyz=(+1.905,+0.075,0.503) up.z=0.995 max|qerr|=0.165
+step= 120 xyz=(+2.371,+0.137,0.499) up.z=0.993 max|qerr|=0.179
+step= 140 xyz=(+2.798,+0.198,0.492) up.z=0.993 max|qerr|=0.189
+duration=8.00s displacement=(+3.087,+0.200,-0.002)m
+z: min=0.492 final=0.504; up.z: min=0.991; worst_joint_error=0.210rad; UPRIGHT
+body-frame mean Froude: forward=+0.1841 lateral=+0.0038 yaw=+0.0013
+motion quality: joint_acc_rms=46.164 jerk_rms=1657.847 contact_switches/s=7.42 support_mean=2.06 support_<=1=0.28
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s8.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s8.npz
+=== clip 9 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 9, applied to 18 shape(s)
+step=   0 xyz=(+0.081,+0.000,0.504) up.z=0.998 max|qerr|=0.107
+step=  20 xyz=(+0.202,-0.002,0.510) up.z=0.997 max|qerr|=0.138
+step=  40 xyz=(+0.744,+0.022,0.497) up.z=0.994 max|qerr|=0.176
+step=  60 xyz=(+1.268,-0.026,0.501) up.z=0.994 max|qerr|=0.187
+step=  80 xyz=(+1.766,-0.137,0.506) up.z=0.989 max|qerr|=0.181
+step= 100 xyz=(+2.243,-0.253,0.512) up.z=0.993 max|qerr|=0.161
+step= 120 xyz=(+2.761,-0.391,0.498) up.z=0.995 max|qerr|=0.190
+step= 140 xyz=(+3.230,-0.554,0.503) up.z=0.995 max|qerr|=0.180
+duration=8.00s displacement=(+3.620,-0.756,-0.000)m
+z: min=0.493 final=0.504; up.z: min=0.988; worst_joint_error=0.222rad; UPRIGHT
+body-frame mean Froude: forward=+0.2213 lateral=+0.0135 yaw=-0.0152
+motion quality: joint_acc_rms=59.776 jerk_rms=2135.146 contact_switches/s=5.53 support_mean=2.62 support_<=1=0.12
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s9.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s9.npz
+=== clip 10 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 10, applied to 18 shape(s)
+step=   0 xyz=(+0.078,+0.001,0.504) up.z=0.999 max|qerr|=0.104
+step=  20 xyz=(+0.204,+0.000,0.516) up.z=0.998 max|qerr|=0.158
+step=  40 xyz=(+0.816,+0.041,0.498) up.z=0.988 max|qerr|=0.194
+step=  60 xyz=(+1.325,+0.106,0.499) up.z=0.990 max|qerr|=0.187
+step=  80 xyz=(+1.802,+0.162,0.497) up.z=0.994 max|qerr|=0.200
+step= 100 xyz=(+2.327,+0.267,0.505) up.z=0.991 max|qerr|=0.158
+step= 120 xyz=(+2.826,+0.360,0.494) up.z=0.993 max|qerr|=0.200
+step= 140 xyz=(+3.338,+0.445,0.508) up.z=0.992 max|qerr|=0.175
+duration=8.00s displacement=(+3.770,+0.510,+0.004)m
+z: min=0.482 final=0.508; up.z: min=0.986; worst_joint_error=0.237rad; UPRIGHT
+body-frame mean Froude: forward=+0.2252 lateral=+0.0064 yaw=+0.0020
+motion quality: joint_acc_rms=61.772 jerk_rms=2200.988 contact_switches/s=5.79 support_mean=2.67 support_<=1=0.12
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s10.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s10.npz
+=== clip 11 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 11, applied to 18 shape(s)
+step=   0 xyz=(+0.079,+0.000,0.505) up.z=0.999 max|qerr|=0.105
+step=  20 xyz=(+0.164,-0.006,0.510) up.z=0.999 max|qerr|=0.118
+step=  40 xyz=(+0.519,-0.049,0.501) up.z=0.997 max|qerr|=0.156
+step=  60 xyz=(+0.875,-0.085,0.503) up.z=0.998 max|qerr|=0.152
+step=  80 xyz=(+1.222,-0.103,0.504) up.z=0.997 max|qerr|=0.150
+step= 100 xyz=(+1.555,-0.140,0.505) up.z=0.998 max|qerr|=0.154
+step= 120 xyz=(+1.905,-0.188,0.501) up.z=0.997 max|qerr|=0.160
+step= 140 xyz=(+2.215,-0.252,0.506) up.z=0.997 max|qerr|=0.144
+duration=8.00s displacement=(+2.468,-0.319,-0.002)m
+z: min=0.499 final=0.503; up.z: min=0.996; worst_joint_error=0.176rad; UPRIGHT
+body-frame mean Froude: forward=+0.1473 lateral=-0.0019 yaw=-0.0033
+motion quality: joint_acc_rms=40.115 jerk_rms=1448.862 contact_switches/s=8.68 support_mean=1.61 support_<=1=0.47
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s11.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s11.npz
+=== clip 12 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 12, applied to 18 shape(s)
+step=   0 xyz=(+0.071,+0.002,0.506) up.z=0.998 max|qerr|=0.105
+step=  20 xyz=(+0.160,-0.002,0.510) up.z=0.999 max|qerr|=0.130
+step=  40 xyz=(+0.557,-0.012,0.504) up.z=0.997 max|qerr|=0.150
+step=  60 xyz=(+0.897,-0.059,0.504) up.z=0.997 max|qerr|=0.159
+step=  80 xyz=(+1.295,-0.119,0.502) up.z=0.994 max|qerr|=0.175
+step= 100 xyz=(+1.697,-0.143,0.504) up.z=0.998 max|qerr|=0.170
+step= 120 xyz=(+2.111,-0.179,0.505) up.z=0.997 max|qerr|=0.155
+step= 140 xyz=(+2.501,-0.203,0.503) up.z=0.998 max|qerr|=0.154
+duration=8.00s displacement=(+2.807,-0.230,-0.002)m
+z: min=0.496 final=0.504; up.z: min=0.994; worst_joint_error=0.197rad; UPRIGHT
+body-frame mean Froude: forward=+0.1663 lateral=+0.0010 yaw=-0.0023
+motion quality: joint_acc_rms=43.973 jerk_rms=1584.511 contact_switches/s=7.80 support_mean=2.09 support_<=1=0.24
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s12.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s12.npz
+=== clip 13 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 13, applied to 18 shape(s)
+step=   0 xyz=(+0.082,+0.001,0.505) up.z=0.999 max|qerr|=0.105
+step=  20 xyz=(+0.207,-0.001,0.518) up.z=0.999 max|qerr|=0.117
+step=  40 xyz=(+0.760,+0.002,0.505) up.z=0.991 max|qerr|=0.161
+step=  60 xyz=(+1.254,+0.043,0.505) up.z=0.994 max|qerr|=0.168
+step=  80 xyz=(+1.766,+0.114,0.498) up.z=0.996 max|qerr|=0.205
+step= 100 xyz=(+2.274,+0.206,0.502) up.z=0.992 max|qerr|=0.144
+step= 120 xyz=(+2.826,+0.260,0.503) up.z=0.992 max|qerr|=0.159
+step= 140 xyz=(+3.368,+0.275,0.506) up.z=0.988 max|qerr|=0.177
+duration=8.00s displacement=(+3.763,+0.292,-0.008)m
+z: min=0.482 final=0.497; up.z: min=0.985; worst_joint_error=0.238rad; UPRIGHT
+body-frame mean Froude: forward=+0.2251 lateral=+0.0058 yaw=-0.0003
+motion quality: joint_acc_rms=59.952 jerk_rms=2138.398 contact_switches/s=4.78 support_mean=2.58 support_<=1=0.13
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s13.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s13.npz
+=== clip 14 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 14, applied to 18 shape(s)
+step=   0 xyz=(+0.081,+0.001,0.505) up.z=0.999 max|qerr|=0.094
+step=  20 xyz=(+0.216,+0.001,0.506) up.z=0.999 max|qerr|=0.162
+step=  40 xyz=(+0.712,+0.011,0.500) up.z=0.994 max|qerr|=0.194
+step=  60 xyz=(+1.198,-0.012,0.504) up.z=0.993 max|qerr|=0.163
+step=  80 xyz=(+1.697,-0.099,0.501) up.z=0.994 max|qerr|=0.179
+step= 100 xyz=(+2.230,-0.198,0.497) up.z=0.990 max|qerr|=0.164
+step= 120 xyz=(+2.736,-0.281,0.499) up.z=0.991 max|qerr|=0.162
+step= 140 xyz=(+3.180,-0.425,0.507) up.z=0.994 max|qerr|=0.154
+duration=8.00s displacement=(+3.590,-0.599,-0.004)m
+z: min=0.491 final=0.501; up.z: min=0.989; worst_joint_error=0.218rad; UPRIGHT
+body-frame mean Froude: forward=+0.2158 lateral=+0.0072 yaw=-0.0128
+motion quality: joint_acc_rms=58.940 jerk_rms=2106.570 contact_switches/s=4.28 support_mean=2.62 support_<=1=0.12
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s14.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s14.npz
+=== clip 15 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 15, applied to 18 shape(s)
+step=   0 xyz=(+0.078,+0.009,0.506) up.z=0.998 max|qerr|=0.101
+step=  20 xyz=(+0.185,+0.009,0.508) up.z=0.999 max|qerr|=0.144
+step=  40 xyz=(+0.669,+0.021,0.493) up.z=0.992 max|qerr|=0.171
+step=  60 xyz=(+1.152,+0.088,0.505) up.z=0.993 max|qerr|=0.160
+step=  80 xyz=(+1.620,+0.164,0.499) up.z=0.995 max|qerr|=0.189
+step= 100 xyz=(+2.094,+0.268,0.505) up.z=0.994 max|qerr|=0.176
+step= 120 xyz=(+2.571,+0.457,0.498) up.z=0.995 max|qerr|=0.186
+step= 140 xyz=(+3.013,+0.674,0.501) up.z=0.992 max|qerr|=0.160
+duration=8.00s displacement=(+3.342,+0.862,+0.003)m
+z: min=0.493 final=0.509; up.z: min=0.990; worst_joint_error=0.221rad; UPRIGHT
+body-frame mean Froude: forward=+0.2075 lateral=+0.0011 yaw=+0.0131
+motion quality: joint_acc_rms=55.641 jerk_rms=1988.142 contact_switches/s=5.53 support_mean=2.51 support_<=1=0.14
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s15.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s15.npz
+=== clip 16 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 16, applied to 18 shape(s)
+step=   0 xyz=(+0.075,-0.005,0.505) up.z=0.998 max|qerr|=0.106
+step=  20 xyz=(+0.159,+0.004,0.510) up.z=0.999 max|qerr|=0.135
+step=  40 xyz=(+0.630,-0.019,0.500) up.z=0.991 max|qerr|=0.175
+step=  60 xyz=(+1.080,-0.060,0.508) up.z=0.996 max|qerr|=0.147
+step=  80 xyz=(+1.541,-0.100,0.503) up.z=0.996 max|qerr|=0.162
+step= 100 xyz=(+2.040,-0.148,0.492) up.z=0.994 max|qerr|=0.202
+step= 120 xyz=(+2.514,-0.149,0.499) up.z=0.994 max|qerr|=0.174
+step= 140 xyz=(+2.957,-0.125,0.499) up.z=0.994 max|qerr|=0.173
+duration=8.00s displacement=(+3.311,-0.075,+0.003)m
+z: min=0.492 final=0.509; up.z: min=0.989; worst_joint_error=0.214rad; UPRIGHT
+body-frame mean Froude: forward=+0.1973 lateral=+0.0033 yaw=+0.0047
+motion quality: joint_acc_rms=53.007 jerk_rms=1904.987 contact_switches/s=6.16 support_mean=2.46 support_<=1=0.18
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s16.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s16.npz
+=== clip 17 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 17, applied to 18 shape(s)
+step=   0 xyz=(+0.068,-0.002,0.505) up.z=0.998 max|qerr|=0.102
+step=  20 xyz=(+0.195,+0.003,0.516) up.z=0.998 max|qerr|=0.121
+step=  40 xyz=(+0.779,+0.002,0.490) up.z=0.991 max|qerr|=0.208
+step=  60 xyz=(+1.288,+0.018,0.503) up.z=0.996 max|qerr|=0.184
+step=  80 xyz=(+1.824,+0.073,0.498) up.z=0.992 max|qerr|=0.174
+step= 100 xyz=(+2.315,+0.167,0.505) up.z=0.995 max|qerr|=0.168
+step= 120 xyz=(+2.838,+0.327,0.498) up.z=0.991 max|qerr|=0.212
+step= 140 xyz=(+3.326,+0.510,0.497) up.z=0.996 max|qerr|=0.201
+duration=8.00s displacement=(+3.730,+0.728,-0.002)m
+z: min=0.487 final=0.503; up.z: min=0.988; worst_joint_error=0.225rad; UPRIGHT
+body-frame mean Froude: forward=+0.2277 lateral=+0.0056 yaw=+0.0140
+motion quality: joint_acc_rms=59.021 jerk_rms=2109.192 contact_switches/s=6.54 support_mean=2.50 support_<=1=0.14
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s17.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s17.npz
+=== clip 18 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 18, applied to 18 shape(s)
+step=   0 xyz=(+0.078,+0.008,0.506) up.z=0.999 max|qerr|=0.096
+step=  20 xyz=(+0.163,+0.017,0.514) up.z=0.999 max|qerr|=0.106
+step=  40 xyz=(+0.600,+0.011,0.492) up.z=0.994 max|qerr|=0.168
+step=  60 xyz=(+1.040,-0.006,0.501) up.z=0.995 max|qerr|=0.162
+step=  80 xyz=(+1.488,-0.057,0.500) up.z=0.994 max|qerr|=0.172
+step= 100 xyz=(+1.926,-0.157,0.499) up.z=0.996 max|qerr|=0.165
+step= 120 xyz=(+2.316,-0.292,0.502) up.z=0.997 max|qerr|=0.167
+step= 140 xyz=(+2.705,-0.380,0.496) up.z=0.996 max|qerr|=0.160
+duration=8.00s displacement=(+3.007,-0.510,-0.007)m
+z: min=0.492 final=0.499; up.z: min=0.991; worst_joint_error=0.205rad; UPRIGHT
+body-frame mean Froude: forward=+0.1827 lateral=+0.0097 yaw=-0.0105
+motion quality: joint_acc_rms=48.340 jerk_rms=1733.936 contact_switches/s=5.16 support_mean=2.38 support_<=1=0.17
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s18.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s18.npz
+=== clip 19 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 19, applied to 18 shape(s)
+step=   0 xyz=(+0.077,+0.005,0.506) up.z=0.998 max|qerr|=0.109
+step=  20 xyz=(+0.190,+0.021,0.509) up.z=0.998 max|qerr|=0.129
+step=  40 xyz=(+0.556,+0.009,0.502) up.z=0.996 max|qerr|=0.157
+step=  60 xyz=(+0.977,-0.001,0.500) up.z=0.996 max|qerr|=0.175
+step=  80 xyz=(+1.407,+0.003,0.505) up.z=0.995 max|qerr|=0.164
+step= 100 xyz=(+1.838,+0.038,0.506) up.z=0.996 max|qerr|=0.162
+step= 120 xyz=(+2.296,+0.080,0.502) up.z=0.994 max|qerr|=0.169
+step= 140 xyz=(+2.716,+0.128,0.507) up.z=0.996 max|qerr|=0.158
+duration=8.00s displacement=(+3.031,+0.158,+0.001)m
+z: min=0.493 final=0.506; up.z: min=0.991; worst_joint_error=0.204rad; UPRIGHT
+body-frame mean Froude: forward=+0.1801 lateral=+0.0026 yaw=+0.0037
+motion quality: joint_acc_rms=47.297 jerk_rms=1690.839 contact_switches/s=7.80 support_mean=2.18 support_<=1=0.20
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s19.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s19.npz
+=== clip 20 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 20, applied to 18 shape(s)
+step=   0 xyz=(+0.076,-0.000,0.506) up.z=0.998 max|qerr|=0.103
+step=  20 xyz=(+0.147,+0.005,0.511) up.z=0.999 max|qerr|=0.132
+step=  40 xyz=(+0.566,-0.022,0.504) up.z=0.996 max|qerr|=0.147
+step=  60 xyz=(+1.004,-0.063,0.505) up.z=0.995 max|qerr|=0.161
+step=  80 xyz=(+1.397,-0.100,0.510) up.z=0.997 max|qerr|=0.137
+step= 100 xyz=(+1.797,-0.135,0.504) up.z=0.997 max|qerr|=0.162
+step= 120 xyz=(+2.209,-0.164,0.507) up.z=0.995 max|qerr|=0.159
+step= 140 xyz=(+2.592,-0.153,0.506) up.z=0.998 max|qerr|=0.138
+duration=8.00s displacement=(+2.901,-0.070,-0.001)m
+z: min=0.496 final=0.504; up.z: min=0.993; worst_joint_error=0.191rad; UPRIGHT
+body-frame mean Froude: forward=+0.1728 lateral=-0.0044 yaw=+0.0083
+motion quality: joint_acc_rms=45.058 jerk_rms=1626.678 contact_switches/s=8.43 support_mean=2.07 support_<=1=0.31
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s20.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s20.npz
+=== clip 21 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 21, applied to 18 shape(s)
+step=   0 xyz=(+0.068,-0.002,0.506) up.z=0.998 max|qerr|=0.102
+step=  20 xyz=(+0.174,-0.008,0.513) up.z=0.999 max|qerr|=0.145
+step=  40 xyz=(+0.746,-0.061,0.490) up.z=0.991 max|qerr|=0.203
+step=  60 xyz=(+1.212,-0.123,0.498) up.z=0.993 max|qerr|=0.159
+step=  80 xyz=(+1.624,-0.249,0.496) up.z=0.997 max|qerr|=0.179
+step= 100 xyz=(+2.100,-0.409,0.499) up.z=0.993 max|qerr|=0.171
+step= 120 xyz=(+2.577,-0.578,0.499) up.z=0.992 max|qerr|=0.166
+step= 140 xyz=(+3.071,-0.763,0.504) up.z=0.990 max|qerr|=0.178
+duration=8.00s displacement=(+3.447,-0.877,-0.002)m
+z: min=0.487 final=0.504; up.z: min=0.988; worst_joint_error=0.223rad; UPRIGHT
+body-frame mean Froude: forward=+0.2136 lateral=+0.0044 yaw=-0.0072
+motion quality: joint_acc_rms=57.294 jerk_rms=2047.655 contact_switches/s=4.03 support_mean=2.62 support_<=1=0.11
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s21.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s21.npz
+=== clip 22 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 22, applied to 18 shape(s)
+step=   0 xyz=(+0.079,+0.001,0.506) up.z=0.998 max|qerr|=0.112
+step=  20 xyz=(+0.171,+0.011,0.511) up.z=0.999 max|qerr|=0.129
+step=  40 xyz=(+0.570,-0.012,0.506) up.z=0.997 max|qerr|=0.178
+step=  60 xyz=(+1.002,-0.036,0.503) up.z=0.995 max|qerr|=0.159
+step=  80 xyz=(+1.414,-0.067,0.509) up.z=0.997 max|qerr|=0.144
+step= 100 xyz=(+1.798,-0.087,0.506) up.z=0.995 max|qerr|=0.147
+step= 120 xyz=(+2.190,-0.143,0.509) up.z=0.997 max|qerr|=0.153
+step= 140 xyz=(+2.609,-0.240,0.497) up.z=0.997 max|qerr|=0.167
+duration=8.00s displacement=(+2.912,-0.338,-0.001)m
+z: min=0.495 final=0.505; up.z: min=0.994; worst_joint_error=0.190rad; UPRIGHT
+body-frame mean Froude: forward=+0.1735 lateral=+0.0020 yaw=-0.0065
+motion quality: joint_acc_rms=46.219 jerk_rms=1663.746 contact_switches/s=8.93 support_mean=2.22 support_<=1=0.17
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s22.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s22.npz
+=== clip 23 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 23, applied to 18 shape(s)
+step=   0 xyz=(+0.075,+0.000,0.506) up.z=0.999 max|qerr|=0.112
+step=  20 xyz=(+0.171,+0.006,0.514) up.z=0.999 max|qerr|=0.121
+step=  40 xyz=(+0.675,+0.054,0.503) up.z=0.993 max|qerr|=0.168
+step=  60 xyz=(+1.146,+0.137,0.502) up.z=0.994 max|qerr|=0.169
+step=  80 xyz=(+1.584,+0.267,0.506) up.z=0.993 max|qerr|=0.173
+step= 100 xyz=(+2.017,+0.442,0.498) up.z=0.995 max|qerr|=0.157
+step= 120 xyz=(+2.504,+0.578,0.505) up.z=0.990 max|qerr|=0.168
+step= 140 xyz=(+2.999,+0.711,0.503) up.z=0.989 max|qerr|=0.171
+duration=8.00s displacement=(+3.359,+0.838,-0.002)m
+z: min=0.487 final=0.503; up.z: min=0.989; worst_joint_error=0.212rad; UPRIGHT
+body-frame mean Froude: forward=+0.2064 lateral=+0.0027 yaw=+0.0088
+motion quality: joint_acc_rms=55.652 jerk_rms=1994.316 contact_switches/s=5.53 support_mean=2.58 support_<=1=0.11
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s23.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s23.npz
+=== clip 24 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 24, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.005,0.505) up.z=0.998 max|qerr|=0.101
+step=  20 xyz=(+0.164,+0.010,0.512) up.z=0.998 max|qerr|=0.116
+step=  40 xyz=(+0.528,+0.008,0.504) up.z=0.997 max|qerr|=0.159
+step=  60 xyz=(+0.895,-0.007,0.503) up.z=0.997 max|qerr|=0.164
+step=  80 xyz=(+1.308,-0.013,0.505) up.z=0.995 max|qerr|=0.161
+step= 100 xyz=(+1.702,-0.032,0.501) up.z=0.996 max|qerr|=0.173
+step= 120 xyz=(+2.096,-0.073,0.503) up.z=0.997 max|qerr|=0.163
+step= 140 xyz=(+2.534,-0.122,0.505) up.z=0.996 max|qerr|=0.145
+duration=8.00s displacement=(+2.855,-0.193,-0.001)m
+z: min=0.492 final=0.504; up.z: min=0.992; worst_joint_error=0.196rad; UPRIGHT
+body-frame mean Froude: forward=+0.1695 lateral=+0.0055 yaw=-0.0047
+motion quality: joint_acc_rms=44.772 jerk_rms=1608.968 contact_switches/s=8.30 support_mean=2.14 support_<=1=0.24
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s24.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s24.npz
+=== clip 25 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 25, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.006,0.506) up.z=0.999 max|qerr|=0.092
+step=  20 xyz=(+0.137,+0.008,0.506) up.z=0.999 max|qerr|=0.134
+step=  40 xyz=(+0.469,+0.022,0.504) up.z=0.996 max|qerr|=0.132
+step=  60 xyz=(+0.863,-0.028,0.504) up.z=0.995 max|qerr|=0.151
+step=  80 xyz=(+1.252,-0.068,0.500) up.z=0.995 max|qerr|=0.158
+step= 100 xyz=(+1.601,-0.085,0.503) up.z=0.997 max|qerr|=0.168
+step= 120 xyz=(+1.973,-0.064,0.498) up.z=0.996 max|qerr|=0.155
+step= 140 xyz=(+2.328,-0.028,0.503) up.z=0.997 max|qerr|=0.140
+duration=8.00s displacement=(+2.593,-0.002,+0.003)m
+z: min=0.494 final=0.509; up.z: min=0.993; worst_joint_error=0.194rad; UPRIGHT
+body-frame mean Froude: forward=+0.1545 lateral=+0.0017 yaw=+0.0041
+motion quality: joint_acc_rms=41.449 jerk_rms=1489.890 contact_switches/s=8.68 support_mean=2.00 support_<=1=0.25
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s25.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s25.npz
+=== clip 26 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 26, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.000,0.506) up.z=0.999 max|qerr|=0.106
+step=  20 xyz=(+0.191,+0.018,0.511) up.z=0.998 max|qerr|=0.126
+step=  40 xyz=(+0.610,+0.038,0.502) up.z=0.995 max|qerr|=0.154
+step=  60 xyz=(+1.084,+0.036,0.496) up.z=0.996 max|qerr|=0.201
+step=  80 xyz=(+1.518,+0.031,0.498) up.z=0.996 max|qerr|=0.182
+step= 100 xyz=(+1.959,+0.009,0.500) up.z=0.993 max|qerr|=0.142
+step= 120 xyz=(+2.395,-0.032,0.508) up.z=0.996 max|qerr|=0.157
+step= 140 xyz=(+2.871,-0.084,0.499) up.z=0.996 max|qerr|=0.173
+duration=8.00s displacement=(+3.216,-0.168,-0.003)m
+z: min=0.492 final=0.503; up.z: min=0.991; worst_joint_error=0.205rad; UPRIGHT
+body-frame mean Froude: forward=+0.1912 lateral=+0.0054 yaw=-0.0082
+motion quality: joint_acc_rms=50.094 jerk_rms=1793.466 contact_switches/s=5.03 support_mean=2.39 support_<=1=0.17
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s26.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s26.npz
+=== clip 27 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 27, applied to 18 shape(s)
+step=   0 xyz=(+0.071,+0.003,0.504) up.z=0.998 max|qerr|=0.108
+step=  20 xyz=(+0.181,+0.007,0.513) up.z=0.998 max|qerr|=0.137
+step=  40 xyz=(+0.668,-0.025,0.500) up.z=0.996 max|qerr|=0.161
+step=  60 xyz=(+1.129,-0.096,0.501) up.z=0.995 max|qerr|=0.161
+step=  80 xyz=(+1.585,-0.184,0.499) up.z=0.997 max|qerr|=0.175
+step= 100 xyz=(+2.063,-0.268,0.506) up.z=0.994 max|qerr|=0.188
+step= 120 xyz=(+2.540,-0.327,0.502) up.z=0.993 max|qerr|=0.174
+step= 140 xyz=(+3.022,-0.357,0.497) up.z=0.992 max|qerr|=0.178
+duration=8.00s displacement=(+3.414,-0.431,+0.000)m
+z: min=0.494 final=0.504; up.z: min=0.990; worst_joint_error=0.215rad; UPRIGHT
+body-frame mean Froude: forward=+0.2036 lateral=+0.0054 yaw=-0.0041
+motion quality: joint_acc_rms=54.758 jerk_rms=1961.058 contact_switches/s=4.03 support_mean=2.54 support_<=1=0.13
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s27.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s27.npz
+=== clip 28 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 28, applied to 18 shape(s)
+step=   0 xyz=(+0.077,+0.002,0.505) up.z=0.998 max|qerr|=0.097
+step=  20 xyz=(+0.223,+0.028,0.514) up.z=0.998 max|qerr|=0.130
+step=  40 xyz=(+0.804,+0.091,0.499) up.z=0.992 max|qerr|=0.193
+step=  60 xyz=(+1.307,+0.171,0.491) up.z=0.993 max|qerr|=0.207
+step=  80 xyz=(+1.818,+0.232,0.505) up.z=0.993 max|qerr|=0.134
+step= 100 xyz=(+2.339,+0.259,0.502) up.z=0.994 max|qerr|=0.170
+step= 120 xyz=(+2.864,+0.349,0.498) up.z=0.994 max|qerr|=0.198
+step= 140 xyz=(+3.326,+0.495,0.502) up.z=0.993 max|qerr|=0.165
+duration=8.00s displacement=(+3.691,+0.658,+0.009)m
+z: min=0.491 final=0.514; up.z: min=0.990; worst_joint_error=0.215rad; UPRIGHT
+body-frame mean Froude: forward=+0.2237 lateral=+0.0044 yaw=+0.0117
+motion quality: joint_acc_rms=59.422 jerk_rms=2128.197 contact_switches/s=3.52 support_mean=2.61 support_<=1=0.13
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s28.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s28.npz
+=== clip 29 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 29, applied to 18 shape(s)
+step=   0 xyz=(+0.080,+0.001,0.504) up.z=0.999 max|qerr|=0.107
+step=  20 xyz=(+0.147,+0.012,0.506) up.z=0.998 max|qerr|=0.132
+step=  40 xyz=(+0.464,+0.021,0.503) up.z=0.997 max|qerr|=0.153
+step=  60 xyz=(+0.806,+0.026,0.498) up.z=0.995 max|qerr|=0.144
+step=  80 xyz=(+1.134,+0.049,0.504) up.z=0.998 max|qerr|=0.131
+step= 100 xyz=(+1.470,+0.084,0.503) up.z=0.997 max|qerr|=0.136
+step= 120 xyz=(+1.773,+0.103,0.504) up.z=0.997 max|qerr|=0.166
+step= 140 xyz=(+2.115,+0.147,0.505) up.z=0.997 max|qerr|=0.137
+duration=8.00s displacement=(+2.357,+0.201,+0.002)m
+z: min=0.497 final=0.506; up.z: min=0.995; worst_joint_error=0.183rad; UPRIGHT
+body-frame mean Froude: forward=+0.1399 lateral=+0.0062 yaw=+0.0034
+motion quality: joint_acc_rms=38.516 jerk_rms=1385.589 contact_switches/s=8.81 support_mean=1.66 support_<=1=0.49
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s29.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s29.npz
+=== clip 30 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 30, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.004,0.505) up.z=0.999 max|qerr|=0.097
+step=  20 xyz=(+0.162,+0.007,0.512) up.z=0.998 max|qerr|=0.122
+step=  40 xyz=(+0.567,+0.036,0.496) up.z=0.997 max|qerr|=0.189
+step=  60 xyz=(+0.948,+0.059,0.505) up.z=0.997 max|qerr|=0.137
+step=  80 xyz=(+1.399,+0.048,0.498) up.z=0.993 max|qerr|=0.154
+step= 100 xyz=(+1.771,+0.046,0.506) up.z=0.997 max|qerr|=0.141
+step= 120 xyz=(+2.189,+0.023,0.509) up.z=0.996 max|qerr|=0.158
+step= 140 xyz=(+2.594,-0.024,0.507) up.z=0.997 max|qerr|=0.160
+duration=8.00s displacement=(+2.907,-0.077,+0.001)m
+z: min=0.495 final=0.507; up.z: min=0.993; worst_joint_error=0.208rad; UPRIGHT
+body-frame mean Froude: forward=+0.1729 lateral=+0.0079 yaw=-0.0047
+motion quality: joint_acc_rms=43.904 jerk_rms=1579.169 contact_switches/s=9.31 support_mean=2.18 support_<=1=0.24
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s30.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s30.npz
+=== clip 31 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 31, applied to 18 shape(s)
+step=   0 xyz=(+0.077,+0.008,0.506) up.z=0.999 max|qerr|=0.099
+step=  20 xyz=(+0.211,+0.015,0.514) up.z=0.998 max|qerr|=0.142
+step=  40 xyz=(+0.760,+0.027,0.501) up.z=0.988 max|qerr|=0.154
+step=  60 xyz=(+1.271,+0.031,0.506) up.z=0.996 max|qerr|=0.178
+step=  80 xyz=(+1.838,+0.074,0.498) up.z=0.995 max|qerr|=0.201
+step= 100 xyz=(+2.361,+0.141,0.511) up.z=0.995 max|qerr|=0.161
+step= 120 xyz=(+2.896,+0.230,0.498) up.z=0.994 max|qerr|=0.166
+step= 140 xyz=(+3.452,+0.330,0.488) up.z=0.992 max|qerr|=0.212
+duration=8.00s displacement=(+3.856,+0.399,+0.008)m
+z: min=0.488 final=0.514; up.z: min=0.986; worst_joint_error=0.230rad; UPRIGHT
+body-frame mean Froude: forward=+0.2316 lateral=+0.0055 yaw=+0.0041
+motion quality: joint_acc_rms=60.760 jerk_rms=2171.308 contact_switches/s=3.02 support_mean=2.72 support_<=1=0.11
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s31.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s31.npz
+=== clip 32 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 32, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.002,0.505) up.z=0.998 max|qerr|=0.115
+step=  20 xyz=(+0.169,+0.011,0.507) up.z=0.997 max|qerr|=0.142
+step=  40 xyz=(+0.493,-0.005,0.504) up.z=0.998 max|qerr|=0.143
+step=  60 xyz=(+0.891,-0.031,0.492) up.z=0.994 max|qerr|=0.180
+step=  80 xyz=(+1.219,-0.083,0.505) up.z=0.996 max|qerr|=0.142
+step= 100 xyz=(+1.612,-0.143,0.507) up.z=0.997 max|qerr|=0.171
+step= 120 xyz=(+1.971,-0.223,0.504) up.z=0.996 max|qerr|=0.155
+step= 140 xyz=(+2.341,-0.278,0.499) up.z=0.996 max|qerr|=0.149
+duration=8.00s displacement=(+2.563,-0.323,+0.006)m
+z: min=0.492 final=0.511; up.z: min=0.991; worst_joint_error=0.188rad; UPRIGHT
+body-frame mean Froude: forward=+0.1543 lateral=+0.0001 yaw=-0.0046
+motion quality: joint_acc_rms=41.843 jerk_rms=1507.639 contact_switches/s=6.42 support_mean=1.89 support_<=1=0.32
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s32.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s32.npz
+=== clip 33 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 33, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.001,0.504) up.z=0.999 max|qerr|=0.098
+step=  20 xyz=(+0.178,+0.011,0.515) up.z=0.998 max|qerr|=0.125
+step=  40 xyz=(+0.600,+0.005,0.505) up.z=0.995 max|qerr|=0.161
+step=  60 xyz=(+1.040,+0.029,0.504) up.z=0.994 max|qerr|=0.177
+step=  80 xyz=(+1.514,+0.039,0.497) up.z=0.994 max|qerr|=0.162
+step= 100 xyz=(+1.950,+0.016,0.503) up.z=0.994 max|qerr|=0.172
+step= 120 xyz=(+2.377,+0.017,0.505) up.z=0.996 max|qerr|=0.172
+step= 140 xyz=(+2.847,+0.085,0.500) up.z=0.994 max|qerr|=0.184
+duration=8.00s displacement=(+3.174,+0.162,-0.003)m
+z: min=0.494 final=0.501; up.z: min=0.992; worst_joint_error=0.197rad; UPRIGHT
+body-frame mean Froude: forward=+0.1894 lateral=-0.0010 yaw=+0.0070
+motion quality: joint_acc_rms=48.404 jerk_rms=1730.638 contact_switches/s=7.67 support_mean=2.35 support_<=1=0.17
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s33.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s33.npz
+=== clip 34 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 34, applied to 18 shape(s)
+step=   0 xyz=(+0.074,-0.004,0.506) up.z=0.999 max|qerr|=0.105
+step=  20 xyz=(+0.143,-0.008,0.504) up.z=0.998 max|qerr|=0.148
+step=  40 xyz=(+0.452,-0.019,0.505) up.z=0.998 max|qerr|=0.143
+step=  60 xyz=(+0.785,-0.067,0.500) up.z=0.996 max|qerr|=0.142
+step=  80 xyz=(+1.069,-0.104,0.509) up.z=0.998 max|qerr|=0.129
+step= 100 xyz=(+1.411,-0.174,0.502) up.z=0.998 max|qerr|=0.163
+step= 120 xyz=(+1.695,-0.225,0.500) up.z=0.998 max|qerr|=0.147
+step= 140 xyz=(+1.994,-0.277,0.500) up.z=0.998 max|qerr|=0.155
+duration=8.00s displacement=(+2.227,-0.323,-0.005)m
+z: min=0.498 final=0.500; up.z: min=0.995; worst_joint_error=0.191rad; UPRIGHT
+body-frame mean Froude: forward=+0.1326 lateral=+0.0042 yaw=-0.0046
+motion quality: joint_acc_rms=37.144 jerk_rms=1339.756 contact_switches/s=8.68 support_mean=1.51 support_<=1=0.56
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s34.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s34.npz
+=== clip 35 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 35, applied to 18 shape(s)
+step=   0 xyz=(+0.072,+0.008,0.506) up.z=0.998 max|qerr|=0.104
+step=  20 xyz=(+0.168,+0.019,0.513) up.z=0.998 max|qerr|=0.113
+step=  40 xyz=(+0.549,+0.014,0.504) up.z=0.997 max|qerr|=0.159
+step=  60 xyz=(+0.948,-0.001,0.503) up.z=0.997 max|qerr|=0.159
+step=  80 xyz=(+1.355,-0.017,0.506) up.z=0.997 max|qerr|=0.153
+step= 100 xyz=(+1.791,-0.018,0.503) up.z=0.996 max|qerr|=0.163
+step= 120 xyz=(+2.234,-0.044,0.506) up.z=0.994 max|qerr|=0.163
+step= 140 xyz=(+2.641,-0.111,0.509) up.z=0.995 max|qerr|=0.153
+duration=8.00s displacement=(+2.931,-0.191,-0.001)m
+z: min=0.494 final=0.505; up.z: min=0.991; worst_joint_error=0.206rad; UPRIGHT
+body-frame mean Froude: forward=+0.1752 lateral=+0.0054 yaw=-0.0066
+motion quality: joint_acc_rms=46.319 jerk_rms=1668.056 contact_switches/s=8.43 support_mean=2.22 support_<=1=0.20
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s35.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s35.npz
+=== clip 36 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 36, applied to 18 shape(s)
+step=   0 xyz=(+0.081,+0.001,0.505) up.z=0.998 max|qerr|=0.102
+step=  20 xyz=(+0.179,+0.013,0.508) up.z=0.998 max|qerr|=0.142
+step=  40 xyz=(+0.479,+0.014,0.508) up.z=0.998 max|qerr|=0.151
+step=  60 xyz=(+0.864,-0.002,0.502) up.z=0.996 max|qerr|=0.169
+step=  80 xyz=(+1.259,+0.005,0.505) up.z=0.997 max|qerr|=0.149
+step= 100 xyz=(+1.643,+0.008,0.506) up.z=0.997 max|qerr|=0.161
+step= 120 xyz=(+1.990,+0.036,0.507) up.z=0.997 max|qerr|=0.145
+step= 140 xyz=(+2.385,+0.046,0.504) up.z=0.996 max|qerr|=0.169
+duration=8.00s displacement=(+2.698,+0.042,-0.001)m
+z: min=0.498 final=0.505; up.z: min=0.994; worst_joint_error=0.193rad; UPRIGHT
+body-frame mean Froude: forward=+0.1586 lateral=-0.0007 yaw=-0.0016
+motion quality: joint_acc_rms=41.161 jerk_rms=1478.438 contact_switches/s=8.43 support_mean=1.78 support_<=1=0.36
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s36.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s36.npz
+=== clip 37 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 37, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.000,0.506) up.z=0.998 max|qerr|=0.108
+step=  20 xyz=(+0.198,+0.021,0.515) up.z=0.998 max|qerr|=0.124
+step=  40 xyz=(+0.742,+0.095,0.497) up.z=0.990 max|qerr|=0.181
+step=  60 xyz=(+1.222,+0.187,0.501) up.z=0.995 max|qerr|=0.153
+step=  80 xyz=(+1.720,+0.270,0.499) up.z=0.993 max|qerr|=0.177
+step= 100 xyz=(+2.193,+0.361,0.507) up.z=0.996 max|qerr|=0.153
+step= 120 xyz=(+2.700,+0.531,0.500) up.z=0.989 max|qerr|=0.156
+step= 140 xyz=(+3.134,+0.710,0.503) up.z=0.995 max|qerr|=0.123
+duration=8.00s displacement=(+3.516,+0.815,-0.001)m
+z: min=0.490 final=0.505; up.z: min=0.986; worst_joint_error=0.213rad; UPRIGHT
+body-frame mean Froude: forward=+0.2139 lateral=+0.0019 yaw=+0.0098
+motion quality: joint_acc_rms=55.820 jerk_rms=1998.429 contact_switches/s=5.53 support_mean=2.45 support_<=1=0.15
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s37.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s37.npz
+=== clip 38 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 38, applied to 18 shape(s)
+step=   0 xyz=(+0.082,+0.009,0.505) up.z=0.999 max|qerr|=0.098
+step=  20 xyz=(+0.178,+0.014,0.512) up.z=0.999 max|qerr|=0.133
+step=  40 xyz=(+0.648,+0.020,0.502) up.z=0.996 max|qerr|=0.168
+step=  60 xyz=(+1.129,+0.030,0.496) up.z=0.993 max|qerr|=0.156
+step=  80 xyz=(+1.550,+0.040,0.499) up.z=0.995 max|qerr|=0.179
+step= 100 xyz=(+1.980,+0.112,0.501) up.z=0.997 max|qerr|=0.175
+step= 120 xyz=(+2.429,+0.222,0.494) up.z=0.993 max|qerr|=0.179
+step= 140 xyz=(+2.860,+0.322,0.496) up.z=0.997 max|qerr|=0.185
+duration=8.00s displacement=(+3.194,+0.422,-0.001)m
+z: min=0.490 final=0.504; up.z: min=0.991; worst_joint_error=0.231rad; UPRIGHT
+body-frame mean Froude: forward=+0.1919 lateral=-0.0002 yaw=+0.0090
+motion quality: joint_acc_rms=49.561 jerk_rms=1770.419 contact_switches/s=7.55 support_mean=2.24 support_<=1=0.22
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s38.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s38.npz
+=== clip 39 / 39 ===
+    built 5 walls, 17.6 m box, 6.6 m high, tile 0.0 m
+egocentric camera: {'forward': [1.0, 0.0, -0.018], 'position': [0.389, 0.0, 0.923]}
+    ground randomised, seed 39, applied to 18 shape(s)
+step=   0 xyz=(+0.076,+0.006,0.505) up.z=0.999 max|qerr|=0.100
+step=  20 xyz=(+0.188,+0.005,0.512) up.z=0.998 max|qerr|=0.130
+step=  40 xyz=(+0.645,+0.001,0.496) up.z=0.996 max|qerr|=0.184
+step=  60 xyz=(+1.090,-0.044,0.498) up.z=0.994 max|qerr|=0.164
+step=  80 xyz=(+1.568,-0.153,0.499) up.z=0.991 max|qerr|=0.165
+step= 100 xyz=(+1.978,-0.297,0.506) up.z=0.998 max|qerr|=0.166
+step= 120 xyz=(+2.421,-0.468,0.507) up.z=0.995 max|qerr|=0.165
+step= 140 xyz=(+2.872,-0.628,0.501) up.z=0.995 max|qerr|=0.180
+duration=8.00s displacement=(+3.206,-0.793,-0.005)m
+z: min=0.491 final=0.500; up.z: min=0.990; worst_joint_error=0.216rad; UPRIGHT
+body-frame mean Froude: forward=+0.1967 lateral=+0.0129 yaw=-0.0130
+motion quality: joint_acc_rms=50.235 jerk_rms=1798.649 contact_switches/s=6.16 support_mean=2.38 support_<=1=0.18
+saved run record: /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s39.yaml
+saved -> /home/aria/ioon-research/data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s39.npz
+done: 40 clips in data/egocentric/b1_babble_coppelia_spring_ego_flat

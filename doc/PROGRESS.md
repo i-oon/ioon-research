@@ -2960,3 +2960,148 @@ up.z ต่ำสุด 0.9998)
 amplitude 0.2 action units. รันซ้ำจาก scene ใหม่ได้ 0.178 m / drift 0.010 m ด้วย stability เท่าเดิม
 จึงไม่ใช่ผลครั้งเดียว. รายละเอียดเต็มอยู่ F196. งานถัดไปคือ reset/action/observation และ
 stop/forward/turn primitives สำหรับ simulator environment; ยังห้ามเริ่ม WM-reward RL เพราะ F195 ไม่ผ่าน gate.
+
+---
+
+## 33. Q21 step 3 — สร้าง RL controller จริง (PPO + physics จริง), เจอบั๊ก 4 ตัว, ตัดสาเหตุออกไป 4 ทาง, ยังไม่จบ (2026-09-13)
+
+**F195 ผ่าน gate แล้วก่อนเริ่ม** (F199/F201 หลังแก้ hinge fix ให้ propagate ผ่าน stage-1 ได้: 20.8%
+เกิน baseline expert 16.7%) จึงเริ่มสร้าง Q21 step 3 จริง: PPO มาตรฐาน, physics จริงจาก MuJoCo (ไม่ใช่
+imagined rollout ที่ F179 ฆ่าไปแล้ว — WM แค่ให้ reward ต่อ step เดียว ไม่ roll FTM เลย)
+
+**ไฟล์ใหม่**: `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py` (ลองเทรนใน CoppeliaSim-Bullet ตรงๆ
+ตามคำขอ แต่ยัง smoke-test อย่างเดียว ไม่เคยผ่าน PPO จริง), `b1_real_ppo.py` (PPO from scratch, hyperparameter
+อ้างอิงจาก `doc/ref/airl-insect-walking`), `b1_ppo_eval.py` (ประเมินแบบ deterministic เทียบ true Froude
+จริงจาก physics ไม่ใช่แค่ reward proxy — กันการหลอกตัวเองแบบ F179)
+
+**4 บั๊กที่เจอและแก้ตามลำดับ** (เจอจากดู log/render จริง ไม่ใช่เดา):
+1. **die fast**: reward `-|pred-goal|` ติดลบเสมอ → optimum คือจบ episode เร็วที่สุด แก้ด้วย `exp(-distance)` bound (0,1] + alive bonus/fall penalty
+2. **stand still**: `ALIVE_BONUS=0.5` คูณ 200 step ~100 อยู่แล้ว ไม่ต้องเดินก็ได้คะแนนพอ (เห็นจาก tracking แบนที่ ~0.04 ทั้งที่ mean_return ขึ้น) แก้โดยลด ALIVE_BONUS เหลือ 0.1 + เพิ่ม TRACKING_WEIGHT=5.0 (ปรับของเดิม ไม่เพิ่ม reward ใหม่ ตามที่ขอ)
+3. **goal อ่านกลับด้าน**: `body_head_b1.pt` fit โดยไม่ได้ rehearse hexapod (ลืมกฎ F191 — บันทึกเป็น memory แล้วว่าห้ามพลาดซ้ำ) อ่าน forward เป็น −1.86 ทั้งที่ควรเป็นบวก แก้โดย fit ใหม่พร้อม `--also hexapod=...`
+4. **qpos/ctrl คนละ order ตอน reset**: `qpos[7:19] = DEFAULT_IL` ลืมแปลงผ่าน `il_to_sdk()` (บรรทัดข้างล่างที่ทำ ctrl แปลงถูก) ทำให้ actuator กระตุกตอน spawn ทุกครั้ง เจอจากดู render จริง ตรวจแล้วสคริปต์เก็บ babble (`collect_b1_cpg_babble.py`) ไม่มีบั๊กนี้ อยู่แค่ไฟล์ RL ใหม่
+
+**หลังแก้ 4 บั๊กแล้ว policy ยัง "เดินติดๆ แล้วหยุดนิ่งสนิท"** — คำถามจากพี่: reward มัน represent
+ความเร็วจริงไหม หรือ model ตัดสินว่า "ถูกอยู่แล้ว" กันแน่ ไล่วัดตรงๆ 2 เรื่อง:
+
+**เรื่องที่ 1 — action space ไปไม่ถึง**: `proj`/`body_head` fit จาก babble action จริง (48 คลิป) ซึ่งไม่สมมาตร
+ต่อข้อต่อ (calf ทางเดียว 0 ถึง +3.59) แต่ policy tanh บีบ action ไว้ที่ [-1,1] เท่ากันทุกข้อ วัดตรง:
+random action ในกรอบ [-1,1] เดิม ได้ tracking สูงสุด 0.007 (=เท่ายืนนิ่งเป๊ะ) แก้ด้วย `scale_action()`
+map เข้าช่วงจริงต่อข้อต่อ (`ACTION_LO`/`ACTION_HI` วัดจากข้อมูลจริง) → หลังแก้ random action เดียวกัน
+ได้ tracking ถึง 0.79 (สูงกว่า expert clip เองด้วยซ้ำ) ยืนยันว่า space เปิดแล้วจริง
+
+**เรื่องที่ 2 — reward ไม่รู้เวลาเลย**: เอา action จริงที่เดินได้มาสลับลำดับเวลาแบบมั่ว (shuffle) แล้ว
+ให้คะแนนซ้ำ → **คะแนนเท่าเดิมเป๊ะ** (0.2118 = 0.2118) แปลว่า `body_head(proj(action))` มองแค่ "หน้าตา
+action ของ step นั้น" อย่างเดียว แยกไม่ออกระหว่างยืนค้าง action ดีๆ กับเดินผ่านมันจริง — นี่คือขีดจำกัด
+ไม่ใช่บั๊ก แก้ได้แต่เป็นงานใหญ่ (ต้องให้ WM เห็นมากกว่า 1 action ต่อครั้ง)
+
+**ลองแก้ต่ออีก 4 ทาง ทุกทางได้ผลเหมือนกันหมด — tracking แบนที่ ~0.09 ตลอด**:
+scale action (ข้างบน) → ปรับ TRACKING_SCALE ให้เหมาะกับหน่วย Froude จริง (ของเดิม exp(-1.0×0.16)=0.85
+สำหรับยืนนิ่งเฉยๆ อยู่แล้ว ไม่มี gradient เหลือ) → ไม่ให้ล้มจบ episode (reset ท่าแล้วเล่นต่อ ไม่เสีย
+reward ที่เหลือ) → ทำ exploration noise ให้ต่อเนื่องข้ามเวลา (AR(1), ~0.4 วิ) **ทุกครั้ง deterministic
+policy หยุดนิ่งท่าเดียวกันเป๊ะ true Froude ≈ 0 เท่ากันทุก episode**
+
+**จุดตัดสำคัญ**: ทดสอบ reward_mode="true_froude" (ความเร็วจริงจากฟิสิกส์ตรงๆ ไม่ผ่าน WM เลย) กับทุกการ
+แก้ข้างบน — **ผลเหมือนเดิมทุกอย่าง** ตัดออกได้ชัดว่าไม่ใช่ทั้ง (ก) reward ของ WM ไม่ดีพอ/ไม่รู้เวลา และ
+(ข) กลัวล้มเลยไม่กล้าเดิน (fall-risk aversion) เพราะแก้ทั้งสองแล้วผลไม่ขยับเลย
+
+**เช็ค policy อ้างอิงของ Unitree เอง** (`sim/assets/b1_policy/base_gait3/train_config.yaml`,
+Isaac Lab): เป็น feedforward MLP ธรรมดา ไม่มี memory เหมือนกัน แต่มี (1) sin/cos gait-phase clock
+ป้อนเข้า observation ทุก step (สัญญาณจับเวลาทั่วไป **ไม่ใช่ imitation** — ตัดสินใจแล้วว่าโปรเจกต์นี้จะ
+ไม่ใช้ AMP/imitation แบบไหนก็ตาม), (2) reward เสริมให้ตรงจังหวะ clock, (3) domain randomization,
+(4) **4096 environment ขนาน 800 iteration (~ level 10^8 step)** เทียบกับของเรา ~10^5 step
+environment เดียว ต่างกัน 1000+ เท่า
+
+**เพิ่ม `VecB1MuJoCoEnv` (`wm/policy/b1_mujoco_env.py`) รัน MuJoCo หลาย process พร้อมกัน (`--n_envs`)
+เพื่อเทียบว่าปัญหาคือ sample budget ล้วนๆ หรือเปล่า** (เจอบั๊กย่อยระหว่างทาง: fork + CUDA ชนกัน แก้เป็น
+spawn context; N worker โหลด VJEPA2 ขึ้น GPU พร้อมกันจน OOM แก้โดยบังคับ goal-reading encoder ไปที่ CPU;
+พบว่า encode goal clip เต็มๆ ใช้เวลา 5+ นาทีบน CPU ทำให้ทั้งเทรนดูเหมือนค้าง แก้โดย subsample เหลือ 12
+frame-pair (จาก ~60) เหลือ ~55 วิ + cache ผลลง disk ตลอดไป; และเจอ diagnostic bug อีกตัว —
+`mean_return`/`mean_len`/`died_frac`/`act_std` เป็น NaN หมดเพราะ `rollout_steps // n_envs` (128)
+น้อยกว่า `horizon` (200) ทำให้ไม่มี episode ไหนจบภายใน 1 update เลย แก้โดยบังคับขั้นต่ำ 2×horizon
+ต่อ environment อัตโนมัติ)
+
+**ผล: รัน 16 environment พร้อมกัน — tracking ยังแบนที่ ~0.09-0.093 เหมือนเดิมทุกประการ** (18 update
+ที่สังเกต) **สมมติฐาน "แค่ sample budget ไม่พอ" อ่อนลงมาก** เพราะถ้าเป็นแค่เรื่องจำนวน ควรเริ่มเห็น
+สัญญาณขยับบ้างหลังเพิ่ม 16 เท่าแล้ว แต่ไม่มีเลยแม้แต่นิดเดียว
+
+**ลองต่ออีก 2 ทาง จากการเจอ `velocity_env_cfg.py` (Isaac Lab config ต้นฉบับของ Unitree)**:
+
+1. **Command curriculum** (`--curriculum_updates`, ค่อยๆ ขยาย goal จากใกล้ 0 ไปเต็มค่า เลียนแบบ
+   `lin_vel_cmd_levels` ของ Isaac Lab) — **พิสูจน์ได้ด้วยตัวเลขตรงๆ ว่าไม่ได้ผล**: ถ้า policy หยุดนิ่ง
+   สนิทจริง (ไม่เรียนรู้อะไรเลย) tracking ควรลดลงด้วย ratio คงที่ ~0.9416 ต่อ update (มาจากสูตร
+   exp(-15×scale×0.16) ที่ scale โตเป็นเส้นตรง) — ratio จริงที่วัดได้ 16 update ติดกัน (0.954, 0.945,
+   0.953, 0.941, 0.936, 0.958, 0.939, 0.946, 0.946, 0.944, 0.941, 0.948, 0.950, 0.931, 0.950, 0.944)
+   **ตรงกับค่าที่คำนวณจากสมมติฐาน "หยุดนิ่งสนิท" แทบทุกตัว** ถ้า policy เรียนรู้จริง ratio ควรสูงกว่านี้
+   ชัดเจน (ลดช้ากว่าที่ target ยากขึ้น) — ยกเลิกการรันทันทีที่เห็นแบบนี้ ไม่ต้องรอจบ
+
+2. **Feet-air-time reward** (`AIR_TIME_WEIGHT=0.1`, `AIR_TIME_THRESHOLD=0.5s` ตรงกับ
+   `velocity_env_cfg.py` เป๊ะ) — reward ตัวเดียวใน config ต้นฉบับที่ยังไม่เคยลอง และไม่ใช่ imitation
+   (แค่ให้รางวัลตอนเท้าลอยอยู่ในอากาศนานพอก่อนลง ไม่ผูกกับท่าใดท่าหนึ่ง) เช็คก่อนว่า term นี้ "มีชีวิต"
+   จริงไหม: สุ่ม action ในช่วงที่แก้แล้ว (F203) 200 step เจอ event เท้าลง 74/200 ครั้ง มี variance จริง
+   (-1.32 ถึง +0.92) ไม่ใช่ค่าตายศูนย์ — **แต่เทรนจริง 51 update แล้ว tracking ยังแบนที่ 0.0908-0.0913
+   เหมือนเดิมทุกอย่าง** ยกเลิกการรันเมื่อถึงจุดเดียวกับ baseline (update ~50) เพื่อเทียบกันตรงๆ
+
+**สรุปรวมของ Q21 step 3 ทั้งหมด**: ลองแก้ไป 6 ทางที่แยกกันชัดเจน (action space, reward scale, ไม่จบ
+episode ตอนล้ม, correlated noise, command curriculum, feet air-time) **ทุกทางได้ผลเป็น null เหมือนกัน
+หมด** บน checkpoint ที่ดีที่สุดที่มี (B1 expert-fit จริง ไม่ใช่ babble) แปลว่านี่เป็น null ที่ "สะอาด"
+กว่า F202 (ไม่เกี่ยวกับคุณภาพ babble เลย) **ตอนนี้ไม่คิดว่าการไล่แก้ทีละกลไกจะคุ้มค่าต่อไปแล้ว** ทางที่
+เหลือจริงๆ มีแค่ (ก) เพิ่ม compute อีกมาก (ไม่มีหลักฐานว่าจะช่วย และช่องว่างกับ reference ยังใหญ่มาก)
+หรือ (ข) กลับไปที่สาย candidate-scoring (F201/F202) ซึ่งใช้ได้แล้วกับ B1 เอง (20.8%) แต่ติดที่คุณภาพ
+babble บนหุ่นที่ไม่เคยเห็นจริงๆ. อัปเดต F204/F205 และ Q21 ใน `doc/FINDINGS.md`/`doc/OPEN_QUESTION.md`
+แล้ว (แก้ในที่เดิม ไม่ stack)
+
+---
+
+## 34. เจอ 2 บั๊กจริงใน environment เอง — น่าจะเป็นสาเหตุที่แท้จริงของ null ทั้ง 6 ทางใน Q21 step 3 (2026-09-13, ต่อจากหัวข้อ 33)
+
+พี่บอกตรงๆ ว่า "more compute wont help, i dont see number moving at all, it must be something we
+missed" — เลยไปหาจริง ไม่เชื่อ compute อีกครั้ง แล้วเจอ 2 บั๊กจริง ทั้งคู่อยู่ใน environment เอง
+ไม่ใช่ปัญหา RL/reward-shaping เลย
+
+**บั๊ก 1 — `scale_action()` (F203) ที่เราสร้างเอง คือตัวปัญหาจริง**: F203 map action ของ policy
+`[-1,1]` ไปเป็นช่วงจริงที่วัดจาก `beh12_b1_ego_flat` (สูงสุด +3.59 ที่ calf) เพราะคิดว่าเป็น "ช่วงที่
+จำเป็นสำหรับการเดินจริง" — **แต่ dataset นั้นคือ action ของ Isaac Lab expert policy เอง ซึ่ง actor ของ
+มันไม่มี tanh (unbounded Gaussian) ค่าเกิน ±1 เป็นแค่ output ธรรมชาติของ policy ที่ไม่ถูก clip ไม่ใช่
+ข้อบังคับทางฟิสิกส์** พิสูจน์ตรงๆ: เอา CPG ตัวจริงที่รู้อยู่แล้วว่าเดินได้ (`collect_b1_cpg_babble.py`
+ค่า default amplitude ซึ่งอยู่ใน [-1,1] อยู่แล้ว) ป้อนตรงผ่าน `DEFAULT_IL + ACTION_SCALE*action`
+(สูตรเดิมที่ทุกสคริปต์ B1 อื่นใช้) — **เดินได้จริง 2.12 เมตร ใน 5 วินาที (Froude 0.196)** แต่ action
+เดียวกันเป๊ะ ผ่าน `scale_action()` ก่อน — **Froude เหลือ ~0.005 พังหมด** แปลว่าทุก training run ตั้งแต่
+F203 ถูกเทรนบน mapping ที่บิดเบือนไปตลอด ไม่ว่าจะแก้ reward/exploration/curriculum ยังไงก็ไม่มีทางเจอ
+ได้ — **ย้อนกลับ `scale_action()` ทิ้งแล้ว** กลับไปใช้สูตรเดิม (clip [-1,1] แล้วคูณ ACTION_SCALE ตรงๆ)
+
+**บั๊ก 2 — วัด velocity ต่อ step ผิด**: `body_velocity`/`yaw_rate` ออกแบบมาให้ smooth ข้าม 1 stride
+(~50 sample ที่ dt นี้) แต่ environment เรียกมันด้วยแค่ **2 sample ต่อ step** (ตำแหน่งก่อน/หลัง 1
+control step) — เอา signal 2 ตัวไป convolve กับ kernel กว้าง 50 ทำให้ผลลัพธ์เจือจางลงประมาณเท่าขนาด
+window เลย วัดตรงๆ: CPG ตัวเดียวกันที่เดินได้จริง Froude 0.0025 ผ่านบั๊กนี้ (เทียบกับ 0.196 ที่คำนวณ
+ถูกทั้ง trajectory) — แก้โดยเก็บ rolling buffer ตำแหน่ง/quat ยาวพอ (เท่ากับ window ที่ฟังก์ชันต้องการ)
+คำนวณทับ buffer เต็มทุก step แล้วเอาค่าล่าสุดมาใช้
+
+**ยืนยันหลังแก้ทั้งสองบั๊ก**: CPG ตัวเดียวกัน ผ่าน environment เต็มๆ ได้ Froude 0.155 และ
+tracking_reward เฉลี่ย 0.336 — **สูงกว่าเพดาน 0.09 ที่ทุก config ใน Q21 step 3 เจอมาตลอดอย่างชัดเจน**
+สรุปได้ว่า 2 บั๊กนี้ (ไม่ใช่กลไก RL ไหนเลยที่ลองมา 6 ทาง) น่าจะเป็นคำตอบจริงว่าทำไม tracking ไม่เคยขยับ
+เลยตลอดทั้ง arc — **environment เดิมไม่มีทางให้ reward กับการเดินจริงได้เลย ต่อให้ policy บังเอิญเดินถูก
+ก็ตาม** กำลังเทรนใหม่ทั้งหมดบน environment ที่แก้แล้ว (พี่ให้สิทธิ์รันเองระหว่างพักผ่อน) อัปเดต F206 +
+Q21 ใน `doc/FINDINGS.md`/`doc/OPEN_QUESTION.md` แล้ว
+
+---
+
+## 35. ผลออกแล้ว — เดินได้จริง เป็นครั้งแรกในโปรเจกต์นี้ (2026-09-13, ต่อจากหัวข้อ 34)
+
+เทรน 300 update (`--n_envs 16`, `reward_mode="true_froude"`) แล้วต่ออีก 300 update จาก checkpoint
+เดิม (เพิ่ม `--resume` ใน `b1_real_ppo.py` เพื่อการนี้โดยเฉพาะ) ระหว่างเทรนเจอ **PPO ไม่เสถียรจริง**:
+tracking ขึ้นไปสูงสุด ~0.20-0.22 ช่วง update 120-184 ของรอบสอง แล้วร่วงลงมา ~0.09-0.11 ช่วง update 240
+ก่อนจะฟื้นกลับมาบางส่วนที่ ~0.14-0.15 ตอนจบ — ไม่ใช่เส้นขึ้นตรงๆ ครั้งหน้าควร save checkpoint เป็นระยะ
+ไม่ใช่ save ตอนจบอย่างเดียว
+
+**ผล deterministic eval (`b1_ppo_eval.py`, ใช้ mean action ไม่ใช่ sample)**: forward Froude **0.113**
+ใกล้เคียงกับเป้าหมายจริง (0.105) มาก เทียบกับ 0.0007-0.012 ที่เจอมาตลอดก่อนแก้บั๊ก **ตรวจสอบตรงๆ ว่า
+เป็นการเคลื่อนที่จริง ไม่ใช่ artifact**: หุ่นเคลื่อนที่ไปข้างหน้าจริง **0.446 เมตร ใน 4 วินาที** (~0.11 m/s)
+ลื่นด้านข้างแทบไม่มี (0.001 m) ยืนได้ตลอด episode ไม่ล้ม — **นี่คือ RL controller ตัวแรกในโปรเจกต์นี้ที่
+เดินได้จริงจากการเรียนรู้เอง ไม่ใช่ CPG หรือ expert policy**
+
+**ยังไม่จบสมบูรณ์**: tracking ทาง lateral/yaw ยังอ่อน (เป้าหมาย 0.302/0.254 แต่ได้แค่ 0.009/-0.048) —
+policy นี้เรียนรู้แค่ "เดินหน้า" ไม่ใช่ตาม goal ครบ 3 แกน และที่สำคัญ **ผลนี้มาจาก `reward_mode=
+"true_froude"` (ground truth ที่ใช้ได้แค่ตอน diagnostic บนหุ่นที่มี physics จริงให้ตรวจ ไม่มีบนหุ่นที่
+ไม่เคยเห็นจริง)** — ยังไม่ได้ทดสอบว่า WM reward ตัวจริง (`body_head(proj(action))`, ที่ F195/F199/F201
+ใช้เวลาทั้ง arc ปรับปรุง) จะเทรน controller ได้จริงไหมบน environment ที่แก้บั๊กแล้วตัวนี้ — เป็นก้าว
+ถัดไปที่ควรทำ. อัปเดต F206 (แก้ในที่เดิม) + Q21 (RESOLVED, positive) แล้ว

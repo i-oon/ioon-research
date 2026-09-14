@@ -1,0 +1,143 @@
+steps: 160
+warmup: 25
+freq: 0.5
+thigh_amp: 0.23
+calf_amp: 0.25
+phase_lag: -1.5707963267948966
+noise: 0.03
+bias: 0.0
+turn_bias: 0.0
+strafe_amp: 0.0
+pivot_amp: 0.0
+seed: 38
+cpg_mode: generic
+generic_freq_min: 0.5
+generic_freq_max: 2.0
+generic_amp_min: 0.2
+generic_amp_max: 0.32
+generic_frequency: 5.0
+generic_amplitude: null
+generic_phase_layout: trot
+generic_joint_role_layout: equal
+generic_gait_shape: coupled-duty
+generic_calf_ratio: 1.5
+generic_coupling_ratio: 0.6
+generic_clearance_ratio: 1.1
+generic_hip_ratio: 0.0
+generic_hip_sign_layout: same
+generic_hip_phase: 0.0
+generic_hip_clock: leg
+generic_hip_bias: null
+generic_stance_calf_bias: -1.2
+generic_calf_phase: -1.5707963267948966
+generic_trot_pairing: diagonal
+generic_thigh_sign_layout: same
+generic_calf_sign_layout: same
+generic_duty_factor: 0.55
+generic_swing_thigh_lift: 0.0
+port: 23000
+pid_p: 300.0
+pid_d: 5.0
+out: data/egocentric/b1_babble_coppelia_spring_ego_flat/b1_babble_s38.npz
+video: ''
+fps: 20.0
+cam_fov: 24.0
+floor_scale: 3.0
+ego: true
+ego_seed: 38
+screen_only: false
+joint_control: spring
+spring_k:
+- 550.0
+- 700.0
+- 970.0
+spring_c:
+- 2.745
+- 4.7
+- 5.201
+max_joint_vel: null
+contact_friction: null
+fall_height: 0.35
+scene: sim/env/b1_flat_convex.ttt
+physics_engine: Bullet
+dt: 0.05
+status: upright
+min_height: 0.49019892930849757
+min_upright: 0.9909257827854596
+displacement_m:
+- 3.1944992718114613
+- 0.4222094999311761
+- -0.0007120921366035038
+mean_body_froude:
+- 0.1918836086988449
+- -0.00015719540533609688
+- 0.008989484049379826
+dominant_family: forward
+view: egocentric
+claim_scope: generic_quadruped_cpg_plus_per_step_motor_noise
+motion_quality:
+  joint_vel_rms: 1.4696621894836426
+  joint_acc_rms: 49.56132888793945
+  joint_acc_var: 2456.3134765625
+  joint_jerk_rms: 1770.4185791015625
+  target_acc_rms: 47.81684112548828
+  action_acc_rms: 191.26736450195312
+  action_jerk_rms: 6693.0576171875
+  mean_abs_tracking_error: 0.03630058467388153
+  max_abs_tracking_error: 0.23076069355010986
+  contact_switches_total: 60
+  contact_switches_per_second: 7.547170162200928
+  contact_duty_per_foot:
+  - 0.0
+  - 1.0
+  - 0.5249999761581421
+  - 0.71875
+  support_count_mean: 2.2437500953674316
+  support_count_min: 1.0
+  support_frac_0_or_1_feet: 0.21875
+  support_frac_2_feet: 0.31875
+  support_frac_3_or_4_feet: 0.4625
+  foot_z_range_per_foot:
+  - 0.002072583884000778
+  - 0.0013483650982379913
+  - 0.05935089290142059
+  - 0.05652648210525513
+  foot_z_max_per_foot:
+  - 0.04185602068901062
+  - 0.04045380651950836
+  - 0.09910804778337479
+  - 0.0965132787823677
+  preview_quality_flags:
+    low_tracking_error: true
+    not_airborne_mostly: true
+    has_contact_variation: true
+retention_policy: retain_every_rollout_including_falls; no_froude_or_outcome_selection
+sampled_cpg:
+  frequency: 5.0
+  base_amplitude: 0.2582913253805441
+  amplitudes:
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  - 0.2582913253805441
+  phases:
+  - 1.5707963267948966
+  - 4.71238898038469
+  - 4.71238898038469
+  - 1.5707963267948966
+  - 0.0
+  - 3.141592653589793
+  - 3.141592653589793
+  - 0.0
+  - -1.5707963267948966
+  - 1.5707963267948966
+  - 1.5707963267948966
+  - -1.5707963267948966

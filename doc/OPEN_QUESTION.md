@@ -275,25 +275,77 @@ unverified version of exactly this assumption and cost weeks; this gate existing
 checked before step 3, not after, is the fix for that mistake.**
 
 **Update, 2026-09-12: the "different checkpoint/objective/fitting procedure" question above has now
-been attempted, five independent ways, at real/exact strength (F195, F197-F199).** Stage-3
-contrastive (`wm.adapt3`, full 15k-step budget) stays at chance; F141's hinge (without a matching
-multi-step anchor) diverges; F178's counterfactual targets fail exactly on B1; all four recurrent-
-architecture variants fail (closed above). **F199 (the multi-step reconstruction anchor F141's own
-diagnosis called for) passed all three of F141's pre-registered criteria on hexapod pretraining --
-but does NOT propagate to B1 (F199's coda, F201): 8.3% on F195's gate, no real margin over F195's
-5.9% chance and not an improvement on its own 16.7%/4.2% expert/babble baselines.**
+been attempted, six independent ways -- five null, one that works (F195, F197-F199, F201).**
+Stage-3 contrastive (`wm.adapt3`, full 15k-step budget) stays at chance; F141's hinge (without a
+matching multi-step anchor) diverges; F178's counterfactual targets fail exactly on B1; all four
+recurrent-architecture variants fail (closed above). F199's multi-step reconstruction anchor passed
+all three of F141's pre-registered criteria on hexapod pretraining, but a first B1 test showed no
+propagation (8.3% on F195's gate) -- **diagnosed, not accepted: `wm.adapt`'s stage 1 fine-tunes with
+a plain one-step MSE loss and nothing else, and directly measuring it (`b1_adaptation_sep_check.py`)
+showed it erodes 38-62% of the pretrain's hinge-built separation on B1's own data.**
 
-**CLOSED, 2026-09-12 (F201): six independent, mechanistically distinct fixes have now failed to
-produce a B1 reward function that clears its own gate.** Contrastive (stage-3), hinge without an
-anchor, counterfactual targets, four recurrence variants, and the anchored hinge that worked on
-hexapod but not B1 -- all null on the actual target. Per this project's standing rule for this shape
-of result: **do not attempt a seventh mechanism; step 3 (RL controller) stays blocked, and this is
-now a write-up-worthy characterized negative result, not an open engineering problem.** The fallback
-this thesis does not depend on resolving: grounding and goal-conditioned selection (no RL, no
-rollout) already work on B1 via its own recorded library (F119-F127).
+**RESOLVED, 2026-09-12 (F201, corrected in place -- an earlier "CLOSED, negative" verdict here was
+premature and has been replaced, not stacked on).** Adding the same K=1 hinge term to `wm.adapt`
+itself (`--lambda_hinge`, anchored by the existing one-step MSE by construction) cut the erosion to
+23-51% and lifted the gate to **20.8% (5/24) -- the best B1 reward-quality-gate result measured
+anywhere in this project, exceeding even the original expert-fit baseline (16.7%).** The count is
+one real, working fix (F199's hexapod-level anchor + carrying it through B1's own adaptation),
+not six nulls. **Step 3 (RL controller) is no longer blocked by an exhausted-fixes wall** -- it
+depends now on whatever further margin the gate needs, a live, open, promising direction rather
+than a closed negative one.
 
-**3. RL controller + WM reward** (W15-2) -- **blocked**, step 2 failed. Do not start this until a
-reward is found that clears step 2's gate.
+**But the fix does not transfer to babble-fit (F202), and this exposes a shared prerequisite
+neither remaining path can skip.** The same hinge fix, tried on `b1_babble_ego_flat` (the actual
+target scenario -- a body with no expert library), makes the adapted model WORSE than doing
+nothing at every horizon (ratio 1.27->1.82). Isolated directly: identical result with the hinge
+term off, so this is a babble DATA problem, not a fine-tuning-method problem -- consistent with,
+and sharper than, F194's "visually unstable" finding. **Whether the eventual controller is
+candidate-scoring or the RL controller in this step, `wm.adapt`'s stage 1 needs adaptation data on
+the unseen body, and on a body with no expert library that can only be babble.** Expert-fit only
+works because B1 already has a trained policy -- not the target scenario the "no controller" framing
+was built around. Neither path can proceed to a genuinely unseen body until babble motion quality
+improves (this MuJoCo CPG source, or the in-progress CoppeliaSim-native replacement, F200, which is
+also not yet at a usable Froude range).
+
+**3. RL controller + WM reward** (W15-2) -- **attempted (2026-09-13), and null on six independent
+fixes (F203-F205), on B1's own expert-fit checkpoint -- not blocked by step 2 or by babble quality,
+blocked by something in the RL-controller mechanism/scale itself.** Built (`wm/policy/`): real
+MuJoCo physics, WM reward never rolled through the FTM (correctly avoids F179's failure mode). Four
+real bugs found and fixed first (action-space reachability, reward hacking via a static pose, a
+sign-flipped vision goal, a spawn-oscillation bug -- F203's action-space fix was the most
+consequential). After fixing all four, the trained policy still froze at a single joint pose, true
+Froude ~0. Diagnosed the reward's own quality was not the (sole) cause by substituting a corrected
+GROUND-TRUTH velocity reward (`reward_mode="true_froude"`) -- identical failure. Tried, each
+independently and each null: reward-scale recalibration, removing fall-ends-episode (ruling out
+fall-risk aversion), temporally-correlated exploration noise, 16x parallelized MuJoCo (ruling out a
+modest sample-budget increase), a command curriculum (quantitatively confirmed zero learning
+signal, not just "still flat"), and a feet-air-time reward matched to the reference Isaac Lab
+config's own weight (confirmed alive, still no effect). **Update (F206): all six null results above
+are now suspected to be an artifact, not evidence against the RL-controller approach.** Found two
+real bugs in the environment itself while re-verifying: (1) F203's own action-space fix
+(`scale_action()`) was built on a wrong premise (calibrated from the Isaac Lab expert policy's
+*unbounded* action range, not a real requirement) and was destroying every action's relationship to
+the physical joint targets -- a known-working CPG gait measured Froude 0.196 fed directly, ~0.005
+through `scale_action()`. (2) the per-step `true_froude` reward called `body_velocity`/`yaw_rate`
+(designed to smooth over a ~50-sample stride) with only 2 samples per step, diluting the signal by
+roughly the window size -- the same real gait measured 0.0025 through this bug. Both reverted/fixed
+in `wm/policy/b1_mujoco_env.py`; the same real gait now measures Froude 0.155 and tracking_reward
+0.336 end to end, against the ~0.09 ceiling every F204/F205 run was stuck at.
+
+**RESOLVED, positive (F206). Retraining on the corrected environment produced a real, RL-discovered
+walking policy** -- the first in this project's history, and this section's "six null results"
+framing is superseded, not just suspected to be an artifact. 300 updates + 300 more resumed
+(`--resume`, added for this), `--n_envs 16`, `reward_mode="true_froude"`. Deterministic eval: 0.446 m
+of real forward displacement in 4 s (~0.11 m/s), forward Froude 0.113 closely matching the goal's
+own forward component (0.105), stays upright the whole episode. **Step 3 (RL controller + WM
+reward) is no longer blocked or null** -- it works, on forward tracking, on B1's own expert-fit
+checkpoint. Bounded, not finished: lateral/yaw tracking are weak (goal's 0.302/0.254 vs. achieved
+0.009/-0.048), and training showed real PPO instability (a mid-run peak ~0.20-0.22 tracking,
+regressing to ~0.09-0.11, partially recovering by the end) -- periodic checkpointing, not just a
+final save, is worth adding before the next run. This result is on `reward_mode="true_froude"`
+(ground truth, a diagnostic never available on a genuinely novel body) -- whether the original
+`body_head(proj(action))` WM reward (F195/F199/F201's own subject) can now also train a working
+controller, on this same fixed environment, is untested and the natural next step.
 
 **4. History-state ablation** (W15-4) -- runs independently of the above, and would improve the
 reward in (3) if it works. See the contradiction note below before scoping it.

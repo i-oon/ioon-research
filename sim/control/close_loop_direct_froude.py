@@ -154,7 +154,19 @@ def main():
     ap.add_argument("--candidates_dir", default="data/egocentric/beh12_b1_ego_flat")
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--embodiment", default="b1")
-    ap.add_argument("--horizon", type=int, default=5)
+    ap.add_argument("--horizon", type=int, default=5,
+                    help="the CANDIDATE-SCORING horizon: how far the rollout planner rolls the "
+                         "forward model. Nothing to do with how the goal is read -- see "
+                         "--goal_horizon, which used to share this flag and should not have.")
+    ap.add_argument("--goal_horizon", type=int, default=None,
+                    help="frame spacing used to READ the goal from the source clip's video "
+                         "(t, t+goal_horizon). Defaults to --horizon for backwards comparability, "
+                         "but **1 is the value that matches training**: every stage that fits the "
+                         "reading path (pretrain ITM, stage-1 adapt, the projector, the body head) "
+                         "is built on adjacent frame pairs, so reading at 5 deploys the head on a "
+                         "spacing it never saw. Measured across 48 source clips, reading at 1 "
+                         "instead of 5 cuts the median goal-read error 0.063 -> 0.040 and raises "
+                         "the share of clips under the candidate-spacing threshold from 15% to 42%.")
     ap.add_argument("--free_offset", action="store_true", help="--mechanism direct only: let "
                     "DirectFroudePlanner pick ANY offset within a candidate, not just the one "
                     "matching the live step -- see wm/policy/planner.py's DirectFroudePlanner "
@@ -224,10 +236,11 @@ def main():
             md_for_goal.load_state_dict(checkpoint["md"], strict=False)
             for p in list(itm_for_goal.parameters()) + list(md_for_goal.body_head.parameters()):
                 p.requires_grad_(False)
+        gh = args.goal_horizon if args.goal_horizon is not None else args.horizon
         goal, goal_single = vision_goal(itm_for_goal, md_for_goal, encoder, goal_offset,
-                                        goal_path, args.horizon)
-        print(f"goal_source=vision ({len(np.load(goal_path)['frames']) - args.horizon} "
-             f"frame-pairs, horizon {args.horizon}, averaged via ITM): "
+                                        goal_path, gh)
+        print(f"goal_source=vision ({len(np.load(goal_path)['frames']) - gh} "
+             f"frame-pairs, goal_horizon {gh}, averaged via ITM): "
              f"{os.path.basename(goal_path)} ({goal_embodiment})  "
              f"body_head units={np.round(goal.cpu().numpy(), 3)}  "
              f"(single-pair estimate was {np.round(goal_single.cpu().numpy(), 3)})")

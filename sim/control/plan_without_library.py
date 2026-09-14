@@ -91,7 +91,17 @@ def main():
     ap.add_argument("--goal_embodiment", default="hexapod")
     ap.add_argument("--seed_clip", default="b1_ep3.npz",
                     help="supplies the physical state the robot starts from, and nothing else")
-    ap.add_argument("--horizon", type=int, default=10)
+    ap.add_argument("--horizon", type=int, default=10,
+                    help="length of each sampled ACTION SEQUENCE. Nothing to do with how the goal "
+                         "is read from frames -- see --goal_horizon, which shared this flag until "
+                         "F208 and should not have.")
+    ap.add_argument("--goal_horizon", type=int, default=1,
+                    help="frame spacing used to read a goal from the source clip (t, t+spacing). "
+                         "**1, because every stage that fits the reading path -- the pretrain "
+                         "inverse model, stage-1 adaptation, the projector, the body head -- is "
+                         "trained on adjacent pairs.** Reading at a wider spacing deploys the head "
+                         "off its training distribution: measured over 48 source clips, reading at "
+                         "1 rather than 5 cut the median goal-read error from 0.063 to 0.017 (F208).")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--scale", type=float, default=1.0, help="noise in units of the joint's own sd")
     ap.add_argument("--smooth", type=int, default=5)
@@ -134,11 +144,16 @@ def main():
                 clip = load(path, REGISTRY[args.goal_embodiment])
                 gcache[path] = encode_clip(encoder, clip["frames"], 2).cpu().half()
             e = gcache[path].float().to(device)
-            t0 = 5
-            goals[cond] = md.body(None, itm(e[t0:t0 + 1],
-                                            e[t0 + args.horizon:t0 + args.horizon + 1])).reshape(-1)
+            # **Averaged over every valid pair, not read off one.** A single pair was used here
+            # until F208; per-pair readings of one clip span -0.19 to 0.21 on the forward channel
+            # against a truth of 0.124, so one pair is a draw from a wide distribution rather than
+            # a measurement of the clip. The clip average is what every other goal reader uses.
+            gh = args.goal_horizon
+            n_pairs = max(1, len(e) - gh)
+            goals[cond] = md.body(None, itm(e[:n_pairs], e[gh:gh + n_pairs])).mean(0).reshape(-1)
     torch.save(gcache, gcache_path)
-    print(f"{len(goals)} goals read from {args.goal_dir} frames, horizon {args.horizon}")
+    print(f"{len(goals)} goals read from {args.goal_dir} frames, goal_horizon {args.goal_horizon}, "
+         f"averaged over every valid pair")
 
     # --- the sample bank, identical for every condition and every goal ---------------------------
     acts = np.concatenate([load(p, REGISTRY["b1"])["actions"]

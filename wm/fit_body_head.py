@@ -136,7 +136,7 @@ def main():
     del encoder
     torch.cuda.empty_cache()
 
-    extra_z, extra_y = [], []
+    extra_z, extra_y, extra_group = [], [], []
     if args.also:
         encoder = VJEPA2FrameEncoder(dtype=torch.float32)
         cache2_path = os.path.join(ROOT, args.also_cache)
@@ -158,6 +158,11 @@ def main():
                     extra_z.append(torch.cat([itm(e[t:t + 1], e[t + 1:t + 2])
                                               for t in range(n)]).cpu())
                     extra_y.append(torch.tensor(motion[:n], dtype=torch.float32))
+                    # one group id per clip, so the other robot gets a held-out split too. Without
+                    # this its every transition was in training and the reported held-out ratio
+                    # covered the adapted robot ONLY -- which is how a systematic goal-reading error
+                    # on the other robot stayed invisible while the printed number looked healthy.
+                    extra_group.append(torch.full((n,), len(extra_group), dtype=torch.long))
         if len(cache2) > n2:
             torch.save(cache2, cache2_path)
         del encoder
@@ -169,6 +174,16 @@ def main():
     group = torch.cat(groups)
     z_extra = torch.cat(extra_z).to(device) if extra_z else None
     y_extra = ((torch.cat(extra_y) - mean) / std).to(device) if extra_y else None
+    if z_extra is not None:
+        g_extra = torch.cat(extra_group)
+        e_ids = torch.unique(g_extra)
+        e_order = torch.randperm(len(e_ids), generator=torch.Generator().manual_seed(args.seed))
+        e_val_ids = e_ids[e_order[:max(1, int(args.val_frac * len(e_ids)))]]
+        val_extra = torch.isin(g_extra, e_val_ids).to(device)
+        print(f"other robot: {len(e_ids)} clips, {int(val_extra.sum())} of {len(z_extra)} "
+             f"transitions held out ({len(e_val_ids)} clips)")
+    else:
+        val_extra = None
 
     ids = torch.unique(group)
     order = torch.randperm(len(ids), generator=torch.Generator().manual_seed(args.seed))
@@ -197,13 +212,17 @@ def main():
     def report(tag):
         md.eval()
         with torch.no_grad():
-            pred = md.body(None, z)
-            for name, m in (("train", ~val), ("held out", val)):
-                err = torch.nn.functional.mse_loss(pred[m], y[m]).item()
-                base = torch.nn.functional.mse_loss(
-                    y[m].mean(0, keepdim=True).expand_as(y[m]), y[m]).item()
-                print(f"  {tag:<8} {name:<9} MSE {err:.4f}   predicting the mean {base:.4f}   "
-                      f"ratio {err / max(base, 1e-9):.3f}")
+            sets = [(args.embodiment, z, y, val)]
+            if z_extra is not None:
+                sets.append(("other", z_extra, y_extra, val_extra))
+            for who, zz, yy, vv in sets:
+                pred = md.body(None, zz)
+                for name, m in (("train", ~vv), ("held out", vv)):
+                    err = torch.nn.functional.mse_loss(pred[m], yy[m]).item()
+                    base = torch.nn.functional.mse_loss(
+                        yy[m].mean(0, keepdim=True).expand_as(yy[m]), yy[m]).item()
+                    print(f"  {tag:<8} {who:<8} {name:<9} MSE {err:.4f}   mean {base:.4f}   "
+                          f"ratio {err / max(base, 1e-9):.3f}")
 
     print(f"fitting {n_train} parameters, everything else frozen")
     report("before")
@@ -213,7 +232,8 @@ def main():
         opt.zero_grad()
         loss = torch.nn.functional.mse_loss(md.body(None, z[~val]), y[~val])
         if z_extra is not None:
-            loss = loss + torch.nn.functional.mse_loss(md.body(None, z_extra), y_extra)
+            loss = loss + torch.nn.functional.mse_loss(md.body(None, z_extra[~val_extra]),
+                                                       y_extra[~val_extra])
         loss.backward()
         opt.step()
         if (epoch + 1) % 100 == 0:

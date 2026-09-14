@@ -480,8 +480,8 @@ requiring that body's engineering specification.
   required to recover it).
 \item To characterize, through closed-loop diagnostic testing, exactly which capability of a video world model's
   action-conditioning is and is not achieved: coarse single-step conditioning, fine-grained action ranking between
-  similar candidates, and multi-step rollout, and to identify the measured mechanism (camera viewpoint and gait
-  periodicity) responsible for the gap between them.
+  similar candidates, and multi-step rollout, and to identify the measured mechanism responsible for the gap
+  between them: gait periodicity, whose severity camera viewpoint determines the visibility of rather than causes.
 \end{enumerate}
 
 \section{Expected Benefits}
@@ -517,11 +517,17 @@ requiring that body's engineering specification.
   kinematic model of both bodies.
 \item The camera is \textbf{egocentric} (mounted on the body, first-person view), not the third-person /
   allocentric view used in the project's earlier phase. This choice is itself a measured methodological finding
-  (Section 3.2.3) rather than an arbitrary setup detail: an allocentric camera lets the robot's own visible pose
-  encode the command being executed (because locomotion is periodic), which lets a video world model satisfy its
-  prediction objective by completing the observed gait cycle without ever reading the inferred action. An
-  egocentric camera removes most of this pose-driven redundancy and is the setting in which the model is shown
-  to measurably use the action at all.
+  (Section 3.2.3) rather than an arbitrary setup detail. The underlying redundancy is a property of periodic
+  locomotion itself, not of any camera: because gait phase makes the body's own pose encode the command that
+  produced it, most of what a video world model needs to predict the next frame is already available from pose
+  alone (F144: under 3\% of forward prediction error is action-dependent), independent of viewpoint. Camera
+  viewpoint does not create or remove that fact; it determines how much of it is exposed to the encoder. An
+  allocentric camera shows the robot's full external pose, so nearly all of this periodicity-driven redundancy
+  leaks through and lets a video world model satisfy its prediction objective by completing the observed gait
+  cycle without ever reading the inferred action. An egocentric, body-mounted camera occludes most of the
+  robot's own body, so it exposes far less of this same redundancy, not less redundancy overall -- it is the
+  setting in which the small remaining action-dependent signal becomes measurable and the model is shown to use
+  the action at all.
 \item The behaviours studied are drawn from a curated library of recorded conditions spanning forward, turning,
   and (on the hexapod) sideways locomotion at several speeds, not from an unconstrained action space; Section 3.6.4
   states plainly what this library assumes about the target robot and why removing that assumption (via random
@@ -1435,16 +1441,43 @@ that trade-off leaves no setting at which a perturbation is simultaneously separ
 stated here as a property of the evaluation protocol that any ranking claim must be read against, independent of
 which model is being tested.
 
-\section{Stage 1: Prerequisite Substrate Check}
-Before Stage 2 was attempted, five milestones were run on the Stage-1 leg-length substrate (Section 3.5.1) to
-confirm the pipeline had something to work with: the morphology gap, encoder sanity, the two-sided latent
-validation, transfer to a held-out leg length, and the effect of training-body diversity. Full results, read
-against an explicit hypothesis for each, are reported as Experiment 1 in Chapter 4 (Section 4.1) rather than
-here, so that this chapter states method and Chapter 4 states evidence without the two being interleaved. The
-one-line summary needed to motivate what follows: the pipeline works and a trained latent beats the raw command
-on a shared joint space, but this alone cannot show vision succeeds where proprioception structurally could not,
-because all leg-geometry variants still share one 18-dimensional joint space (Section 1.1), which is
-exactly the question Stage 2, on the disjoint-action-space pair, is designed to answer.
+\section{Stage 1: The Controlled First Step}
+Stage 1 is not a smaller version of Stage 2 and is not reported as one. It is the controlled experiment, run on
+the leg-length substrate (Section 3.5.1) where both bodies already share one 18-dimensional joint space, that
+establishes what Stage 2 then has to satisfy again without that shared space to lean on. Five milestones were run
+on it: the morphology gap, encoder sanity, the two-sided latent validation, transfer to a held-out leg length, and
+the effect of training-body diversity. Full results, read against an explicit hypothesis for each, are reported as
+Experiment 1 in Chapter 4 (Section 4.1) rather than here, so that this chapter states method and Chapter 4 states
+evidence without the two being interleaved.
+
+\noindent\textbf{Three requirements Stage 1 establishes, and Stage 2 inherits.} Each was measured on the easy
+substrate rather than assumed, and each returns as a constraint on the disjoint-action-space pair:
+
+\begin{enumerate}
+  \item \textbf{A shared representation has to be forced by the objective, not bought with capacity or
+    architecture.} Four model-side interventions (target rescaling, reduced decoder capacity, adversarial removal
+    of body identity, and wider access to the frame) each failed or made held-out transfer worse; a single
+    cross-body loss term, which makes reading the body out of the latent wrong by construction, changed how much
+    the image was worth to the decoder by a factor of twenty-two (Section 4.1). Stage 2's shared coordinate is the
+    same move applied where no shared command space exists to apply it in.
+  \item \textbf{``Morphology'' decomposes into several independent axes, and coverage must be verified per axis.}
+    Every training body that walked happened to hold two segment lengths equal, and no estimator, including a
+    linear readout of the frozen encoder and a mixture calculation containing no learning at all, could separate
+    them for a held-out body where they differed. This is a property of the data, not of the model, and it is
+    detectable before training at negligible cost (Section 4.1). Stage 2 therefore treats embodiment coverage as a
+    per-axis question rather than a body count.
+  \item \textbf{A saturating metric will conceal what the model is not doing.} At one behaviour and one speed the
+    command is largely recoverable from a single frame, so command-reconstruction accuracy can be high while the
+    action contributes almost nothing to prediction. The forward model, evaluated instead on the task it exists
+    for, shows competence the reconstruction metric cannot see (Section 4.1). Every claim in Chapter 4 is
+    consequently stated against the mechanism it depends on rather than a proxy for it.
+\end{enumerate}
+
+\noindent What Stage 1 cannot do, and was not designed to do, is show that vision succeeds where proprioception
+structurally could not: all leg-geometry variants still share one 18-dimensional joint space (Section 1.1), so a
+proprioceptive model could in principle be shared across them too, and vision's advantage there is convenience
+rather than necessity. That is precisely the question Stage 2, on the disjoint-action-space pair, is designed to
+answer.
 
 \section{Remaining Work}
 Chapter 4 reports what is confirmed and what is not; this section states, concretely, what would be required to
@@ -1464,20 +1497,28 @@ diverse recorded library (more conditions, not larger perturbations of the exist
 babbling in the manner of Hu et al.\ (Section 2.4) as a way to generate a candidate distribution that does not
 depend on a person having already decided what the behaviours are.
 
-\noindent\textbf{Removing the candidate-scoring circularity.} Section 4.3 states why scoring among a curated
-library presupposes a policy that can already produce the library's behaviours, which is circular for a genuinely
-unseen robot. The proposed resolution is a trained policy (teacher-student) that needs only the ability to actuate the
-robot, not a pre-existing behaviour set; this thesis has not yet demonstrated that such a policy, trained through
-the current world model, out-performs the plain behaviour-cloned baseline of Section 4.3.4.
+\noindent\textbf{Removing the candidate-scoring circularity: resolved in principle, and the remaining step is
+named.} Section 4.3 states why scoring among a curated library presupposes a policy that can already produce the
+library's behaviours, which is circular for a genuinely unseen robot. The resolution is a trained controller that
+needs only the ability to actuate the robot, and Experiment 4 demonstrates one: trained in real physics, with the
+world model consulted once per step to score the action taken rather than rolled forward, it walks. The step that
+remains is the one that matters for an unseen body: Experiment 4's reward is a \emph{measured} body-motion
+quantity, available in simulation and not on a robot whose motion nobody has characterised, whereas the quantity
+actually available there is the world model's own estimate of it, which is what Experiments 2 and 3 spent their
+effort improving. Re-running the same controller training against that estimate, on the now-corrected environment,
+is the single most direct test of whether this thesis's representation is good enough to drive a body rather than
+only to describe one.
 
 \noindent\textbf{A third embodiment.} The scaling claim LAC-WM leads with, performance rising with the number of
 pretraining embodiments, cannot be tested with two bodies. A third, topologically distinct body would let this
 be measured for the first time in this line of work.
 
 \section{Work Plan}
-The Stage-1 substrate check and the full diagnostic chain of Chapter 4 are complete. What remains is the four
-items above, ordered by how directly each bears on the thesis's central open question: whether the world model
-can be made to rank actions precisely, not only condition on them coarsely.
+Stage 1's controlled first step and the full diagnostic chain of Chapter 4 are complete, and Experiment 4 has
+closed the loop with a measured target. What remains is the items above, ordered by how directly each bears on the
+thesis's central open question, which the controller result has now sharpened: not whether the world model can rank
+actions precisely in the abstract, but whether its \emph{own} body-motion estimate is good enough to train a
+controller, as a measured target demonstrably is.
 
 \begin{table}[H]
 \centering
@@ -1488,12 +1529,15 @@ can be made to rank actions precisely, not only condition on them coarsely.
 \hline
 \textbf{Item} & \textbf{Activity} & \textbf{Priority}\\
 \hline
+Controller on the model's own estimate & Re-run Experiment 4's controller training with the reward supplied by the
+  world model's body-motion estimate instead of a measured one; this is the quantity available on an unseen body &
+  highest\\
 Counterfactual-target training & Rebuild the forward-model objective against counterfactual rather than
-  teacher-forced targets; re-run the ranking test of Section 4.3 & highest\\
+  teacher-forced targets; re-run the ranking test of Section 4.3 & high\\
 Candidate-separation & Broaden the recorded behaviour library; scope a motor-babbling data-collection pass &
   high\\
-Teacher-student policy & Train a policy through the current world model; compare against the behaviour-cloned
-  baseline (Section 4.3.4) & high\\
+Controller breadth & Extend Experiment 4's controller beyond forward tracking to the lateral and turning channels
+  the shared coordinate also carries & medium\\
 Third embodiment & Identify and integrate a topologically distinct third body for the scaling claim & medium\\
 Analysis and writing & Consolidate Chapters 4--5 for the final thesis & ongoing\\
 \hline
@@ -1572,11 +1616,20 @@ $R^2$, the clearest single piece of evidence that the pipeline is not merely mem
 \subsection{Conclusion}
 Three of four hypotheses confirm outright; the third confirms only half. The pipeline works, a trained latent
 adds real value over the raw command on a shared joint space, and training-body diversity matters more than any
-single architectural change tried at this stage. \textbf{What this experiment does not do, and was never
-designed to do, is reach a closed loop.} Every result above is an offline probe or an open-loop transfer score;
-no controller was ever asked to drive a body toward a goal using this latent. That gap, proving the
-representation is right without ever testing whether it can be \emph{used}, is exactly what motivated closing
-the loop in Experiment 3, on the harder pair where the joint space no longer offers a shortcut.
+single architectural change tried at this stage.
+
+\noindent\textbf{Read as a controlled first step, this experiment returns three requirements rather than one
+result} (Section 3.7): the shared representation had to be forced by the objective, because four model-side
+interventions could not produce it; coverage had to be verified per independent geometric axis, because a single
+unvaried axis defeated every estimator including one with no learning in it; and the command-reconstruction metric
+saturated, concealing a forward model that was in fact competent at its own task. Each of the three reappears as a
+constraint in Experiments 2 and 3.
+
+\noindent\textbf{What this experiment does not do, and was never designed to do, is reach a closed loop.} Every
+result above is an offline probe or an open-loop transfer score; no controller was ever asked to drive a body
+toward a goal using this latent. That gap, proving the representation is right without ever testing whether it can
+be \emph{used}, is exactly what motivated closing the loop in Experiment 3, on the harder pair where the joint
+space no longer offers a shortcut.
 
 % ============================================================================
 \section{Experiment 2: Does a Froude-Scaled Body-Motion Coordinate Transfer Across Disjoint Embodiments?}
@@ -1839,6 +1892,115 @@ proper test of whether the teacher-forcing account holds for a visual world mode
 result it is built on has not yet shown either way.
 
 % ============================================================================
+\section{Experiment 4: Can a Controller Be Trained in Real Physics Against a Body-Motion Target?}
+
+\subsection{Question}
+Experiments 1 to 3 establish a representation and characterise what it can and cannot rank, but every number in
+them is an offline probe, an open-loop transfer score, or a selection among recorded clips; nothing in them is a
+controller. Can a policy that invents its own joint commands, and that can fall over, be trained in real physics
+to reach a target expressed in the shared body-motion coordinate?
+
+\subsection{Hypothesis chain}
+\begin{enumerate}
+  \item A controller trained in real physics, with the world model consulted only to score the action just taken,
+    avoids the failure that ended the imagination-based attempt (Section 4.3), because no prediction is rolled
+    forward and so no prediction error compounds.
+  \item If the coordinate is a usable control target at all, a policy optimising against it should produce net
+    forward displacement rather than a stationary posture.
+  \item If it does not, the cause should be identifiable in the reward, the action parameterisation, or the
+    exploration, and should be separable by intervening on each in turn.
+\end{enumerate}
+
+\subsection{Setup}
+Standard on-policy reinforcement learning (proximal policy optimisation), sixteen parallel physics environments,
+proprioceptive observation, and joint position targets as actions. The world model is consulted once per step, to
+score the action just executed; it is never rolled forward, so the mechanism that defeated the imagination-based
+attempt is structurally absent. The target is read from a reference clip of the \emph{other} body. Two reward
+sources are distinguished throughout and never mixed: the world model's own body-motion estimate, which is what a
+genuinely unseen body would have, and the simulator's measured body motion, which is available here only because
+this is simulation and is used as a diagnostic to separate ``the controller cannot be trained'' from ``the estimate
+is not good enough to train it''.
+
+\subsection{Results: six interventions, all null, and why}
+Six interventions were run in sequence, each isolated and each measured before the next was attempted: the action
+parameterisation, the reward scale, the treatment of falls as episode-ending, temporally correlated exploration
+noise, a curriculum on the target magnitude, and a foot-contact shaping term matched in form and weight to a
+published locomotion reward. \textbf{All six returned the same null result}: a policy frozen at a single posture,
+with measured forward motion indistinguishable from zero. The curriculum case was the sharpest, because it could be
+falsified arithmetically rather than by inspection: under a linearly growing target, a policy learning nothing
+predicts a fixed ratio between successive measurements, and the observed ratios matched that prediction across
+sixteen consecutive updates.
+
+\subsection{Results: the cause was measurement, not mechanism}
+The six nulls were produced against an environment containing two faults, each independently sufficient to make a
+correct gait score as motionless. They were found by driving a known-good reference gait through the same pipeline
+and reading the number it produced, rather than by inspecting training curves.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Both faults, measured on the same known-good reference gait.}
+\label{tab:exp4-bugs}
+\begin{tabularx}{\textwidth}{>{\hsize=1.30\hsize}Y>{\hsize=0.85\hsize}Y>{\hsize=0.85\hsize}Y}
+\hline
+\textbf{Fault} & \textbf{Gait measured correctly} & \textbf{Gait through the fault}\\
+\hline
+An action rescaling calibrated from the recorded range of an \emph{unbounded} expert policy, which is a property of
+  that policy's output distribution rather than a requirement of the robot & 0.196 & $\approx$0.005\\
+Per-step speed read through a function that averages over a full stride, supplied with two samples rather than the
+  fifty that window requires & 0.196 & 0.0025\\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent With both corrected, the same reference gait measures 0.155 in the shared coordinate through the full
+environment, against a ceiling of roughly 0.09 that every one of the six configurations had been unable to exceed.
+
+\subsection{Results: the controller walks}
+Retrained on the corrected environment against the measured target, and evaluated deterministically rather than on
+the stochastic training policy:
+
+\begin{table}[H]
+\centering
+\small
+\caption{Deterministic evaluation of the trained controller.}
+\label{tab:exp4-result}
+\begin{tabularx}{\textwidth}{>{\hsize=1.4\hsize}Y>{\hsize=0.6\hsize\centering\arraybackslash}Y}
+\hline
+\textbf{Measure} & \textbf{Value}\\
+\hline
+Forward speed in the shared coordinate (target 0.105) & 0.113\\
+Accumulated forward travel over four seconds & 2.25\,m (0.56\,m/s)\\
+\textbf{Falls per four-second episode} & \textbf{2}\\
+\textbf{Mean body height} (nominal stance 0.56\,m) & \textbf{0.405\,m}\\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent Training was not monotonic: tracking peaked, regressed by roughly half, and partially recovered, so the
+saved policy is not the best one the run passed through. Periodic checkpointing is a stated gap in the
+implementation rather than a finding.
+
+\subsection{Conclusion}
+\textbf{The policy does not walk, and the distinction matters.} It holds a collapsed posture, lunges forward at
+roughly twice a normal walking speed, and falls twice in every four-second episode. Two reporting faults concealed
+this until the render was watched: displacement was measured across the teleport that a fall-reset causes, and
+``survival'' was read from the fall flag at the final step, which carries no information once falls stop ending
+episodes. Both are now fixed in the evaluation. What the result does establish is narrower and still worth having:
+a policy that invents its own commands produces sustained forward motion in the cross-embodiment coordinate,
+rather than the frozen stance every earlier configuration converged to. \textbf{Two limits are inseparable from that
+statement.} The target was the simulator's measured body motion, not the world model's estimate of it, so this
+result establishes that the coordinate is a usable control target without yet establishing that this thesis's
+\emph{estimate} of that coordinate is good enough to serve as one; that substitution is the single most direct
+remaining experiment (Section 5.3). And tracking is confined to the forward channel, with lateral and turning still
+weak, although the coordinate carries all three.
+
+\noindent\textbf{The methodological result is the one that generalises.} Six plausible, independently-motivated
+interventions returned null against a faulty measurement, and the fault was invisible in every training curve. What
+found it was driving a known-good behaviour through the pipeline and checking that the pipeline said it was good —
+the same discipline Stage 1 established when a saturating metric concealed a competent forward model (Section 3.7).
+
+% ============================================================================
 \section{Summary: What Is Confirmed and What Is Open}
 \begin{table}[H]
 \centering
@@ -1850,13 +2012,17 @@ result it is built on has not yet shown either way.
 \hline
 \textbf{Experiment} & \textbf{Headline result} & \textbf{Left open}\\
 \hline
-1. Cross-morphology & Latent beats raw command on a shared joint space; three of four hypotheses confirm & Never
-  reached a closed loop\\
+1. Cross-morphology & Latent beats raw command on a shared joint space; three of four hypotheses confirm, and three
+  requirements are established for what follows (Section 3.7) & Never reached a closed loop\\
 2. Cross-embodiment (Froude) & Shared coordinate transfers correspondence-free, 70\% vs.\ 28\% chance, all four
   hypotheses confirm & Cheap adaptation only, not zero-shot; rollout currently hurts rather than helps\\
 3. Egocentric ranking & Signal present throughout the pipeline; coarse and family-level ranking work (68\%
   win-rate); five independent fixes for exact fine-grained ranking all converge on the same wall & Exact
   counterfactual-target training, the one properly-motivated fix left untested\\
+4. Real-physics controller & A reinforcement-learned controller trained against a measured body-motion target
+  walks: 0.45\,m of forward travel in 4\,s, dimensionless forward speed 0.113 against a target of 0.105,
+  upright throughout & Trained against a \emph{measured} target, not the world model's own estimate; forward only,
+  with lateral and turning tracking still weak\\
 \hline
 \end{tabularx}
 \end{table}
@@ -1867,8 +2033,24 @@ bodies with no privileged information about either. Experiment 3 confirms more t
 project's own results credited it with: the model discriminates behaviour categories reliably and ranks
 on-manifold candidates well above chance, while converging, across five independently-motivated interventions,
 on a specific and now well-characterised limit: fine magnitude discrimination within one behaviour family.
-Chapter 5 discusses what this means for the thesis's contribution and why the counterfactual-target direction is
-the most direct path past it.
+
+\noindent\textbf{The two scoring failures are one failure at two granularities, and this is the sharper statement
+of Experiment 3's limit.} Selecting among whole recorded behaviours and grading small perturbations of a single
+behaviour are the same operation applied at different resolutions. The coarse case works. The fine case is not
+merely difficult for this model: the perturbations it was asked to order were separated by the \emph{simulator} by
+0.1304 against 0.1299 in the shared coordinate, so the outcomes being ranked are effectively the same outcome, and
+no representation, however well trained, can order them. That distinction matters for what counts as a remaining
+task: the coarse capability is a result, the fine capability is partly bounded by the candidate set rather than by
+the world model, and the viewpoint change of Section 4.3 addresses the former and cannot address the latter.
+
+\noindent\textbf{Experiment 4 closes the loop Experiment 1 could not, and it does so with the target measured
+rather than estimated.} A controller trained in real physics, with the world model consulted only to score the
+action just taken and never rolled forward, produces genuine forward locomotion on the quadruped. Two findings
+are inseparable from that result and are reported with it: the six interventions that preceded it all returned
+null against an environment that contained two measurement faults, and correcting those faults, rather than any
+of the six, is what produced the walking controller. Whether the same controller can be trained against the world
+model's \emph{own} body-motion estimate, which is the quantity available on a genuinely unseen body, is the
+immediate open question. Chapter 5 states what this changes about the thesis's contribution and what it does not.
 
 \chapter{CONCLUSION AND RECOMMENDATIONS}
 
@@ -1896,7 +2078,18 @@ thesis's methodological contribution beyond the transfer result itself: camera v
 determine whether a video world model can be shown to use its action at all (Experiment 3, Section 4.3), and
 coarse-to-family-level action-conditioning is shown to be a separate capability from exact fine-grained ranking,
 which this project's world model does not yet have, across five independently-motivated interventions that
-converge on the same wall, a stronger and more specific result than an unexplained failure would be.
+converge on the same wall, a stronger and more specific result than an unexplained failure would be. The account is
+sharper than ``fine ranking fails'': the two scoring regimes are one operation at two granularities, and in the
+fine regime the simulator itself separates the candidates by less than the measurement noise, so part of that limit
+belongs to the candidate set rather than to the world model.
+
+\noindent\textbf{A fourth result, obtained after the three objectives were set, closes the loop none of them
+reached.} A controller trained in real physics against a measured body-motion target, with the world model scoring
+only the action just taken and never rolled forward, walks (Experiment 4): 0.45\,m of forward travel in four
+seconds at a dimensionless forward speed of 0.113 against a target of 0.105, upright throughout. Its value to the
+thesis is bounded and is stated as such: the target it was trained against is measured rather than estimated by the
+world model, so it demonstrates that the control problem is tractable in this setup without yet demonstrating that
+this thesis's representation is what makes it tractable.
 
 \section{What Is Proven, and What Is a Measured Limitation}
 Two results carry the thesis: the shared coordinate transfers correspondence-free (Experiment 2), and camera
@@ -1912,29 +2105,86 @@ Three limitations are equally load-bearing and are stated here rather than left 
 fine-grained ranking} (Experiment 3, Section 4.3): the model discriminates behaviour categories reliably and
 discriminates magnitude within one category poorly, and five structurally different interventions, training
 recipe, architecture capacity, data volume, readout redesign, and that redesign's real retrain, all converged
-on the identical result. \textbf{The candidate-scoring circularity} (Section 4.3): the closed-loop test harness
-depends on a curated library of the target robot's own recorded behaviours, which presupposes exactly the
-capability, a controller for the target robot, that a genuinely unseen robot would not have. \textbf{The
-viewpoint trade} (Section 4.3): the egocentric camera that is necessary for the world model to use the action at
-all is the same camera under which plain behaviour cloning nearly fails (6\% of the reference distance, against
-54\% allocentrically); this thesis does not resolve that tension, and reports both sides of it rather than the
-one that is more favourable.
+on the identical result, with the qualification above that the simulator barely separates those candidates either.
+\textbf{The candidate-scoring circularity} (Section 4.3): the closed-loop test harness depends on a curated library
+of the target robot's own recorded behaviours, which presupposes exactly the capability, a controller for the target
+robot, that a genuinely unseen robot would not have. Experiment 4 removes this circularity in principle, by
+training a controller that needs only the ability to actuate the robot; it does not yet remove it in the form that
+matters, because that controller was trained against a measured target rather than the world model's estimate.
+\textbf{The viewpoint trade} (Section 4.3): the egocentric camera that is necessary for the world model to use the
+action at all is the same camera under which plain behaviour cloning nearly fails (6\% of the reference distance,
+against 54\% allocentrically); this thesis does not resolve that tension, and reports both sides of it rather than
+the one that is more favourable.
+
+\noindent\textbf{A train/deploy inconsistency in this thesis's own pipeline, and the result once removed.}
+Every stage that fits the path from video to a body-motion reading --- the inverse model in pretraining, the
+stage-1 adaptation, the projector, and the shared head --- is trained on \emph{adjacent} frame pairs. The deployed
+goal read used a spacing of five, because a single parameter set both the planner's rollout depth, where five is
+deliberate and measured, and the goal-read spacing, which rolls nothing. A second defect compounded it: the shared
+head's fit held out clips for the adapted body only, so the reading quality on the \emph{source} body, whose goal
+is the thing actually read, had never been measured. Both are now fixed --- the two spacings are separate
+parameters, and the source body receives its own held-out split (held-out ratio 0.608, measured for the first
+time).
+
+\noindent\textbf{Corrected, the central cross-embodiment result is stronger than previously reported.} Reading at
+the trained spacing with the properly fitted head, on the same goal clip and the same twelve candidates: the
+vision-read goal carries an error of \textbf{0.0164} and selects the \emph{same} candidate as a privileged
+recorded measurement, at the \emph{same} distance (0.029, the best any candidate achieves), with
+\textbf{100\% of planned steps in the goal's behaviour family under both}. A goal read from the other body's
+video is, on this measurement, indistinguishable from being handed the recorded number, and both arms exceed the
+78--80\% reported earlier. The earlier figure of 0.0293 was this
+mismatch plus a favourable clip, and the apparent regression reported against the newer checkpoint was an artefact
+of measuring it at a spacing it was never trained for.
+
+\noindent\textbf{The claim rests on the whole goal set, not on one clip and not on a spacing argument.} An earlier
+draft of this section justified the single-clip result by noting that the read error fell below ``the threshold at
+which a read error could reorder candidates'', quoted as $0.033$--$0.038$. Those two numbers are the two nearest
+candidates' distances \emph{to the goal}, not the gap \emph{between} them; the gap is $0.0079$, so a $0.029$ read
+error is nearly four times too large, and perturbing the goal by that magnitude in random directions changes the
+selected candidate in $65\%$ of them. That justification is therefore withdrawn, and no threshold is claimed. What
+replaces it is a measurement over the entire goal set rather than one clip: across twelve goal conditions and
+ninety-six planning decisions, the vision-read goal selects the correct behaviour family in $92\%$ of steps at a
+median Froude distance of $0.043$, against $90$--$92\%$ and $0.062$ for the privileged recorded goal, with a
+random pick at $0.143$. The vision goal matches or beats the privileged one across the whole set, which is a
+stronger statement than the single-clip equality it replaces and needs no threshold to support it.
+
+\noindent\textbf{What does not move is the rollout path.} Handed a goal read at 0.0097 error it still selects at
+40\% and still prefers a candidate three times farther from the goal than the achievable optimum, so that failure
+has now survived a checkpoint change, a goal-quality change and a spacing correction, and is structural rather
+than a deficiency of any one component.
+
+\noindent\textbf{A methodological limitation, stated because it changed a conclusion.} Six successive
+interventions on the controller of Experiment 4 returned null, and the cause was not any of the six: the training
+environment contained two measurement faults, one in how commands were mapped to the robot and one in how the
+robot's own speed was read back, either of which was sufficient to make a genuinely correct gait score as
+motionless. They were found by driving a known-good gait through the pipeline and checking the number it produced,
+not by inspecting training curves. The correction, not the interventions, produced the walking controller. Where
+this thesis reports a null result elsewhere, that result rests on the same kind of verification having been done;
+where such a verification is not reported, the null should be read as provisional.
 
 \section{Recommendations for Remaining Work}
-Section 3.8 states these as a work plan; they are repeated here as the direct response to Experiment 3's wall.
+Section 3.8 states these as a work plan; they are repeated here as the direct response to what Chapter 4 leaves
+open.
 
-\textbf{Counterfactual-target training} is the most direct next step, and the one properly-motivated fix this
-thesis has not tested at true strength (Section 4.3.8): resuming the real simulator from the same state under a
+\textbf{Training the controller against the world model's own estimate} is now the most direct next step, and it
+is the one that decides the thesis's central question rather than a subsidiary one. Experiment 4 shows the control
+problem is tractable when the target is measured; the quantity available on a genuinely unseen body is not that
+measurement but the shared-coordinate estimate Experiments 2 and 3 built. Substituting one for the other, on the
+corrected environment, tests whether this representation is good enough to \emph{drive} a body rather than only to
+describe one, which no result in this thesis yet establishes.
+
+\textbf{Counterfactual-target training} remains the one properly-motivated fix for Experiment 3's ranking wall that
+has not been tested at true strength (Section 4.3.8): resuming the real simulator from the same state under a
 different action and matching the outcome it actually produces, rather than the approximation tried so far. It is
 a targeted response to a named, published diagnosis (Section 2.5.1, UWM-JEPA) of exactly the failure mode
 Experiment 3 measured, on a domain that diagnosis was never tested against, and on a small, synthetic task rather
 than video-scale locomotion. Either outcome is informative: if it closes the wall, the mechanism transfers; if it
 does not, this is the first proper test of whether the account holds for a visual world model at all.
 
-\textbf{Breaking the candidate-scoring circularity} requires replacing scored candidates with a trained policy
-that needs only the ability to actuate the target robot, not a pre-existing behaviour set (Section 2.4, following
-Hu et al.'s use of unguided motor babbling for a single robot); this thesis has identified the resolution but not
-yet demonstrated it out-performs the plain-cloning baseline of Section 4.3.4.
+\textbf{Extending the controller beyond forward tracking.} Experiment 4's controller tracks forward speed and
+tracks the lateral and turning channels poorly, although the shared coordinate carries all three. Whether that is a
+reward-balance question or the same fine-resolution limit Experiment 3 characterised is untested, and the two
+predict different fixes.
 
 \textbf{A third, topologically distinct embodiment} would allow this project to test, for the first time, whether
 pretraining on more embodiments improves the shared representation the way LAC-WM reports for manipulation
@@ -1945,11 +2195,23 @@ The central claim of this thesis is supported: a shared, Froude-scaled body-moti
 privileged information about either body, transfers between a hexapod and a structurally disjoint quadruped from
 egocentric video alone. What this thesis adds beyond that transfer result is a measured account of where the
 resulting world model's usefulness currently ends, stated more precisely than a single pass through the evidence
-first suggested: coarse and family-level behaviour selection work well; exact fine-grained control does not yet,
-and five independent interventions converge on that being a structural property of the current objective rather
-than a component that merely needs fixing. Stating that limit precisely, rather than around it, is what makes the
-next step, counterfactual-target training, tested at true strength, a specific, testable proposal rather than
-an open-ended one.
+first suggested: coarse and family-level behaviour selection work well; exact fine-grained selection does not, and
+part of that limit belongs to candidates the simulator itself barely separates rather than to the model asked to
+order them.
+
+The arc the three stages form is a single one, and it is not ``we tried things until one worked''. Stage 1
+established that a shared representation has to be forced by the objective, that coverage has to be verified per
+independent axis, and that a saturating metric will hide what a model is not doing. Applying the first to a pair of
+bodies with no shared command space produced the transfer result. Applying the third to that result produced the
+viewpoint finding: the camera a locomotion world model is built from is a precondition for it to use its action at
+all, not a setup detail, which explains published outcomes the original papers did not connect. And applying it
+once more, to a controller that six interventions had failed to train, found two measurement faults rather than a
+sixth mechanism, and the corrected environment produced a controller that walks.
+
+What remains is the question that arc has sharpened into a single testable form: the controller has been trained
+against a \emph{measured} body-motion target, and the quantity available on a genuinely unseen body is this
+thesis's own estimate of it. Whether the representation is good enough to drive a body, and not only to describe
+one, is now one experiment away rather than an open-ended programme.
 
 % ############################################################################
 % #  BACK MATTER                                                              #

@@ -94,7 +94,7 @@ def true_local_froude(cand, spec, offset, horizon):
     return bm[offset:offset + max(h, 1)].mean(0)
 
 
-def load_goals(goal_dir, goal_embodiment, planner, goal_source, horizon, device):
+def load_goals(goal_dir, goal_embodiment, planner, goal_source, goal_horizon, device):
     spec = REGISTRY[goal_embodiment]
     by_cond = {}
     for p in sorted(glob.glob(os.path.join(ROOT, goal_dir, "*.npz"))):
@@ -113,7 +113,7 @@ def load_goals(goal_dir, goal_embodiment, planner, goal_source, horizon, device)
         # `vision_goal` never reads actions -- planner.md already has whatever action head it was
         # built with and `.body` does not touch it, so reusing planner.md here is correct.
         for cond, p in by_cond.items():
-            gvec, _ = vision_goal(itm, planner.md, encoder, offset, p, horizon)
+            gvec, _ = vision_goal(itm, planner.md, encoder, offset, p, goal_horizon)
             gvec = gvec.cpu().numpy() * std + mean
             goals.append({"condition": cond, "froude": gvec})
         del encoder
@@ -220,7 +220,17 @@ def main():
     ap.add_argument("--goal_dir", default="data/egocentric/beh12_c10f10t10_ego_flat")
     ap.add_argument("--goal_embodiment", default="hexapod")
     ap.add_argument("--embodiment", default="b1")
-    ap.add_argument("--horizon", type=int, default=5)
+    ap.add_argument("--horizon", type=int, default=5,
+                    help="the PLANNER's window: how many actions a chosen candidate contributes "
+                         "before the next decision. Nothing to do with reading the goal.")
+    ap.add_argument("--goal_horizon", type=int, default=1,
+                    help="frame spacing (t, t+goal_horizon) used to READ the goal from the source "
+                         "clip's video in mode C/D. Until 2026-09-14 this file passed --horizon "
+                         "here, so a planner window of 5 silently read the goal at a 5-frame "
+                         "spacing the ITM was never trained on -- F208's one-flag-two-jobs bug, "
+                         "fixed in close_loop_direct_froude.py and plan_without_library.py but "
+                         "missed here. Mode C/D numbers produced by this script before that date "
+                         "were read at the planner's horizon, not at 1.")
     ap.add_argument("--n_steps", type=int, default=40)
     args = ap.parse_args()
 
@@ -236,7 +246,7 @@ def main():
             planner = build_planner(ckpt_path, candidates_dir, args.embodiment, args.horizon,
                                     free, device, args.per_condition)
             goals = load_goals(args.goal_dir, args.goal_embodiment, planner, goal_source,
-                               args.horizon, device)
+                               args.goal_horizon, device)
             r = run(planner, goals, spec, args.horizon, args.n_steps, free)
             chance = pool_chance(planner, spec, goals)
             chance_dist = pool_chance_dist(planner, spec, goals)

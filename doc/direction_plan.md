@@ -50,16 +50,21 @@ mechanistically distinct fixes have now been tried at real/exact strength:
 | recurrence, 4 variants (R0, ConvGRU probe, full RSSM, ConvGRU at full budget) | give the model more temporal context | **F198: all fail.** Full-budget ConvGRU (-0.006 gap) is *worse* than its own 2000-iteration probe (+0.069); the field-standard full RSSM (pooled + stochastic, matching DreamerV3's own recipe) scored worst of every scorer measured in this project's history |
 | **F141's own missed fix: multi-step recon anchor + hinge** | `recon` extended to match the hinge's horizon (not just step 1), using existing `lambda_rollout` -- zero new code | **F199: passes all 3 of F141's pre-registered criteria for the first time.** No divergence, `/mean-z` within-family 0.886-0.938 and holds flat across horizon, separation rises and holds. A follow-up ceiling check (F199 coda) shows this is close to what the data allows (natural family separation in `z` is itself near 1.0) — real, modest, not a weak model leaving signal on the table |
 
-**Resolved, 2026-09-12, and it closes negative (F199's coda, F201).** The launch mistake was fixed
-and the full chain rerun: `beh12_hinge_multistep_anchor_v2` (with `lambda_body`) → full B1 adaptation
-→ `reward_quality_gate_b1.py`. Result: **8.3%, no real margin over F195's 5.9% chance, not an
-improvement on the 16.7%/4.2% expert/babble baselines already on record.** F199's fix is real on
-hexapod pretraining but does not propagate to B1. **This makes six independent, mechanistically
-distinct fixes (contrastive, hinge without an anchor, counterfactual targets, four recurrence
-variants, and now the anchored hinge) that have all failed to produce a usable B1 reward function
-(F201).** Per this project's standing rule for this shape of result: stop trying fixes, write this
-up as a characterized negative result. `doc/OPEN_QUESTION.md` Q21 step 3 (RL controller) stays
-blocked, permanently for this checkpoint family, not pending another attempt.
+**Resolved, 2026-09-12, and it closes positive (F199's coda, F201) — an earlier "closes negative"
+reading of this same day's work was premature and is corrected here, not stacked beside.** The
+launch mistake was fixed and the full chain rerun: `beh12_hinge_multistep_anchor_v2` (with
+`lambda_body`) → full B1 adaptation → `reward_quality_gate_b1.py`. First result: 8.3%, no real
+margin over chance — looked like a propagation failure. **Diagnosed rather than accepted**:
+`wm.adapt`'s B1 stage-1 fine-tune uses a plain one-step MSE loss with no separation term at all,
+and directly measuring it (`b1_adaptation_sep_check.py`) showed it erodes 38-62% of the pretrain's
+hinge-built action-sensitivity on B1's own frames — the same MSE-dominance mechanism recurring one
+stage downstream. Fix: a K=1 hinge term added to `wm.adapt` itself (`--lambda_hinge`, anchored by
+the existing one-step MSE by construction, so it can't reproduce F141's unanchored-multi-step
+divergence). Result after the fix: **20.8% (5/24) — the best B1 reward-quality-gate result measured
+anywhere in this project, exceeding the original expert-fit baseline (16.7%).** The honest count is
+one real, working fix, not six failed ones. `doc/OPEN_QUESTION.md` Q21 step 3 (RL controller) is no
+longer blocked by an exhausted-fixes wall — it now depends on how much further margin the gate
+needs, a live, open, promising direction.
 
 **A separate, corrected understanding, not yet acted on (F197).** A prior claim in this project's
 own reasoning — that stage-3 InfoNCE "has a specific history of not transferring across bodies" —

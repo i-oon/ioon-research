@@ -48,6 +48,7 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "diagnostics", "objective_experiments"))
+sys.path.insert(0, os.path.join(ROOT, "sim", "collect", "_archive"))
 from collect_b1_cpg_babble import ACTION_SCALE, DEFAULT_IL, PHASE, il_to_sdk  # noqa: E402
 from b1_coppelia_cpg_controller import (  # noqa: E402
     FOOT_ALIASES_SDK, JOINT_ALIASES_SDK, JOINT_LIMITS, LEFT_LEGS, LEGS_IL, MAX_FORCE,
@@ -131,7 +132,14 @@ def generic_trot_pair_phases(pairing):
     if pairing == "front-rear":
         return np.asarray([0.0, 0.0, np.pi, np.pi])
     if pairing == "wave":
-        # FL, FR, RL, RR phases for footfall order LF(0) -> RH(RR, 1/4) -> RF(1/2) -> LH(RL, 3/4)
+        # FL, FR, RL, RR phases. Footfall order by phase is LF(0) -> LH(1/4) -> RF(1/2) ->
+        # RH(3/4), which read from a hind leg is LH -> RF -> RH -> LF: the DIAGONAL-sequence walk,
+        # where each footfall is on the opposite side from the one before.
+        # The comment here used to claim LF -> RH -> RF -> LH (the LATERAL-sequence walk) and was
+        # wrong about the array beneath it. Swapping RL/RR on 2026-09-13 to match that comment was
+        # measured directly and made it strictly worse: the one config that stood (2.5 Hz, amp
+        # 0.60, duty 0.65) fell, and so did all six others tried. Reverted; the comment is the
+        # thing that was wrong.
         return np.asarray([0.0, np.pi, 0.5 * np.pi, 1.5 * np.pi])
     raise ValueError(f"unknown generic trot pairing: {pairing}")
 
@@ -247,7 +255,8 @@ def generic_coupled_action_at(t, frequency, amplitude, coupling_ratio, pairing,
 
 def generic_coupled_duty_action_at(t, frequency, amplitude, coupling_ratio, duty_factor,
                                    clearance_ratio, pairing, thigh_sign_layout, noise, rng,
-                                   hip_ratio=0.0, hip_bias=None):
+                                   hip_ratio=0.0, hip_bias=None, hip_sign_layout="same",
+                                   hip_phase=0.0, hip_clock="leg", stance_calf_bias=0.0):
     """Duty-cycle stance/swing shape (propulsion) with the calf ALGEBRAICALLY COUPLED to the
     thigh during stance (Egocentric-VSM-style foot-orientation coupling, for the stability
     `generic_coupled_action_at` showed but without its own near-zero forward speed -- that
@@ -268,13 +277,15 @@ def generic_coupled_duty_action_at(t, frequency, amplitude, coupling_ratio, duty
     action = np.zeros(12, np.float32)
     leg_phase = generic_trot_pair_phases(pairing) / (2.0 * np.pi)
     thigh_sign = generic_leg_signs(thigh_sign_layout)
+    hip_sign = generic_leg_signs(hip_sign_layout)
     ramp = min(1.0, max(0.0, t / 1.0))
     bias = hip_bias if hip_bias is not None else np.zeros(4)
     for li, offset in enumerate(leg_phase):
         cycle = (frequency * t + offset) % 1.0
         if cycle < duty_factor:
             thigh = amplitude * (1.0 - 2.0 * cycle / duty_factor)
-            calf = -coupling_ratio * thigh   # coupled: foot orientation follows thigh, planted
+            calf = (-coupling_ratio * thigh
+                    + stance_calf_bias * amplitude)  # generic planted-leg extension/preload
         else:
             swing = (cycle - duty_factor) / (1.0 - duty_factor)
             thigh = amplitude * (-1.0 + 2.0 * swing)
@@ -282,13 +293,141 @@ def generic_coupled_duty_action_at(t, frequency, amplitude, coupling_ratio, duty
             # clearance arc so the foot actually leaves the ground during the return.
             calf = (-coupling_ratio * thigh
                     + clearance_ratio * amplitude * np.sin(np.pi * swing))
-        hip = ramp * (bias[li] + thigh_sign[li] * hip_ratio * amplitude
-                      * np.sin(2.0 * np.pi * cycle))
+        hip_cycle = cycle if hip_clock == "leg" else frequency * t
+        hip = ramp * (bias[li] + hip_sign[li] * hip_ratio * amplitude
+                      * np.sin(2.0 * np.pi * hip_cycle + hip_phase))
         action[li] = hip
         action[4 + li] = ramp * thigh_sign[li] * thigh
         action[8 + li] = ramp * thigh_sign[li] * calf
     action += rng.normal(0.0, noise, size=12).astype(np.float32)
     return action
+
+
+def generic_smooth_duty_action_at(t, frequency, amplitude, coupling_ratio, duty_factor,
+                                  clearance_ratio, pairing, thigh_sign_layout, noise, rng,
+                                  hip_ratio=0.0, hip_bias=None, hip_sign_layout="same",
+                                  hip_phase=0.0, hip_clock="leg", stance_calf_bias=0.0):
+    """`coupled-duty` with the thigh's corners removed, and nothing else changed.
+
+    **Why this exists, stated so it can be checked rather than trusted.** `coupled-duty` ramps the
+    thigh LINEARLY down through stance and LINEARLY back up through swing, so the joint reverses
+    direction instantaneously twice per cycle: commanded acceleration is unbounded at both seams.
+    That single property, not the robot and not the engine, is what pinned every gait this file
+    could produce. Stance and swing cover the same thigh excursion in different amounts of time,
+    so the swing's joint speed is `duty/(1-duty)` times the stance's -- 1.2x at duty 0.55, but 3x
+    at duty 0.75. Raising duty to get a third foot on the ground therefore BUYS support by making
+    the leg flick back harder, and measured directly, the flick wins: at 2.5 Hz every duty-0.75
+    rollout fell while duty 0.65 stood. Being stuck near duty 0.5 forces the 2-feet-down diagonal
+    pairing, which in turn forces >= 4.5 Hz to stay upright -- the whole chain follows from the
+    corners.
+
+    **The fix carries no task knowledge and adds no parameter.** Stance is reparameterised as
+    phase 0..pi and swing as pi..2pi, with the thigh riding `cos` of that phase. Thigh speed goes
+    as `sin(phase)`, which is exactly zero at both seams, so the phase rate may jump at the
+    stance/swing boundary without the joint's velocity jumping with it: C1 for free, from the
+    parameterisation alone. Identical treatment for every leg, no robot state, no behaviour or
+    command input, same knobs and same meanings as `coupled-duty` -- duty still sets the stance
+    fraction, amplitude still sets the thigh excursion, and the calf coupling, clearance arc and
+    hip channel are copied across verbatim.
+
+    It is NOT a claim that this gait is better for the task: whether the reachable Froude range
+    changes is an outcome to be measured on a declared, randomised parameter distribution, never a
+    target to tune toward.
+    """
+    if not 0.5 <= duty_factor < 1.0:
+        raise ValueError("generic duty factor must be in [0.5, 1.0)")
+    action = np.zeros(12, np.float32)
+    leg_phase = generic_trot_pair_phases(pairing) / (2.0 * np.pi)
+    thigh_sign = generic_leg_signs(thigh_sign_layout)
+    hip_sign = generic_leg_signs(hip_sign_layout)
+    ramp = min(1.0, max(0.0, t / 1.0))
+    bias = hip_bias if hip_bias is not None else np.zeros(4)
+    for li, offset in enumerate(leg_phase):
+        cycle = (frequency * t + offset) % 1.0
+        if cycle < duty_factor:
+            theta = np.pi * cycle / duty_factor                       # 0 -> pi over stance
+            thigh = amplitude * np.cos(theta)                         # +amp -> -amp
+            calf = -coupling_ratio * thigh + stance_calf_bias * amplitude
+        else:
+            theta = np.pi * (1.0 + (cycle - duty_factor) / (1.0 - duty_factor))   # pi -> 2pi
+            thigh = amplitude * np.cos(theta)                         # -amp -> +amp
+            # clearance arc, zero at both seams like the thigh's own speed
+            calf = (-coupling_ratio * thigh
+                    + clearance_ratio * amplitude * np.sin(theta - np.pi))
+        hip_cycle = cycle if hip_clock == "leg" else frequency * t
+        hip = ramp * (bias[li] + hip_sign[li] * hip_ratio * amplitude
+                      * np.sin(2.0 * np.pi * hip_cycle + hip_phase))
+        action[li] = hip
+        action[4 + li] = ramp * thigh_sign[li] * thigh
+        action[8 + li] = ramp * thigh_sign[li] * calf
+    action += rng.normal(0.0, noise, size=12).astype(np.float32)
+    return action
+
+
+def motion_quality_metrics(actions, joint_targets, joint_pos, contacts, foot_pos, dt):
+    """Reporting-only quality metrics for babble pilots.
+
+    These are deliberately not used to keep/discard rollouts here.  The final babble collection
+    rule remains retain-every-rollout; these values are gates for judging whether a frozen
+    generator is smooth/contact-consistent enough before any downstream work is built on it.
+    """
+    actions = np.asarray(actions, dtype=np.float32)
+    joint_targets = np.asarray(joint_targets, dtype=np.float32)
+    joint_pos = np.asarray(joint_pos, dtype=np.float32)
+    contacts = np.asarray(contacts, dtype=np.float32)
+    foot_pos = np.asarray(foot_pos, dtype=np.float32)
+
+    def finite_diff(x, order):
+        y = x
+        for _ in range(order):
+            if len(y) < 2:
+                return np.zeros_like(y)
+            y = np.diff(y, axis=0) / dt
+        return y
+
+    joint_vel = finite_diff(joint_pos, 1)
+    joint_acc = finite_diff(joint_pos, 2)
+    joint_jerk = finite_diff(joint_pos, 3)
+    target_acc = finite_diff(joint_targets, 2)
+    action_acc = finite_diff(actions, 2)
+    action_jerk = finite_diff(actions, 3)
+    contact_switches = np.abs(np.diff(contacts, axis=0)) if len(contacts) > 1 else np.zeros_like(contacts)
+    support_count = contacts.sum(axis=1) if len(contacts) else np.zeros(0, dtype=np.float32)
+    foot_z = foot_pos[:, :, 2] if foot_pos.size else np.zeros((0, 4), dtype=np.float32)
+
+    metrics = {
+        "joint_vel_rms": float(np.sqrt(np.mean(joint_vel ** 2))) if joint_vel.size else 0.0,
+        "joint_acc_rms": float(np.sqrt(np.mean(joint_acc ** 2))) if joint_acc.size else 0.0,
+        "joint_acc_var": float(np.var(joint_acc)) if joint_acc.size else 0.0,
+        "joint_jerk_rms": float(np.sqrt(np.mean(joint_jerk ** 2))) if joint_jerk.size else 0.0,
+        "target_acc_rms": float(np.sqrt(np.mean(target_acc ** 2))) if target_acc.size else 0.0,
+        "action_acc_rms": float(np.sqrt(np.mean(action_acc ** 2))) if action_acc.size else 0.0,
+        "action_jerk_rms": float(np.sqrt(np.mean(action_jerk ** 2))) if action_jerk.size else 0.0,
+        "mean_abs_tracking_error": float(np.mean(np.abs(joint_targets - joint_pos)))
+        if joint_targets.size else 0.0,
+        "max_abs_tracking_error": float(np.max(np.abs(joint_targets - joint_pos)))
+        if joint_targets.size else 0.0,
+        "contact_switches_total": int(contact_switches.sum()) if contact_switches.size else 0,
+        "contact_switches_per_second": float(contact_switches.sum() / max(dt * max(len(contacts) - 1, 1), dt))
+        if len(contacts) else 0.0,
+        "contact_duty_per_foot": [float(v) for v in contacts.mean(axis=0)] if len(contacts) else [],
+        "support_count_mean": float(support_count.mean()) if support_count.size else 0.0,
+        "support_count_min": float(support_count.min()) if support_count.size else 0.0,
+        "support_frac_0_or_1_feet": float(np.mean(support_count <= 1.0)) if support_count.size else 0.0,
+        "support_frac_2_feet": float(np.mean(support_count == 2.0)) if support_count.size else 0.0,
+        "support_frac_3_or_4_feet": float(np.mean(support_count >= 3.0)) if support_count.size else 0.0,
+        "foot_z_range_per_foot": [float(v) for v in (foot_z.max(axis=0) - foot_z.min(axis=0))]
+        if len(foot_z) else [],
+        "foot_z_max_per_foot": [float(v) for v in foot_z.max(axis=0)] if len(foot_z) else [],
+    }
+    # Conservative preview flags only.  These are intentionally soft and visible; they do not
+    # change retention.  The thresholds should be recalibrated after enough B1 pilots exist.
+    metrics["preview_quality_flags"] = {
+        "low_tracking_error": bool(metrics["max_abs_tracking_error"] < 0.75),
+        "not_airborne_mostly": bool(metrics["support_frac_0_or_1_feet"] < 0.50),
+        "has_contact_variation": bool(metrics["contact_switches_total"] > 0),
+    }
+    return metrics
 
 
 def main():
@@ -333,7 +472,7 @@ def main():
                     default="equal", help="quadruped-trot uses generic hip/thigh/calf amplitude roles")
     ap.add_argument("--generic-gait-shape",
                     choices=("sine", "stance-swing", "trot-sine", "duty-cycle", "coupled",
-                             "coupled-duty"),
+                             "coupled-duty", "smooth-duty"),
                     default="sine")
     ap.add_argument("--generic-calf-ratio", type=float, default=1.5)
     ap.add_argument("--generic-coupling-ratio", type=float, default=0.6, help="coupled gait shape "
@@ -346,9 +485,22 @@ def main():
                     "coupled-duty when > 0 to actively drive hip on the same phase clock (see "
                     "generic_coupled_duty_action_at's docstring -- the real B1 expert's own "
                     "recorded actions use hip at a magnitude comparable to thigh, not zero)")
+    ap.add_argument("--generic-hip-sign-layout",
+                    choices=("same", "left-right", "front-rear", "diagonal"), default="same",
+                    help="coupled-duty only: fixed generic hip sign convention. This is a sampled "
+                    "CPG parameter for lateral/yaw coverage, not a separate behavior primitive")
+    ap.add_argument("--generic-hip-phase", type=float, default=0.0,
+                    help="coupled-duty only: hip oscillator phase offset, radians")
+    ap.add_argument("--generic-hip-clock", choices=("leg", "global"), default="leg",
+                    help="coupled-duty only: hip oscillator clock. leg uses each leg's CPG phase; "
+                    "global uses one shared clock with the sampled sign layout")
     ap.add_argument("--generic-hip-bias", type=float, nargs=4, default=None,
                     help="coupled-duty only: fixed per-leg hip offset, FL FR RL RR order, added "
                     "on top of the oscillation -- matches the real expert's own static asymmetry")
+    ap.add_argument("--generic-stance-calf-bias", type=float, default=0.0,
+                    help="coupled-duty only: generic planted-leg calf offset as a multiple of "
+                    "base amplitude. Negative usually means more extension/lower stance on B1, "
+                    "but this is a sampled CPG parameter, not per-leg tuning")
     ap.add_argument("--generic-calf-phase", type=float, default=-np.pi / 2.0,
                     help="calf phase relative to thigh for the generic trot-sine CPG")
     ap.add_argument("--generic-trot-pairing",
@@ -382,6 +534,33 @@ def main():
                     help="paired room/ground appearance seed for --ego")
     ap.add_argument("--screen-only", action="store_true",
                     help="skip camera/NPZ output; retain the YAML outcome for a fast parameter screen")
+    ap.add_argument("--joint-control", choices=("position", "spring"), default="position",
+                    help="'spring' runs a per-joint PD INSIDE the physics engine "
+                         "(tau = K(q*-q) - C*qdot) instead of Coppelia's generic position PID. "
+                         "It is the only way to give these joints a viscous damping term: Bullet "
+                         "exposes no joint damping or friction parameter, and that term is what "
+                         "makes this same open-loop CPG walk in MuJoCo -- +1.997 m on "
+                         "b1_flat_real.xml (system-identified per-joint damping/frictionloss) "
+                         "against -0.234 m on the uniform-physics b1_flat.xml, same seed, same "
+                         "gait. K and C default to b1_flat_real.xml's own numbers.")
+    ap.add_argument("--spring-k", type=float, nargs=3, default=(550.0, 700.0, 970.0),
+                    metavar=("HIP", "THIGH", "CALF"),
+                    help="b1_flat_real.xml's actuator kp per segment")
+    ap.add_argument("--spring-c", type=float, nargs=3, default=(2.745, 4.700, 5.201),
+                    metavar=("HIP", "THIGH", "CALF"),
+                    help="b1_flat_real.xml's actuator kv PLUS its system-identified joint damping "
+                         "(2.0+0.745, 3.0+1.700, 3.0+2.201). The Coulomb frictionloss term "
+                         "(0.882/2.698/6.166) has no equivalent in this mode and is NOT modelled.")
+    ap.add_argument("--max-joint-vel", type=float, default=None,
+                    help="rad/s ceiling on every joint. Bullet has no joint damping/friction "
+                         "parameter, so this is the only lever here that bounds swing overshoot. "
+                         "Left unset, the scene's 15.6-23.3 rad/s stands.")
+    ap.add_argument("--contact-friction", type=float, default=None,
+                    help="Bullet friction for the feet and the floor. The scene ships both at 0.50, "
+                         "and Bullet MULTIPLIES the two surfaces, so the traction the feet actually "
+                         "get is 0.25 -- against 1.0 in the MuJoCo model of the same robot, where "
+                         "the same CPG family reaches Froude 0.196 instead of 0.127. Set 1.0 to "
+                         "match MuJoCo. Left unset, the scene's own values are untouched.")
     ap.add_argument("--fall-height", type=float, default=0.35, help="same criterion "
                     "b1_coppelia_cpg_controller.py and collect_b1_cpg_babble.py both use")
     args = ap.parse_args()
@@ -451,14 +630,39 @@ def main():
     if args.ego:
         randomise_ground(sim, seed=args.ego_seed, uv=ego_room["ground_uv"])
 
+    if args.contact_friction is not None:
+        contact_shapes = [h for name, h in shapes_by_name.items()
+                         if name.endswith("_foot_respondable")]
+        contact_shapes += [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
+                          if sim.getObjectAlias(h, 1).startswith("/Floor")]
+        for handle in contact_shapes:
+            sim.setEngineFloatParam(sim.bullet_body_friction, handle, float(args.contact_friction))
+        print(f"contact friction set to {args.contact_friction} on {len(contact_shapes)} shapes "
+             f"(feet + floor); scene ships 0.50, Bullet multiplies the pair")
+
     neutral = il_to_sdk(DEFAULT_IL)
     for alias, handle, target in zip(JOINT_ALIASES_SDK, joints, neutral):
         segment = alias.split("_")[1]
         sim.setJointMode(handle, sim.jointmode_dynamic, 0)
         sim.setObjectInt32Param(handle, sim.jointintparam_dynctrlmode, sim.jointdynctrl_position)
         sim.setObjectInt32Param(handle, sim.jointintparam_motor_enabled, 1)
-        sim.setObjectFloatParam(handle, sim.jointfloatparam_pid_p, args.pid_p)
-        sim.setObjectFloatParam(handle, sim.jointfloatparam_pid_d, args.pid_d)
+        if args.joint_control == "spring":
+            k = dict(zip(("hip", "thigh", "calf"), args.spring_k))[segment]
+            c = dict(zip(("hip", "thigh", "calf"), args.spring_c))[segment]
+            sim.setObjectInt32Param(handle, sim.jointintparam_dynctrlmode, sim.jointdynctrl_spring)
+            sim.setObjectFloatParam(handle, sim.jointfloatparam_kc_k, float(k))
+            sim.setObjectFloatParam(handle, sim.jointfloatparam_kc_c, float(c))
+        else:
+            sim.setObjectFloatParam(handle, sim.jointfloatparam_pid_p, args.pid_p)
+            sim.setObjectFloatParam(handle, sim.jointfloatparam_pid_d, args.pid_d)
+        if args.max_joint_vel is not None:
+            # Bullet exposes NO joint damping or friction parameter (only pospid1/2/3, cfm, erp),
+            # so the system-identified viscous+Coulomb terms that make this same CPG walk in MuJoCo
+            # -- +1.997 m on b1_flat_real.xml vs -0.234 m on the uniform-physics b1_flat.xml, same
+            # seed -- cannot be expressed here at all. A velocity ceiling is not friction, but it
+            # bounds the same overshoot the damping term would otherwise absorb. The scene ships
+            # 15.6-23.3 rad/s while the gait uses ~1.6.
+            sim.setObjectFloatParam(handle, sim.jointfloatparam_maxvel, float(args.max_joint_vel))
         sim.setJointMaxForce(handle, MAX_FORCE[segment])
         sim.setJointPosition(handle, float(target))
         sim.setJointTargetPosition(handle, float(target))
@@ -532,8 +736,12 @@ def main():
                 pairing=args.generic_trot_pairing,
                 thigh_sign_layout=args.generic_thigh_sign_layout,
                 noise=args.noise, rng=rng)
-        elif args.cpg_mode == "generic" and args.generic_gait_shape == "coupled-duty":
-            action = generic_coupled_duty_action_at(
+        elif (args.cpg_mode == "generic"
+              and args.generic_gait_shape in ("coupled-duty", "smooth-duty")):
+            shape_fn = (generic_smooth_duty_action_at
+                        if args.generic_gait_shape == "smooth-duty"
+                        else generic_coupled_duty_action_at)
+            action = shape_fn(
                 step * dt, frequency=generic_parameters["frequency"],
                 amplitude=base_amplitude, coupling_ratio=args.generic_coupling_ratio,
                 duty_factor=args.generic_duty_factor,
@@ -542,7 +750,11 @@ def main():
                 thigh_sign_layout=args.generic_thigh_sign_layout,
                 noise=args.noise, rng=rng,
                 hip_ratio=args.generic_hip_ratio,
-                hip_bias=(np.asarray(args.generic_hip_bias) if args.generic_hip_bias else None))
+                hip_bias=(np.asarray(args.generic_hip_bias) if args.generic_hip_bias else None),
+                hip_sign_layout=args.generic_hip_sign_layout,
+                hip_phase=args.generic_hip_phase,
+                hip_clock=args.generic_hip_clock,
+                stance_calf_bias=args.generic_stance_calf_bias)
         elif args.cpg_mode == "generic":
             action = generic_cpg_action_at(step * dt, noise=args.noise, rng=rng,
                                            **generic_parameters)
@@ -598,8 +810,15 @@ def main():
     body_motion = np.concatenate([body_v, body_yaw], axis=1)
     interior = slice(max(1, int(round(0.5 / dt))), -max(1, int(round(0.5 / dt))))
     mean_motion = body_motion[interior].mean(0)
+    quality = motion_quality_metrics(actions, targets, actuals, contacts, foot_positions, dt)
     print(f"body-frame mean Froude: forward={mean_motion[0]:+.4f} "
           f"lateral={mean_motion[1]:+.4f} yaw={mean_motion[2]:+.4f}")
+    print("motion quality: "
+          f"joint_acc_rms={quality['joint_acc_rms']:.3f} "
+          f"jerk_rms={quality['joint_jerk_rms']:.3f} "
+          f"contact_switches/s={quality['contact_switches_per_second']:.2f} "
+          f"support_mean={quality['support_count_mean']:.2f} "
+          f"support_<=1={quality['support_frac_0_or_1_feet']:.2f}")
 
     out = os.path.abspath(args.out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -616,6 +835,7 @@ def main():
         "dominant_family": ("forward", "lateral", "yaw")[int(np.argmax(np.abs(mean_motion)))],
         "view": "egocentric" if args.ego else "allocentric",
         "claim_scope": "designed_cpg_primitives_not_undirected_babble",
+        "motion_quality": quality,
     })
     if args.cpg_mode == "generic":
         config["claim_scope"] = "generic_quadruped_cpg_plus_per_step_motor_noise"
@@ -644,6 +864,7 @@ def main():
         body_motion=body_motion, foot_contact=np.asarray(contacts),
         foot_pos=np.asarray(foot_positions),
         joint_targets=np.asarray(targets), joint_pos=np.asarray(actuals), dt=dt,
+        motion_quality=np.asarray(yaml.safe_dump(quality, sort_keys=False)),
         expert_episode=np.int64(0),
         condition=(f"coppelia_generic_cpg_s{args.seed}" if args.cpg_mode == "generic" else
                    f"coppelia_babble_f{args.freq}_n{args.noise}_tb{args.turn_bias}"

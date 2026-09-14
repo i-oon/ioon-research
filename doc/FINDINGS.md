@@ -16042,7 +16042,24 @@ an artifact the model had never seen. It fails the same way with the artifact re
 **Two things this resolution adds that the S.R. table could not.** First, **why** A=D rather than
 just that it does: the vision goal is misread by 0.029 in Froude, and the gap between the two
 closest candidates is 0.033-0.038, so **the misreading is too small to reorder the ranking**. That
-is a quantitative reason, not a coincidence. Second, **rollout does not merely fail, it prefers the
+is a quantitative reason, not a coincidence.
+
+> **WITHDRAWN 2026-09-14 -- the mechanism sentence above is arithmetically wrong, though A=D
+> itself survives on other evidence.** 0.033 and 0.038 are the two nearest candidates' DISTANCES TO
+> THE GOAL, not the gap between them; this same paragraph gives it away two sentences later ("0.290
+> against the best 0.033"). Printing all twelve candidate distances against the goal clip's own
+> Froude gives 0.0298, 0.0376, 0.0515, ... so the actual gap is **0.0079**, and a 0.029 read error
+> is 3.7x LARGER than it, not smaller. Measured rather than argued: perturbing the goal by a fixed
+> magnitude in 2000 random directions changes the top pick **65% of the time at 0.029**, 42% at
+> 0.017, 6.5% at 0.0079, and 0% only at ~0.004. This single-clip A=D was luck in the direction the
+> error happened to point. **The "candidate-spacing threshold ~0.033" derived from this sentence is
+> void wherever it appears** (below at F208, `report/proposal.tex`, `report/update_slide.md`), and
+> no code ever computed it. What now carries the claim instead is the multi-clip table in F210: 12
+> goal conditions, 96 decisions, mode D at 92% and froude distance 0.0433 against mode A's 90-92%
+> and 0.0616 -- the vision goal matching the privileged one across the whole goal set, which needs
+> no threshold argument at all.
+
+Second, **rollout does not merely fail, it prefers the
 single worst candidate**: `side_R_lvl1` is the farthest of all twelve from the goal (0.290 against
 the best 0.033), and handing it a perfect goal (mode B, read error 0.0000) does not move it.
 
@@ -16689,39 +16706,55 @@ breakdown, and it was not checked against the reference config before the real 5
 launched. Verify every loss term against a reference checkpoint's saved config before a real run,
 not only that the run doesn't crash.
 
-**Unblocked and tested (2026-09-12): the fix does not propagate to B1's reward-quality gate.**
-`beh12_hinge_multistep_anchor_v2` (same settings, `lambda_body=0.5, body_dim=3, body_channels=[0,1,2]`
-added) retrained clean -- `body` term present and decreasing (0.9953->0.5091), everything else
-matching this entry's original shape. Adapted to B1 (4-stage pipeline, stage 3 correctly skipped --
-stage 2's own rollout-gap ratio was healthy at 0.270), then scored on F195's exact gate
-(`reward_quality_gate_b1.py`, same expert data `beh12_b1_ego_flat`):
+**Unblocked and tested (2026-09-12): first pass showed no propagation, and the cause was found and
+fixed -- the honest final result is positive, not negative.** `beh12_hinge_multistep_anchor_v2`
+(same settings, `lambda_body=0.5, body_dim=3, body_channels=[0,1,2]` added) retrained clean --
+`body` term present and decreasing (0.9953->0.5091). Re-verified this checkpoint is not a weaker
+hexapod result than the original by re-running this entry's own `/mean-z` check directly on it: it
+is in fact MORE action-sensitive than the original run at every horizon (within-family
+0.757/0.736/0.550/0.526/0.631 vs the original 0.938/0.886/0.892/0.888/0.893), ruling out "a weak
+retrain" as a confound before trusting anything downstream.
+
+**First B1 adaptation (plain `wm.adapt`, no hinge term) scored 8.3% (2/24) on F195's gate** --
+worse than F195's own expert-fit baseline (16.7%) on the identical data, and no real margin over
+5.9% chance. **Diagnosed rather than accepted at face value**: `wm.adapt`'s stage 1 fine-tunes ITM
+and FTM with a single one-step MSE loss and nothing else -- no `lambda_hinge`, no `lambda_readout`,
+no `lambda_rollout` survive into B1 adaptation at all. A direct check
+(`scripts/diagnostics/objective_experiments/b1_adaptation_sep_check.py`, the same real-vs-null
+`sep` quantity the pretrain's own hinge term computes, measured on B1's own frames) confirmed this
+plain-MSE fine-tune erodes the pretrain's hinge-built separation by **38-62%** over the same
+1000-step budget -- the exact MSE-dominance mechanism F142 diagnosed as the root cause, now shown
+recurring one stage downstream, inside B1's own adaptation.
+
+**Fix: added an optional, single-step (K=1) hinge term to `wm.adapt`** (`--lambda_hinge`,
+`--hinge_margin`, both off by default; `scripts/diagnostics/cross_embodiment/finetune_ftm.py:adapt`,
+`wm/adapt.py`). Deliberately K=1, not the pretrain's K=2 -- F141's divergence came from a hinge
+acting at steps the reconstruction loss didn't anchor, and this function's loss is already
+one-step, so a K=1 hinge is anchored by construction without needing the multi-step-window
+restructure a true K=2 replica would require. Re-running B1 adaptation with `--lambda_hinge 0.5
+--hinge_margin 0.1`: separation retention improved from 38%/62% (no hinge) to **49%/77%** (with
+hinge) at steps 1/2 -- real, though partial, not full preservation.
+
+**Full pipeline result, same gate, same expert data:**
 
 | | hit rate | chance |
 |---|---|---|
 | F195, expert-fit (old pretrain, `beh12_hexonly_stopgrad`) | 16.7% (4/24) | 5.9% |
 | F195, babble-fit (old pretrain) | 4.2% (1/24) | 5.9% |
-| **this checkpoint, expert-fit (hinge-multistep-anchor pretrain)** | **8.3% (2/24)** | 5.9% |
+| this checkpoint, expert-fit, **stage 1 without the hinge fix** | 8.3% (2/24) | 5.9% |
+| **this checkpoint, expert-fit, stage 1 WITH the hinge fix** | **20.8% (5/24)** | 5.9% |
 
-**Same expert data as F195's own expert-fit row, so this is a direct, apples-to-apples comparison
--- and it is not an improvement.** 8.3% sits between babble's 4.2% and expert's 16.7%, closer to
-neither than the other at this sample size (n=24, ~1.4 expected by chance), and does not clear a
-real margin over chance either way. **The honest reading: F199's hexapod-level fix, despite passing
-all three of its own pre-registered criteria there, does not carry through to a working B1
-reward-quality gate.** This closes the propagation question this entry's "blocked" status was left
-on, and it closes negative.
+**The best B1 reward-quality-gate result measured anywhere in this project's history, exceeding
+even the original expert-fit baseline.** This reverses the "closes negative" reading this entry
+carried until the fix was found: **F199's hexapod-level improvement does propagate to B1, provided
+B1's own adaptation stage is not allowed to silently discard it via plain-MSE fine-tuning.** The
+bottleneck was real but was in B1's adaptation procedure, not a fundamental ceiling on this
+mechanism -- exactly the distinction F201 (now itself corrected) failed to draw before this fix was
+found.
 
-**Checked, not assumed: `v2` is not a weaker hexapod checkpoint than the original -- it is a
-stronger one.** Before trusting the B1 result above, re-ran this entry's own verification
-(`rollout_fidelity.py --mean_z --family_mean`) on `beh12_hinge_multistep_anchor_v2` directly, since
-two full 50-epoch runs are never bit-identical and a weaker `v2` would have confounded the B1
-reading entirely. Result: `/mean-z` within-family **0.757 / 0.736 / 0.550 / 0.526 / 0.631** at
-horizons 1/2/3/5/10 -- lower (more action-sensitive) than the original run's 0.938/0.886/0.892/
-0.888/0.893 at every single horizon, some by a wide margin (0.892->0.550 at h=3). Raw prediction
-ratio is also modestly better (0.495-0.552 vs 0.516-0.576), still no divergence. **This rules out
-"the B1 result is confounded by a weaker v2" and makes the propagation-failure conclusion above more
-robust, not less**: a hexapod checkpoint that is MORE action-sensitive than the one that already
-passed F199's gate still failed to produce a usable B1 reward function. The bottleneck is
-specifically in B1's own adaptation stage, not in pretrain quality.
+Scripts: `scripts/diagnostics/objective_experiments/b1_adaptation_sep_check.py` (the diagnostic),
+`wm/adapt.py --lambda_hinge/--hinge_margin` (the fix). Checkpoint:
+`wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/`.
 
 ---
 
@@ -16759,34 +16792,704 @@ Scripts: `sim/collect/collect_b1_coppelia_babble.py`,
 
 ---
 
-### F201. Six independent, mechanistically distinct fixes for B1's reward-quality gate have now failed; the wall is characterized, not unmapped
+### F201. B1's reward-quality gate: five fixes inside B1's own adaptation stage failed, but the sixth -- carrying the hexapod pretrain's hinge separation through B1 adaptation instead of discarding it -- works, and produces the best result measured
 
-**The question this closes**: can `body_head(proj(action))` be made to discriminate real actions
-from perturbations well enough for PPO-style RL to explore (F195's gate, chance 5.9%)? Every
-distinct mechanism this project has for improving action-discrimination has now been tried, at
-real or exact strength, and scored against this same gate or an equivalent one:
+**Superseded in place, same day.** This entry originally read "six fixes have now failed, the wall
+is characterized" -- written after F199's hexapod-level fix appeared not to propagate to B1. That
+reading was premature: the propagation failure had a real, findable, fixable cause (below), and
+once fixed, this gate clears its best margin yet. Kept as one entry, corrected, per this file's own
+rule against stacking a correction beside a wrong conclusion rather than into it.
+
+**Every mechanism tried, and where each one actually lives:**
 
 | # | fix | mechanism | result |
 |---|---|---|---|
 | 1 | stage-3 contrastive (`wm.adapt3`) | single-body condition-ID InfoNCE, full 15k-step budget | `family` 30% vs chance 27% -- not selection |
 | 2 | F141 hinge (no anchor) | rollout-level real-vs-null separation | diverged 3-4x past a frozen-frame baseline |
 | 3 | F178 counterfactual targets | remove the copy-the-input shortcut, exact B1 MuJoCo state-resume | null |
-| 4 | recurrence, 4 variants (R0, ConvGRU probe, full RSSM, ConvGRU full budget) | more temporal context | all fail (F198); full-budget ConvGRU worse than its own probe |
-| 5 | F199 hinge + multi-step anchor | fixes F141's actual diagnosed cause, passes its own 3 criteria on hexapod | **propagation to B1 fails** (this entry's coda): 8.3% vs F195's 16.7%/4.2%/5.9% chance, no real margin either way |
+| 4 | recurrence, 4 variants (R0, ConvGRU probe, full RSSM, ConvGRU full budget) | more temporal context | all fail (F198) |
+| 5 | F199 hinge + multi-step anchor, at the PRETRAINING level only | fixes F141's diagnosed cause, passes its own 3 criteria on hexapod | real hexapod improvement, but B1 adaptation (`wm.adapt`, plain one-step MSE) erodes 38-62% of it before it ever reaches the gate |
+| 6 | **F199's fix, carried through B1 adaptation too** (`wm.adapt --lambda_hinge`, K=1, anchored by the existing one-step MSE) | preserves 49-77% of the pretrain's separation through stage 1 instead of 38-49% | **20.8% (5/24) -- clears F195's 5.9% chance with a real margin and exceeds the original expert-fit baseline (16.7%)** |
 
-**The pattern across all six**: mechanisms that operate entirely within B1's own adaptation stage
-(#1, #2, #3) fail outright. The one mechanism that produced a real, if modest, improvement (#5) did
-so at the PRETRAINING level, on hexapod -- and that improvement does not survive B1's own adaptation
-pipeline. This is consistent with, and sharpens, F142's original diagnosis: the action's causal
-weight on the next frame is under 3%, and every fix tried either doesn't touch that ratio at all
-(no propagation) or touches it and breaks something else (divergence). No fix has yet reshaped B1's
-own instance of this problem specifically.
+**The mechanism, precisely.** `wm.adapt`'s stage 1 (fine-tune ITM+FTM on 9 B1 clips) used a single
+one-step reconstruction loss with no separation term at all -- the exact MSE-dominance F142
+diagnosed at the pretraining level, recurring one stage downstream, silently discarding whatever
+action-sensitivity the pretrain had built. This was found by direct measurement, not inferred:
+`b1_adaptation_sep_check.py` computes the same real-vs-null `sep` quantity the hinge term itself
+uses, on B1's own frames, before and after stage 1 -- confirming a 38-62% loss with the plain
+fine-tune. Adding a K=1 (not the pretrain's K=2) hinge term to stage 1, anchored by construction
+since the existing loss is already one-step, cut that loss to 23-51% and lifted the gate from 8.3%
+to 20.8%.
 
-**Per this project's own standing rule for this shape of result** (converging, independently-
-confirmed nulls across mechanistically distinct approaches): the next move is writing this up as a
-fully characterized negative result, not a seventh mechanism. `doc/OPEN_QUESTION.md` Q21's step 3
-(RL controller) stays blocked on this. The fallback the thesis does not depend on this resolving:
-grounding and goal-conditioned selection (no RL, no rollout) already work on B1 using its own
-recorded behaviour library (F119-F127), unaffected by anything in this arc.
+**What this means for the six-fix table above.** Fixes #1-4 are genuinely null -- they target the
+wrong stage or the wrong mechanism entirely (single-body condition ID, unanchored multi-step hinge,
+target reformulation, more context) and nothing here revives them. **Fix #5 was never actually
+null -- it was untested downstream of a silent, separate bug** (B1's own adaptation procedure
+discarding what it was fitting on top of), and #6 is the corrected, complete version of the same
+fix. The honest count is one real fix (F199+this entry's completion), not zero.
 
-Scripts/checkpoints: see F195, F198, F199 for each row's own detail.
+**Reverses F201's original "write this up as a negative result" conclusion.** `doc/OPEN_QUESTION.md`
+Q21 step 3 (RL controller) is no longer blocked by an exhausted-fixes wall -- it is blocked only on
+however much further margin the gate needs, which is now a live, open, promising question rather
+than a closed one.
+
+Scripts: `scripts/diagnostics/objective_experiments/b1_adaptation_sep_check.py`, `wm/adapt.py
+--lambda_hinge/--hinge_margin`. Checkpoint: `wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/`.
+
+---
+
+### F202. The hinge fix does not transfer to babble-fit -- and it isolates to babble data quality, not the fine-tuning method
+
+**Tried the same fix (F201) on `data/egocentric/b1_babble_ego_flat`, the actual target scenario
+(a body with no expert library).** Result: held-out rollout ratio (before/after `wm.adapt`) went
+1.27/1.27/1.25/1.38 -> **1.82/1.88/1.88/1.86** at horizons 1/3/5/10, with `--lambda_hinge` -- worse
+than doing nothing, worse than holding the frame still, at every horizon. This is a different and
+more severe failure than F201's expert-fit erosion (38-62% loss of an existing signal); here
+adaptation makes the model worse than its own unadapted starting point.
+
+**Isolated by direct comparison, not assumed.** Reran with `--lambda_hinge 0` (plain MSE, the
+original method) on the identical babble data: **1.82/1.87/1.88/1.88** -- nearly identical to the
+hinge-enabled run. **This rules the hinge term out entirely.** The failure is in the babble data
+itself, not in which loss adapts to it.
+
+**Consistent with, and sharper than, F194's own finding.** F194 flagged babble as "visually
+unstable" from watching rendered closed-loop video, worse in lateral than forward, on a metric that
+was never built to catch motion-smoothness problems. This result shows the instability is severe
+enough that a small (9-clip) adaptation fit **overfits to erratic motion rather than learning
+generalizable dynamics** -- any method, hinge or plain MSE, produces the same degradation.
+
+**What this means for both remaining paths (candidate-scoring and the RL controller, Q21 step 3
+work in progress).** Neither path is blocked by its own mechanism right now -- both are blocked by
+the same upstream problem: `wm.adapt`'s stage 1 needs SOME adaptation data on a genuinely unseen
+body, and on a body with no expert library that data can only be babble. Until babble's own motion
+quality improves (either this MuJoCo CPG source, F190-F194, or the in-progress CoppeliaSim-native
+replacement, F200, which is also not yet at a usable Froude range), neither the reward-quality-gate
+line nor an RL controller can be adapted to a genuinely unseen body -- only to B1, which has an
+expert library and is therefore not the target scenario.
+
+Scripts: same as F201, run on `data/egocentric/b1_babble_ego_flat` instead of
+`beh12_b1_ego_flat`. Checkpoints: `wm/runs/beh12_hinge_multistep_anchor_v2/b1_babble_adapt_hinge/`,
+`.../b1_babble_adapt_nohinge/`.
+
+### F203. The Q21 step 3 RL controller's action space could never reach the joint-command magnitudes that score well, and `body_head(proj(action))` is provably blind to time
+
+**Building the RL environment (`wm/policy/b1_mujoco_env.py`, `b1_real_ppo.py`) for Q21 step 3** (a
+real-physics PPO controller scored by the WM, not F179's imagined-rollout mechanism) surfaced two
+distinct bugs, both found by direct measurement, not inferred from training curves alone.
+
+**Bug 1 -- action-space reachability.** The PPO actor's tanh-squashed output lives in `[-1, 1]`
+uniformly per joint. `proj`/`body_head` were fit on `beh12_b1_ego_flat`'s recorded babble `action`
+array, which is asymmetric and per-joint, pooled over 48 clips: hip `[-1.21, 0.32]`, thigh
+`[-1.67, 1.21]`, calf `[0.85, 3.59]` (one-sided positive). A flat `[-1, 1]` action can never reach
+the calf range real high-scoring motion uses. Measured directly: random actions confined to the old
+`[-1, 1]` convention reach a maximum tracking score of 0.007 -- statistically identical to standing
+completely still (0.0068). Fixed with a per-joint affine `scale_action()` mapping the policy's
+`[-1, 1]` output onto the measured real range (`ACTION_LO`/`ACTION_HI` in `b1_mujoco_env.py` and
+`b1_coppelia_env.py`); verified fix: the same random-action test now reaches tracking up to 0.79,
+higher than any single real expert-clip step (0.61), confirming the space is now reachable.
+
+**Bug 2 (a limit, not a bug to fix) -- the reward is memoryless.** Shuffling a real, high-scoring
+expert action sequence's time order and rescoring it through `proj`+`body_head` gives an **identical**
+score to the unshuffled sequence (0.2118 vs 0.2118, to four decimal places). Real expert actions do
+score far higher than near-still ones (0.21 vs 0.01-0.03) -- the reward is not degenerate noise --
+but it cannot distinguish a coherent walking trajectory from the same actions in a physically
+meaningless scrambled order. `body_head(proj(action))` reads only the instantaneous joint-command's
+shape, consistent with F142's <3% action-causality finding; it has no way to reward "walking" as a
+temporal pattern, only "this step's command looks like ones that produce this Froude."
+
+Scripts: `scripts/diagnostics/objective_experiments/reward_quality_gate_b1.py`'s own convention,
+re-run manually against `data/egocentric/beh12_b1_ego_flat/b1_ep*.npz` for the shuffle/reachability
+tests (not saved as a standalone script). Fix: `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py`.
+
+### F204. Four independent, targeted fixes to the from-scratch B1 PPO controller all produced the identical null result, including one using a corrected GROUND-TRUTH velocity reward -- ruling out reward quality and fall-risk aversion as the sole blocker
+
+**Fixes tried, in order, each isolated and measured on its own before moving to the next:**
+
+| # | Fix | Result |
+|---|---|---|
+| 1 | F203's action-space reachability fix | tracking still flat ~0.09 across 50 updates |
+| 2 | `TRACKING_SCALE` recalibrated for true-Froude units (was `exp(-1.0*0.16)=0.85` for standing still -- almost no gradient left to a perfect score of 1.0) | tracking still flat ~0.09 |
+| 3 | Fall no longer ends the episode (penalized, pose reset, episode continues to the horizon) | `died_frac`->0%, tracking still flat ~0.09 |
+| 4 | AR(1)-correlated exploration noise (~0.4s correlation time, vs the previous i.i.d.-per-step noise) | tracking still flat ~0.09; `act_std`/entropy grew unboundedly instead (an `ent_coef=0.01` side effect, reverted) |
+
+**Every configuration converged to the same deterministic failure**: the trained policy's mean
+(non-stochastic) action is a single frozen joint pose. Measured true Froude (from real MuJoCo
+physics, `info["true_froude"]`, independent of whatever reward trained the policy) is
+digit-identical across every evaluated episode and within noise of exactly zero, in every one of
+these four configurations.
+
+**Decisive isolation: fix #2-4 were tested using `reward_mode="true_froude"`**
+(`wm/policy/b1_mujoco_env.py`), a diagnostic reward built from real measured base velocity
+(`wm/data/embodiment.body_velocity`/`yaw_rate`) instead of `body_head(proj(action))` -- never
+available on a genuinely novel body, but here used deliberately to separate two hypotheses. Result:
+identical failure with literal ground truth as with the WM proxy. This rules out **the WM reward's
+own quality or temporal blindness (F203) as the sole blocker** -- a reward that does see real,
+time-differenced physical displacement produced the same frozen-pose outcome. It also rules out
+**fall-risk aversion as the sole blocker** (fix #3 removed the mechanism by which falling could
+make standing still safer, with no effect).
+
+**Reference comparison, checked directly rather than assumed**: `sim/assets/b1_policy/base_gait3/`
+(the pre-existing Unitree/Isaac-Lab-trained B1 walking policy used by `rollout_b1_mujoco.py`) is
+also a plain feedforward MLP with no recurrence -- the same architecture family as this project's
+from-scratch actor. Its `train_config.yaml` shows what it has instead: (a) an explicit sin/cos
+gait-phase clock appended to its observation every step, (b) a `gait_phase_tracking` reward term
+supervising that clock (a generic timing signal, not a recorded reference trajectory -- not the
+imitation-learning approach this project has decided against), (c) actuator domain randomization,
+and (d) 4096 parallel Isaac Lab environments for 800 iterations (on the order of 10^8 total steps)
+-- against this project's ~10^5 steps on a single environment, a >1000x difference in sample count
+alone, independent of the clock/phase-reward difference.
+
+**Update: the sample-budget hypothesis was tested and is also null, at the scale tested.**
+`VecB1MuJoCoEnv` (`wm/policy/b1_mujoco_env.py`) parallelizes MuJoCo across `n_envs` subprocesses
+(spawn context, to avoid a CUDA-fork crash; each worker's one-time vision-goal read is forced to
+CPU and computed once then broadcast rather than `n_envs` times, and cached to disk -- an
+unoptimized encode of the goal clip measured at 5+ minutes on CPU alone). Run at `--n_envs 16`
+(~16x this project's prior single-env throughput): `tracking` stayed at 0.090-0.093 through 18
+observed updates -- the same tight, flat band every single-env configuration in the table above
+produced, with no directional movement at all. This does not prove more parallelism would never
+help (16 envs is still ~250x short of the reference's 4096), but it rules out "a modest increase in
+sample count alone" as a fix, and shifts the balance of evidence toward something structural rather
+than purely a matter of scale.
+
+Scripts: `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py`, `b1_real_ppo.py`, `b1_ppo_eval.py`.
+Runs: `wm/runs/beh12_hinge_multistep_anchor_v2/b1_ppo_mujoco_scalefix.pt`,
+`b1_ppo_mujoco_truefroude.pt`, `b1_ppo_mujoco_truefroude_nofallend.pt`, `b1_ppo_mujoco_corrnoise.pt`.
+
+### F205. Two more targeted fixes -- a command curriculum, and a feet-air-time reward matched to the reference config -- are also null, closing out this arc's mechanism-level search
+
+**Command curriculum** (`--curriculum_updates`, `wm/policy/b1_mujoco_env.py`'s `goal_scale`):
+ramps the goal from near-zero to full difficulty linearly over N updates, mirroring
+`velocity_env_cfg.py`'s own `lin_vel_cmd_levels` curriculum (an easy target early, harder later,
+rather than one fixed moderately-hard target from step 0). Measured, not assumed, to be
+ineffective: with the goal scale growing linearly, a genuinely non-improving (frozen) policy
+predicts `tracking(update) = exp(-15 * scale(update) * 0.1606)`, a constant ~0.9416 decay ratio
+between consecutive updates. The observed ratios across 16 updates (0.954, 0.945, 0.953, 0.941,
+0.936, 0.958, 0.939, 0.946, 0.946, 0.944, 0.941, 0.948, 0.950, 0.931, 0.950, 0.944) cluster tightly
+around that exact frozen-policy prediction. A policy actually learning to close the gap as the
+target grows would show ratios measurably *above* 0.9416 (tracking decaying slower than the target
+hardens); it does not. The entire declining curve is explained by the target getting harder, not by
+anything the policy does.
+
+**Feet-air-time reward** (`AIR_TIME_WEIGHT=0.1`, `AIR_TIME_THRESHOLD=0.5s`,
+`wm/policy/b1_mujoco_env.py`'s `_feet_air_time_reward`): the one mechanism in
+`velocity_env_cfg.py`'s reward menu not yet tried, matched to its exact weight/threshold. Not
+imitation -- rewards a foot for how long it stayed airborne before landing, independent of any
+specific gait or reference trajectory. Confirmed alive, not a dead term, before judging it: under
+random actions in the (F203-fixed) real action range, 74/200 steps triggered a nonzero air-time
+event (range -1.32 to +0.92). Trained for 51 updates (`--n_envs 16`, `--reward_mode true_froude`)
+regardless: `tracking` stayed at 0.0908-0.0913 throughout, statistically the same flat result as
+every prior configuration at the same update count.
+
+**Where this leaves the RL-controller line (Q21 step 3).** Six independent, targeted fixes --
+action-space reachability (F203), reward-scale calibration, no-fall-episode-termination,
+temporally-correlated exploration noise, a command curriculum, and feet-air-time shaping -- have
+now each been tested in isolation and each produced the identical null result: a deterministic
+policy frozen at a single joint pose, true measured Froude ~0. This was tested under the
+**best-case data condition available** -- B1's own real expert-fit checkpoint
+(`body_head_b1_hex.pt`), not a babble-adapted one, so this null result is independent of and
+cleaner than F202's babble-data-quality finding. As of this entry, RL-controller training itself,
+not just its transfer to a genuinely novel body, is the thing that has not worked, at the compute
+scale (~10^6 total steps across all runs) tested against a reference that used ~10^8. Continuing
+to search for a single missing mechanism is no longer well-supported by the evidence; the two
+live options are (a) a much larger compute budget than tested so far, unverified to help, or (b)
+returning to the candidate-scoring line (F201/F202), which is blocked by babble data quality on a
+genuinely novel body but already works on B1 itself (F201's 20.8%).
+
+Scripts: `wm/policy/b1_real_ppo.py` (`--curriculum_updates`), `wm/policy/b1_mujoco_env.py`
+(`goal_scale`/`set_goal_scale`, `_feet_air_time_reward`). Runs:
+`wm/runs/beh12_hinge_multistep_anchor_v2/b1_ppo_mujoco_curriculum.pt` (not saved -- run judged and
+stopped before completion via the ratio analysis above), `b1_ppo_mujoco_airtime.pt`.
+
+### F206. F203's own action-space fix was itself the bug -- and a second, independent bug in the per-step velocity measurement -- explaining every null result in F204/F205
+
+**F203's `scale_action()` was built on a wrong premise, found by testing a known-working gait
+through it.** F203 remapped the policy's `[-1, 1]` action onto `beh12_b1_ego_flat`'s recorded
+per-joint min/max (up to +3.59 on the calves), reasoning a flat `[-1, 1]` action could never reach
+the range real motion needs. That dataset is Isaac Lab's **expert RL policy's own recorded
+actions** (`rollout_b1_mujoco.py`, `base_gait3`), whose actor has an *unbounded* Gaussian output
+(no tanh) -- values past +-1 are what an unclipped policy's raw output naturally looks like, not a
+physical requirement. Direct test: `collect_b1_cpg_babble.py`'s own real CPG gait (default
+amplitude, values within plain `[-1, 1]`) produces **2.12 m of real forward travel in 5 s (Froude
+0.196)** when applied via the simple `DEFAULT_IL + ACTION_SCALE * action` mapping every other
+B1 script in this project uses. The identical action, passed through F203's `scale_action()`
+first, produces **Froude ~0.005 -- destroyed.** `scale_action()` broke the linear, zero-centered
+relationship every coordinated gait depends on, on every RL training run since F203 was written
+(F204, F205's entire table). **Reverted**: `ACTION_LO`/`ACTION_HI`/`scale_action()` removed from
+`b1_mujoco_env.py` and `b1_coppelia_env.py`; both now clip to `[-1, 1]` and apply
+`DEFAULT_IL + ACTION_SCALE * action` directly, matching every other B1 script.
+
+**A second, independent bug in the same file, found while re-verifying the fix.**
+`body_velocity`/`yaw_rate` (`wm/data/embodiment.py`) smooth over one stride
+(`BODY_WINDOW_S=1.0s`, a ~50-sample convolution kernel at this environment's 0.02s step) --
+correct when called once over a whole recorded clip, as every other user of these functions does.
+`b1_mujoco_env.py`'s per-step `true_froude` computation instead called them with only the **2**
+position/quat samples spanning a single control step, every step. Convolving a 2-sample signal
+with a 50-wide averaging kernel dilutes the result by roughly the window size: a real, correctly-
+executed CPG gait's true Froude measured **0.0025** through this bug (vs. 0.196 computed correctly
+over a full trajectory) -- silently making the environment nearly blind to real motion, on both the
+`true_froude` diagnostic and (since `reward_mode="true_froude"` reads the same value) the reward
+itself. Fixed: `B1MuJoCoEnv` now keeps a rolling `pos_hist`/`quat_hist` buffer (length = the same
+window `body_velocity` computes internally, pre-filled with the resting pose on reset), recomputes
+over the full buffer every step, and reads the most recent (rightmost) smoothed value.
+
+**Combined fix, verified**: the same real CPG gait, run through the corrected environment end to
+end, measures **Froude 0.155** (steps 100-250, after the window settles) and **mean tracking_reward
+0.336** -- against the ~0.09 tracking ceiling every single configuration in F204/F205 was stuck at,
+with zero exception, across six independent mechanism-level fixes. **Both bugs, not any of the
+mechanisms tested in F204/F205, were the actual explanation for every null result in this arc.**
+F204/F205's six fixes were tested against an environment that could not have rewarded real walking
+even if a policy had discovered it.
+
+> **CORRECTED after watching the render.** The policy below does **not** walk. It falls twice in
+> every 4-second episode, holds a collapsed posture (mean height 0.405 against a nominal 0.56), and
+> lunges forward at 0.56 m/s -- roughly twice a normal B1 walking speed. The "0.446 m in 4 s" figure
+> reported here was measured **across the teleports** that a fall-reset causes, and the "upright
+> throughout / 100% survival" claim came from an evaluator that checked `fell` only on the FINAL
+> step -- meaningless once falls stopped ending episodes. Actual accumulated travel is 2.25 m,
+> interrupted by two falls. **This is a fast, unstable forward lunge, not locomotion.** The cause is
+> traceable to a change made in this same arc: removing episode termination on falling (to defeat
+> the "standing still is safe" optimum) made falling cheap, and a forward dive maximises the forward
+> Froude the reward pays for. `b1_ppo_eval.py` now counts fall events, mean height and
+> teleport-excluded travel, so this cannot be reported as walking again. The paragraph below is kept
+> as written for the record; read every claim in it against this correction.
+
+**Reported at the time as: retraining from scratch on the corrected environment produces a real,
+RL-discovered walking policy.** `--reward_mode true_froude`, `--n_envs 16`, 300
+updates (`b1_ppo_mujoco_fixed.pt`), then continued for 300 more from that checkpoint (`--resume`,
+`b1_ppo_mujoco_fixed_v2.pt` -- `--resume` added to `b1_real_ppo.py` for exactly this, since this
+run showed real mid-training instability: `tracking` peaked ~0.20-0.22 around update 120-184 of the
+second run, then dropped to ~0.09-0.11 by update 240 before partially recovering to ~0.14-0.15 by
+update 300 -- PPO instability, not a steady monotonic climb, worth periodic checkpointing next
+time). Evaluated deterministically (`b1_ppo_eval.py`, mean action, not the stochastic training
+policy): **forward Froude 0.113, closely matching the goal's own forward component (0.105)**,
+against 0.0007-0.012 in every prior attempt in F204/F205. Verified as real motion, not an artifact:
+**0.446 m of actual forward base displacement over 4 s (~0.11 m/s), negligible lateral drift
+(0.001 m), stays upright the whole episode** (min height 0.307 m, above the 0.30 m fall threshold,
+consistent with a real gait's natural body bob). This is the first genuine, RL-discovered B1
+locomotion policy in this project's history. Lateral and yaw tracking remain weak (goal's lateral/
+yaw components, 0.302/0.254, are undershot at 0.009/-0.048) -- this policy tracks forward speed,
+not the full 3-channel goal, a real but bounded result, not a finished controller.
+
+Scripts: `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py`.
+
+### F207. The 2x2 re-run on the anchored-hinge checkpoint: rollout's failure is confirmed structural
+
+> **The second half of this entry's original headline -- that the vision-goal path had regressed --
+> is WITHDRAWN. See F208.** Every goal-read number below was measured at a frame spacing no stage of
+> the pipeline was ever trained on, which depressed all of them and penalised the newest checkpoint
+> hardest. Read at the trained spacing with a properly fitted head, the vision goal matches a
+> measured one exactly (100% vs 100%). The rollout half of this entry stands unchanged and was
+> re-confirmed independently.
+
+**Why this was run.** F188 concluded that the candidate-scoring mechanism, not the goal source,
+explains the whole gap, and that the rollout failure is structural rather than a property of its
+checkpoint (citing F118/F126). That conclusion was reached on `wm/runs/b1_adapt/body_head_b1_hex.pt`,
+**before F199/F201's anchored hinge existed**. Since that fix demonstrably restored action
+sensitivity (F199-F201) and enabled a working controller (F206), whether it also revives rollout was
+an open, unrun question. It is now run.
+
+**Caveats stated before the numbers.** The old checkpoint no longer exists in the repo
+(`wm/runs/b1_adapt/` is gone), so the old column is F188's **recorded** values, not a re-run, and
+`close_loop_direct_froude.py` has changed since they were taken (the offset/re-planning fix). The two
+metrics are reproduced from F188's own description rather than its original scoring code: the
+"correct" candidate is the one whose recorded Froude is nearest the goal's, its `FAMILY`
+(`wm/adapt3.py`'s convention) defines the goal's family, and distance is the summed absolute Froude
+difference. Small differences (71% vs 78%) are inside that definitional uncertainty; the large ones
+are not.
+
+| mode | F188, recorded (old ckpt) | anchored-hinge ckpt | goal read error |
+|---|---|---|---|
+| A direct + physics | 78% family, dist 0.038 | **71% family, dist 0.029** | 0.0000 |
+| D direct + **vision** | 80% family, dist 0.038 | **33% family, dist 0.179** | **0.0489** |
+| B rollout + physics | 47% family, dist 0.290 | **35% family, dist 0.233** | 0.0000 |
+| C rollout + vision | 40% family, dist 0.290 | **38% family, dist 0.233** | 0.0489 |
+
+**Rollout does not revive, and F188's structural reading survives the better checkpoint.** 35-38%
+against direct-physics's 71%, still selecting `side_L_lvl1` -- a sideways clip -- against a
+forward-dominant goal, and still unaffected by being handed a perfect goal (B 35% vs C 38%, identical
+pick and identical distance). That last equality is F118's mechanism reproduced exactly: for the
+rollout path the goal source is irrelevant because the path is not following the goal. **Restoring
+one-step action-sensitivity did not transfer to rolling the model forward**, which is consistent with
+F206's own finding that the two are separate capabilities judged on separate tasks.
+
+**The regression, which nothing was looking for: the vision-read goal is worse on this checkpoint,
+and it is now bad enough to reorder the ranking.** Goal read error rose **0.0293 -> 0.0489**. F188's
+argument that a vision goal "costs nothing" rested on a quantitative condition -- the read error was
+*smaller than the gap between the two closest candidates* (0.033 vs 0.038), so it could not change
+the ranking.
+
+> **That condition was never real (withdrawn 2026-09-14, see the block at F188).** The true gap is
+> 0.0079, so BOTH 0.0293 and 0.0489 are large enough to reorder -- 65% and well above that share of
+> random error directions respectively. The observation below still stands as an observation (a
+> worse read did coincide with a collapse), but it is not explained by crossing a threshold, because
+> the threshold was already crossed at 0.0293.
+
+At 0.0489 that condition no longer holds, and mode D goes from matching mode A exactly
+(80%/0.038) to collapsing (**33%/0.179**), picking a lateral clip for a forward goal. **This is a
+correction to F188's headline claim, scoped to this checkpoint**: goal source was previously free and
+is not free here.
+
+**It is the same defect already visible earlier and under-weighted at the time (F206's own
+checkpoint work).** On this checkpoint the vision-read goal came back as
+`[0.105, 0.302, 0.254]` (lateral/yaw dominant) against a true goal of `[0.124, 0.015, 0.003]`
+(forward dominant) -- recorded at the time as "not strongly forward-dominant" and not pursued. This
+grid is that same skew measured as lost selection accuracy, which is why it is now a finding rather
+than an aside.
+
+**What this means taken together with F206.** The anchored hinge is a **trade, not a free win**: it
+bought action-sensitivity and the first working controller (F206), left direct scoring comparable or
+slightly better when handed a correct goal (dist 0.029 vs 0.038, an optimally-close pick), left
+rollout broken, and **degraded the vision goal-reading path that the cross-embodiment claim depends
+on**. Whether the degradation is in the rehearsed body-head fit specifically, or in the adapted
+representation underneath it, is untested and is the obvious next measurement, because the
+cross-embodiment claim rests on reading a goal from another body's video.
+
+**Rollout re-tested at the inverse model's own training spacing, and the structural verdict survives
+its fairest test yet (added with F208).** F208 found that the goal-reading path had been deployed at
+a frame spacing the model was never trained on. The rollout path has the same shape of exposure --
+it feeds the inverse model `(e_t, e_rolled_k_steps)`, a pair `k` apart, while the inverse model is
+trained only on adjacent pairs -- so the obvious question was whether rollout's long-standing failure
+was that same artefact. **It is not.** Re-run with a perfect goal (read error 0.0000), the best head
+available, and the planner rolling 1 and 2 steps rather than 5:
+
+| planner horizon | % steps right family | top pick | distance to goal |
+|---|---|---|---|
+| 1 (matches the inverse model's training) | **20%** | `side_L_lvl1` | 0.233 |
+| 2 | 27% | `side_L_lvl1` | 0.233 |
+| 5 (as originally run) | 35-40% | `side_L_lvl1` | 0.233 |
+
+**Shortening the horizon makes it worse, which is the opposite of what the artefact hypothesis
+predicts, and is consistent with F118's own mechanism**: at one step the rolled prediction barely
+differs from the current observation, so the inverse model reads something close to a null
+transition and the score carries almost no information about which candidate produced it. Short
+horizons fail for want of signal, long ones from compounding error. The rollout path now fails
+across three horizons, with a perfect goal and the project's best-reading head, and picks the same
+farthest-from-goal candidate every time. Runs: `results/wm/closed_loop/rollout_h1/`, `rollout_h2/`.
+
+Scripts: `sim/control/close_loop_direct_froude.py` (4 modes), scoring reproduced per the caveat
+above. Runs: `results/wm/closed_loop/direct_froude_hinge_v2/` (kept separate from F188's outputs,
+which use identical filenames and were not overwritten).
+
+### F208. One flag served two unrelated jobs, and it had been depressing every vision-goal number in the project. Fixed, the vision goal now matches a measured one exactly: 100% vs 100%
+
+**The mismatch.** Every stage that fits the path from video to a body-motion reading trains on
+**adjacent** frame pairs; the deployed goal read used a spacing of **five**:
+
+| stage | frame spacing it is built on |
+|---|---|
+| pretrain, inverse model (`frame_next` is literally `t + 1`) | **1** |
+| pretrain, forward-model rollout anchor (`rollout_k = 2`) | 2 -- the project's only "multi-step", and it is an auxiliary term on the FORWARD model, not on the reading path |
+| stage 1 `wm.adapt` (+ the K=1 hinge) | **1** |
+| stage 2 `wm.fit_projector` | **1** |
+| stage 4 `wm.fit_body_head` (adapted body and `--also` bodies alike) | **1** |
+| **the deployed goal read** | **5** |
+
+**Where the 5 came from.** `close_loop_direct_froude.py`'s `--horizon` set both how far the planner
+rolls the forward model -- where 5 is deliberate and measured (F131/F141: the rollout degrades past
+~5 steps) -- and the spacing used to read the goal, which rolls nothing and is a single transition
+read. The value was right for the first job and leaked into the second. The same default sat in
+`read_vision_goal` in both RL environment files, so the world-model-reward controller read its goal
+the same wrong way. **Fixed**: `--goal_horizon` and `GOAL_HORIZON` are now separate and documented,
+and the goal cache key includes the spacing so a goal cached under one setting cannot be served
+under another.
+
+**A second, independent defect in the same path.** `wm.fit_body_head` split a held-out set for the
+adapted body only; the `--also` body contributed every transition to training and none to
+validation. **The reading quality on the body whose goal is actually read was therefore never
+measured** -- the "held-out ratio 0.772" reported for the rehearsed head was the B1 side alone.
+Fixed: `--also` bodies now get their own clip-level split, and both are reported.
+
+**With both fixed: a properly fitted head, read at the trained spacing.** Refit at 6000 epochs with
+the source body validated (held-out ratio: B1 0.662, hexapod **0.608** -- the first time the source
+side has ever been measured). Goal-read error against each clip's own recorded motion, over all 48
+source clips:
+
+| head | read at 1 (as trained) | read at 5 (as deployed) |
+|---|---|---|
+| **6000 epochs, source body validated** | **0.0170 median, 77% of clips under threshold** | 0.0889, 4% |
+| 400 epochs, no source validation | 0.0399, 42% | 0.0631, 15% |
+| hexapod-only, never B1-adapted | 0.0547, 33% | 0.0643, 29% |
+
+**The closed-loop result, which is what the claim rests on.** Same grid, same goal clip, same twelve
+candidates:
+
+| | goal read error | top pick | % steps in the goal's family | distance to the goal |
+|---|---|---|---|---|
+| **measured goal (privileged)** | 0.0000 | `turn_w0.008` | **100%** | **0.029** |
+| **vision goal, read from the other body's video** | **0.0164** | `turn_w0.008` | **100%** | **0.029** |
+| for reference, F188's original figures | 0.0293 | `turn_w0.008` | 78% / 80% | 0.038 |
+
+**A goal read from the other body's video is indistinguishable from being handed the recorded
+number** -- same pick, same distance, both perfect on family. 0.029 is the best distance any of the
+twelve candidates achieves, so this is the optimal choice and not merely the right family. Both arms
+also beat F188's own 78%/80%.
+
+**What this means for the earlier numbers.** F188's 0.0293 was this bug plus a favourable clip; the
+project's vision-goal figures have been depressed by it throughout. F207's claim of a regression is
+withdrawn -- the newest checkpoint was not worse, it was measured at a spacing it was never trained
+for, and being better converged made it degrade *harder* there. Its rollout half stands: with a
+near-perfect goal (0.0097) the rollout planner still selects at 40% and picks a candidate 3x farther
+from the goal than the achievable optimum.
+
+**The methodological lesson, which cost the most to learn.** Three separate wrong conclusions were
+drawn tonight from measurements taken at the untrained spacing -- that training the head longer made
+it worse, that turning read well and forward speed badly (this inverts once measured in the
+standardised units the planner actually scores in: forward 0.159, lateral 0.235, yaw 0.325), and a
+recommendation to delete what turned out to be the best checkpoint in the project. Each was a
+confident reading of a real number measured the wrong way. **Where a spacing, horizon, or window
+appears in more than one place in this pipeline, it needs its own name; and a metric must be
+computed in the units the system it judges actually operates in.**
+
+Scripts: `sim/control/close_loop_direct_froude.py` (`--goal_horizon`), `wm/fit_body_head.py`
+(`--also` validation split, per-body reporting), `wm/policy/b1_mujoco_env.py` and
+`b1_coppelia_env.py` (`GOAL_HORIZON`, all-pairs averaging, spacing-keyed cache). Runs:
+`results/wm/closed_loop/direct_froude_v2head_gh1/`. Checkpoint:
+`wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`.
+
+---
+
+### F209. CoppeliaSim rollouts are not reproducible, which invalidated a day of single-run screening -- and, measured properly, Bullet's missing joint damping was what capped B1's babble speed
+
+**The measurement bug comes first, because it decides how much of the rest to believe.** Running
+one identical config -- same seed, same flags, same scene -- five times in a row gives forward
+Froude 0.1206, 0.1241, 0.1298, 0.1319, 0.1322, with yaw changing sign between runs (+0.014,
+-0.013, +0.006, +0.020), and an earlier run of that same config FELL where these four stood. So a
+CoppeliaSim rollout is a draw, not a measurement: +-5% on Froude, and near a stability boundary the
+upright/fell verdict is close to a coin flip. `b1-mujoco-deterministic` does not carry over to
+Bullet.
+
+Every conclusion screened at n=1 this session had to be thrown out, including three I had already
+reported: "the wave gait caps at 0.097", "duty 0.75 falls", and a structural-sounding claim that
+stability and speed trade off irreducibly without balance feedback. Re-measured at n=3-8, the wave
+gait reaches 0.163-0.183 at 3.0 Hz and duty 0.75 stands 7/7. **Screening protocol from here: 3
+repeats minimum per config, report the upright fraction and the spread, never a single number.**
+
+**The real cap: Bullet has no joint damping or friction parameter.** `sim.setEngineFloatParam`
+exposes `bullet_joint_pospid1/2/3`, `normalcfm`, `stopcfm`, `stoperp` -- and nothing else. Only the
+MuJoCo and Vortex engines expose `*_joint_damping`/`*_joint_frictionloss`. That matters because the
+same open-loop CPG, same seed, run on MuJoCo against the two available B1 models, gives:
+
+| model | per-joint physics | 160-step travel |
+|---|---|---|
+| `b1_flat_real.xml` | system-identified: armature 0.013/0.110/0.246, damping 0.745/1.700/2.201, frictionloss 0.882/2.698/6.166 | **+1.997 m** |
+| `b1_flat.xml` | uniform placeholder: armature 0.1, damping 0.5, frictionloss 0.2 | **-0.234 m** (walks backwards) |
+
+Joint friction is the single thing that makes an open-loop CPG walk at all, and the Coppelia scene
+is in the uniform-placeholder regime with no way to leave it through engine parameters.
+
+**The fix: `jointdynctrl_spring`, not a hand-written controller.** Coppelia's spring mode runs
+`tau = K(q*-q) - C*qdot` inside the physics engine at the dynamics rate, and `C` is the damping term
+Bullet otherwise refuses to expose. Setting K and C per segment from `b1_flat_real.xml`'s own
+numbers (K = kp 550/700/970, C = kv + damping = 2.745/4.700/5.201) took forward Froude from
+**0.140 to 0.220** on the same gait, 8/8 upright, spread 0.214-0.221. No scene edit, no engine
+change, no reduced timestep, no custom torque loop -- both bodies stay on Bullet.
+
+**Falsified along the way, each at n=3 or better, so they need not be re-litigated:** ground/foot
+friction (the scene ships feet and floor at 0.50 each and Bullet multiplies them, so effective mu is
+0.25 against MuJoCo's 1.0 -- changing it 4x moves Froude by less than the run-to-run noise); link
+masses (62.57 kg summed from the scene against the XML's 62.58); joint velocity ceilings (15.6-23.3
+rad/s, gait uses ~1.6); joint ranges (nothing clips); and PID gains (600 buys 0.002, 900
+destabilises). A hip-abduction stance widening did fix the roll instability at 3.0 Hz outright
+(up.z 0.97 where the narrow stance fell every time) and reached 0.225, but only by splaying to 36
+degrees, which drops the trunk to 0.30 m against a 0.52 m nominal -- traded away, not adopted.
+
+**Frozen for collection: diagonal trot, 5.0 Hz, amplitude 0.30, duty 0.55, spring mode.** 8/8
+upright, 0.214-0.221, the cleanest attitude measured (up.z 0.985-0.988), and it is the gait B1
+actually ships with. The slower alternatives are real but each costs something: wave at 3.0 Hz
+gives 0.148-0.183 at 6/7 upright with a gait this robot was not built for; trot below 4.5 Hz falls
+0/3 at every amplitude tried.
+
+**Not yet honest enough to collect on.** The parameters above were found by searching against the
+hexapod goal band, which is fitting the data generator to the answer -- the exact drift
+`babble-premise-drift` records. Before any collection: declare the sampled ranges up front, justify
+them by uprightness alone, randomise, retain every rollout including falls, and report the Froude
+coverage as an outcome. If the coverage misses part of the hexapod range, that gets written down,
+not tuned away.
+
+Scripts: `sim/collect/collect_b1_coppelia_babble.py` (`--joint-control spring`, `--spring-k/-c`,
+`--contact-friction`, `--max-joint-vel`, `smooth-duty` shape). Previews and per-run configs:
+`results/wm/dataset/b1_babble/coppelia_spring_preview/`.
+
+---
+
+### F210. The vision-read goal matches a privileged recorded goal across the whole goal set, not one clip -- and the threshold argument that used to justify it was arithmetically wrong
+
+**Why this was re-run.** F188's claim that reading the goal from the other body's video "costs
+nothing" rested on one goal clip plus a mechanism sentence: the read error (0.029) was said to be
+smaller than "the gap between the two closest candidates" (0.033-0.038). Printing all twelve
+candidates' distances to that goal's own Froude gives 0.0298, 0.0376, 0.0515, 0.0562, ... -- 0.033
+and 0.038 are two candidates' **distances to the goal**, not the gap **between** them. The gap is
+**0.0079**, and a 0.029 read error is 3.7x larger than it.
+
+Measured instead of argued -- perturb the goal by a fixed magnitude in 2000 random directions and
+count how often the top pick changes:
+
+| read error | top pick changes |
+|---|---|
+| 0.0293 (this clip's measured error) | **65%** |
+| 0.0170 (median over 48 clips) | 42% |
+| 0.0079 | 6.5% |
+| 0.0040 | 0% |
+
+So the single-clip A=D was luck in the direction the error happened to point, and the
+"candidate-spacing threshold ~0.033" that F208, `proposal.tex` and `update_slide.md` all inherited
+from that sentence is void. No code ever computed it; it existed only as prose.
+
+**What replaces it, and it is stronger.** `final_2x2x2_test.py` over the full goal set -- 12
+hexapod goal conditions x 8 steps = 96 planning decisions, `body_head_b1_hex_v2.pt`, expert
+candidate pool, `--goal_horizon 1`:
+
+| goal source | free_offset | family accuracy | chance | froude dist (median) |
+|---|---|---|---|---|
+| A, physics (privileged) | no | 90% | 56% | 0.0616 |
+| A, physics | yes | 92% | 56% | 0.0450 |
+| **D, vision** | no | **92%** | 56% | **0.0433** |
+| **D, vision** | yes | **92%** | 56% | 0.0452 |
+
+The vision goal matches or beats the privileged recorded one on both metrics, over every goal in the
+set. Forward goals 64/64, lateral 24/32. **Downstream failures -- candidate scoring, rollout, the RL
+reward, the controller -- are not caused by goal reading, and this should not be re-measured.**
+
+**Read the continuous distance, not the percentage.** Chance is 56% because 8 of 12 goals are
+forward-family, so 92% is a smaller margin than it looks; 0.043 against a random pick's 0.143 is the
+number with room in it. And there are **no yaw-family goals in this set** at all -- the hexapod
+`turn_*` clips carry forward as their dominant channel -- so turning is untested here, exactly the
+aggregate-hides-a-family trap F192 recorded.
+
+**One bug fixed to run it.** `final_2x2x2_test.py` still passed `--horizon` (the planner's window,
+default 5) into `vision_goal` as the frame spacing -- F208's one-flag-two-jobs bug, fixed in
+`close_loop_direct_froude.py` and `plan_without_library.py` but missed here. Split into
+`--goal_horizon` (default 1). **Every mode C/D number this script produced before 2026-09-14 read
+the goal at the planner's horizon, not at the trained spacing, and is not comparable to the table
+above.**
+
+Scripts: `scripts/diagnostics/objective_experiments/final_2x2x2_test.py`.
+
+---
+
+### F211. F209's new babble adapts better than expert data on a matched protocol -- but the new-vs-old-babble comparison stays confounded, and composition should have been checked before running either adapt job
+
+**The ablation, same pretrain and body, only the babble source differs.** `wm.adapt`,
+`beh12_hex-b1_body3/best.pt` (the two-body pretrain), B1, 1000 steps, lr 1e-4:
+
+| babble source | clips (train/test) | selection | h1 before/after | h3 | h5 | h10 |
+|---|---|---|---|---|---|---|
+| new, spring-mode (F209), 0 falls/40, fwd 0.124-0.216 | 30/10 | stratified | 1.17 / **1.76** | 1.04 / **1.74** | 0.97 / **1.66** | 0.92 / **1.47** |
+| expert, `beh12_b1_ego_flat` | 30/10 | stratified (matched to the new-babble run) | 1.09 / **1.60** | 0.94 / **1.62** | 0.85 / **1.53** | 0.77 / **1.30** |
+| old, `b1_babble_v2_ego_flat` (position-control CPG, pre-F209) | 26/10 | plain permutation (v2 files carry no `condition` field, so `--stratify` errors) | 1.19 / **1.82** | 1.10 / **1.83** | 1.04 / **1.78** | 0.99 / **1.70** |
+
+**With the confound removed (expert row, matched clip count and selection method to the new-babble
+row), the new babble beats expert data at every horizon** -- 1.76 vs 1.60, 1.74 vs 1.62, 1.66 vs
+1.53, 1.47 vs 1.30. That comparison is clean and stands. The old-babble row is the one that
+does not: different clip count (26 vs 30), different selection (plain permutation vs stratified,
+forced by the missing `condition` field), so "old >= new" cannot be read off it.
+
+**This "old babble ties or beats new babble" reading is WITHDRAWN -- the two sets are not
+comparable in what they contain, and that should have been checked before running either adapt job,
+not after.** Composition, read directly from each set's own metadata:
+
+| set | n | behavioural composition |
+|---|---|---|
+| expert (`beh12_b1_ego_flat`) | 48 | 3 distinct behaviours -- forward-speed, turn, sideways -- 4 sub-levels x 4 seeds each |
+| new babble (spring, F209) | 40 | **forward-trot only.** Varies solely by random seed (per-step noise + amplitude draw in [0.20, 0.32]); zero lateral or yaw variety, because F209's sampling-range declaration only covered the forward-trot stability point |
+| old babble (`b1_babble_v2_ego_flat`) | 36 | filenames (`fwd_f*`, `lat_f*`, `yaw_f*`) imply fwd/lat/yaw families exist, but the npz files carry **no `condition` field at all** -- unverifiable without re-deriving from filenames, and the reason `--stratify` errored on it |
+
+So the old babble very plausibly ties or beats the new babble **because it has direction variety
+and the new babble has none**, not because F209's Coppelia physics fix failed to help anything.
+**F209's fix has only ever been validated at the forward-trot point** -- no lateral or turning
+babble has been collected under spring-mode control yet, so comparing "new babble" against sets
+that include turning and sideways motion compares a narrower thing to a broader one by
+construction. The rollout-ratio numbers recorded below are kept for the record, but the conclusion
+drawn from them (old >= new) does not follow and should not be cited.
+
+**What actually needs to happen, cheaply, before spending more adapt-job time:** extend F209's
+declared-range methodology to lateral and turning gaits under spring-mode control, collect a
+matched-composition babble set (3 behaviours, comparable clip counts, a real `condition` field),
+and only then re-run this ablation. Checking composition first costs a `glob` and a dict read;
+running an unneeded `wm.adapt` costs ~5-10 minutes of VJEPA2 encoding each. Do the former first.
+
+Checkpoints: `wm/runs/beh12_hex-b1_body3/b1_adapt_spring/adapted_b1.pt` (new babble),
+`wm/runs/beh12_hex-b1_body3/b1_adapt_expert/adapted_b1.pt` (expert), `wm/runs/beh12_hex-b1_body3/b1_adapt_oldbabble/adapted_b1.pt` (old babble).
+
+---
+
+### F212. B1's `teacher_student_insect.py` port: two real bugs caught before they could confound the result, and a measured, severe train/eval physics gap -- neither student clears the pre-registered bar, in two qualitatively different ways depending on which physics evaluates them
+
+**Ported the insect's cloning-only stage (F133), not `improve()`** -- F135/F136/F138 already showed
+local-perturbation DAgger ranking fails for a task-level reason (fixed-magnitude action
+perturbations barely change real physics) that is not insect-specific, so it was not re-tested.
+Input is proprioceptive (34-d: 12 joint pos + 12 joint vel + 4 base quat + 6 base lin/ang vel, matching
+`B1MuJoCoEnv._obs()`'s own convention exactly), not the insect's pooled-VJEPA2-embedding -- no
+CoppeliaSim or VJEPA2 anywhere in this pipeline. Base velocity isn't recorded in the clips, so it's
+finite-differenced (central difference: 2.1% mean-abs-error against live MuJoCo `qvel` on linear
+velocity, 18.1% on angular -- validated directly by re-simulating a clip and comparing before
+trusting it as training data; a one-step forward difference measured WORSE, 8.5%/39.8%, confirmed
+not assumed). Data: `data/egocentric/beh12_b1_ego_flat`, confirmed balanced (16/16/16 clips across
+speed/turn/side) before training. Teacher checkpoint: `wm/runs/beh12_hinge_multistep_anchor_v2/
+b1_adapt_hinge/teacher_b1.pt` -- the currently-active checkpoint (F210 used it the same session),
+not refit, per the project's own rule that only genuinely superseded artifacts get refit.
+
+**Two real bugs found and fixed before they could produce a false result, both caught by watching
+video rather than trusting a number (the project's own repeated lesson, again).** A first pass
+reported "246% of D_real, PASS" on a 20-epoch smoke test -- an implausibly good result for that
+little training, and watching it showed the robot walking backward at an odd cadence.
+
+1. **`D_real` was computed from the wrong initial condition.** `rollout_b1_mujoco.py` runs
+   `--policy_warmup 45` steps of real walking BEFORE recording starts, so a clip's own `actions[0]`
+   was applied to an already-moving body mid-gait, never a freshly reset, standing one. Replaying it
+   from `env.reset()`'s static pose gave **-0.23 m** (wrong direction) against the clip's own
+   recorded **+1.25 m**, same action sequence, same model file -- not a sign bug, a mismatched
+   initial state. Fixed by seeding MuJoCo's `qpos`/`qvel` from the clip's own recorded frame-0 state
+   (`seed_from_clip()`), with base velocity again from the validated finite-difference formula.
+2. **The recorded expert actions are unbounded** (min/max -1.42/3.50, 32% of all values exceed
+   |1|) -- an unclipped Isaac Lab actor output, the same class of value F203/F206 already documented
+   for this dataset. `B1MuJoCoEnv.step()` clips the raw action to [-1, 1] before scaling, correct
+   for a tanh-squashed RL actor but wrong here: it silently truncated a third of the commanded
+   targets. Fixed by reproducing `rollout_b1_mujoco.py`'s own convention exactly
+   (`apply_action_unclipped()`: clamp only the final scaled target at the physical actuator range).
+
+**With both fixed, the expert's own recorded actions replay at 95.5% fidelity** (1.216 m replayed
+vs. 1.273 m recorded, correct direction) under `b1_flat_real.xml` -- comparable to F133's insect
+replay ratio of 1.017, and now trustworthy as `D_real`.
+
+**The train/eval physics gap is real and severe, not just theoretical.** `beh12_b1_ego_flat` was
+collected on `sim/assets/b1_mujoco/b1_flat.xml` (uniform placeholder joint physics --
+`rollout_b1_mujoco.py:21`); `B1MuJoCoEnv` defaults to `b1_flat_real.xml` (system-identified
+damping/friction -- F209's own finding that this is what makes an open-loop gait viable at all).
+Evaluated on both, per student:
+
+| student | `b1_flat_real.xml` (eval default) | `b1_flat.xml` (the collection physics) |
+|---|---|---|
+| forward-only (R2 0.999 offline) | 52% of `D_real`, **FALLS** (min height 0.13 vs 0.56 settled) | 35%, **upright** (min height 0.53, barely dips) |
+| all 3 behaviours (R2 0.995 offline) | 30%, upright (min height 0.41) | 7%, **upright** (min height 0.53, near-stationary) |
+
+**No cell clears the pre-registered bar** (upright the whole window AND >= 50% of `D_real`).
+**But the failure mode flips entirely with the physics**, not just the magnitude: under the
+higher-damping `b1_flat_real.xml`, the student that travels farthest (52%) is the one that falls
+hardest; under `b1_flat.xml` (matching what it was actually cloned on), both students are stable but
+barely move. Read together with the offline R2s (0.995-0.999, matching F135's own warning that
+held-out regression fit does not predict closed-loop rollout quality): **the student has learned
+*a* action pattern that reproduces recorded joint targets well in isolation, but that pattern's
+real-world behaviour depends heavily on which joint damping/friction it is executed against** -- a
+policy fit on one physics model's dynamics does not transfer its stability margin to another's, even
+when both are B1 in name.
+
+**Reading against the two precedents this project already has.** F133's insect clone stayed up and
+undertravelled (36%); the informally-found `wm/runs/students/b1_bc_ego_forward.pt` (vision-embedding
+input, not reproduced here, cited only from F179) travelled far and fell (92%). This B1 proprioceptive
+clone reproduces BOTH patterns depending on which physics it's dropped into -- upright-but-slow on
+the matched physics, fast-but-falling on the mismatched one -- which suggests the two "modes" seen
+across this project's B1/insect attempts are not properties of the input representation (vision vs.
+proprioceptive) or the specific checkpoint, but of how well the evaluation physics matches whatever
+implicit dynamics assumption the cloned action pattern carries.
+
+**What this rules in and out.** It does not settle whether B1 behaviour cloning can pass the bar --
+neither run was tuned, and the physics-mismatch confound was uncontrolled going in. It does rule out
+reading either FAIL as evidence about the cloning mechanism itself, since the SAME weights produce
+a qualitatively different failure depending only on which physics they're asked to act in. The clean
+next test, not yet run: re-collect (or re-render) B1 clips on `b1_flat_real.xml` so training and
+evaluation share one physics model, removing this confound before judging the mechanism.
+
+Scripts: `sim/control/teacher_student_b1.py` (new; `bc`/`eval` stages, no `improve`). Checkpoints:
+`wm/runs/students/b1_bc_forward.pt`, `wm/runs/students/b1_bc_all.pt`. Videos:
+`results/wm/students/eval_{forward,all}{,_flat}.mp4`.

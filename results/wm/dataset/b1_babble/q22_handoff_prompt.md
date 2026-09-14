@@ -348,21 +348,124 @@ drift (`0.006-0.028`) is higher than the straightest configs (duty=0.65's `~0.00
 below anything the uncoupled gaits produced (`0.03-0.13`) -- a real, worthwhile trade for the
 speed gained.
 
+## Qualified babble generator checklist learned from failures
+
+This is the current bar for calling a babble source usable. It is not all solved yet; it is the
+checklist distilled from failure cases in this session.
+
+1. **Stable, smooth motion must be measured directly.** F202 showed that erratic babble can make
+   adaptation worse than doing nothing. A candidate needs a quantitative smoothness/contact gate
+   such as joint-acceleration variance and contact consistency, not only Froude and occasional
+   visual inspection.
+2. **The generator must stay genuinely generic.** One broad CPG parameterization is allowed:
+   sampled frequency, amplitude, phase offsets, joint-role scales, and per-step noise. Per-body or
+   per-behavior primitives such as separate strafe/yaw mechanisms are premise drift, not undirected
+   babble.
+3. **Separation must be checked in the fitted model's predicted space.** F194's raw/true-Froude
+   margin check was the wrong acceptance test. The margin must be checked through the actual fitted
+   checkpoint prediction, e.g. `body_head(proj(actions))`.
+4. **Coverage must match the actual goal vocabulary.** Collection effort should be calibrated
+   against the source body's goal Froude range, not an arbitrary target. Current Coppelia B1 preview
+   remains below the useful pretraining/expert band.
+5. **Stage-1 adaptability is a required pre-check.** Before downstream experiments, run the
+   candidate babble through `wm.adapt` and verify held-out ratio improves. This cheap gate would
+   have caught F202 before the rest of the pipeline depended on it.
+
+Bottom line: the current B1 Coppelia babble work has produced a much better live-physics preview
+generator, but it is not yet a qualified final babble dataset until these gates pass.
+
+## Quality-metric pilot after tip-toe diagnosis (2026-09-12)
+
+Added reporting-only motion-quality metrics to `sim/collect/collect_b1_coppelia_babble.py`; every
+new rollout YAML/NPZ now records joint velocity/acceleration/jerk, target/action acceleration,
+tracking error, contact switches, support count, and foot-height ranges. These metrics do **not**
+filter or discard rollouts; they only make the "stable/smooth/contact-consistent" gate measurable.
+
+Also added `sim/collect/collect_b1_coppelia_swing_distance_preview.py`: a reproducible fixed
+preview for the user's "more swing distance, less tip-toe" idea (`freq=4.5 Hz`, `amp=0.32`,
+`duty=0.55`, `coupling=0.6`, `clearance=1.1`). It is the same generic coupled-duty CPG family,
+not a new behavior primitive.
+
+Rendered comparison, seed 11, ego + allo:
+`results/wm/dataset/b1_babble/coppelia_quality_pilot/`.
+
+| preview | view | status | mean body Froude | joint acc/jerk RMS | contact/support read |
+|---|---|---|---|---|---|
+| soft-air `5.0Hz/a0.26/d0.55/c1.1` | allo | upright | `[+0.0485,-0.0006,-0.0037]` | `16.69 / 552.11` | support mean `0.49`, `<=1 foot` frac `1.00` |
+| soft-air `5.0Hz/a0.26/d0.55/c1.1` | ego | upright | `[+0.0462,-0.0002,-0.0015]` | `16.66 / 549.95` | support mean `0.49`, `<=1 foot` frac `1.00` |
+| swing-distance `4.5Hz/a0.32/d0.55/c1.1` | allo | upright | `[+0.0398,+0.0036,+0.0040]` | `14.89 / 454.36` | support mean `0.53`, `<=1 foot` frac `1.00` |
+| swing-distance `4.5Hz/a0.32/d0.55/c1.1` | ego | upright | `[+0.0392,+0.0046,+0.0023]` | `14.89 / 454.53` | support mean `0.52`, `<=1 foot` frac `1.00` |
+
+Read: increasing swing distance and reducing Hz helps smoothness (`~18%` lower joint
+acceleration, `~17%` lower jerk), but it costs speed (`~0.046-0.049` down to `~0.039`) and does
+**not** fix the deeper tip-toe/contact problem. The low support-count metric makes the visual
+failure mode concrete: these previews move forward while barely registering stable foot support.
+Next babble work should target contact-consistent stance, not more speed-only tuning.
+
+## Working Coppelia B1 babble preview: target-scale forward + lateral/yaw knobs (2026-09-12)
+
+Added generic CPG parameters to `sim/collect/collect_b1_coppelia_babble.py`:
+
+- `--generic-stance-calf-bias`: planted-leg calf preload/extension. Negative values extend the
+  stance leg and were the missing speed/contact lever.
+- `--generic-hip-sign-layout`, `--generic-hip-phase`, `--generic-hip-clock`: one generic hip
+  oscillator parameterization for lateral/yaw coverage. This is not separate behavior scripting;
+  it is the same coupled-duty CPG with sampled hip sign/clock/ratio parameters.
+
+This finally made the Froude target achievable in native Coppelia/Bullet. Screen validation:
+
+- Forward target candidate: `freq=5.0`, `amp=0.26`, `duty=0.55`, `coupling=0.6`,
+  `clearance=1.1`, `stance_calf_bias=-1.2`, no hip oscillator. Seeds 10-14: **5/5 upright**,
+  forward Froude `0.1187-0.1266`.
+- Turn candidate: same base but `stance_calf_bias=-1.0`, global hip oscillator,
+  `hip_sign_layout=left-right`, `hip_ratio=0.8`. Seeds 10-14: **5/5 upright**, forward
+  `0.1013-0.1103`, lateral about `-0.022 to -0.028`, yaw `0.0445-0.0515`.
+- Lateral/mixed candidate: same base but `hip_sign_layout=diagonal`, `hip_ratio=0.3`.
+  Rendered upright in both views at seed 12, forward `~0.103-0.104`, lateral `~0.029-0.030`,
+  yaw `~-0.021 to -0.024`. Stronger diagonal hip (`0.5-1.0`) can produce lateral `~0.04-0.09`
+  and yaw `~0.05-0.10`, but is a genuine fall-boundary sample under Bullet and should not be the
+  safe default.
+
+Named preview scripts:
+
+- `sim/collect/collect_b1_coppelia_target_forward_preview.py`
+- `sim/collect/collect_b1_coppelia_turn_preview.py`
+- `sim/collect/collect_b1_coppelia_lateral_preview.py`
+- `sim/collect/collect_b1_coppelia_side_yaw_edge_preview.py` (diagnostic edge only; not safe)
+
+Rendered proof, seed 12: `results/wm/dataset/b1_babble/coppelia_working_babble_preview/`.
+
+| preview | view | status | mean body Froude | note |
+|---|---|---|---|---|
+| target-forward | allo | upright | `[+0.1220,+0.0137,+0.0117]` | inside lower useful forward band |
+| target-forward | ego | upright | `[+0.1232,+0.0136,+0.0116]` | same camera/room convention |
+| turn-left/right-hip | allo | upright | `[+0.1095,-0.0231,+0.0472]` | reliable yaw while moving fast |
+| turn-left/right-hip | ego | upright | `[+0.1073,-0.0221,+0.0454]` | reliable yaw while moving fast |
+| lateral-diagonal-hip | allo | upright | `[+0.1044,+0.0299,-0.0236]` | safer lateral/mixed preview |
+| lateral-diagonal-hip | ego | upright | `[+0.1028,+0.0290,-0.0205]` | safer lateral/mixed preview |
+
+Read: the babble generator now has usable preview coverage for forward, yaw/turn, and moderate
+lateral/mixed motion at Coppelia-native dynamics. It is still **not a final qualified babble
+dataset**: contact/support metrics remain imperfect (`support_count_mean` often below 1), strong
+lateral/yaw is unstable, and no final parameter distribution has been frozen.
+
 ## Required next work
 
 1. Build a genuinely good Coppelia-native expert controller: feedback/IK or fresh training using
    a trustworthy physics/task reward, not the failed WM reward.
 2. Freeze one generic CPG parameter distribution before final collection; then collect it without
    Froude/outcome filtering. This is the no-demonstration babble condition.
-3. Collect expert and babble with identical scene, Bullet version, timestep, initialization,
+3. Add and enforce the qualified-babble gates above: smoothness/contact metrics, predicted-space
+   separation, vocabulary coverage report, and `wm.adapt` held-out improvement.
+4. Collect expert and babble with identical scene, Bullet version, timestep, initialization,
    camera/room, duration, signs, seeds, and output schema.
-4. Report the measured goal-source vocabulary alongside babble coverage: forward `0.12–0.19`,
+5. Report the measured goal-source vocabulary alongside babble coverage: forward `0.12–0.19`,
    lateral `-0.12–+0.07`; current data has no useful yaw-dominant goal. Do not reject babble clips
    for weak/near-zero Froude.
-5. Render every candidate body/data source for user inspection and keep YAML beside every run.
-6. Fit/reuse a pilot checkpoint, then verify cross-family nearest-neighbour risk in **predicted**
+6. Render every candidate body/data source for user inspection and keep YAML beside every run.
+7. Fit/reuse a pilot checkpoint, then verify cross-family nearest-neighbour risk in **predicted**
    Froude (`body_head(proj(actions))`). True-Froude margin is not an acceptance substitute.
-7. Fit expert and babble pipelines separately against their own data/candidate pools, then rerun
+8. Fit expert and babble pipelines separately against their own data/candidate pools, then rerun
    the original 2x2x2: pipeline x goal source x locked/free-offset.
 
 ## Guardrails
