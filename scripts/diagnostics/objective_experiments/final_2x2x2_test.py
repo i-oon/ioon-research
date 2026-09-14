@@ -94,12 +94,18 @@ def true_local_froude(cand, spec, offset, horizon):
     return bm[offset:offset + max(h, 1)].mean(0)
 
 
-def load_goals(goal_dir, goal_embodiment, planner, goal_source, goal_horizon, device):
+def load_goals(goal_dir, goal_embodiment, planner, goal_source, goal_horizon, device,
+              behaviour_filter=None):
+    """`behaviour_filter`: keep only conditions whose `behaviour` field matches (e.g. "turn"), to
+    isolate a single channel's mode-A-vs-mode-D comparison instead of the aggregate, which is
+    8/12-forward-dominated and can hide a channel-specific result (F127's own warning)."""
     spec = REGISTRY[goal_embodiment]
     by_cond = {}
     for p in sorted(glob.glob(os.path.join(ROOT, goal_dir, "*.npz"))):
         with np.load(p, allow_pickle=True) as d:
             cond = str(d["condition"])
+            if behaviour_filter is not None and str(d["behaviour"]) != behaviour_filter:
+                continue
         by_cond.setdefault(cond, p)
 
     goals = []
@@ -223,6 +229,9 @@ def main():
     ap.add_argument("--horizon", type=int, default=5,
                     help="the PLANNER's window: how many actions a chosen candidate contributes "
                          "before the next decision. Nothing to do with reading the goal.")
+    ap.add_argument("--behaviour_filter", default=None,
+                    help="keep only goal conditions with this `behaviour` field (e.g. 'turn'), "
+                         "to isolate one channel from the 8/12-forward-dominated aggregate")
     ap.add_argument("--goal_horizon", type=int, default=1,
                     help="frame spacing (t, t+goal_horizon) used to READ the goal from the source "
                          "clip's video in mode C/D. Until 2026-09-14 this file passed --horizon "
@@ -246,7 +255,7 @@ def main():
             planner = build_planner(ckpt_path, candidates_dir, args.embodiment, args.horizon,
                                     free, device, args.per_condition)
             goals = load_goals(args.goal_dir, args.goal_embodiment, planner, goal_source,
-                               args.goal_horizon, device)
+                               args.goal_horizon, device, behaviour_filter=args.behaviour_filter)
             r = run(planner, goals, spec, args.horizon, args.n_steps, free)
             chance = pool_chance(planner, spec, goals)
             chance_dist = pool_chance_dist(planner, spec, goals)

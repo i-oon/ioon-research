@@ -9,7 +9,7 @@ Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaS
 | **Part 2 — the gap and the attempt** | 9-12 | what crossing embodiments requires, the field's own proposed fix rebuilt faithfully, and six independent measurements of why it does not work here |
 | **Part 3 — the principle** | 13-15 | pose determines the future, so the action is redundant: what that explains in the literature, and in our own three failed attempts |
 | **Part 4 — the prediction, tested** | 16-17 | removing the body from view restores action-sensitivity, the shared coordinate survives the change, and what we claim as contributions |
-| **Part 5 — where this stands** | 18-27 | behaviour selection from a recorded library, the diagnostic arc, and a controller that now genuinely walks |
+| **Part 5 — where this stands** | 18-30 | behaviour selection from a recorded library, the diagnostic arc, a controller that now genuinely walks, and a second controller attempt (imitation) that does not yet |
 
 **The arc, in one line.** We could not make the world model use the action, so we measured why; the
 answer turned out to be a property of the **viewpoint** rather than of the model; that property
@@ -1459,5 +1459,145 @@ speed, not the full three-channel goal.
 > เทรนใหม่แล้วเดินได้จริง: เดินหน้า 0.446 เมตร ใน 4 วินาที ไม่ล้มเลย
 > ยังไม่จบ: ผลนี้ใช้ reward แบบรู้ความเร็วจริง (ground truth) ยังไม่ได้ลองกับ reward จาก world model
 > ตัวจริงที่ใช้ได้กับหุ่นที่ไม่เคยเห็น และเลี้ยว/ไถลข้างยังทำไม่ได้ดี เดินหน้าเก่งอย่างเดียว
+
+---
+
+## Slide 28 — A checkpoint bug reversed two other results; corrected, the shared coordinate reads better than a trivial baseline
+
+**Two diagnostics run the same night had defaulted to the wrong checkpoint** — one whose shared
+Froude head was never actually fit for B1, still carrying whatever the original hexapod-only
+pretrain left it at. Corrected to the checkpoint the candidate-selection result (Slide 24) itself
+used, both results reverse:
+
+| | wrong checkpoint | correct checkpoint |
+|---|---|---|
+| a linear function of a raw frame pair vs. the shared head's Froude read, held out | **linear wins** (R² 0.292) | **shared head wins** (R² 0.736) |
+| same-behaviour clustering across the two bodies, Froude output, held out | 25% of within-body signal survives | **89% survives, three-fold cross-validated** |
+
+**The clustering result is the more direct evidence for this project's actual claim** — that what
+crosses bodies is a shared body-motion coordinate, not a shared latent — measured geometrically
+rather than only through candidate-selection accuracy.
+
+**One remaining question, asked and answered in full:** is the shared head's advantage over a
+linear baseline just "any nonlinear function would do," or does its specific transition structure
+matter?
+
+| | held-out R² |
+|---|---|
+| linear function of the raw frame pair | 0.486 |
+| a generic nonlinear network of matching size, same raw pair | 0.667 |
+| **the shared head, reading the inferred transition instead of the raw pair** | **0.736** |
+
+**Most of the gain over linear is just "any nonlinearity" — a real, smaller remainder is specific to
+reading the transition rather than the raw pair**, and it holds up better out of sample than the
+generic network does (which fits training data almost perfectly and generalises worse). Both
+alternatives still lose to the shared coordinate; neither replaces it.
+
+> **บทพูด (TH).** สองผลก่อนหน้านี้ในคืนเดียวกันใช้ checkpoint ผิด (ตัวที่ shared head ไม่เคย fit จริงสำหรับ B1)
+> พอแก้เป็นตัวที่ถูกต้อง **ผลกลับด้านทั้งคู่**: จากที่ linear ชนะ กลายเป็น shared head ชนะ (R² 0.736)
+> จากที่ cluster ข้ามร่างได้แค่ 25% กลายเป็น **89%** ยืนยันด้วย cross-validation
+> **คำถามที่เหลือ**: ที่ชนะ linear เพราะเป็น nonlinear เฉย ๆ หรือเพราะโครงสร้างเฉพาะตัว — ทดสอบแล้วทั้งสองส่วนจริง:
+> ส่วนใหญ่มาจาก "ไม่ใช่ linear" (0.486→0.667) ส่วนที่เหลือมาจากโครงสร้างเฉพาะของมันจริง ๆ (0.667→0.736)
+> และ generalize ดีกว่าโครงข่ายทั่วไปที่ความจุเท่ากันด้วย
+
+---
+
+## Slide 29 — A second, independent controller attempt: imitation instead of RL, same discipline, same result
+
+**Same rigor as Slide 27, a different route and a different failure mode.** Slide 27's controller is
+trained by RL and invents its own motion from state. This asks the same question a different way:
+clone a policy directly from B1's own recorded expert clips (34-d proprioceptive state → 12-d joint
+target), pre-register the same kind of bar in advance (upright the whole window **and** ≥50% of the
+distance the expert itself covers, replayed under the same physics the student is judged in), and
+report whichever way it comes out.
+
+**Two real bugs caught by watching the video, not by trusting a number — the same lesson this
+project has already learned once.** A first pass reported "246% of D_real, PASS"; the clip showed
+the robot walking backward.
+
+| bug | effect once fixed |
+|---|---|
+| the distance bar (`D_real`) was measured from the wrong starting state — a clip's first recorded action assumes a body already mid-stride, not one freshly reset | replaying the expert's own actions now reproduces its recorded distance at 95.5% fidelity |
+| the environment's action clip (`[-1, 1]`, correct for a bounded RL actor) silently truncated a third of this dataset's unbounded expert commands | fixed to reproduce the collection script's own convention exactly |
+
+**With both fixed, no condition clears the pre-registered bar** — and the way it fails depends on
+which physics evaluates it, not on the student:
+
+| student | trained-on physics | judged-on physics | result |
+|---|---|---|---|
+| forward-only | placeholder joint damping | **system-identified (the eval default)** | 52% of D_real, **falls** |
+| forward-only | placeholder joint damping | placeholder (matched to training) | 35%, **stays upright** |
+| all 3 behaviours | placeholder joint damping | system-identified | 30%, upright |
+| all 3 behaviours | placeholder joint damping | placeholder | 7%, upright, barely moves |
+
+**The same weights produce a qualitatively different failure depending only on which physics
+executes them** — fast-and-falling under one, stable-and-stationary under the other. That rules out
+reading either failure as evidence about the cloning mechanism itself; the physics mismatch between
+training and evaluation was never controlled going in.
+
+> **บทพูด (TH).** สไลด์นี้คือ **ความพยายามที่สองที่แยกจาก RL ของสไลด์ก่อน** — รอบนี้ clone นโยบายตรงจาก
+> คลิปจริงของ B1 (state 34 มิติ → คำสั่งข้อต่อ 12 มิติ) ตั้งเกณฑ์ผ่าน/ไม่ผ่านไว้ก่อนเทรนเหมือนเดิม
+> **เจอบั๊กสองตัวจากการดูวิดีโอ ไม่ใช่จากตัวเลข** (บทเรียนเดิมของโปรเจกต์นี้) แก้แล้วยังไม่ผ่านเกณฑ์ในทุกเงื่อนไข
+> **ที่สำคัญกว่านั้นคือ น้ำหนักโมเดลชุดเดียวกัน พังคนละแบบขึ้นอยู่กับฟิสิกส์ที่ใช้ตัดสิน** — เร็วแต่ล้ม กับ นิ่งแต่ไม่ล้ม
+> แปลว่ายังสรุปอะไรเกี่ยวกับตัว mechanism การ clone เองไม่ได้ เพราะ confound เรื่องฟิสิกส์ยังไม่ได้ควบคุม
+
+---
+
+## Slide 30 — Grading the clone with the world model: the same mechanism Slide 15 found on the insect, now measured directly on B1 instead of assumed
+
+**Slide 15 already showed this failure once, on the insect, and the reasoning was carried to B1
+rather than re-tested:** grading small variations of one behaviour asks the model to rank outcomes
+physics itself barely separates (0.1304 against 0.1299), so no representation can order them. Built
+the grading stage for B1 anyway, using the properly-fit shared head (Slide 28), to check that
+reasoning directly rather than keep assuming it.
+
+**Same physics, same clip, same bar as Slide 29; the only addition is 30 rounds of grading small
+perturbations of the cloned policy's own action against the shared head's Froude prediction, and
+refitting on the winner.**
+
+| policy | travelled | stays upright | verdict |
+|---|---|---|---|
+| clone only | 52% of D_real | falls near the end of the window | FAIL |
+| **clone + 30 rounds of grading** | **31%** | **falls at roughly the halfway point** | FAIL |
+
+**Grading made it worse, not better — confirmed by watching both videos, not by the number alone:**
+the graded policy visibly collapses onto its back well before the clone-only one's later, milder
+tip-over.
+
+**Why, measured rather than assumed.** The expert's own recorded actions, replayed through the exact
+physics the student is judged in, complete all 66 steps, cover the full recorded distance, and never
+once command a joint past its physical limit. The cloned policy's own actions do — climbing from the
+expert's typical command size to nearly triple it by the point the body starts to sink, and
+beginning to hit joint limits the expert itself never touches. That is a **compounding-error
+signature**: a small early deviation from the expert's trajectory reaches a state the policy was
+never shown, so it answers increasingly badly, which pushes it further off course. Grading is
+supposed to correct exactly that — but if the grader cannot tell nearby actions apart (precisely what
+Slide 15 measured), the "correction" it hands back is close to a random label, added on top of an
+otherwise-clean training set.
+
+```
+  what breaks the clone            what grading was supposed to fix it with
+  ────────────────────             ─────────────────────────────────────────
+  small drift → unseen state       ask the model: which nearby action recovers best?
+  → the policy answers worse       → the model can't tell nearby actions apart (Slide 15)
+  → drift compounds                → the "best" pick is close to random
+                                    → refitting on it teaches the wrong lesson
+```
+
+**Open, not yet tested: whether the model helps through a different mechanism entirely** — not by
+ranking discrete nearby actions, but as a training-time signal computed once, directly, by gradient,
+at the policy's own action, using the same frozen model. That sidesteps the specific failure measured
+here (comparing noisy nearby candidates), but could still fail if the shared head's local sensitivity
+is genuinely flat rather than merely noisily estimated — a question this test does not answer either
+way.
+
+> **บทพูด (TH).** สไลด์ 15 เจอปัญหานี้บนแมลงแล้ว: การให้คะแนน "ท่าเดียวกันที่เปลี่ยนไปนิดเดียว" คือถามคำถามที่
+> **ฟิสิกส์จริงเองก็แยกไม่ออก** (0.1304 กับ 0.1299) ตอนนั้นสรุปว่าไม่คุ้มลองซ้ำที่อื่น — **รอบนี้ลองจริงกับ B1**
+> ผล: การให้คะแนนทำให้แย่ลง ไม่ใช่ดีขึ้น (52% → 31%) ยืนยันด้วยวิดีโอทั้งคู่ ไม่ใช่แค่ตัวเลข
+> **สาเหตุที่วัดได้จริง**: คำสั่งจริงของ expert เดินครบ 66 สเต็ป ไม่เคยชนขีดจำกัดข้อต่อเลย ส่วนนโยบายที่ clone มา
+> ยิ่งเบี่ยงจาก expert คำสั่งก็ยิ่งแรงขึ้นเรื่อย ๆ จนชนขีดจำกัด — คือ **ความผิดพลาดที่สะสมตัวเอง** การให้คะแนนควรจะ
+> แก้จุดนี้ได้ แต่ถ้าตัวให้คะแนนเองแยกท่าใกล้เคียงกันไม่ออก มันก็สอนบทเรียนผิด ๆ ทับเข้าไปแทน
+> **ที่ยังไม่ได้ลอง**: ใช้โมเดลแบบ backprop ตรง ๆ แทนการเทียบตัวเลือก — อาจเลี่ยงปัญหานี้ได้ หรืออาจล้มด้วยเหตุผล
+> เดียวกันก็ได้ ยังไม่รู้
 
 ---

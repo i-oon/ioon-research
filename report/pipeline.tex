@@ -1,0 +1,175 @@
+\documentclass{article}
+\usepackage[paperwidth=275mm,paperheight=104mm,margin=0pt]{geometry}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\graphicspath{{report/image/}{image/}}
+\usetikzlibrary{arrows.meta,backgrounds,calc,fit,positioning}
+\pagestyle{empty}
+
+% Paper-oriented palette: role is still identifiable in grayscale.
+\definecolor{panel}{HTML}{FBF7E9}
+\definecolor{ink}{HTML}{30343B}
+\definecolor{targetgray}{HTML}{777B82}
+\definecolor{encoderfill}{HTML}{E8E1F0}
+\definecolor{modelfill}{HTML}{F3DCCF}
+\definecolor{decoderfill}{HTML}{F3E2A9}
+\definecolor{bodyfill}{HTML}{DDEED6}
+\definecolor{latentfill}{HTML}{E4F3FA}
+\definecolor{latentblue}{HTML}{5AA9CE}
+\definecolor{featureblue}{HTML}{5B8FD9}
+\definecolor{lossfill}{HTML}{FFFFFF}
+
+\tikzset{
+  font=\sffamily\footnotesize,
+  >={Latex[length=2.2mm,width=1.4mm]},
+  flow/.style={draw=ink, line width=.85pt, ->},
+  line/.style={draw=ink, line width=.85pt},
+  clearflow/.style={draw=ink, line width=.9pt, ->,
+    preaction={draw=panel, line width=3.2pt}},
+  clearline/.style={draw=ink, line width=.9pt,
+    preaction={draw=panel, line width=3.2pt}},
+  target/.style={draw=targetgray, line width=.75pt, dashed, ->},
+  operation/.style={draw=ink!75, fill=white, line width=.65pt,
+    rounded corners=1.5pt, align=center, minimum width=18mm,
+    minimum height=6.5mm, inner sep=2pt, font=\sffamily\scriptsize},
+  encoder/.style={draw=ink!75, fill=encoderfill, line width=.7pt,
+    rounded corners=2pt, align=center, minimum width=19mm,
+    minimum height=14mm, inner sep=2.5pt},
+  model/.style={draw=ink, fill=modelfill, line width=.8pt,
+    rounded corners=2.5pt, align=center, minimum width=32mm,
+    minimum height=13mm, inner sep=3pt},
+  decoder/.style={model, fill=decoderfill, minimum width=29mm},
+  bodyhead/.style={model, fill=bodyfill, minimum width=32mm},
+  latent/.style={draw=latentblue, fill=latentfill, line width=1.2pt,
+    rounded corners=3pt, align=center, minimum width=17mm,
+    minimum height=10mm, inner sep=1.5pt,
+    font=\sffamily\bfseries\footnotesize},
+  loss/.style={draw=ink!80, fill=lossfill, line width=.75pt,
+    rounded corners=5pt, align=center, minimum width=27mm,
+    minimum height=10mm, inner sep=2pt},
+  imageframe/.style={draw=ink!65, fill=white, line width=.65pt,
+    rounded corners=1pt, inner sep=0pt},
+  junction/.style={circle, fill=ink, inner sep=0pt, minimum size=2mm},
+  labelbox/.style={fill=panel, inner sep=1pt, font=\scriptsize}
+}
+
+\begin{document}
+\thispagestyle{empty}
+\vspace*{\fill}
+\noindent\makebox[\paperwidth][c]{%
+\begin{tikzpicture}[x=1mm,y=1mm]
+  % One semantic region: only pretraining is shown in this figure.
+  \begin{scope}[on background layer]
+    \path[draw=ink!35, fill=panel, line width=.8pt, rounded corners=5pt]
+      (-7,-47) rectangle (258,47);
+  \end{scope}
+  \node[font=\sffamily\bfseries\large, text=ink] at (126,41) {Pretraining};
+
+  % -----------------------------------------------------------------------
+  % Paired observations: visual objects rather than network-style boxes.
+  \node[imageframe] (frameT) at (5.4,10.1)
+    {\includegraphics[width=20mm,height=14mm]{1.png}};
+  \node[imageframe] (frameTp1) at (7.8,4.9)
+    {\includegraphics[width=20mm,height=14mm]{2.png}};
+  \node[anchor=south east, font=\scriptsize] at (frameT.north east) {$o_t$};
+  \node[anchor=south east, font=\scriptsize] at (frameTp1.north east) {$o_{t+1}$};
+  \node[align=center, font=\scriptsize, text=ink!80] at (8,-7)
+    {Adjacent RGB\\observations};
+
+  % Synchronized action supervision is kept visually secondary.
+  \node[align=center, font=\scriptsize, text=ink!85] (label)
+    at (7,31) {Body-motion label\\$\mathbf v_t$};
+  \node[align=center, font=\scriptsize, text=ink!85] (bodylabel)
+    at (7,-35) {Joint-command label\\$a_t$};
+
+  % -----------------------------------------------------------------------
+  % Two independently augmented views.
+  \coordinate (obsSplit) at (26,5);
+  \draw[flow] (frameTp1.east) -- (obsSplit);
+  \node[junction] at (obsSplit) {};
+  \node[operation] (augA) at (40,19) {Aug. $A$};
+  \node[operation] (augB) at (40,-9) {Aug. $B$};
+  \draw[flow] (obsSplit) |- (augA.west);
+  \draw[flow] (obsSplit) |- (augB.west);
+
+  % Two forward passes through one shared, frozen visual model.
+  \node[encoder] (encA) at (63,19) {Frozen Visual\\Encoder};
+  \node[encoder] (encB) at (63,-9) {Frozen Visual\\Encoder};
+  \draw[flow] (augA) -- (encA);
+  \draw[flow] (augB) -- (encB);
+  \node[draw=ink!28, dashed, rounded corners=3pt,
+    fit=(augA)(augB)(encA)(encB), inner sep=4pt,
+    label={[font=\scriptsize,text=ink!62]below:visual front-end; shared frozen encoder}]
+    (visualfrontend) {};
+
+  % Feature-token glyphs distinguish data representations from computations.
+  \foreach \dy/\h in {-3/7,-1/11,1/9,3/13} {
+    \fill[featureblue!82] (80+\dy,19-\h/2) rectangle ++(1.7,\h);
+    \fill[featureblue!82] (80+\dy,-9-\h/2) rectangle ++(1.7,\h);
+  }
+  \node[anchor=west, align=left] (featuresA) at (86,19)
+    {$(e_t^{A},e_{t+1}^{A})$};
+  \node[anchor=west, align=left] (featuresB) at (86,-9)
+    {$(e_t^{B},e_{t+1}^{B})$};
+  \draw[flow] (encA.east) -- (75,19);
+  \draw[flow] (encB.east) -- (75,-9);
+
+  % -----------------------------------------------------------------------
+  % The ITM produces one latent vector.  A small circular data node keeps it
+  % visually distinct from the learned modules that compute with it.
+  \node[model] (itm) at (119,19)
+    {Inverse Transition Model};
+  \draw[flow] (featuresA.east) -- (itm.west);
+
+  \node[latent] (z) at (151,1) {$z_t$};
+  \node[font=\scriptsize, text=ink!75, above=2.0mm of z]
+    {latent action};
+  \node[font=\scriptsize, text=latentblue!85!black, below=1.3mm of z]
+    {$\mathbb{R}^{64}$};
+  \draw[clearflow] (itm.south) -- (119,1) -- (z.west);
+
+  \node[bodyhead] (bodyhead) at (202,25)
+    {Body-motion Head};
+  \node[model] (ftm) at (202,1)
+    {Forward Transition Model};
+  \node[decoder] (md) at (202,-23)
+    {Motion Decoder};
+  \draw[clearflow] (z.north) -- (151,25) -- (bodyhead.west);
+  \draw[clearflow] (z.east) -- (ftm.west);
+  \draw[clearflow] (z.south) -- (151,-20.2) -- ($(md.west)+(0,2.8)$);
+
+  % Current-view context from branch B conditions both predictors.
+  \coordinate (context) at (124,-9);
+  \draw[flow] (featuresB.east) -- node[above,labelbox] {$e_t^{B}$ context} (context);
+  % \node[junction] at (context) {};
+  \coordinate (ctxBus) at (181,-9);
+  \draw[clearline] (context) -- (ctxBus);
+  \draw[clearflow] (ctxBus) |- ($(ftm.west)+(0,-2.8)$);
+  \draw[flow] (context) -- ++(7,0) -- ++(0,-16.8) -- ($(md.west)+(0,-2.8)$);
+
+  % -----------------------------------------------------------------------
+  % Compact scalar terminal objectives.
+  \node[loss] (bodyloss) at (242,25) {$\mathcal L_{\mathrm{body}}$};
+  \node[loss] (reconloss) at (242,1) {$\mathcal L_{\mathrm{recon}}$};
+  \node[loss] (motionloss) at (242,-23) {$\mathcal L_{\mathrm{motion}}$};
+  \draw[flow] (bodyhead) -- node[above,labelbox] {$\hat{\mathbf v}_t$} (bodyloss);
+  \draw[flow] (ftm) -- node[above,labelbox] {$\hat e_{t+1}$} (reconloss);
+  \draw[flow] (md) -- node[above,labelbox] {$\hat a_t$} (motionloss);
+
+  % Ground-truth targets use quiet dashed paths; backpropagation is implicit.
+  \draw[target] (label.east) -- (242,31) --
+    node[right,labelbox] {Froude $\mathbf v_t$} (bodyloss.north);
+  \draw[target] (featuresB.south) -- ++(0,-7) -|
+    node[pos=.92,right,labelbox] {$e_{t+1}^{B}$} (reconloss.south);
+  \draw[target] (bodylabel.east) -- (242,-35) --
+    node[right,labelbox] {$a_t$} (motionloss.south);
+
+  % A single unobtrusive annotation explains the non-solid target paths.
+\node[font=\scriptsize, text=targetgray, anchor=east] at (256,-41)
+    {dashed: supervision target};
+\end{tikzpicture}%
+}
+\vspace*{\fill}
+\end{document}

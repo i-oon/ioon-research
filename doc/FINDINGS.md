@@ -17426,8 +17426,12 @@ velocity, 18.1% on angular -- validated directly by re-simulating a clip and com
 trusting it as training data; a one-step forward difference measured WORSE, 8.5%/39.8%, confirmed
 not assumed). Data: `data/egocentric/beh12_b1_ego_flat`, confirmed balanced (16/16/16 clips across
 speed/turn/side) before training. Teacher checkpoint: `wm/runs/beh12_hinge_multistep_anchor_v2/
-b1_adapt_hinge/teacher_b1.pt` -- the currently-active checkpoint (F210 used it the same session),
-not refit, per the project's own rule that only genuinely superseded artifacts get refit.
+b1_adapt_hinge/teacher_b1.pt` -- **correction (F214): F210 actually used `body_head_b1_hex_v2.pt`,
+not this checkpoint.** `teacher_b1.pt` is still the right choice *here*, but for a narrower reason
+than originally stated: `clone_b1()` reads only `cfg.body_channels` from it, never `body_head`
+(F214 confirms this precisely), and `cfg` is identical across the whole `b1_adapt_hinge` family, so
+which member of that family is named makes no difference to this specific stage. Not refit, per the
+project's own rule that only genuinely superseded artifacts get refit.
 
 **Two real bugs found and fixed before they could produce a false result, both caught by watching
 video rather than trusting a number (the project's own repeated lesson, again).** A first pass
@@ -17490,6 +17494,209 @@ a qualitatively different failure depending only on which physics they're asked 
 next test, not yet run: re-collect (or re-render) B1 clips on `b1_flat_real.xml` so training and
 evaluation share one physics model, removing this confound before judging the mechanism.
 
-Scripts: `sim/control/teacher_student_b1.py` (new; `bc`/`eval` stages, no `improve`). Checkpoints:
+Scripts: `sim/control/teacher_student_b1.py` (at the time of this entry, `bc`/`eval` stages only, no
+`improve` -- see F216, which added a grading stage later the same session and renamed the file back).
+Checkpoints:
 `wm/runs/students/b1_bc_forward.pt`, `wm/runs/students/b1_bc_all.pt`. Videos:
 `results/wm/students/eval_{forward,all}{,_flat}.mp4`.
+
+---
+
+### F214. `teacher_b1.pt` was used as "the teacher" for two z-sharing diagnostics tonight despite never having a fitted `body_head` -- correcting to `body_head_b1_hex_v2.pt` reverses both results
+
+**The mistake.** `wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/teacher_b1.pt` has no
+`body_head_fit` key at all -- its `body_head` is whatever the original hexapod-only pretrain left
+it at (`lambda_body=0.5` during joint training, never touched by `wm.adapt`'s stage-1 loss, which
+is pure next-embedding MSE with no body term). `body_head_b1_hex_v2.pt` is the checkpoint that
+actually went through `wm.fit_body_head` (6000 epochs, B1 data) -- the checkpoint F210 itself used
+to get 92% family accuracy. Both scripts tonight (`body_head_hidden_share.py`,
+`linear_vs_itm_froude.py`) defaulted to `teacher_b1.pt`, not `body_head_b1_hex_v2.pt`. ITM and the
+projector are identical between the two (`body_head_b1_hex_v2.pt`'s own metadata: `body_head_fit.
+source = teacher_b1.pt`, i.e. body_head was fit on top of it, everything else inherited unchanged)
+-- confirmed directly, since raw-`z` numbers below are bit-identical across both checkpoints.
+
+**Result 1, linear-pair-mapper vs `body_head(ITM(.))`, 48 hexapod clips, 36/12 held-out split:**
+
+| | wrong checkpoint (`teacher_b1.pt`) | correct checkpoint (`body_head_b1_hex_v2.pt`) |
+|---|---|---|
+| linear ridge, held-out median err | 0.0202 | 0.0202 (unchanged, baseline doesn't use the checkpoint) |
+| `body_head(ITM(.))`, held-out median err | 0.0669 (loses to linear) | **0.0168 (beats linear)** |
+| `body_head(ITM(.))`, held-out R2 | +0.292 | **+0.736** |
+
+**Result 2, cross-embodiment same-behaviour clustering (cosine gap, 18 clips, hexapod+B1):**
+
+| representation | wrong checkpoint gap | correct checkpoint gap | held-out (3-fold) |
+|---|---|---|---|
+| raw z (64-D) | 0.080 | 0.080 (identical -- same ITM) | -- |
+| body_head hidden (128-D) | 0.027 | 0.007 | -- |
+| **body_head Froude output (3-D)** | 0.041 (25% of within-body signal) | **0.672 (89% of within-body signal)** | **0.75 / 0.89 / 0.91, all three folds strongly positive** |
+
+**Reading.** With the properly-fit checkpoint, `body_head`'s Froude output clusters strongly by
+behaviour across the two bodies -- 89% of the within-one-body behaviour signal survives crossing
+embodiments, validated with a proper train/test split (identity direction fit on 2 seeds per cell,
+tested on the third, never seen together), all three folds consistent. This directly supports the
+thesis's actual claim (`report/proposal.tex`'s "shared body-motion coordinate", not a shared `z`)
+with geometric clustering evidence, not just F210's candidate-selection accuracy. And the linear
+baseline, which briefly looked like it beat `body_head(ITM(.))` on the wrong checkpoint, does not
+beat it on the checkpoint that was actually fit for this task -- the ITM/z pathway earns its keep
+over a trivial linear function of the same frame pair.
+
+**What is unaffected.** `sim/control/teacher_student_b1.py`'s `clone_b1()` (F212's BC test) reads
+only `cfg.body_channels` from its `--base_ckpt` argument, never `body_head` itself, and its
+`evaluate_b1()` constructs `B1MuJoCoEnv` with `goal_std=np.zeros(3)`, never querying `body_head`'s
+output anywhere in the rollout loop. F212's numbers do not depend on which of these two checkpoints
+is named `--teacher` and are not revised by this entry.
+
+**Practical rule going forward, stated so it isn't tripped over again**: `teacher_b1.pt` is valid
+whenever only `itm`/`projector`/`cfg` are needed (they are identical in both checkpoints).
+`body_head_b1_hex_v2.pt` is required whenever `body_head`'s actual fitted output matters -- check a
+checkpoint's own `body_head_fit` key before trusting its `body_head`, rather than assuming "the
+teacher checkpoint" is interchangeable with "the one with a properly fit body_head".
+
+Scripts (both fixed in place, no new files): `scripts/diagnostics/cross_embodiment/
+body_head_hidden_share.py`, `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py`.
+
+### F215. ITM's Froude read beats an equal-capacity MLP on the same raw frame pair, not just a linear one -- most of the earlier "ITM helps" gap is generic nonlinearity, but a real remainder is ITM-specific
+
+F214's corrected result (linear ridge 0.486 R2, `body_head(ITM(.))` 0.736 R2, held out) left one gap
+unclosed: does ITM's own transition-model structure matter, or would *any* nonlinear function of
+the same `concat(pooled(e_t), pooled(e_next))` pair close most of that gap on its own? Added a
+second baseline to `linear_vs_itm_froude.py`: an MLP with `body_head`'s exact shape (LayerNorm,
+Linear->128, GELU, Linear->3) trained by gradient descent on the identical pair features and split
+-- same capacity as `body_head`, but applied directly to the raw pair instead of to ITM's `z`.
+
+Held out (12 hexapod clips, same split as F214):
+
+| method | median\|err\| | mean\|err\| | R2 |
+|---|---|---|---|
+| linear ridge (no ITM, no z) | 0.0202 | 0.0595 | +0.486 |
+| MLP, same capacity as body_head, no ITM | 0.0181 | 0.0471 | +0.667 |
+| existing `body_head(ITM(.))` | 0.0168 | 0.0397 | **+0.736** |
+
+Train split, for reference: linear 0.983, MLP 0.997, ITM 0.964 -- the MLP baseline fits training
+data almost perfectly (0.997) yet generalizes worse than ITM (0.667 vs 0.736 held out), a larger
+train/held-out gap than ITM's own (0.964 -> 0.736). That is evidence the MLP is overfitting on raw
+pixel-embedding noise that ITM's transition structure does not, not just "under-capacity."
+
+**Reading, precisely.** Most of the linear-to-ITM gap (0.486 -> 0.736) is recovered by adding *any*
+nonlinearity of matching capacity (0.486 -> 0.667) -- so "z helps because it's nonlinear" is largely
+right. But a real, smaller remainder (0.667 -> 0.736) survives when the nonlinearity is specifically
+ITM's two-frame transition structure (trained jointly with FTM/projector) rather than a generic MLP
+on the raw pair -- and it does so while generalizing better, not by fitting harder. Both baselines
+still lose to ITM; neither closes the gap.
+
+Script: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py` (extended in place with
+`PairMLP`/`mlp_fit`/`mlp_predict`, no new file).
+
+### F216. `improve()`, finally built and run for B1: DAgger against the real, correctly-fit teacher makes the student worse, not better -- confirming by measurement what F135/F136/F138 had only argued by extrapolation
+
+F212 tested clone-only (`clone_b1()`); the grading/DAgger stage was deliberately left unbuilt,
+reasoning from F135/F136/F138 (measured on the insect: local-perturbation ranking scores 33% against
+a 50% coin flip, because real physics barely distinguishes nearby actions at fixed magnitude) that
+the same failure would recur on B1. That reasoning was never actually tested on B1 -- it was an
+extrapolation from one embodiment to another. Built `improve_b1()` in
+`sim/control/teacher_student_b1.py` to check it directly rather than keep assuming it, which also
+made "teacher-student" an accurate name again (the file had been renamed to `clone_b1.py` earlier
+this session for having no such stage -- reverted here, with the reason kept in its own docstring).
+
+**Three departures from `teacher_student_insect.py`'s `improve()`, all forced by B1's existing split,
+none new design**: physics stays in MuJoCo, CoppeliaSim is brought up only to pose the body and take
+one picture per step (`close_loop_b1_physics.py`'s own split, reused); the room is rendered in the
+SAME egocentric convention `beh12_b1_ego_flat` itself was rendered in (`ego_camera.attach_ego`,
+`room_for`, `WALK_PITCH["b1"]`) so grading is not confounded by a render-domain shift against the
+frames `body_head_b1_hex_v2.pt` was actually fit on; the goal is B1's own recorded body motion, kept
+to `clone_b1`'s own training split, so the comparison against the BC-only number is apples to apples
+and not a new cross-embodiment claim. `main()` now asserts `--base_ckpt` for `improve` carries a real
+`body_head_fit` for b1, refusing `teacher_b1.pt` outright (F214's mixup, made structurally impossible
+here rather than just documented).
+
+Ran 30 DAgger rounds against `body_head_b1_hex_v2.pt`, refitting `b1_bc_forward.pt` (F212's BC
+student). Evaluated both, same bar, same goal clip, **video watched for both before trusting either
+number** (the standing rule, and it mattered again):
+
+| student | travelled / D_real | upright | verdict |
+|---|---|---|---|
+| BC only (`b1_bc_forward.pt`, F212) | 52% | falls (frame ~60 of 66, near the end) | FAIL |
+| BC + 30 rounds DAgger (`b1_dagger_forward.pt`) | **31%** | falls (frame ~30 of 66, roughly twice as early) | FAIL |
+
+The video confirms the number is not a rendering artifact: the DAgger student visibly crumples onto
+its back by the middle of the rollout, well before the BC-only student's later, milder tip-over.
+DAgger did not just fail to help -- it made the policy measurably worse and made it fall sooner.
+
+**Reading.** This is the direct, on-B1 confirmation of what F135/F136/F138 only established on the
+insect and this session had extrapolated rather than tested: grading candidate actions with the
+world-model teacher, at a fixed local perturbation scale, does not produce a useful training signal
+for this robot either. The likely mechanism carries over unchanged: `body_head`'s Froude read cannot
+discriminate between the small, nearby action perturbations DAgger samples, so `argmin` over those
+candidates picks close to noise, and refitting the student on that noise pulls it away from the
+clean expert labels in the buffer rather than sharpening them -- a plausible account of why it is
+worse than baseline, not just equal to it. **Both bars stay a pre-registered FAIL either way**, so
+this does not reopen F212's overall verdict on the B1 port -- it closes the one open question F212
+left standing (grading vs. clone-only) with a clean negative, on this embodiment, by measurement.
+
+**A latent bug fixed while running this**: `eval`'s `--out` shared `bc`'s own default
+(`wm/runs/students/b1_bc_forward.pt`), so running `eval` without `--out` wrote an eval-results
+`.npz` alongside a same-named `.pt` checkpoint (numpy appends `.npz` rather than overwriting the
+`.pt` file directly, so no checkpoint was lost, but this was a live footgun). Fixed: `eval` now
+defaults its `--out` to `results/wm/<student-name>_eval.npz`.
+
+Script: `sim/control/teacher_student_b1.py` (renamed back from `clone_b1.py`; `improve_b1()` added,
+`--out` default fixed). Runs: `wm/runs/students/b1_dagger_forward.pt`, videos
+`results/wm/b1_bc_forward.mp4` / `results/wm/b1_dagger_forward.mp4`.
+
+### F217. Coarse-candidate correction (the buildable half of "does grading help," once the state-aware half turned out not to exist) also fails, but travels farther before it does -- offline R2 diverges to negative while closed-loop distance improves
+
+Following F216, a second grading mechanism was proposed: instead of ranking small local action
+perturbations (proven broken), use `DirectFroudePlanner` -- F210's own mechanism, `body_head(proj(a))
+vs. goal`, no rollout, 90%+ family accuracy -- to pick among **coarse, qualitatively different**
+candidates instead. Before building it, found this specific framing does not exist: `DirectFroudePlanner`
+scores purely from a fixed goal and a candidate's own recorded actions, with no `e_t` and no notion
+of the live rollout's current state at all -- it cannot see or react to drift, so it cannot implement
+"correction at a drift point." The planner that DOES take the live state (`LatentPlanner`, rolling
+the FTM) is the one Slide 24/F127 already showed prefers the *worst* candidate. Neither combination
+gives a mechanism that is both state-aware and proven to discriminate well.
+
+**Built the honestly-available version instead**: relabel each of `b1_bc_all.pt`'s own 48 training
+clips with `DirectFroudePlanner`'s own coarse pick for that clip's goal (12-condition library, one
+clip per condition, `free_offset=True`, matching F210's own setting) instead of that clip's own
+recorded actions, then train the same `Student` architecture on the relabeled data, same held-out
+split as `b1_bc_all.pt` (its own saved `val_paths`, for an apples-to-apples comparison).
+
+**Expected, stated before running: since the library holds only one clip per condition, most of the
+48 training clips are NOT their own condition's representative, so most examples get relabeled with
+a genuinely different episode's action trajectory paired against their own state** -- confirmed:
+the planner picked a clip's own condition as its own best match on only 6/48 training clips.
+
+| | held-out MSE (best epoch) | held-out R2 |
+|---|---|---|
+| plain BC on raw expert actions (`b1_bc_all.pt`, F212) | -- | 0.995 (offline, F212) |
+| **distilled on the planner's own coarse pick** | 1.42, rising to 8.53 by epoch 2000 (never converges) | **-0.418** |
+
+Closed-loop, same bar, same goal clip, video watched for both:
+
+| student | travelled / D_real | upright | verdict |
+|---|---|---|---|
+| plain BC, all 3 behaviours (`b1_bc_all.pt`, F212) | 30% | stays upright (crouched low, but above the fall threshold) | FAIL |
+| **distilled on coarse picks** | **58%** | **falls completely** (frame ~35 of 66, legs splayed) | FAIL |
+
+**Reading.** The offline regression signal is unambiguously worse -- diverging, not just weaker --
+because pairing one clip's proprioceptive state with a *different* clip's action sequence breaks
+the basic state-action consistency BC depends on (an action that was correct for the state it was
+recorded at is not necessarily correct for a different clip's state at the same index). That the
+closed-loop distance improves anyway (58% vs 30%) rather than getting uniformly worse is a repeat of
+F135's own warning, now on a second embodiment: **held-out regression fit does not predict
+closed-loop rollout quality.** The trade this policy makes -- travel farther, fall harder -- echoes
+F212's own physics-dependent pattern (fast-and-falling vs. stable-and-slow), this time produced by a
+labelling choice rather than a physics mismatch. **Neither student clears the pre-registered bar.**
+
+**What this closes and what it leaves open.** Between the two buildable variants of "does the model's
+grading capability improve a cloned policy" -- fine local perturbation (F216) and coarse candidate
+relabelling (this entry) -- both fail the walking bar, for two different, now-diagnosed reasons (a
+grading signal that cannot discriminate nearby actions; a relabelling scheme that breaks state-action
+consistency). Neither result bears on the untested third option -- a differentiable auxiliary loss
+computed by backpropagating through the frozen model at the student's own action, never sampling or
+relabelling anything -- which remains the one candidate mechanism not yet tried.
+
+Script: `sim/control/teacher_student_b1.py` (`distill_b1()` and the `distill` stage added; reuses
+`wm/policy/planner.py`'s existing `DirectFroudePlanner`, no new planner code). Runs:
+`wm/runs/students/b1_distill_all.pt`. Videos: `results/wm/b1_bc_all.mp4` / `results/wm/b1_distill_all.mp4`.
