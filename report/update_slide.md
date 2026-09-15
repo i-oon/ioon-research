@@ -2,512 +2,31 @@
 
 Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaSim.
 
-| part | slides | what it covers |
-|---|---|---|
-| **Motivation** | 0a-0c | why morphology-specific control is expensive, what every existing route needs from the new body, and why answering this requires two bodies whose command spaces share nothing |
-| **Part 1 — Stage 1** | 1-8 | one six-legged topology, several leg geometries: the controlled first step, and the three requirements it establishes |
-| **Part 2 — the gap and the attempt** | 9-12 | what crossing embodiments requires, the field's own proposed fix rebuilt faithfully, and six independent measurements of why it does not work here |
-| **Part 3 — the principle** | 13-15 | pose determines the future, so the action is redundant: what that explains in the literature, and in our own three failed attempts |
-| **Part 4 — the prediction, tested** | 16-17 | removing the body from view restores action-sensitivity, the shared coordinate survives the change, and what we claim as contributions |
-| **Part 5 — where this stands** | 18-30 | behaviour selection from a recorded library, the diagnostic arc, a controller that now genuinely walks, and a second controller attempt (imitation) that does not yet |
-
-**The arc, in one line.** We could not make the world model use the action, so we measured why; the
-answer turned out to be a property of the **viewpoint** rather than of the model; that property
-predicted a fix which prior work had already adopted without explaining; and building on the result
-eventually produced a controller that walks. **This is not "we tried things until one worked."**
-
-**Terms used throughout.** *Latent action* — a 64-number code inferred from a pair of observations,
-standing in for the command that caused the change between them. *Shared coordinate* — forward,
-lateral and turning speed made dimensionless by body size, so the same number means the same
-behaviour on a 0.09 m insect and a 0.56 m quadruped.
-
-**Citations are separated from contributions throughout.** Each claim slide states what prior work
-found, what we measured where they did not, and what is ours.
-
----
-
-## Slide 0a — Why morphology-specific control is expensive, and what it would mean to fix it
-
-**The problem.** Legged robots are typically controlled by policies learned through RL. A policy
-learned for one body does not generalise to another — lengthen or shorten the legs, change the mass
-distribution, change the skeleton's topology, and the policy fails. A new one is trained from
-scratch, hours to days per body. Biological organisms share locomotion principles across vastly
-different body plans; a shared, body-independent representation of *movement* may be possible.
-
-**The precise analogy already has a name.** Psychology calls this **vicarious learning** (Bandura,
-1977) — acquiring a behaviour by observing another agent perform it, with no direct instruction, no
-first-hand demonstration of the observer's own body doing the task, and no requirement that the
-observed model resemble the observer. That is exactly the transfer under test here: a held-out
-body's controller, informed by video of a different body's behaviour — one it does not resemble and
-has never itself performed — with no kinematic account of either body supplied to bridge them. The
-behaviour crosses through what is *observed*, not through anything told to the model about the
-bodies involved.
-
-> **บทพูด (TH).** ปัญหาคือ policy ที่เทรนให้หุ่นตัวหนึ่งใช้กับหุ่นตัวอื่นไม่ได้เลย เปลี่ยนความยาวขา
-> เปลี่ยนโครงกระดูก ต้องเทรนใหม่ทุกครั้ง เป็นชั่วโมงถึงวัน ในขณะที่สิ่งมีชีวิตใช้หลักการเดินเดียวกัน
-> ข้ามร่างกายที่ต่างกันมาก แนวคิดที่ตรงที่สุดมีชื่อในจิตวิทยาอยู่แล้วคือ **vicarious learning** — เรียนรู้
-> พฤติกรรมจากการ**ดู**ตัวอื่นทำ ไม่ต้องมีใครสอนตรงๆ ไม่ต้องเคยทำเองมาก่อน และร่างไม่จำเป็นต้องเหมือนกัน
-> นี่คือสิ่งที่งานนี้ทดสอบเป๊ะๆ
-
----
-
-## Slide 0b — Every existing route hands the model privileged information about the new body; one result does not, but stops short
-
-**Every existing route around morphology-specificity assumes access to something about the target
-body** that the motivating scenario (an animal, a damaged robot, hardware acquired with no published
-kinematics) does not provide:
-
-| approach | what it needs from the new body |
-|---|---|
-| QWM | a CAD or URDF description read from the robot's design files |
-| graph/transformer universal controllers | a kinematic tree — which joint connects to which |
-| L3P | an observation encoder and action decoder fitted per robot from its own proprioception and foot force |
-| LAC-WM | a task space (e.g. end-effector pose) that already means the same thing on every body |
-| Demo-JEPA | demonstrations of the same task, paired across both bodies |
-
-**One result drops the requirement entirely — the starting point for this thesis.** Hu, Chen, and
-Lipson (2025) learn a task-agnostic visual self-model for a legged robot from a single egocentric
-camera and random motor babbling, with no prior knowledge of morphology, kinematics, or task, and
-use it to plan locomotion and recover from physical damage. **But the self-model is fitted to one
-robot at a time** — each body is babbled and modelled separately, nothing is shared or transferred
-between bodies. **Extending that premise across embodiments is what this thesis attempts, and it is
-the step nobody in this literature has taken.**
-
-> **บทพูด (TH).** วิธีที่มีอยู่ทุกวิธีต้องได้ข้อมูลพิเศษเกี่ยวกับหุ่นตัวใหม่ก่อนเสมอ — CAD/URDF, โครงสร้าง
-> ข้อต่อ, ข้อมูล proprioception ของหุ่นนั้นเอง, หรือ demonstration ที่จับคู่ไว้แล้ว มีงานเดียวที่ตัด
-> ข้อกำหนดนี้ทิ้งได้จริง (Hu et al. 2025) — babble หุ่นตัวเดียว ไม่รู้ kinematics เลย แต่ใช้ควบคุมและ
-> ซ่อมแซมตัวเองได้ **แต่ทำทีละตัว ไม่เคยแชร์อะไรข้ามหุ่นเลย** — งานนี้คือการเอาแนวคิดนั้นไปทดสอบข้ามหุ่น
-> ซึ่งไม่มีใครในงานวิจัยที่ผ่านมาทำมาก่อน
-
----
-
-## Slide 0c — Why this needs two genuinely disjoint action spaces, and what is learned
-
-**Why the leg-geometry variants (Stage 1) cannot answer this alone.** Several leg-geometry variants
-share one 18-D joint space, so a proprioceptive model *could in principle* be shared across them too
-— vision's advantage there is convenience, not necessity. Answering whether a vision-only latent
-action can unify locomotion where **proprioception has no shared coordinate to begin with** needs a
-second body whose action space is genuinely disjoint from the first.
-
-```
-  hexapod (18 actuated joints, CoppeliaSim)     Unitree B1 (12 actuated joints, MuJoCo)
-          │                                              │
-          └──────────── share no dimension, no correspondence ────────────┘
-                                     │
-                    a single egocentric camera describes both
-                    in the same 256x256x3 pixel array regardless
-```
-
-**What is actually learned is not an opaque latent action, but a shared body-motion coordinate**:
-dimensionless forward, lateral, and yaw velocity — the same three physical quantities on both
-robots, inferred from egocentric video alone, no morphology label, no kinematic model or URDF for
-either body, no manually defined joint correspondence. Learning this coordinate is one problem;
-*using* it to drive an unseen body is a second, harder one — a substantial part of this thesis is
-the diagnostic work separating what the resulting world model can do (coarse, single-step
-action-conditioning) from what it cannot yet do reliably (fine-grained ranking, multi-step rollout),
-and the measured mechanism behind that gap (Parts 2-4).
-
-**The significance, twofold.** Scientifically: whether a body-independent notion of locomotion
-behaviour can be learned from vision alone, across bodies whose action spaces cannot be reconciled
-by any coordinate choice without a kinematic model — and, along the way, a diagnostic methodology
-for telling whether a video world model is *using* an inferred action at all, not merely able to
-decode it. Practically: if such a coordinate transfers cheaply, it cuts the cost of controlling a
-new robot by reusing behaviour already observed on a different body, rather than retraining from
-zero or requiring that body's engineering specification.
-
-> **บทพูด (TH).** Stage 1 ตอบคำถามนี้เองไม่ได้ เพราะหุ่นทุกตัวใน Stage 1 ใช้ joint space เดียวกัน (18-D)
-> ต่อให้ไม่ใช้ภาพก็แชร์กันได้ในหลักการ ภาพเลยแค่สะดวก ไม่ใช่จำเป็น ต้องมีหุ่นสองตัวที่ joint space ไม่มี
-> ความสัมพันธ์กันเลยจริงๆ — หกขา 18 ข้อต่อ กับสี่ขา 12 ข้อต่อ — กล้องตัวเดียวอธิบายทั้งคู่ได้ในรูปแบบ
-> เดียวกันเป๊ะ **สิ่งที่เรียนรู้จริงๆ ไม่ใช่ latent ลึกลับ แต่คือพิกัดการเคลื่อนที่ร่วม** (เดินหน้า/ไถลข้าง/
-> เลี้ยว แบบไม่มีหน่วย) ความสำคัญมีสองด้าน: ทางวิทยาศาสตร์ (พิสูจน์ว่าเรียนรู้พฤติกรรมข้ามร่างได้จากภาพ
-> ล้วนๆ ไหม) และทางปฏิบัติ (ถ้าทำได้ ควบคุมหุ่นตัวใหม่ถูกกว่าการเทรนใหม่ทั้งหมด)
-
----
-
-# Part 1 — Stage 1: the controlled first step
-
-**The question.** Can a model learn, from video alone, a representation of *movement* that is
-independent of *which body* is moving — and then convert it back into the correct joint command for
-one specific body?
-
-**The scope.** Stage 1 varies leg geometry only: every body has six legs and the same eighteen
-joints, so the command spaces already correspond. Stage 2 removes that correspondence entirely
-(Slide 0c).
-
-```
-  STAGE 1 — the easy case: command spaces already match
-      measures three things, each of which Stage 2 then has to satisfy again:
-
-   1  a shared representation must be FORCED by the objective,      Stage 2 needs the same forcing,
-      not bought with capacity or architecture        (Slide 4)  ─▶  with no shared command space
-                                                                    to apply it in
-
-   2  "morphology" is several INDEPENDENT axes; coverage must be     check coverage per axis,
-      checked per axis, and can be checked in advance (Slides 5-6) ─▶ not per body count
-
-   3  a metric can SATURATE and hide what the model is not doing;    test the mechanism you
-      test the mechanism, not a proxy for it          (Slides 7-8) ─▶ depend on, directly
-```
-
-Stage 1 never closes the loop. It is the controlled experiment that justifies attempting Stage 2.
-
----
-
-## Slide 1 — The pipeline: one frozen encoder, three small trained modules
-
-```
-   frame ──▶ [ frozen visual encoder ] ──▶ observation
-                                               │
-                            observation pair ──┴──▶ [ inverse model ] ──▶ latent action
-                                                                              │
-            observation + latent action ──▶ [ forward model  ] ──▶ predicted next observation
-            observation + latent action ──▶ [ command decoder] ──▶ joint command
-```
-
-| module | the question it answers |
-|---|---|
-| inverse model | given a transition, what action produced it? |
-| forward model | does the latent action let us predict what happens next? |
-| command decoder | can the latent action be turned back into an executable joint command? |
-
-- **Encoder:** a one-billion-parameter video model, **frozen throughout**, never trained on robots.
-  The three modules on top are about five million parameters each.
-- **Training signal:** predict the next observation, and recover the real joint command. Equal
-  nominal weight on the two.
-
-**Two structural facts that shape every result below.** The command decoder never sees the second
-frame — whatever the transition contributes has to pass through a 64-number latent, and that
-bottleneck is the whole design. And the two training terms differ in scale by two orders of
-magnitude, so **next-observation prediction takes roughly 99% of the gradient in practice**: the
-term meant to ground the latent in real commands runs on the remainder.
-
-> **บทพูด (TH).** encoder เป็นโมเดลวิดีโอขนาดพันล้านพารามิเตอร์ที่ **แช่แข็งไว้ ไม่เคยเทรนกับหุ่นยนต์เลย**
-> เราเทรนแค่สามโมดูลเล็ก ๆ ข้างบนมัน: ตัวแรกถามว่า "การเปลี่ยนจากภาพนี้ไปภาพนั้น เกิดจากคำสั่งอะไร"
-> ตัวที่สองถามว่า "คำสั่งที่ถอดได้ ทำนายอนาคตได้ไหม" ตัวที่สามถามว่า "แปลงกลับเป็นคำสั่งข้อต่อที่สั่งได้จริงไหม"
-> **สองข้อที่ต้องจำไว้**: ตัวถอดคำสั่งไม่เคยเห็นเฟรมที่สอง ข้อมูลต้องลอดผ่าน latent 64 ตัวเท่านั้น
-> และ loss สองก้อนต่างสเกลกันร้อยเท่า ทำให้ **การทำนายภาพกินเกรเดียนต์ไปราว 99%**
-
----
-
-## Slide 2 — Setup, hypothesis, and how every number is read
-
-**The bodies.** Six-legged walkers differing only in segment lengths — hip, thigh, shin. Held-out
-bodies are never trained on. Only clips where the body genuinely walked are used (a minimum forward
-travel, a maximum sideways drift); bodies that collapse or veer are excluded by name, not by hope.
-
-**Commands are retargeted, not copied.** One foot trajectory in Cartesian space is solved separately
-for each body by inverse kinematics: **same intended behaviour, genuinely different joint numbers.**
-Without this the transfer question would be empty — every body would receive the same command.
-
-**Behaviour:** forward walking, one speed. This turns out to matter, and Slide 7 is where it returns.
-
-**The hypothesis.** If the latent truly separates movement from body, then a body never seen in
-training should receive commands appropriate to *its own* geometry — not the commands of whichever
-training body it most resembles.
-
-| how each claim is tested | what it isolates |
-|---|---|
-| linear probe on the frozen encoder | is the information present and readable at all, before any training |
-| swap test — one body's frame, another body's latent | does the decoder take the body from the image or from the latent |
-| input ablation — delete one input, re-measure | which input the decoder actually depends on |
-| mixture fit | is the model interpolating between training bodies, or copying the nearest one |
-| physical replay | do the predicted commands actually walk, not merely score well per joint |
-
-**Reading the numbers.** Command error is RMSE in degrees, pooled over all eighteen joints, on a
-body never trained on. **The commands' own spread is 11.7°** — that is the scale every error below
-is read against. R² is measured against the held-out body's own mean posture, so a negative value
-means *worse than memorising one fixed pose*. A "control" is the identical run with one setting
-changed.
-
-**Ratios in this deck point in two different directions, so each one says which.** An *error* ratio
-(`error / baseline error` — the held-out body-head fit, for instance) is **better below 1.0**: 1.0
-means the model only learned the dataset mean. A *beats-the-baseline* ratio (the forward model's
-rollout score, `baseline error / model error`) is **better above 1.0**: 1.0 means the model ties with
-predicting that nothing moves, and 1.5 means its error is 1.5x smaller. An earlier version of this
-line declared "above 1.0 means worse" without qualification, which is backwards for every rollout
-number in Part 3 — the same sign error the project already made once inside a finding and had to
-correct.
-
-> **บทพูด (TH).** หุ่นทุกตัวมีหกขาและข้อต่อ 18 ข้อเหมือนกัน **ต่างกันแค่ความยาวขา** คำสั่งของแต่ละตัว
-> ได้มาจากการแก้ IK จากรอยเท้าเดียวกัน — **เจตนาเดียวกัน แต่ตัวเลขคำสั่งต่างกันจริง** ถ้าไม่ทำแบบนี้
-> คำถามเรื่องการถ่ายโอนจะไม่มีความหมาย เพราะทุกตัวจะได้คำสั่งชุดเดียวกัน
-> **สมมติฐาน**: ถ้า latent แยก "การเคลื่อนไหว" ออกจาก "ร่างกาย" ได้จริง หุ่นที่ไม่เคยเห็นควรได้คำสั่งที่
-> เหมาะกับขาของตัวเอง ไม่ใช่คำสั่งของหุ่นที่หน้าตาใกล้ที่สุดในชุดเทรน
-> **เลขที่ต้องเทียบตลอด**: ค่าความกว้างของคำสั่งเองคือ 11.7 องศา — error ทุกตัวอ่านเทียบกับเลขนี้
-> และ R² ติดลบหมายถึง **แย่กว่าการจำท่านิ่งท่าเดียว**
-
----
-
-## Slide 3 — The geometry is visible in the image; the trained model does not use it
-
-**A four-thousand-parameter probe on the frozen encoder recovers a held-out body's segment lengths
-to within 0.04**, fitted on four training bodies and applied to one never seen, with nothing
-supervising it. The information is in the image. **This is the premise the whole project rests on.**
-
-**The trained decoder, a thousand times larger, reads the same body wrong:**
-
-| held-out body, segment scales | hip | thigh | shin |
-|---|---|---|---|
-| the truth | **0.80** | 0.90 | 0.90 |
-| probe on the frozen encoder, 4k parameters | **0.84** | 0.91 | 0.91 |
-| the trained command decoder, 5M parameters | **0.62** | 0.96 | 0.96 |
-
-The probe lands within 0.04 everywhere; the decoder implies a hip segment **22% shorter than the
-body has**. The larger model is the one that misreads it.
-
-**A swap test says why.** Given one body's image together with a *different* body's latent — two
-bodies whose commands differ by 21° — the decoder answers with the **latent's** body to within 6°.
-It followed the latent and ignored the image.
-
-**Diagnosis: the decoder learned to recognise which training body it is looking at, and recall that
-body's commands.** There is no entry in that lookup for a body it has never seen — which is why more
-trained capacity buys lower error on bodies it saw and *higher* error on the one it did not.
-
-![the encoder places the unseen body correctly; the decoder does not](../results/wm/stage1/figures/encoder_vs_decoder.png)
-
-> **บทพูด (TH).** สองบรรทัดนี้คือหัวใจของสไลด์: **probe เล็กจิ๋วอ่านความยาวขาของหุ่นที่ไม่เคยเห็นได้แม่น**
-> (ข้อมูลอยู่ในภาพจริง ไม่มีใครไปบอกมันเลย) แต่ **decoder ที่ใหญ่กว่าพันเท่าอ่านผิด** — มันเดาขาหน้าสั้นกว่า
-> ความจริง 22% และ swap test บอกสาเหตุ: เอาภาพของตัวหนึ่งคู่กับ latent ของอีกตัว **มันตอบตาม latent
-> ไม่สนใจภาพเลย** แปลว่ามันไม่ได้อ่านรูปร่างจากภาพ มันแค่ **จำได้ว่านี่คือหุ่นตัวไหนในชุดเทรน แล้วเรียกคำสั่ง
-> ของตัวนั้นออกมา** — ซึ่งหุ่นที่ไม่เคยเห็นไม่มีอยู่ในตารางนั้น
-
----
-
-## Slide 4 — The fix has to be in the objective, and that is the lever
-
-**Capacity, access, and the contents of the latent were each ruled out first.** Rescaling the
-target, shrinking the decoder, stripping body identity adversarially, and handing the decoder a
-global view of the frame all failed or made transfer worse. **What remained was the objective:
-nothing in the loss ever *required* reading geometry from pixels.** Recognising the body was cheaper
-and scored just as well.
-
-**So change what the loss asks for.** Every body walks the same episodes, so at a given timestep two
-bodies share the intent and differ only in geometry. Add one term: *take body A's latent, show the
-decoder body B's frame, and require body B's command.*
-
-```
-  BEFORE   the latent can carry the body  ──▶  decoder recalls a training body's commands
-                                               (cheap, and the loss never objects)
-
-  AFTER    reading the body out of the latent is WRONG BY CONSTRUCTION
-                                          ──▶  the only way to be right is to read
-                                               geometry from the image
-```
-
-**One term, one extra decoder pass per batch, nothing else changed:**
-
-| matched pair, same held-out body | without the term | with it |
-|---|---|---|
-| command error | 3.67° | **3.44°** |
-| **how much the image is worth to the decoder** | 0.4× | **9.6×** |
-| movement's share of the latent | 82% | **93%** |
-| body identity's share of the latent | 12% | **3%** |
-
-**The second row is the result: a 22-fold change in what the image is worth, from one term.** The
-last two rows are the mechanism, and the check that this is purification rather than destruction —
-behaviour decodes out of the latent slightly *better* than before, so nothing was lost. **The latent
-stopped carrying a job that was never its own**, and the two inputs ended up with separate jobs:
-the image carries *which body*, the latent carries *what movement*.
-
-**After the change, swapping the latent between two bodies moves the decoder's answer by 0.04°.**
-It is reading geometry from pixels.
-
-![what the cross-body term does](../results/wm/stage1_correct/figures/cross_loss_effect.png)
-
-> **บทพูด (TH).** ลองแก้ที่ตัวโมเดลมาสี่ทาง (ลดขนาด, เพิ่มการเข้าถึงภาพ, ไล่ body identity ออกจาก latent)
-> **ไม่ได้ผลหรือแย่ลง** — เพราะปัญหาไม่ได้อยู่ที่ความสามารถ แต่อยู่ที่ **loss ไม่เคยบังคับให้มันต้องอ่านรูปร่าง
-> จากภาพเลย** วิธีจำตัวหุ่นมันถูกกว่าและได้คะแนนเท่ากัน
-> **เราจึงเปลี่ยนสิ่งที่ loss ขอ**: เอา latent ของหุ่น A ไปคู่กับภาพของหุ่น B แล้วบังคับให้ตอบคำสั่งของ B
-> → การอ่าน "ตัวไหน" ออกจาก latent กลายเป็น **คำตอบที่ผิดโดยโครงสร้าง** ทางเดียวที่จะถูกคือต้องอ่านจากภาพ
-> **ผลคือภาพมีค่าต่อ decoder เพิ่มขึ้น 22 เท่า จาก term เดียว** และ latent สะอาดขึ้น (การเคลื่อนไหว 82→93%,
-> ตัวตนของร่าง 12→3%) โดยที่ข้อมูลพฤติกรรมไม่ได้หายไปเลย
-
----
-
-## Slide 5 — Where it works, and where it stops: the held-out body has to sit inside the geometry the data spans
-
-**Inside that span, the predicted commands actually walk.** Driven open-loop through the same physics
-used to collect the data, on a body never trained on:
-
-| | inverse kinematics | control | with the cross-body term |
-|---|---|---|---|
-| forward distance | 100% | 85% | **90%** |
-| heading deviation | 0° | 11.8° | **5.5°** |
-| worst joint-limit excursion | 0° | 8.2° | **3.9°** |
-
-Both walk. The cross-body run is **steadier** rather than dramatically better: it stays in a narrow
-band everywhere and is closer to the reference heading on every clip, where the control matches it
-twice and then fails badly on the third. Gait structure matches the reference — tripod alternation
-and stance durations line up, with 3.02 feet on the ground on average against the reference's 3.08.
-Stated plainly: on one clip the reference walks almost straight and both models veer. **Neither
-reproduces a straight walk on demand.**
-
-**Outside that span, the same weights fail — and fail at one specific joint.**
-
-| the same model, asked about | error | R² |
-|---|---|---|
-| a body inside the geometry spanned by training | **3.4°** | **+0.81** |
-| a body whose shin is short while its thigh is not | 13.4° | **−0.34** |
-
-Every training body that walked happened to have thigh and shin the same length — **not by design:
-the bodies where they differ are the ones that fall over.** So those two segments never moved apart
-in anything the model saw.
-
-| asked what that body's thigh and shin are | thigh | shin |
-|---|---|---|
-| the truth | **1.00** | **0.80** |
-| the trained decoder | 0.68 | 0.68 |
-| the probe on the frozen encoder | 0.84 | 0.84 |
-| the best any mixture of training bodies could say | 0.60 | 0.60 |
-
-**All three give the two segments the same number** — a large trained decoder, a tiny readout of the
-raw encoder, and a calculation with no learning in it at all, making the identical mistake. The last
-row is why: **no combination of bodies in which two segments always move together can pull them
-apart.** And the joint that fails worst is the knee, **the joint between exactly those two
-segments**, while the joint that does not involve the shin still works. That localisation is the
-fingerprint of a data gap, not of a model that merely got worse — and it repeats on every unseen
-thigh/shin ratio available, all negative.
-
-![gait structure matches the reference](../results/wm/stage1_correct/gait/gait_stage1_m3d_cross_clip0.png)
-
-![per-joint traces, inside the span](../results/wm/stage1_correct/figures/action_trace_m3d_cross_c08f09t09.png)
-
-![per-joint traces, outside it — the damage is at the knee](../results/wm/stage1_correct/figures/action_trace_m3d_cross_c10f10t08.png)
-
-> **บทพูด (TH).** สไลด์นี้เทียบ **"ได้" กับ "ไม่ได้" ในแง่ของร่างกายที่ป้อนเข้าไป ไม่ใช่ในแง่ loss**
-> **ได้**: ถ้าหุ่นที่ไม่เคยเห็นอยู่ในช่วงรูปร่างที่ข้อมูลครอบคลุม คำสั่งที่ทำนายออกมา **เดินได้จริง** ในฟิสิกส์
-> (ระยะ 90% ของ IK, เลี้ยวเพี้ยนน้อยกว่าครึ่ง, จังหวะขาตรงกับอ้างอิง)
-> **ไม่ได้**: ถ้าอยู่นอกช่วงนั้น พังทันที (13.4 องศา, R² ติดลบ = แย่กว่าจำท่านิ่ง)
-> **สาเหตุไม่ใช่โมเดล**: หุ่นทุกตัวที่เดินได้ในชุดเทรนมีท่อนขาสองท่อนยาวเท่ากันหมด (ตัวที่ไม่เท่ากันมันล้ม)
-> ดังนั้น **ทั้ง decoder ใหญ่, probe จิ๋ว, และการคำนวณที่ไม่มีการเรียนรู้เลย ตอบผิดเหมือนกันเป๊ะ**
-> และข้อต่อที่พังที่สุดคือ **หัวเข่า ซึ่งอยู่ระหว่างสองท่อนนั้นพอดี** — นี่คือลายนิ้วมือของช่องว่างในข้อมูล
-
----
-
-## Slide 6 — Testing that explanation instead of asserting it
-
-**An explanation makes a prediction.** If the two segments are tied because every training body ties
-them, then adding bodies where they differ should untie them. Two such bodies were generated and
-checked to walk.
-
-**A matched pair, same clip budget, same held-out body, same clips.** The only thing that differs is
-whether the training set contains bodies whose segments move apart:
-
-| | four bodies, segments tied | six bodies, segments decoupled |
-|---|---|---|
-| command error | 12.7° | **3.3°** |
-| R² against the body's own mean posture | **−0.78** | **+0.89** |
-
-**A 3.9× improvement, and it crosses zero:** from worse than memorising one fixed pose, to
-explaining 89% of the held-out body's variance. **Filling the gap the diagnosis named does not
-merely improve extrapolation — it removes the failure.**
-
-**The same thing shows up before any decoder is trained, at no GPU cost.** Refit only the probe on
-the enlarged set, and the two segments come apart: the gap between them opens to 0.18 against a true
-0.20, from 0.00 before. **The tying broke in the frozen encoder's readout first.**
-
-**Two qualifications, because they bound the number.** Adding coverage converts an extrapolation
-problem into an interpolation one — that is exactly what coverage is *for*, but it means the two runs
-do not face equally hard tasks, so the 3.9× measures the conversion rather than the same task done
-better. And both runs were still improving when the budget ended, so both figures are lower bounds.
-
-![the coverage experiment](../results/wm/stage1_correct/figures/coverage_experiment.png)
-
-> **บทพูด (TH).** สไลด์ก่อนจบด้วย *คำอธิบาย* — สไลด์นี้คือ **การทดสอบคำอธิบายนั้น ไม่ใช่แค่เชื่อมัน**
-> ถ้าสาเหตุคือ "ข้อมูลไม่เคยมีหุ่นที่สองท่อนนี้ยาวไม่เท่ากัน" การเพิ่มหุ่นแบบนั้นเข้าไปต้องแก้ได้ — **และแก้ได้จริง**
-> **คุมจำนวนคลิปให้เท่ากัน** เพื่อไม่ให้เถียงได้ว่าเพราะข้อมูลเยอะขึ้น: 12.7 องศา → 3.3 องศา, R² −0.78 → +0.89
-> และที่สำคัญ **เห็นได้ก่อนเทรนด้วยซ้ำ** แค่ refit probe ตัวเล็กบนชุดใหม่ สองท่อนก็แยกออกจากกันทันที
-> **ข้อจำกัดที่ต้องพูดเอง**: การเพิ่ม coverage เปลี่ยนโจทย์จาก "ทำนายนอกช่วง" เป็น "ทำนายในช่วง" ด้วย
-> เลข 3.9 เท่าจึงวัดการเปลี่ยนโจทย์ด้วย ไม่ใช่วัดโจทย์เดิมที่ทำได้ดีขึ้นล้วน ๆ
-
----
-
-## Slide 7 — Why this task hides what the model is not learning: the gait is a cycle
-
-**Scope first, because it decides how far the claim reaches.** Everything here is forward walking at
-one speed.
-
-```
-   a gait is a limit cycle
-          │
-          ▼   one frame shows the pose   ──▶   the pose fixes the phase
-          │
-          ▼   the phase fixes what comes next
-   the command is largely readable from a SINGLE frame — and so is the future
-```
-
-**Three measurements, all pointing the same way:**
-
-| | |
-|---|---|
-| predicting the command **32 frames ahead** | as accurate as predicting the present (2.9° vs 3.0°) |
-| removing the transition entirely — show the same frame twice | costs only about **30%** |
-| which feet are swinging, from one frame alone | **82%** correct, against 50% by chance |
-
-**And the consequence, measured directly:** replace the real action with a null one and re-predict.
-**The prediction changes by under 3%.** A model with nothing to gain from the action channel will
-not use it, and no reweighting can create a signal the task does not contain.
-
-> **This was first noticed here as an oddity at one speed.** It is not confined to one speed — the
-> same measurement, repeated later across twelve behaviour conditions including four speeds, gives
-> the same answer. **Parts 2 and 3 are what happened when that oddity was taken seriously.**
-
-> **บทพูด (TH).** อันนี้สำคัญมากและเป็นต้นทางของทุกอย่างหลังจากนี้ **การเดินเป็นวงรอบ (limit cycle)**
-> เฟรมเดียวบอกท่าทาง ท่าทางบอกเฟสของการเดิน และเฟสบอกว่าอะไรจะเกิดต่อไป
-> เลขสามตัวที่พูดพอ: (1) **ทำนายคำสั่งล่วงหน้า 32 เฟรม แม่นเท่าทำนายปัจจุบัน** (2) ตัดข้อมูลการเปลี่ยน
-> ระหว่างเฟรมออกทั้งหมด เสียความแม่นแค่ราว 30% (3) ดูเฟรมเดียวเดาได้ว่าขาไหนกำลังยก ถูก 82% เทียบเหรียญ 50%
-> **ผลที่ตามมาคือ**: สลับคำสั่งจริงเป็นคำสั่งว่าง ๆ แล้วทำนายใหม่ — **ผลเปลี่ยนไม่ถึง 3%**
-> ถ้าโมเดลไม่ได้อะไรจากช่องคำสั่งเลย มันก็ไม่ใช้ และการไปปรับน้ำหนัก loss ก็สร้างสัญญาณที่โจทย์ไม่มีขึ้นมาไม่ได้
-
----
-
-## Slide 8 — The forward model is not broken; it was being judged on the wrong task
-
-Every measurement so far asks whether forward prediction helps **reconstruct the command**. It does
-not — but that is not what a forward model is for.
-
-**Judged on its own job — rolling the world forward, with true latents supplied so the module is
-isolated:**
-
-| steps ahead | how much it beats holding the frame still |
-|---|---|
-| 1 | 1.5× |
-| 5 | 1.7× |
-| 10 | 1.5× |
-
-It beats a frozen world at **every horizon out to ten steps**, and beats a constant-velocity
-baseline by two orders of magnitude. **And the latent action does real work:** delete it and the
-command decoder loses roughly a factor of three.
-
-**So both parts function, and the ceiling is the task rather than the parts.** The margin over a
-frozen world is real but modest and decays with horizon; the latent matters for decoding commands;
-and yet **the action contributes under 3% of what next-observation prediction needs**, because the
-pose already says what comes next. That gap — a module that works, a latent that carries real
-information, and an action channel worth almost nothing to prediction — **is the quantity the rest
-of this deck chases.**
-
-> Part of the mistake was ours, and reading the source method confirmed it: there, the command
-> decoder is an **auxiliary regulariser**, and the deployed system plans by comparing predicted
-> futures against a goal image. **We had made the auxiliary term the whole evaluation.**
-
-> **บทพูด (TH).** ทุกการวัดก่อนหน้านี้ถาม forward model ว่า "ช่วยถอดคำสั่งได้ไหม" — **ซึ่งไม่ใช่หน้าที่มัน**
-> พอวัดด้วยงานของมันเองคือ **ม้วนโลกไปข้างหน้า มันทำได้จริง** ชนะการ "หยุดภาพไว้เฉย ๆ" ทุกช่วง 1-10 สเต็ป
-> และ **latent action ก็มีผลจริง** ลบออกแล้ว decoder แย่ลงราวสามเท่า
-> **แปลว่าชิ้นส่วนไม่ได้พัง แต่เพดานอยู่ที่ตัวโจทย์** — margin มีจริงแต่ไม่มาก และลดลงตามระยะ
-> ขณะที่ **คำสั่งมีค่าต่อการทำนายไม่ถึง 3%** เพราะท่าทางบอกอนาคตไปแล้ว ช่องว่างนี้คือสิ่งที่เดคที่เหลือไล่ตาม
-> และต้องยอมรับว่า **ส่วนหนึ่งเราวัดผิดเอง**: ในงานต้นฉบับ ตัวถอดคำสั่งเป็นแค่ตัวช่วย regularise
-> ระบบจริงเขาวางแผนด้วยการเทียบภาพอนาคตกับภาพเป้าหมาย เราเอาตัวช่วยมาเป็นการประเมินทั้งหมด
-
----
-
-# Part 2 — Crossing embodiments: the gap, and the attempt
-
-## Slide 9 — What crossing embodiments requires, and what the field already has
-
-**The target.** Plan toward a goal defined in a coordinate **shared across bodies whose command
-spaces have nothing in common** — an eighteen-joint six-legged insect and a twelve-joint quadruped —
-with no kinematic model, no retargeting, and no controller already running on the target body.
-**The only thing the two robots share is what a camera sees.**
+> **Note on format.** Sections 1-10 below are written the way I actually talk through them with the
+> committee — plain background/methodology notes, not a numbered slide deck. From Part 2 onward
+> (Slide 11 on) the file is still in the earlier, more formal slide-by-slide format; that part
+> hasn't been reshaped yet.
+
+## 1. Background — A locomotion controller is fitted to one body
+
+The analogy this thesis attempts is a real one in psychology: **Social Learning Theory**, vicarious
+learning (Albert Bandura, 1977) — the acquisition of a behaviour by observing another agent perform
+it, with no direct instruction. A held-out body's controller, with no prior knowledge of the
+behaviour required of it, is informed only by video of a different body's behaviour. It does not
+resemble that body and has never itself performed the behaviour, with no direct instruction and no
+kinematic account of either body supplied to bridge them.
+
+- The behaviour crosses through what is *observed*, not by telling the model about the bodies
+  involved.
+- **The problem.** A locomotion controller maps state to joint commands. With a morphology change,
+  the same numerical command can produce a different physical result: the robot stumbles, stands at
+  a different height, or does not move at all. Every body needs its own commands for the same
+  behaviour.
+- **The contribution.** A world model that plans toward a goal defined in a coordinate shared across
+  bodies whose action spaces have nothing in common — no kinematic model, no retargeting, no
+  existing controller on the target robot. The only thing the two robots share is what a camera
+  sees.
+- **The gap, stated against what exists:**
 
 ```
                           needs a kinematic model
@@ -523,37 +42,482 @@ with no kinematic model, no retargeting, and no controller already running on th
                           needs no kinematics
 ```
 
-**Everything that crosses leg count is handed a body model; everything that needs no body model
-stays inside one leg count.** The lower-right quadrant is empty. Manipulation escapes the problem by
-sharing end-effector pose; locomotion has no such fallback, because eighteen and twelve joint
-targets share no dimension at all.
+Everything that crosses leg count needs a body model. Everything that needs no body model doesn't
+cross leg count. The lower-right quadrant is empty, and locomotion has no end-effector pose to
+retreat to the way manipulation does: eighteen and twelve joint targets share no dimension.
 
-**Vision-based world models for locomotion, and what each leaves open:**
-
-| | what it establishes | what it does not do |
-|---|---|---|
-| egocentric visual self-model, one legged robot | morphology and kinematics are **not needed** — babble plus a single camera suffice to plan, and even to detect and recover from damage | fits **one robot at a time**; no action representation is shared, nothing is transferred between bodies |
-| latent-action world models (manipulation) | an action inferred from video alone can drive a policy | end-effector pose already means the same thing on every body |
-| cross-embodiment latent-goal planning | a shared latent goal space across embodiments is achievable | built from **retargeted, temporally aligned paired demonstrations** |
-| action-conditioned video world models | name the failure when prediction ignores the action | diagnosed on manipulation or single-body locomotion, never across embodiments |
-
-**The gap this thesis occupies:** no body description, no paired data, no retargeting — in
-locomotion, where the action is precisely what has to cross.
-
-**And the three requirements Stage 1 hands this part.** A shared representation has to be forced by
-the objective; coverage has to be checked per independent axis; and a saturating metric will hide
-what the model is not doing. All three return in what follows.
-
-> **บทพูด (TH).** เป้าคือ **วางแผนผ่านพิกัดที่ใช้ร่วมกันได้ ระหว่างหุ่นที่ space ของคำสั่งไม่มีอะไรตรงกันเลย**
-> (แมลงหกขา 18 ข้อต่อ กับสี่ขา 12 ข้อต่อ) โดยไม่ใช้ kinematic model ไม่ retarget และไม่ต้องมี controller
-> ที่ใช้ได้อยู่แล้วบนหุ่นเป้าหมาย — **สิ่งเดียวที่สองตัวนี้แชร์กันคือสิ่งที่กล้องเห็น**
-> ดูแผนภาพ: **งานที่ข้ามจำนวนขาได้ ทุกงานถูกป้อนข้อมูลร่างกายให้ / งานที่ไม่ต้องใช้ข้อมูลร่างกาย ก็อยู่ในจำนวนขาเดียว**
-> ช่องขวาล่างว่างอยู่ งาน manipulation หนีปัญหานี้ได้เพราะใช้ตำแหน่งปลายมือร่วมกัน **แต่การเดินไม่มีอะไรให้หนีไป**
-> งานที่ใกล้เราที่สุดคือ self-model จากกล้องบนหัว — **พิสูจน์ว่าไม่ต้องรู้ kinematics จริง แต่ทำทีละตัว ไม่เคยข้ามร่าง**
+> **บทพูด (TH).** ปัญหาคือ policy ที่เทรนให้หุ่นตัวหนึ่งใช้กับหุ่นตัวอื่นไม่ได้เลย เปลี่ยนความยาวขา
+> เปลี่ยนโครงกระดูก ต้องเทรนใหม่ทุกครั้ง แนวคิดที่ตรงที่สุดมีชื่อในจิตวิทยาอยู่แล้วคือ **vicarious
+> learning** — เรียนรู้พฤติกรรมจากการ**ดู**ตัวอื่นทำ ไม่ต้องมีใครสอนตรง ๆ ไม่ต้องเคยทำเองมาก่อน และร่างไม่
+> จำเป็นต้องเหมือนกัน **โจทย์**: หุ่นคนละร่างสั่งคำสั่งตัวเลขเดียวกันแล้วได้ผลจริงต่างกัน ต้องมีของตัวเอง
+> **สิ่งที่เราเสนอ**: world model ที่วางแผนผ่านพิกัดร่วม ไม่ต้อง kinematic model ไม่ retarget ไม่ต้องมี
+> controller อยู่แล้วบนหุ่นเป้าหมาย — สิ่งเดียวที่สองตัวแชร์กันคือสิ่งที่กล้องเห็น ดูแผนภาพ: ช่องขวาล่าง
+> (ข้ามขาได้ + ไม่ต้อง kinematics) ว่างอยู่ เพราะการเดินไม่มีตำแหน่งปลายมือให้หนีไปแบบ manipulation
 
 ---
 
-## Slide 10 — We rebuilt the field's own fix for this, faithfully
+## 2. Background — Idea forming from the literature
+
+- **Hu, Chen, and Lipson (2025)**, *Egocentric Visual Self-Modeling for Autonomous Robot Dynamics
+  Prediction and Adaptation*. They learn a task-agnostic visual self-model for a legged robot from a
+  single egocentric camera and random motor babbling, with no prior knowledge of the robot's
+  morphology, kinematics, or task, and use it to plan locomotion and even to detect and recover from
+  physical damage. Their claim is that the body description was never necessary. Their self-model is
+  fitted to one robot at a time: each body is babbled and modelled separately, there is no action
+  representation shared between bodies, and nothing is ever transferred from one body to another.
+  **Extending that premise across embodiments is what this thesis attempts.**
+- **Huang et al., *Cross-Embodiment Robot Foundation World Models with Latent Actions*, ICML 2026.**
+  Different robots have different action formats, so they discard explicit action labels as the
+  conditioning signal and define a latent action instead — the world model is conditioned on `z`
+  rather than on any robot's native command vector. One latent space covers several embodiments, and
+  adding embodiments *improves* it rather than fragmenting it. **This is the piece we adapt into
+  locomotion.** Their setting is manipulation, where every embodiment already shares one task space
+  (end-effector pose); locomotion has no such shared space to condition on, which is exactly the gap
+  Section 1 draws.
+
+> **บทพูด (TH).** สองงานนี้เป็นจุดเริ่ม **Hu et al. (2025)** พิสูจน์ว่าไม่ต้องรู้ kinematics เลยก็ควบคุม
+> ได้ ด้วยแค่ babble กับกล้องตัวเดียว แต่ทำทีละตัว ไม่เคยแชร์อะไรข้ามหุ่น — งานนี้เอาแนวคิดนั้นไปทดสอบข้ามหุ่น
+> **Huang et al. (ICML 2026)** เสนอ latent action แทนคำสั่งดิบของแต่ละหุ่น เพราะหุ่นแต่ละตัวมี action
+> format ไม่เหมือนกัน ใช้ latent เดียวครอบหลายร่างได้ และยิ่งเพิ่มร่างยิ่งดีขึ้น — แต่ของเขาคือ manipulation
+> ที่มี task space ร่วมอยู่แล้ว (ตำแหน่งปลายมือ) การเดินไม่มีของแบบนั้นให้ยืม นี่คือช่องว่างที่ section 1 พูดถึง
+
+---
+
+## 3. Methodology — Pretraining pipeline
+
+```
+   frame ──▶ [ frozen visual encoder ] ──▶ observation
+                                               │
+                            observation pair ──┴──▶ [ inverse model ] ──▶ latent action
+                                                                              │
+            observation + latent action ──▶ [ forward model  ] ──▶ predicted next observation
+            observation + latent action ──▶ [ command decoder] ──▶ joint command
+```
+
+- **Encoder:** a one-billion-parameter video model, frozen throughout, never trained on robots. The
+  three modules on top of it are about five million parameters each.
+- **Inverse model:** given a transition, what action produced it? — this is where the latent action
+  comes from.
+- **Forward model:** does the latent action let us predict what happens next?
+- **Command decoder:** can the latent action be turned back into an executable joint command? It
+  never sees the second frame — whatever the transition contributes has to pass through the 64-number
+  latent, and that bottleneck is the whole design.
+- **Training signal:** predict the next observation, and recover the real joint command, nominally
+  equal weight — but the two losses differ in scale by two orders of magnitude, so next-observation
+  prediction takes roughly 99% of the gradient in practice. The term meant to ground the latent in
+  real commands runs on the remainder.
+
+> **บทพูด (TH).** encoder เป็นโมเดลวิดีโอพันล้านพารามิเตอร์ **แช่แข็งไว้ ไม่เคยเทรนกับหุ่นยนต์เลย** เทรนแค่
+> สามโมดูลเล็ก ๆ บนมัน: inverse model ถามว่า "เปลี่ยนจากภาพนี้ไปภาพนั้น เกิดจากคำสั่งอะไร", forward model
+> ถามว่า "คำสั่งที่ถอดได้ ทำนายอนาคตได้ไหม", command decoder ถามว่า "แปลงกลับเป็นคำสั่งข้อต่อที่สั่งได้จริง
+> ไหม" — decoder ไม่เคยเห็นเฟรมที่สอง ต้องลอดผ่าน latent 64 ตัวเท่านั้น และ loss สองก้อนต่างสเกลกันร้อยเท่า
+> ทำให้การทำนายภาพกินเกรเดียนต์ไปราว 99%
+
+---
+
+## 4. Methodology — Stage 1: cheap test and hypothesis from simple cross-morphology transfer
+
+**The bodies.** Training data uses six-legged walkers differing only in segment lengths. Held-out
+bodies are what the model is never trained on, and become the unseen-body test.
+
+**Commands are retargeted.** Data used in training takes one foot trajectory in Cartesian space,
+solved separately for each body by inverse kinematics: same intended behaviour, genuinely different
+joint numbers.
+
+**Behaviour:** forward walking, one speed.
+
+**The hypothesis.** If the latent truly separates movement from body, then a body never seen in
+training should receive commands appropriate to its own geometry — not the commands of whichever
+training body it most resembles.
+
+| held-out c08f09t09 | coxa | femur | tibia |
+|---|---|---|---|
+| the truth | 0.80 | 0.90 | 0.90 |
+| probe on the visual encoder (4,227 params) | 0.84 | 0.91 | 0.91 |
+| the motion decoder (5.2M params) | 0.62 | 0.96 | 0.96 |
+
+The probe lands close everywhere; the decoder implies a coxa **22% shorter than the body actually
+has**. The bigger model is the one that misreads it.
+
+**Swap test:** give the motion decoder body A's frame together with body B's latent. The two
+bodies' commands differ by 21°. It answers with body B's command, to within 6°. It followed the
+latent and ignored the frame it was holding.
+
+**Diagnosis.** The decoder learned to recognise the closest body in its training set and recall that
+body's commands. With this, the whole idea of "make the new body observe the old body and behave
+like it" would just fail outright, because the model doesn't understand the frame-action
+relationship at all — it's doing lookup, not reading geometry.
+
+**The fix has to be in the objective.** Capacity, access, and the contents of the latent were each
+ruled out first: rescaling the target, shrinking the decoder, stripping body identity adversarially,
+and handing the decoder a global view of the frame all failed or made transfer worse. What remained
+was the objective — no loss function ever forces reading geometry from the frame. Every body shares
+the intent and differs only in geometry, so add one loss term: take body A's latent, show the
+decoder body B's frame, and require body B's command (`A's latent, B's frame, B's command`).
+
+| held-out body test | without the term | with it |
+|---|---|---|
+| command error | 3.67° | 3.44° |
+| image's worth to the decoder | 0.4× | 9.6× |
+| movement's share of the latent | 82% | 93% |
+| body identity's share of the latent | 12% | 3% |
+
+The latent stopped carrying a job that was never its own, and the two inputs ended up with separate
+jobs: the image carries which body, the latent carries what movement.
+
+> **บทพูด (TH).** หุ่นทุกตัวมีขา 6 ขา 18 ข้อต่อเหมือนกัน ต่างกันแค่ความยาวขา คำสั่งได้จากแก้ IK จาก
+> รอยเท้าเดียวกัน — เจตนาเดียวกัน ตัวเลขคำสั่งต่างกันจริง **probe เล็กจิ๋วอ่านความยาวขาของหุ่นที่ไม่เคยเห็นได้
+> แม่น แต่ decoder ใหญ่กว่าพันเท่าอ่านผิด** (coxa สั้นกว่าจริง 22%) swap test บอกสาเหตุ: สลับ latent คนละตัว
+> มันตอบตาม latent ไม่สนใจภาพเลย — **มันจำหุ่นที่ใกล้ที่สุดในชุดเทรนได้ ไม่ได้อ่านรูปร่างจากภาพ** ลองแก้ที่
+> โมเดลมาสี่ทางแล้วไม่ได้ผล เพราะปัญหาไม่ใช่ความสามารถ แต่ loss ไม่เคยบังคับให้อ่านรูปร่างจากภาพเลย — เพิ่ม
+> loss term เดียว (latent ของ A คู่กับภาพของ B ต้องตอบคำสั่งของ B) ภาพมีค่าต่อ decoder เพิ่มขึ้น 22 เท่า
+> และ latent สะอาดขึ้น (การเคลื่อนไหว 82→93%, ตัวตนของร่าง 12→3%)
+
+---
+
+## 5. Methodology — Stage 1: to work, the held-out body has to sit inside the geometry the data spans
+
+| | ground truth (IK) | control | with the cross-body loss |
+|---|---|---|---|
+| forward distance | 100% | 85% | 90% |
+| heading deviation | 0° | 11.8° | 5.5° |
+| worst joint-limit excursion | 0° | 8.2° | 3.9° |
+
+Inside the geometry the training set spans, the predicted commands actually walk, driven open-loop
+through the same physics used to collect the data, on a body never trained on.
+
+| same model | error | R² |
+|---|---|---|
+| a body with geometry inside the training span | 3.4° | 0.81 |
+| a body with femur/tibia ratio outside the training span | 13.4° | −0.34 |
+
+Outside that span, the same weights fail — proved, not assumed.
+
+**Test:** same budget, same held-out body, but the training set now contains bodies whose segments
+don't move together the way every other training body's do.
+
+| same model | coxa | femur | tibia |
+|---|---|---|---|
+| ground truth | 1.00 | 1.00 | 0.80 |
+| probe fitted on the original dataset | 0.955 | 0.819 | 0.819 |
+| probe fitted on the original dataset + the added bodies | 0.973 | 0.954 | 0.772 |
+
+The distance from the held-out body's segment scales to the nearest mixture of the training bodies
+predicts this failure on its own — no encoder, no model, no learning at all. Every body that cannot
+be mixed from the training set fails; the one that can, succeeds.
+
+**A tool this produced:** before committing to a train/held-out split, fit the probe on the training
+bodies and read off how well it recovers the held-out one. A large error there says the split is
+asking for a direction the data does not span, and the run will not answer the question meant to be
+asked — check this before spending the training run, not after.
+
+> **บทพูด (TH).** ในช่วงรูปร่างที่ข้อมูลครอบคลุม คำสั่งที่ทำนายเดินได้จริง (ระยะ 90%, เลี้ยวเพี้ยนน้อยกว่า
+> ครึ่ง) นอกช่วงนั้นพังทันที (13.4°, R² ติดลบ) **สาเหตุพิสูจน์ได้ ไม่ใช่แค่เดา**: ลองเพิ่มหุ่นที่สองท่อนขา
+> ไม่เท่ากันเข้าไปในชุดเทรน แค่ probe อย่างเดียว (ไม่ต้องเทรน decoder ใหม่เลย) ก็บอกได้แล้วว่าจะพังไหม —
+> **เครื่องมือที่ได้จากตรงนี้**: ก่อนจะ split train/held-out ให้ fit probe บนชุดเทรนแล้วดูว่า probe อ่านตัว
+> held-out ได้แม่นแค่ไหนก่อน ถ้าคลาดมากคือ split นั้นถามคำถามที่ข้อมูลตอบไม่ได้ตั้งแต่ต้น
+
+---
+
+## 6. Methodology — Stage 1: one frame nearly determines the command — the gait is a cycle
+
+| what is `e_{t+1}` in the ITM | change |
+|---|---|
+| ground truth `e_{t+1}` | 3.37° (1×) |
+| `e_t` (no transition) | 1.34× |
+| `e_{t-1}` (wrong transition) | 1.65× |
+| `e_random` (other time) | 3.44× |
+| `ITM(None)` | 3.48× |
+
+Without the transition, the motion decoder `MD(e_t, z_t)` cannot work — `z` is carrying the movement
+it needs. A wrong transition hurts *more* than no transition; removing the transition entirely costs
+31% accuracy. The latent action is genuinely sensitive to what the second frame contains.
+
+```
+   a gait is a limit cycle
+     one frame shows the pose
+       the pose fixes the phase
+         the phase fixes what comes next
+```
+
+| predict from 1 frame | t | t+8 | t+32 |
+|---|---|---|---|
+| error (signal spread 11.3°) | 3° | 3.4° | 2.9° |
+
+| steps ahead | `e_{t+h}` | `e_0` | beats `e_0` by |
+|---|---|---|---|
+| 1 | 1.39 | 2.11 | 1.52× |
+| 3 | 1.78 | 3.05 | 1.72× |
+| 5 | 2.12 | 3.57 | 1.69× |
+| 10 | 2.98 | 4.36 | 1.46× |
+
+But the horizon barely matters — predicting 32 frames ahead is about as accurate as predicting the
+present. One frame already identifies which feet are swinging (81.5% accuracy against 50% by
+chance), and a second frame is worth only 1.11× on the step-to-step change. There is barely anything
+left in the transition for `z` to carry.
+
+Rolling the forward model `FTM(e_t, z_t)` forward with the *true* `z`: the action contributes under
+3% of what prediction needs, because the pose in a single frame already says what comes next. That
+gap — a module that works, a latent that carries real information, and `z` still worth almost
+nothing to prediction — is what Stage 1 leaves open.
+
+**Stage 1 can only prove the pipeline is promising and that the remaining problem is mostly the
+structural periodicity of locomotion.** It cannot yet prove that vision helps share behaviour where
+proprioception could not, because this setup doesn't have the variety needed for that — it needs a
+second body whose action space is genuinely disjoint from the first.
+
+> **บทพูด (TH).** ไม่มี transition, MD ทำงานไม่ได้เลย — z แบกข้อมูลการเคลื่อนไหวไว้จริง transition ที่ผิด
+> ยิ่งแย่กว่าไม่มี transition ตัด transition ออกเสียแม่นยำแค่ 31% **แต่ horizon แทบไม่มีผล**: ทำนาย 32
+> เฟรมล่วงหน้า ≈ ทำนายปัจจุบัน เฟรมเดียวบอกได้แล้วว่าขาไหนกำลังยก (81.5% เทียบเหรียญ 50%) เฟรมที่สองมีค่า
+> เพิ่มแค่ 1.11 เท่า **เหลือให้ z แบกน้อยมาก** — ม้วน FTM ด้วย z จริง action มีค่าต่อการทำนายไม่ถึง 3% เพราะ
+> ท่าทางเฟรมเดียวบอกอนาคตไปแล้ว **Stage 1 พิสูจน์ได้แค่ว่า pipeline มีทางไปได้ และปัญหาที่เหลือเป็นเรื่อง
+> โครงสร้างวงรอบของการเดิน** ยังพิสูจน์ไม่ได้ว่าภาพช่วยแชร์พฤติกรรมที่ proprioception ทำไม่ได้ เพราะ setup
+> นี้ยังไม่มีหุ่นตัวที่สองที่ action space แยกจากตัวแรกจริง ๆ
+
+---
+
+## 7. Methodology — Stage 2: what crossing embodiments with vision requires
+
+Vision-based world models for locomotion and manipulation, and what each leaves open — separated on
+purpose so the search across both literatures is visible:
+
+| | what it establishes | what it does not do |
+|---|---|---|
+| egocentric visual self-model (locomotion) — Hu et al. 2025 | morphology and kinematics are not needed; babble + a camera suffice to plan, and can detect and recover from damage | no cross-embodiment, no transferring between bodies |
+| latent-action world models (manipulation) — Huang et al. 2026 | a shared action between bodies, inferred from video alone | no need to map anything, because all bodies already share the same task space |
+| cross-embodiment latent-goal planning (manipulation) | a shared latent goal space across different bodies is achievable | built from retargeted, temporally aligned paired demonstrations |
+| action-conditioned video world models | name the failure when prediction ignores the action | diagnosed on manipulation or single-body locomotion, never across embodiments — this is Section 6's own problem, still open, and Section 11 is where it gets confronted directly |
+
+**The key thing none of these three hand us: a shared GOAL.** Every one of them either stays inside
+one body (Hu et al.) or gets its cross-embodiment coordinate for free, because manipulation already
+has one — end-effector pose already means the same thing on every arm. Locomotion has no such
+task space. So before anything about *control* can even be asked, there has to be a coordinate that
+means the same thing on an 18-joint hexapod and a 12-joint quadruped, built with no kinematic model,
+no retargeting, and no paired demonstrations across the two bodies.
+
+**That coordinate is the Froude number, and the claim rides on it entirely:**
+
+```
+   Fr = v / sqrt(g · L)
+```
+
+speed made dimensionless by body size (`L` ≈ hip height). Two robots of very different size, walking
+"the same way," land on the *same* Froude number:
+
+| | hexapod | B1 |
+|---|---|---|
+| hip height `L` | ~0.09 m | ~0.56 m |
+| a normal walk, m/s | 0.13 | 0.29 |
+| **same walk, in Froude** | **~0.13** | **~0.13** |
+
+Three channels: forward, lateral, yaw. This single equation is what makes a goal read off one
+body's video mean anything at all to a body that shares no joint, no size, and no kinematics with
+it — without it there is no shared target to plan toward, and the whole cross-embodiment claim has
+nothing to stand on.
+
+**And this is also where the "no prior" claim actually gets tested.** The goal can be produced two
+ways: read the true, privileged number directly off the source body's recorded motion, or read it
+off nothing but the source body's *video* — no proprioception, no state, no kinematics, exactly what
+a genuinely novel body would have to work with. The claim this thesis needs is that the second way is
+**good enough to replace the first**: that vision alone recovers the same shared coordinate a
+privileged read would, so that nothing about crossing bodies secretly depends on information the
+motivating scenario (an animal, a damaged robot, unknown hardware) could never actually supply.
+
+> **บทพูด (TH).** สามงานนี้ไม่มีตัวไหนให้ **เป้าหมายร่วม** มาเปล่า ๆ เลย — Hu et al. ไม่ข้ามร่างเลย, Huang
+> et al. ได้พิกัดร่วมมาฟรีเพราะ manipulation มี task space ร่วมอยู่แล้ว (ตำแหน่งปลายมือ) การเดินไม่มีของแบบ
+> นั้นให้ยืม **สิ่งที่ต้องมีก่อนจะถามเรื่องควบคุมด้วยซ้ำ คือพิกัดที่ความหมายเดียวกันบนหุ่น 18 ข้อต่อกับ 12
+> ข้อต่อ** โดยไม่ต้อง kinematic model ไม่ retarget ไม่ต้องจับคู่ข้อมูล
+> **พิกัดนั้นคือ Froude number และข้อเคลมทั้งหมดตั้งอยู่บนสมการนี้**: `Fr = v / sqrt(g·L)` — ความเร็วหาร
+> ด้วยขนาดตัว หุ่นคนละขนาดที่เดินแบบเดียวกันได้ค่าเท่ากันเป๊ะ ถ้าไม่มีสมการนี้ก็ไม่มีเป้าหมายร่วมให้วางแผนไปหา
+> เลย ข้อเคลมเรื่องข้ามร่างทั้งหมดจะไม่มีอะไรค้ำ
+> **และตรงนี้คือจุดที่ทดสอบข้อเคลม "ไม่ใช้ข้อมูลพิเศษ" จริง ๆ**: เป้าหมายทำได้สองแบบ — อ่านตัวเลขจริงที่อัดไว้
+> (มีข้อมูลพิเศษ) กับอ่านจาก**วิดีโอ**ล้วน ๆ ไม่มี proprioception ไม่มี kinematics เลย ซึ่งคือสิ่งเดียวที่หุ่น
+> ตัวใหม่จริง ๆ จะมี **ข้อเคลมที่ต้องพิสูจน์คือวิธีที่สองต้องดีพอที่จะแทนวิธีแรกได้** — ว่าภาพเพียงอย่างเดียว
+> อ่านพิกัดร่วมได้เท่ากับการอ่านแบบมีสิทธิพิเศษ ไม่งั้นข้อเคลมเรื่องข้ามร่างจะแอบพึ่งข้อมูลที่หุ่นตัวใหม่จริง ๆ
+> ไม่มีทางมีได้
+
+---
+
+## 8. Methodology — Stage 2: it transfers, but not by sharing a latent
+
+Same setup style as Stage 1: a hypothesis, a term, a measurement. Froude is the shared target
+(Section 7). To force it to actually be shared across the two bodies' latents, add one loss term:
+
+```
+   L_body = || b_hat_t − b_t ||        b_hat_t = body_head(z_t)
+```
+
+Both robots are walked at matched Froude speed, so a readout fitted on one body should work on the
+other — a bad score is the representation's fault, not the question's.
+
+| | insect→insect | b1→b1 | insect→b1 | b1→insect |
+|---|---|---|---|---|
+| frozen encoder | 0.676 | 0.753 | −0.046 | 0.131 |
+| control, no term | 0.664 | 0.167 | −7.083 | −2.357 |
+| + shared head, λ=0.5 (2 seeds) | 0.798 / 0.815 | 0.879 / 0.881 | +0.544 / +0.749 | +0.435 / +0.704 |
+| + shared head, λ=0.1 | 0.809 | 0.868 | 0.675 | 0.624 |
+
+Without the term, cross-robot readout is systematically wrong. With it, both directions go
+positive — and the model is not preserving structure V-JEPA2 already supplied (the frozen-encoder
+row is itself negative on `insect→b1`); it is creating structure the encoder did not have.
+
+**The same thing, checked one level down, at the raw joint command instead of the Froude scalar.**
+This is a different measurement — not a second version of the number above, a decode-level one:
+does forcing the shared term also help a body still recover its *own* joint targets, and does it
+survive being read out on the other body's joints?
+
+| | within-robot joint error | cross-robot transfer |
+|---|---|---|
+| joint target, no body term | 0.3517 | −28.9 / −43.1 |
+| joint target + shared body term | **0.2183** | **+0.610 / +0.573** |
+
+The term does not just fix the cross-robot number — it improves the robot's own joint decoding by
+38%, at both levels of the pipeline.
+
+**But "shared" is not the same claim as "transferred," and this is the open question the term does
+not settle.** The readout improving on both bodies is consistent with two different mechanisms: the
+latent genuinely learning what a shared body-motion coordinate should look like across robots, or
+the term simply making the latent more normalized/well-scaled in a way that happens to help a linear
+readout regardless of whether the network anywhere *uses* that shared structure for anything.
+Section 9 is what happens when that question gets asked directly.
+
+> **บทพูด (TH).** ไอเดีย: Froude คือเป้าหมายร่วม (section 7) เพิ่ม loss term บังคับให้ latent สองหุ่น
+> ถูกอ่านออกมาตรงกันได้จริง (`L_body = ||b_hat_t − b_t||`) — สองหุ่นเดินที่ Froude เท่ากัน ถ้า readout ที่
+> fit จากหุ่นหนึ่งเอาไปใช้กับอีกหุ่นแล้วแย่ ก็เป็นความผิดของ representation ไม่ใช่คำถาม
+> **ผล**: ไม่มี term การอ่านข้ามหุ่นผิดเพี้ยนสิ้นเชิง (ติดลบหนัก) มี term แล้วทั้งสองทิศเป็นบวก และเช็คอีกชั้น
+> ที่ระดับคำสั่งข้อต่อดิบ (คนละตัวเลขกับด้านบน) ก็ดีขึ้นเหมือนกัน — แถมช่วยให้หุ่นถอดคำสั่งของตัวเองแม่นขึ้น
+> ด้วย (38%)
+> **แต่ "แชร์กันได้" ไม่เท่ากับ "เอาไปใช้จริง"** — readout ดีขึ้นอาจเป็นเพราะ latent แค่ normalize เนียนขึ้น
+> ไม่ได้แปลว่า network เข้าใจพิกัดร่วมจริง ๆ **นี่คือคำถามที่ค้างไว้ ให้ section 9 ไปตอบต่อ**
+
+---
+
+## 9. Methodology — Stage 2: fine-tune to adapt to a genuinely different robot
+
+**The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
+that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
+on only a few of B1's own clips, rather than retraining from nothing?
+
+**The staged procedure this uses, assembled from pieces that already existed separately but had
+never been run as one pipeline before:**
+
+```
+  stage 1  wm.adapt        — fine-tune ONLY the inverse/forward model on B1's own clips
+  stage 2  fit_projector   — fit a separate network, the PROJECTOR: action → z, no frame pair needed
+  stage 3  wm.adapt3       — optional joint fine-tune (skipped here)
+  stage 4  fit_body_head   — refit the shared Froude head against the projector's own latent
+```
+
+**Why a projector exists at all.** The `z` used everywhere so far comes from the inverse model
+reading a *pair* of frames — it only exists once the next frame has already happened. At the moment
+a controller has to pick an action, that frame doesn't exist yet. The projector is a small separate
+network trained to guess what `z` an action *would* produce, from the action alone
+(`z = proj(action)`), so a control loop has something to plan with before the outcome is known.
+Section 10 uses both `z` sources side by side for exactly this reason.
+
+| B1, `z = proj` | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|
+| zero-shot, frozen head, no adaptation | 0.057 | 0.264 | 0.526 | 0.264 |
+| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
+
+Every channel more than doubles, forward included. **This is the actual cost of bringing up a new
+body**, stated as a number: a handful of B1's own clips through stages 1, 2 and 4, not full expert
+demonstrations and not training from scratch.
+
+> **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
+> หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune แค่คลิปไม่กี่คลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
+> **ขั้นตอน 4 stage**: (1) fine-tune inverse/forward model บนคลิป B1 (2) fit **projector** — เน็ตเวิร์ก
+> แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
+> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit shared Froude head **ผล**: ทุกช่องดีขึ้นเกินเท่าตัว
+> (median 0.264 → 0.572) — **นี่คือต้นทุนจริงของการเอาหุ่นตัวใหม่เข้ามา** ใช้แค่คลิปไม่กี่คลิปของมันเอง
+> ไม่ต้องมี demonstration เต็มรูปแบบ ไม่ต้องเทรนจากศูนย์
+
+---
+
+## 10. Methodology — Stage 2: z had the signal all along; body_head just never learned to read it
+
+**Why `body_head` has to exist at all.** `z` is an opaque 64-number code — nothing in it is
+inherently "forward speed," and nothing guarantees coordinate 17 of the insect's `z` means the same
+thing as coordinate 17 of B1's `z`. Somebody has to know how to read it — a trained function mapping
+`z` onto the one space that *is* shared: the three-channel Froude coordinate. That's `body_head`, and
+it's not a training-time extra — it's what every real use calls: reading a goal off video, scoring an
+action at control time (`score(a) = |body_head(proj(a)) − goal|`). No `body_head`, no cross-embodiment
+claim to test.
+
+**"z already contains Froude" only ever means: some function fitted on z can read it out.** Not that
+the raw numbers in z are Froude, or line up the same way across bodies for free. Even the test below
+uses a small trained network to do that reading — that network *is* `body_head`'s job, just done
+separately. The question is whether the real one is trained well.
+
+**Test: is the signal there regardless of whether the real head found it?** Freeze the same `z`
+Section 8 already used, bolt on a fresh head, train it on Froude alone, nothing else competing:
+
+| z source | action-lever gap (bar 0.110) |
+|---|---|
+| `z = ITM(e_t, e_next)` | +1.048 to +1.226 |
+| `z = proj(action)` | +1.049 to +1.092 |
+
+**Passes by ~10×.** So `z` was never the problem — the original `body_head`, co-trained alongside
+it, simply never learned to read it this well.
+
+**Why not.** `L_recon`, `L_motion`, `L_body` all push gradient into the same `z`, every step.
+`body_head` is trying to learn `z → Froude` while `z` itself keeps getting reshaped by two losses
+that have nothing to do with Froude — a moving target it never converges against.
+
+**Fix: `z.detach()` before `body_head`.** `body_head` still trains, but can no longer push back and
+reshape `z`. `z` is now shaped by `L_recon`+`L_motion` only. One line, one full retrain, same hex+B1
+recipe as Section 8:
+
+| action-lever, real retrain | value |
+|---|---|
+| real z, median cos | 0.693 |
+| mean z, median cos (baseline) | −0.315 |
+| **gap (bar: 0.110)** | **+1.008 (~9× the bar)** |
+
+| channel | gap (real − mean) |
+|---|---|
+| forward | +0.238 |
+| lateral | +0.031 (weakest, still positive) |
+| yaw | +0.243 |
+
+**Not free — `z` gets measurably worse.** `L_body`'s gradient wasn't pure competition, it was also
+doing real work shaping `z`. Cut it, and `z` develops only **32-76%** of its old signal. A real trade:
+`z` comes out weaker, `body_head` trains against a stable target instead and actually learns to use
+it — net result still 9× better despite the weaker `z`.
+
+**Not yet shown: this improves control** — only that `body_head` is now correctly direction-sensitive.
+Whether that becomes working closed-loop behaviour is separate, unproven.
+
+> **บทพูด (TH).** ทำไมต้องมี body_head: z คือเลข 64 ตัวที่ไม่มีความหมายในตัวเอง ต้องมี "ใครสักคนอ่านมันเป็น"
+> — คือฟังก์ชันที่เทรนมาแมป z ไปยังพื้นที่ร่วม (Froude 3 ช่อง) ไม่ใช่ของช่วยตอนเทรน แต่คือสิ่งที่ทุกการใช้งาน
+> จริงเรียกใช้ (อ่านเป้าจากวิดีโอ, ให้คะแนน action ตอนควบคุม) ไม่มี body_head ก็ไม่มีข้อเคลมข้ามร่างเหลือทดสอบ
+> **"z มีสัญญาณอยู่แล้ว" แปลว่าแค่ "มีฟังก์ชันอ่านออกได้"** ไม่ใช่ตัวเลขดิบเป็น Froude เอง — แม้แต่ตอนทดสอบก็
+> ยังต้องมีเน็ตเวิร์กเล็ก ๆ อ่านมันอยู่ดี (นั่นคืองานของ body_head) คำถามจริงคือ head ตัวจริงเทรนมาดีพอไหม
+> **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
+> **ปัญหาคือ**: body_head ตัวเดิมเทรนพร้อม loss อื่น (recon, motion) ที่แย่ง gradient เข้า z ตลอด z เลย
+> ขยับตลอดเวลา body_head ไล่จับเป้าที่วิ่งหนีไม่ทัน
+> **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก เทรนใหม่รอบเดียว **ดีขึ้น ~9 เท่า**
+> **แต่ไม่ฟรี**: z เองอ่อนลงจริง (เหลือ 32-76% เพราะ L_body เคยช่วยสร้างสัญญาณด้วย) — trade คือ z อ่อนลง
+> แลกกับ body_head นิ่งพอเรียนได้จริง **ยังไม่ได้พิสูจน์ว่าคุมหุ่นได้จริง** แค่ไวต่อทิศทางที่ควรไวแล้วเท่านั้น
+
+---
+
+# Part 2 — Crossing embodiments: the gap, and the attempt
+
+*(from here down, the file is still in the earlier slide-by-slide format — not yet reshaped)*
+
+**With Stage 2's setup in place, cross-embodiment is ready on the readout side: `body_head` can now
+correctly read the shared coordinate out of `z`.** That does not touch the other open problem. Section
+6 already found that the action contributes under 3% to next-frame prediction — the forward model
+itself barely cares about the action at all, because the pose alone already determines what happens
+next. Nothing in Section 9 or 10 changes that; `body_head` and the forward model are different parts
+of the network, and fixing one says nothing about the other.
+
+**So this is where that problem gets mapped onto what the field already calls it.** Slide 11 picks
+the action-blindness problem back up and asks whether it has a name and a published fix elsewhere —
+it does, and rebuilding that fix faithfully is the next step.
+
+## Slide 11 — We rebuilt the field's own fix for this, faithfully
 
 **The failure already has names in the literature.** A world model conditioned on an action should
 predict a different future for a different action; when it does not, one line of work calls it
@@ -586,7 +550,7 @@ the run started. **Six came out negative, and none of the criteria moved afterwa
 
 ---
 
-## Slide 11 — Six independent measurements, one answer
+## Slide 12 — Six independent measurements, one answer
 
 **Read this as a chain of eliminations, not a list of failures.** Each row closes one hypothesis
 about *where* the missing action-sensitivity lives, and each returns a number.
@@ -621,7 +585,7 @@ runs of the same command.**
 
 ---
 
-## Slide 12 — The number underneath all six
+## Slide 13 — The number underneath all six
 
 **One quantity explains every row above.** In third-person locomotion video, the joint command is
 readable from a **single frame**:
@@ -665,7 +629,7 @@ measured on manipulation.
 
 # Part 3 — The principle
 
-## Slide 13 — Pose determines the future, so the action is redundant
+## Slide 14 — Pose determines the future, so the action is redundant
 
 > **When the agent's own configuration is visible and determines what happens next, the action
 > carries no information the observation lacks — and a model trained to predict the next observation
@@ -714,7 +678,7 @@ visible in the pose.
 
 ---
 
-## Slide 14 — The principle explains results that are already published
+## Slide 15 — The principle explains results that are already published
 
 **The pieces are not ours; the connection is.** Sort existing systems by the single question the
 principle says matters — *does the visible configuration determine the future?* — and their
@@ -755,7 +719,7 @@ re-measurements of those systems.
 
 ---
 
-## Slide 15 — Three attempts built on this model, and how each was tested
+## Slide 16 — Three attempts built on this model, and how each was tested
 
 Three different things were built on top of this world model. All three failed — and the tests show
 that **two of them failed for the same reason, and the third for a different one.**
@@ -775,7 +739,7 @@ so no representation, however good, can order them.
   behaviour selection   ─┐
                          ├─▶ both need the action to be VISIBLE IN PREDICTION
   action-conditioning   ─┘      ──▶  POSE DETERMINES THE FUTURE
-                                     ──▶ removed by the egocentric view (Slide 16):
+                                     ──▶ removed by the egocentric view (Slide 17):
                                          single-frame readability 0.78 → 0.29
 
   teacher-graded policy ───────▶ a SECOND obstacle the viewpoint does not touch:
@@ -808,7 +772,7 @@ The principle makes a falsifiable prediction: if *pose determines the future* is
 action-conditioning, then removing the agent's own pose from view should restore it. This part tests
 that directly, and reports which half held.
 
-## Slide 16 — Moving the camera onto the body removes the redundancy — and the shared coordinate survives it
+## Slide 17 — Moving the camera onto the body removes the redundancy — and the shared coordinate survives it
 
 **The cheapest test that could answer it, built to be discarded:** four textured walls and a ceiling
 around the spawn point, camera moved onto the robot's head. **Not an environment.**
@@ -858,7 +822,7 @@ that existed and were ignored, so that measurement needs the trained model.
 
 ---
 
-## Slide 17 — What we claim as contributions
+## Slide 18 — What we claim as contributions
 
 ### Contribution 1 — a cross-embodiment coordinate that needs no correspondence
 
@@ -922,18 +886,18 @@ removing body-specific motion.
 
 > **How to read Part 5.** Everything here is about **motor babble** — the standard way a robot that
 > nobody has a controller for gets bootstrapped. B1 results and gecko results are kept apart: B1 was
-> in pretrain, gecko never was. **All gecko work is on Slide 26 alone** and appears in no flow
+> in pretrain, gecko never was. **All gecko work is on Slide 27 alone** and appears in no flow
 > diagram or result table above it.
 >
 > **บทพูด (TH).** ตั้งแต่ part นี้ไปคือเรื่อง **motor babble** — วิธีมาตรฐานที่ใช้ตั้งต้นหุ่นที่ยังไม่มี controller
 > ขอแยก B1 กับ gecko ให้ชัด: **B1 เคยอยู่ใน pretrain แต่ gecko ไม่เคย**
-> **เรื่อง gecko อยู่ที่สไลด์ 32 หน้าเดียว** ไม่ปนกับแผนภาพหรือตารางไหนข้างบนเลย
+> **เรื่อง gecko อยู่ที่สไลด์ 27 หน้าเดียว** ไม่ปนกับแผนภาพหรือตารางไหนข้างบนเลย
 
 ---
 
 ---
 
-## Slide 18 — Imagination-RL: the wall is the rollout
+## Slide 19 — Imagination-RL: the wall is the rollout
 
 
 ```
@@ -977,7 +941,7 @@ failure mode Koopman Dreamer (2607.19719) names.
 
 ---
 
-## Slide 19 — Sequence context does not fix it
+## Slide 20 — Sequence context does not fix it
 
 
 ```
@@ -1031,7 +995,7 @@ representation.
 
 ---
 
-## Slide 20 — Stop-gradient clears the lever ~9×
+## Slide 21 — Stop-gradient clears the lever ~9×
 
 
 ```
@@ -1080,7 +1044,7 @@ ranking or closed-loop behaviour — a gap this project has been burned by befor
 
 ---
 
-## Slide 21 — What the coordinate fixed
+## Slide 22 — What the coordinate fixed
 
 
 **Scoring in the right space is what turned selection on.** Frame distance reads the current frame,
@@ -1127,7 +1091,7 @@ is coarse and works.**
 
 ---
 
-## Slide 22 — Controller vs. what we test, and what Froude is
+## Slide 23 — Controller vs. what we test, and what Froude is
 
 ```
   A CONTROLLER / POLICY                 WHAT WE TEST (a "closed loop")
@@ -1143,8 +1107,8 @@ is coarse and works.**
 | what "survival" proves | the policy is stable | **nothing — it cannot fall by construction** |
 | what it DOES prove | — | **was the goal read, and the right motion chosen** |
 
-**Everything on this slide and through Slide 26 is about selection, not control, and was true when
-measured.** A real controller exists now — Slide 27, dated, separate, and bounded — but it does not
+**Everything on this slide and through Slide 27 is about selection, not control, and was true when
+measured.** A real controller exists now — Slide 28, dated, separate, and bounded — but it does not
 retroactively apply to any result below: those numbers are about picking the right recorded clip
 from a library, and remain exactly what they say they are.
 
@@ -1172,7 +1136,7 @@ goal can mean anything to a B1. Three channels: **forward**, **lateral**, **yaw*
   score = | candidate Froude − goal Froude |   → pick the smallest
 ```
 
-Crossing the two gives the 2×2 (A/B/C/D) on Slide 24 — separated **on purpose**, since bundling
+Crossing the two gives the 2×2 (A/B/C/D) on Slide 25 — separated **on purpose**, since bundling
 them confounded an earlier version of this test.
 
 > **บทพูด (TH).** ผมเองก็สับสนบ่อย ขอแยกให้ชัด
@@ -1185,7 +1149,7 @@ them confounded an earlier version of this test.
 > **เป้าผลิตได้ 2 แบบ** (อ่านตัวเลขที่อัดไว้ = มีข้อมูลพิเศษ / ถอดจากวิดีโอ = แบบที่ใช้จริง)
 > **ให้คะแนนได้ 2 แบบ** (Direct ไม่ใช้ world model / Rollout ใช้) — ที่ต้องแยกสองแกนนี้เพราะเวอร์ชันก่อนเรามัดรวมกัน เลยสรุปไม่ได้ว่าตัวไหนพัง
 
-## Slide 23 — The correct adaptation pipeline
+## Slide 24 — The correct adaptation pipeline
 
 
 ```
@@ -1218,7 +1182,7 @@ mechanism.** The whole "B1 got worse" episode was a tooling error, not a result 
 
 ---
 
-## Slide 24 — The 2×2: which half is broken
+## Slide 25 — The 2×2: which half is broken
 
 
 ```
@@ -1279,7 +1243,7 @@ goal by 0.029 — yet matches A exactly: same top pick, same distance, 80% vs 78
 of all 12 from the goal (0.290 against the best 0.033). Handing it a perfect goal (mode B, error
 0.0000) does not help. The goal is not the problem; the world model in the scoring loop is.
 
-**Reminder (Slide 22): selections from a library, not a controller.** Nothing here can fall.
+**Reminder (Slide 23): selections from a library, not a controller.** Nothing here can fall.
 
 **📹 VIDEO — C vs D.** Three panels, aligned by elapsed time (the two bodies record at 20 Hz and
 50 Hz, so matching by frame index puts the goal 2.5× ahead). Goal panel shows both what the system
@@ -1304,7 +1268,7 @@ read and the true value; footer shows both errors.
 
 ---
 
-## Slide 25 — Motor babble, and what we added
+## Slide 26 — Motor babble, and what we added
 
 
 ```
@@ -1350,7 +1314,7 @@ half-works (0.427); adapting on that body's own babble takes it to 0.572.
 
 ---
 
-## Slide 26 — Gecko: the actual unseen body
+## Slide 27 — Gecko: the actual unseen body
 
 
 **Separate from everything above.** B1 was in pretrain. Gecko was not — no URDF, no kinematics, no
@@ -1401,15 +1365,15 @@ coordinate** — it bounds which bodies this method reaches.
 ---
 
 
-## Slide 27 — A real controller now walks, on B1, bounded
+## Slide 28 — A real controller now walks, on B1, bounded
 
-**Referenced from Slide 22.** Everything above this slide is selection from a library of recorded
+**Referenced from Slide 23.** Everything above this slide is selection from a library of recorded
 clips. This is a network that invents its own motion from state, trained by RL, that can fall —
 and does not, and moves.
 
 **Two real bugs, not six failed mechanisms, explain a whole prior arc of null results.** Building a
 real-physics RL controller (Q21 step 3: real MuJoCo physics, the world model only scoring the action
-just taken, never rolled forward — deliberately not the mechanism that killed Slide 18's
+just taken, never rolled forward — deliberately not the mechanism that killed Slide 19's
 imagination-RL attempt) produced a policy frozen at a single pose across six independently-tested
 fixes (action-space reachability, reward-scale calibration, no-fall-termination, correlated
 exploration noise, a command curriculum, a feet-air-time reward). Two bugs, found by testing a
@@ -1442,7 +1406,7 @@ training-time proxy:
 > a policy that falls every two seconds still finishes upright. **The cause is a change made earlier
 > in this same arc**: removing episode-termination-on-fall (to defeat the "standing still is safe"
 > optimum) made falling cheap, and a forward dive is the fastest way to earn forward Froude. This is
-> Slide 22's own warning, walked into: *what survival proves — nothing.*
+> Slide 23's own warning, walked into: *what survival proves — nothing.*
 
 **Bounded, stated precisely.** This is `reward_mode="true_froude"` — ground truth, a diagnostic
 never available on a genuinely novel body — not yet the WM-only reward
@@ -1462,11 +1426,11 @@ speed, not the full three-channel goal.
 
 ---
 
-## Slide 28 — A checkpoint bug reversed two other results; corrected, the shared coordinate reads better than a trivial baseline
+## Slide 29 — A checkpoint bug reversed two other results; corrected, the shared coordinate reads better than a trivial baseline
 
 **Two diagnostics run the same night had defaulted to the wrong checkpoint** — one whose shared
 Froude head was never actually fit for B1, still carrying whatever the original hexapod-only
-pretrain left it at. Corrected to the checkpoint the candidate-selection result (Slide 24) itself
+pretrain left it at. Corrected to the checkpoint the candidate-selection result (Slide 25) itself
 used, both results reverse:
 
 | | wrong checkpoint | correct checkpoint |
@@ -1502,9 +1466,9 @@ alternatives still lose to the shared coordinate; neither replaces it.
 
 ---
 
-## Slide 29 — A second, independent controller attempt: imitation instead of RL, same discipline, same result
+## Slide 30 — A second, independent controller attempt: imitation instead of RL, same discipline, same result
 
-**Same rigor as Slide 27, a different route and a different failure mode.** Slide 27's controller is
+**Same rigor as Slide 28, a different route and a different failure mode.** Slide 28's controller is
 trained by RL and invents its own motion from state. This asks the same question a different way:
 clone a policy directly from B1's own recorded expert clips (34-d proprioceptive state → 12-d joint
 target), pre-register the same kind of bar in advance (upright the whole window **and** ≥50% of the
@@ -1543,15 +1507,15 @@ training and evaluation was never controlled going in.
 
 ---
 
-## Slide 30 — Grading the clone with the world model: the same mechanism Slide 15 found on the insect, now measured directly on B1 instead of assumed
+## Slide 31 — Grading the clone with the world model: the same mechanism Slide 16 found on the insect, now measured directly on B1 instead of assumed
 
-**Slide 15 already showed this failure once, on the insect, and the reasoning was carried to B1
+**Slide 16 already showed this failure once, on the insect, and the reasoning was carried to B1
 rather than re-tested:** grading small variations of one behaviour asks the model to rank outcomes
 physics itself barely separates (0.1304 against 0.1299), so no representation can order them. Built
-the grading stage for B1 anyway, using the properly-fit shared head (Slide 28), to check that
+the grading stage for B1 anyway, using the properly-fit shared head (Slide 29), to check that
 reasoning directly rather than keep assuming it.
 
-**Same physics, same clip, same bar as Slide 29; the only addition is 30 rounds of grading small
+**Same physics, same clip, same bar as Slide 30; the only addition is 30 rounds of grading small
 perturbations of the cloned policy's own action against the shared head's Froude prediction, and
 refitting on the winner.**
 
@@ -1572,14 +1536,14 @@ beginning to hit joint limits the expert itself never touches. That is a **compo
 signature**: a small early deviation from the expert's trajectory reaches a state the policy was
 never shown, so it answers increasingly badly, which pushes it further off course. Grading is
 supposed to correct exactly that — but if the grader cannot tell nearby actions apart (precisely what
-Slide 15 measured), the "correction" it hands back is close to a random label, added on top of an
+Slide 16 measured), the "correction" it hands back is close to a random label, added on top of an
 otherwise-clean training set.
 
 ```
   what breaks the clone            what grading was supposed to fix it with
   ────────────────────             ─────────────────────────────────────────
   small drift → unseen state       ask the model: which nearby action recovers best?
-  → the policy answers worse       → the model can't tell nearby actions apart (Slide 15)
+  → the policy answers worse       → the model can't tell nearby actions apart (Slide 16)
   → drift compounds                → the "best" pick is close to random
                                     → refitting on it teaches the wrong lesson
 ```
@@ -1599,5 +1563,133 @@ way.
 > แก้จุดนี้ได้ แต่ถ้าตัวให้คะแนนเองแยกท่าใกล้เคียงกันไม่ออก มันก็สอนบทเรียนผิด ๆ ทับเข้าไปแทน
 > **ที่ยังไม่ได้ลอง**: ใช้โมเดลแบบ backprop ตรง ๆ แทนการเทียบตัวเลือก — อาจเลี่ยงปัญหานี้ได้ หรืออาจล้มด้วยเหตุผล
 > เดียวกันก็ได้ ยังไม่รู้
+
+---
+
+## Slide 32 — Slide 30's own baseline was buggy in four separate ways; fixed, plain cloning passes
+
+**Same student, same physics family, four independent bugs found in Slide 30/31's own setup —
+not a new mechanism, the measurement underneath it.** Each was found and fixed one at a time, each
+verified before moving to the next, on the same held-out clip throughout:
+
+| # | bug | fix |
+|---|---|---|
+| 1 | trained on placeholder-physics data, evaluated on the system-identified model — the exact confound Slide 30 already names, never actually checked | re-collected training data directly on the system-identified model |
+| 2 | recorded actions are 20 Hz, replayed one row per 50 Hz physics step — every clip played back 2.5× too fast, at 40% of its recorded resolution | hold each action for its real 0.05 s, not the environment's 0.02 s substep |
+| 3 | the goal fed to the student is the whole-clip mean Froude, dragged 12% below cruising speed by every clip's accel/decel edges | average only the steady-state middle window |
+| 4 | the expert's straight-line behaviour depends on a live external heading-correction signal the student's state never included | append live heading error as a 35th state input |
+
+```
+  bug 1 fixed → falling stops, travel 20% (stable but slow — a DIFFERENT failure)
+       │
+  bug 2 fixed → 20% → 29%
+       │
+  bug 3 fixed → 29% → 37%
+       │
+  bug 4 fixed → drift halved (53.8° → 25.7°), but distance drops again (37% → 23%)
+       │            a real trade-off, not a regression: same total action effort,
+       │            redirected toward correction instead of peak speed
+       ▼
+  still short of the bar — one thing never in any of these fixes: an example of RECOVERING
+```
+
+**The fifth fix closed it: the training data never demonstrated recovery.** Every clip starts at
+zero heading error by construction, so bug 4's fix gave the student the right *input* with no
+example of what to *do* with a large value of it. Added spawns rotated 10/20/30° off target, target
+pinned at the canonical heading — six new clips, confirmed to show real, scaled recovery (e.g.
++25.6° → +1.8° within one clip).
+
+| student | travelled / expert distance | upright | verdict |
+|---|---|---|---|
+| plain BC, Slide 30's original buggy baseline | 52% | falls | FAIL |
+| + all four bugs fixed, no recovery data | 23-37% (varies by fix) | stable | FAIL |
+| **+ recovery data** | **65%** | **stable** | **PASS** |
+
+**What this settles, and what it doesn't.** A properly-measured, properly-informed plain clone
+*can* clear the bar for this one goal — none of Slide 31's grading/gradient mechanisms were
+necessary, the blocker was measurement and a missing input, not a need for a teacher. It does not
+settle whether a teacher earns its keep *on top of* a baseline that already works, since this one
+needed no such mechanism to start working. And this result is forward-walking only, in isolation —
+Slide 33 is what happened when the same goal-conditioned student was asked to handle more than one
+behaviour at once.
+
+> **บทพูด (TH).** นักเรียนตัวเดิม ฟิสิกส์ตระกูลเดิมจากสไลด์ 29/30 — **เจอบั๊กสี่ตัวในสิ่งที่วัดผล ไม่ใช่กลไกใหม่**
+> แก้ทีละตัว: (1) ฟิสิกส์เทรน/ประเมินไม่ตรงกัน — confound ที่สไลด์ 29 เอ่ยไว้แต่ไม่เคยเช็คจริง (2) เล่นคลิปเร็วเกิน 2.5
+> เท่า (3) เป้าหมายที่ป้อนถูกดึงต่ำลงจากช่วงเร่ง/ชะลอความเร็ว (4) ไม่มีสัญญาณแก้ทิศทางที่ expert ใช้จริง
+> แก้ครบสี่ข้อ **ยังไม่ผ่านเกณฑ์** (23-37%) เพราะไม่มีข้อมูลตัวอย่าง "หลุดแล้วกลับมา" เลยสักคลิป — เพิ่มคลิปที่ปล่อย
+> ให้หันเบี่ยงจากเป้า 10/20/30 องศาแล้วบังคับให้กลับมา **ผ่านทันที 65%** ยืนได้ตลอด
+> **สรุป**: การ clone เฉย ๆ ที่วัดถูกต้องก็ผ่านได้ ไม่ต้องมีตัวช่วยให้คะแนนแบบสไลด์ 30 เลย — ปัญหาคือการวัดกับ
+> input ที่ขาดไป ไม่ใช่ตัวโมเดล **แต่นี่คือเดินหน้าอย่างเดียว** สไลด์ 32 คือตอนให้ทำหลายพฤติกรรมพร้อมกัน
+
+---
+
+## Slide 33 — Reframed, and where the multi-behaviour gate still fails
+
+**A methodological correction came before this result, and governs how to read it.** Slide 32's
+student is trained and tested on B1's *own full expert data* — every goal it is asked about has a
+labelled demonstration behind it. That is a fair, cheap **gate**: does a goal-conditioned clone even
+change behaviour correctly when given a different goal, before anything cross-embodiment is
+attempted? It is not yet the thesis's actual claim, which needs a genuinely novel body with *no*
+full expert demonstrations, only babble.
+
+```
+  STEP 1 — the gate (this slide)          STEP 2 — the real claim (not started)
+  B1's own labelled expert data      ──▶  babble instead of expert data
+  cheap, fast to iterate                  the actual thing a novel body would have
+  privileged, NOT the thesis claim        gated on step 1 passing first
+```
+
+**The gate is not yet passed.** Slide 32 only ever tested one goal family (forward) in isolation.
+Asked to condition on speed, turn, *and* side goals from the same 54-clip mixed set, using the exact
+same recipe that passed alone, a new failure appeared:
+
+| goal family | what happened |
+|---|---|
+| speed, turn | **static-pose collapse** — action converges to a fixed, non-cyclic vector; body freezes within 10-20 steps and never moves again |
+| side | reaches 133% of expert distance, but **falls** |
+
+**Ruled out one at a time, each checked directly rather than assumed:** fall-contaminated training
+data (checked every clip's own height trace — clean), action-normalisation skew across the three
+behaviours (per-behaviour action statistics nearly identical), undertraining (5000 vs. 2000 epochs:
+no offline or closed-loop improvement). Removing the heading-error input eliminates the freeze
+specifically — all three goals move again — but then all three **fall** instead (75-120% of
+distance, min body height ~0.09 m vs. ~0.58 m settled). The heading-error input is a confirmed
+contributing cause of the freeze, not the whole story.
+
+**The decisive check: even a training goal, fit to R² 0.99 offline, still falls in closed loop.**
+This rules out "can't generalise to unseen goals" entirely — it is the same compounding closed-loop
+drift Slide 30 already diagnosed for forward-only, before recovery data fixed that one case. Turn
+and side simply never received the equivalent treatment. Built the natural extension — recovery
+clips for turn, spawned off-heading with the target advancing at the real turn rate instead of
+sitting still — and retrained on the enlarged 60-clip set:
+
+| behaviour | result |
+|---|---|
+| speed | 13% of expert distance, stable (slow, not frozen — a third distinct failure) |
+| turn | 132%, falls |
+| side | not yet given recovery data at all |
+
+**Neither the original collapse nor a clean pass — a still-unresolved failure mode.** Whether it
+needs more/better recovery coverage, a different state representation, or something else entirely is
+open. **Paused here** to redirect effort to writing.
+
+**One further avenue considered and also paused, for the same reason.** The one existing real
+controller (Slide 28) has no goal input at all — its network only ever tracks one fixed goal it was
+trained against, the Froude channel is used to *shape the reward*, never fed to the policy. Making
+it genuinely goal-conditioned (so a goal read from another body's video could later drive it) needs
+a real architecture change and a full retrain, not a rerun — and it is the identical open question
+above, moved into a slower, noisier setting to debug. Held for after this gate resolves.
+
+> **บทพูด (TH).** ก่อนอ่านผลนี้ต้องปรับกรอบก่อน: **สไลด์ 31 เทรนและทดสอบบนข้อมูล expert เต็มของ B1 เอง** —
+> ทุกเป้าหมายมีตัวอย่างสาธิตรองรับ นี่คือ **ด่านทดสอบราคาถูก** ว่ากลไก goal-conditioning ทำงานถูกไหม ก่อนจะไป
+> ข้ามร่างกายจริง **ยังไม่ใช่ข้อเคลมของวิทยานิพนธ์** ซึ่งต้องใช้หุ่นใหม่ที่ไม่มี expert data เต็ม มีแค่ babble
+> **ด่านนี้ยังไม่ผ่าน**: ให้เทรนพร้อมกันสามพฤติกรรม (เดินหน้า/เลี้ยว/ไถลข้าง) เจอ **การแช่แข็งท่ายืนนิ่ง** ในเดินหน้า/
+> เลี้ยว และไถลข้าง **ล้ม** ทั้งที่ไปได้ไกลพอ
+> ตัดสาเหตุออกทีละอัน: ข้อมูลปนเปื้อน (ไม่ใช่), สเกลคำสั่งเพี้ยน (ไม่ใช่), เทรนไม่พอ (ไม่ใช่) — เอาสัญญาณแก้ทิศทาง
+> ออก อาการแช่แข็งหายแต่กลับไปล้มแทน **แม้แต่เป้าหมายที่เคยเห็นตอนเทรนก็ยังล้ม** — พิสูจน์ว่าไม่ใช่เรื่อง generalize
+> แต่คือ compounding drift แบบเดียวกับที่เจอตอนเดินหน้า เพิ่มข้อมูล recovery สำหรับการเลี้ยวแล้วเทรนใหม่ — **ยังไม่ผ่าน
+> อีก เป็นความล้มเหลวแบบที่สาม** (เดินหน้าช้าแต่นิ่ง, เลี้ยวยังล้ม) **หยุดตรงนี้** เพื่อไปโฟกัสงานเขียน
+> **อีกทางที่พักไว้เหมือนกัน**: PPO controller ตัวเดียวที่เดินได้จริง (สไลด์ 27) ไม่มีช่องรับเป้าหมายเลย ถ้าจะทำให้
+> รับเป้าได้ต้องแก้สถาปัตยกรรมและเทรนใหม่ทั้งหมด ซึ่งเป็นคำถามเดียวกับด้านบน แค่ย้ายไปอยู่ใน RL ที่ช้าและวุ่นกว่า
 
 ---
