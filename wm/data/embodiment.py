@@ -95,7 +95,11 @@ def _b1(data):
     else:
         motion = body_motion(position, dt)
     return {
-        "frames": data["frames"],
+        # optional: proprioceptive-only B1 collections (e.g. clone_b1's matched-physics data,
+        # data/proprioceptive/beh12_b1_flatreal) carry no video at all -- every caller that reads
+        # `clip["frames"]` already requires it to be present in its own data, so None here is only
+        # ever reached by callers that never touch it.
+        "frames": data["frames"] if "frames" in data.files else None,
         "actions": data["action"].astype(np.float32),
         "contact": (data["foot_contact"].astype(np.float32) > 0.5).astype(np.int64),
         "body_motion": motion,

@@ -3105,3 +3105,30 @@ policy นี้เรียนรู้แค่ "เดินหน้า" ไ
 ไม่เคยเห็นจริง)** — ยังไม่ได้ทดสอบว่า WM reward ตัวจริง (`body_head(proj(action))`, ที่ F195/F199/F201
 ใช้เวลาทั้ง arc ปรับปรุง) จะเทรน controller ได้จริงไหมบน environment ที่แก้บั๊กแล้วตัวนี้ — เป็นก้าว
 ถัดไปที่ควรทำ. อัปเดต F206 (แก้ในที่เดิม) + Q21 (RESOLVED, positive) แล้ว
+
+---
+
+## 36. B1 teacher-student port ทั้ง session: เจอ bug ของ baseline เอง 4-5 ตัว, forward ผ่านจริง, แต่ turn/side ยังไม่ผ่าน gate (2026-09-15)
+
+**ต้นเรื่อง**: F216 ลอง 4 กลไก (DAgger ละเอียด, distill จาก candidate หยาบ, aux gradient loss, frame-stacking) เพื่อแก้ B1 clone ที่ล้ม ไม่มีอันไหนผ่านเกณฑ์ที่ตั้งไว้ (ยืนได้ตลอด + ไปได้ ≥50% ของ D_real)
+
+**พบว่า baseline เองมี bug 4 อย่างที่ไม่เคยเช็ค** (ก่อนจะไปโทษกลไกที่ลองมา):
+1. เทรนบนฟิสิกส์ปลอม (`b1_flat.xml`) แต่เทสบนฟิสิกส์จริง (`b1_flat_real.xml`) — ทั้งที่ policy ตัวเดิม (ไม่ต้องเทรนใหม่) เดินดีบนฟิสิกส์จริงอยู่แล้ว (เช็คตรงๆ ก่อนเชื่อ)
+2. action ที่บันทึกไว้ 20Hz แต่ replay ที่ 50Hz ของ environment — เล่นเร็วเกิน 2.5 เท่า จากที่ควรเป็น
+3. goal ที่ป้อนให้ student เป็นค่าเฉลี่ยทั้งคลิป ซึ่งต่ำกว่าความเร็วจริงตอน cruise ~12% (โดนลากลงจากช่วง accel/decel ต้น-ท้ายคลิป)
+4. student ไม่เคยเห็น "heading error" ที่ policy จริงใช้แก้ทาง (P-controller ภายนอก network เอง, `head_kp` default เปิดอยู่ตลอด) — เพิ่มเป็น input ที่ 35
+
+แก้ครบทั้ง 4 + เพิ่ม **recovery data** (spawn เอียงจาก heading เป้าหมาย 10-30 องศา ให้เห็นตัวอย่างจริงว่า "เบี่ยง→แก้" ไม่ใช่แค่ "ตรงอยู่แล้ว→อยู่ต่อ") → **BC ธรรมดา (ไม่มี teacher, ไม่มี grading เลย) ผ่านเกณฑ์**: 65%, ยืนได้, ท่าใกล้เคียง expert เอง (พี่ดูวิดีโอเทียบเองแล้วยืนยัน) — บันทึกเป็น F217
+
+**เปลี่ยนแผน**: พี่ทัก — student ที่ train บน B1 expert (ground truth ทั้งพฤติกรรม) ไม่ตรง claim จริงของโปรเจกต์ (หุ่นใหม่ไม่มี expert มีแค่ babble) เพราะงั้นต้องทำ 2 ขั้น:
+1. **gate**: goal-conditioned BC + B1 expert (ground truth, ถูก) — เช็คว่า mechanism ทำงานไหม (เปลี่ยน goal เปลี่ยนพฤติกรรมไหม)
+2. **claim จริง**: goal-conditioned + babble แทน expert — ต้องรอ gate ผ่านก่อน
+
+**ผล gate (all-behaviour: speed+turn+side)**: ยังไม่ผ่าน
+- ใส่ yaw_err_input (fix ของ forward) บนข้อมูลผสม 3 พฤติกรรม → **นิ่งค้าง** (static pose, ไม่ใช่เดิน) สำหรับ speed/turn, side ไปไกลแต่ล้ม
+- ตัด yaw_err_input ออก → นิ่งค้างหาย แต่ **ล้มทั้ง 3** แทน
+- เช็คแล้วไม่ใช่: ข้อมูลปนเปื้อน (เช็คตรงๆ สะอาดดี), normalization เพี้ยน (stats แต่ละพฤติกรรมใกล้กันมาก), train ไม่พอ (5000 epoch ไม่ต่างจาก 2000)
+- เช็คขาด: แม้ป้อน goal ที่เป็น**ข้อมูล train เอง** (fit ได้ R²=0.99) ก็ยังล้ม → ยืนยันว่าเป็นปัญหาเดิม (compounding drift, F216) ไม่ใช่ generalize ไม่ได้
+- เพิ่ม turn-recovery data (ขยาย --yaw0 ให้มี wz ด้วย, heading target วิ่งตามจริงระหว่างแก้ offset) → เทรนใหม่ → **ยังไม่ผ่าน**: speed 13% (ช้าแต่นิ่ง), turn 132% (ล้ม)
+
+**สถานะตอนนี้**: gate ยังไม่ผ่านสำหรับ turn (และ side ยังไม่ได้แตะเลย เพราะไม่มีกลไก external-correction แบบ heading-hold ให้ต่อยอด) บันทึกละเอียดใน `doc/FINDINGS.md` F218 **หยุดตรงนี้ตามที่พี่ขอ** เพื่อไปโฟกัส slide/deck/report — เรื่องที่ค้างไว้ให้ทำต่อ (ไม่เร่งด่วน): recovery data ให้ side, หรือแนวทางอื่นสำหรับ closed-loop stability บน multi-behaviour goal

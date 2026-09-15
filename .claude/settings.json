@@ -1,0 +1,11 @@
+{
+  "enabledPlugins": {
+    "marketing-skills@claude-code-skills": false,
+    "self-improving-agent@claude-code-skills": true,
+    "research-summarizer@claude-code-skills": true,
+    "caveman@claude-code-skills": true,
+    "zero-hallucination-coder@claude-code-skills": true,
+    "memory-engineering@claude-code-skills": true,
+    "handoff-engineering@claude-code-skills": true
+  }
+}

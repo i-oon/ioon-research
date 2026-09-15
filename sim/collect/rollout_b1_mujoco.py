@@ -140,6 +140,13 @@ def main():
                          "Physics state alone is not enough to resume exactly -- this policy is "
                          "closed-loop and reacts to its own last action and heading history too.")
     ap.add_argument("--state_out", default="")
+    ap.add_argument("--yaw0", type=float, default=0.0,
+                    help="spawn rotated this many degrees off the held heading target (0 = "
+                         "straight ahead), instead of spawning already facing it. The default "
+                         "spawn always starts at zero heading error, so no existing clip has ever "
+                         "shown the correction loop responding to a REAL offset -- every recorded "
+                         "example is 'already on target, stay there.' This exists to collect "
+                         "genuine recovery examples: 'start N degrees off, watch it correct back.'")
     ap.add_argument("--load_state", default="",
                     help="resume from a --save_state_at snapshot instead of the default spawn "
                          "pose. --vx/--vy/--wz (or --schedule) from here on can be a DIFFERENT "
@@ -176,12 +183,23 @@ def main():
         # counterfactual target is supposed to capture, not something to discard
         args.policy_warmup = 0
     else:
-        d.qpos[0:3] = [0, 0, SPAWN_Z]; d.qpos[3:7] = [1, 0, 0, 0]
+        d.qpos[0:3] = [0, 0, SPAWN_Z]
+        # **A pure yaw rotation from identity IS the yaw0 quaternion itself** -- no composition
+        # needed since the un-rotated spawn is already axis-aligned. `heading_target` is pinned to
+        # 0.0 (the canonical straight-ahead direction), not left to auto-grab whatever heading the
+        # robot starts at (the default path below): with `--yaw0 0` those are the same value, so
+        # nothing changes for every existing clip; with `--yaw0` nonzero, this is what makes the
+        # correction loop have a REAL error to respond to from step 1, instead of starting at zero
+        # error like every recorded clip so far has.
+        yaw0_rad = np.radians(args.yaw0)
+        d.qpos[3:7] = [np.cos(yaw0_rad / 2), 0, 0, np.sin(yaw0_rad / 2)]
         d.qpos[7:19] = il_to_sdk(DEFAULT_IL); d.ctrl[:] = il_to_sdk(DEFAULT_IL)
         mujoco.mj_forward(m, d)
         for _ in range(args.warmup * DECIMATION):
             mujoco.mj_step(m, d)
-        last = np.zeros(12, np.float32); step_i = 0; heading_target = None; yaw_int = 0.0
+        last = np.zeros(12, np.float32); step_i = 0
+        heading_target = 0.0 if args.yaw0 else None
+        yaw_int = 0.0
 
     plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
         if args.schedule else None

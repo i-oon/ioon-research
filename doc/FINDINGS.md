@@ -17494,9 +17494,8 @@ a qualitatively different failure depending only on which physics they're asked 
 next test, not yet run: re-collect (or re-render) B1 clips on `b1_flat_real.xml` so training and
 evaluation share one physics model, removing this confound before judging the mechanism.
 
-Scripts: `sim/control/teacher_student_b1.py` (at the time of this entry, `bc`/`eval` stages only, no
-`improve` -- see F216, which added a grading stage later the same session and renamed the file back).
-Checkpoints:
+Scripts: `sim/control/clone_b1.py` (`bc`/`eval` stages -- see F216 for the other mechanisms tried
+against this baseline afterward; none survived, so the file holds only this control). Checkpoints:
 `wm/runs/students/b1_bc_forward.pt`, `wm/runs/students/b1_bc_all.pt`. Videos:
 `results/wm/students/eval_{forward,all}{,_flat}.mp4`.
 
@@ -17541,7 +17540,7 @@ baseline, which briefly looked like it beat `body_head(ITM(.))` on the wrong che
 beat it on the checkpoint that was actually fit for this task -- the ITM/z pathway earns its keep
 over a trivial linear function of the same frame pair.
 
-**What is unaffected.** `sim/control/teacher_student_b1.py`'s `clone_b1()` (F212's BC test) reads
+**What is unaffected.** `sim/control/clone_b1.py`'s `clone_b1()` (F212's BC test) reads
 only `cfg.body_channels` from its `--base_ckpt` argument, never `body_head` itself, and its
 `evaluate_b1()` constructs `B1MuJoCoEnv` with `goal_std=np.zeros(3)`, never querying `body_head`'s
 output anywhere in the rollout loop. F212's numbers do not depend on which of these two checkpoints
@@ -17588,115 +17587,196 @@ still lose to ITM; neither closes the gap.
 Script: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py` (extended in place with
 `PairMLP`/`mlp_fit`/`mlp_predict`, no new file).
 
-### F216. `improve()`, finally built and run for B1: DAgger against the real, correctly-fit teacher makes the student worse, not better -- confirming by measurement what F135/F136/F138 had only argued by extrapolation
+### F216. Does the model help turn the B1 clone into a working walker? Four mechanisms tried, none clear the pre-registered bar, and the reasons why are now specific rather than "it doesn't work"
 
-F212 tested clone-only (`clone_b1()`); the grading/DAgger stage was deliberately left unbuilt,
-reasoning from F135/F136/F138 (measured on the insect: local-perturbation ranking scores 33% against
-a 50% coin flip, because real physics barely distinguishes nearby actions at fixed magnitude) that
-the same failure would recur on B1. That reasoning was never actually tested on B1 -- it was an
-extrapolation from one embodiment to another. Built `improve_b1()` in
-`sim/control/teacher_student_b1.py` to check it directly rather than keep assuming it, which also
-made "teacher-student" an accurate name again (the file had been renamed to `clone_b1.py` earlier
-this session for having no such stage -- reverted here, with the reason kept in its own docstring).
+F212 cloned B1 straight from its own recorded (state, goal) -> action pairs and never cleared the
+pre-registered bar (upright the whole window AND >= 50% of `D_real`). The question this entry
+answers: does bringing the world model (or more temporal context) into that training loop, in any
+of the ways actually available, produce a policy that does? Four mechanisms were tried, in order,
+each motivated by the previous one's specific failure rather than a fresh guess. **None pass.**
 
-**Three departures from `teacher_student_insect.py`'s `improve()`, all forced by B1's existing split,
-none new design**: physics stays in MuJoCo, CoppeliaSim is brought up only to pose the body and take
-one picture per step (`close_loop_b1_physics.py`'s own split, reused); the room is rendered in the
-SAME egocentric convention `beh12_b1_ego_flat` itself was rendered in (`ego_camera.attach_ego`,
-`room_for`, `WALK_PITCH["b1"]`) so grading is not confounded by a render-domain shift against the
-frames `body_head_b1_hex_v2.pt` was actually fit on; the goal is B1's own recorded body motion, kept
-to `clone_b1`'s own training split, so the comparison against the BC-only number is apples to apples
-and not a new cross-embodiment claim. `main()` now asserts `--base_ckpt` for `improve` carries a real
-`body_head_fit` for b1, refusing `teacher_b1.pt` outright (F214's mixup, made structurally impossible
-here rather than just documented).
+| # | mechanism | what it changes | travelled / D_real | closed-loop behaviour (every video watched in full) |
+|---|---|---|---|---|
+| 0 | plain BC (`b1_bc_forward.pt`) | nothing -- the baseline | 52% | falls near the end |
+| 1 | DAgger, fine local grading (`b1_dagger_forward.pt`) | grades ~15 small random perturbations of the current action against `body_head`, refits on the winner | 31% | falls at ~halfway, worse than baseline |
+| 2 | coarse-candidate distillation (`b1_distill_all.pt`) | relabels each training clip with the model's own best-matching library clip instead of its own actions | 58% | fully collapses on its side by ~frame 35 |
+| 3 | auxiliary model-consistency loss (`b1_bc_aux_forward.pt`) | adds a differentiable loss: backprop through frozen ITM/FTM/body_head at the student's own action, no sampling | 85% | violent slip-and-tilt from ~step 30 onward, never recovers a normal stance |
+| 4 | frame-stacking, `history=8` / `history=3` | student sees the last k raw proprioceptive frames instead of one instant | 38% / 43% | `history=8` fully collapses by ~frame 50; `history=3` stays upright but gait is visibly wobbly |
 
-Ran 30 DAgger rounds against `body_head_b1_hex_v2.pt`, refitting `b1_bc_forward.pt` (F212's BC
-student). Evaluated both, same bar, same goal clip, **video watched for both before trusting either
-number** (the standing rule, and it mattered again):
+**Why each one failed, specifically -- this is the part worth keeping.**
+
+- **Mechanisms 1 and 2 are both candidate-scoring**, and both inherit a property already measured
+  on the insect (F135/F136/F138): `body_head` cannot discriminate between actions that are close
+  together, whether "close" means small perturbations (1) or different recordings of nearly the
+  same condition (2, only 6/48 clips scored best against their own recording). Grading against a
+  signal that can't discriminate injects near-random labels, which is worse than no correction at
+  all -- confirmed directly on B1, not just extrapolated from the insect.
+- **Mechanism 3's training signal did move** (its loss dropped ~30% over training, not flat), so
+  the model's gradient at a single action does carry more information than its discrete ranking
+  does -- but a closed-loop policy trained on it still doesn't walk cleanly: it slips and tilts
+  violently from step ~30 onward and never recovers a normal stance, while never dropping low
+  enough to trip the height-only "upright" check. **That check alone is not sufficient to certify a
+  working gait** -- a real gap in the verdict metric, not just this one policy's problem.
+- **None of 1-3 could have fixed gait-level instability even in principle**, because `body_head`
+  only ever scores one Froude number averaged over a whole clip -- it has no notion of what a leg
+  should be doing at a given instant. That reframing (not "does grading help" but "grading can't
+  see gait at all") is what motivated mechanism 4.
+- **Mechanism 4 tests whether the missing ingredient is short temporal context** (a CPG-shaped
+  hypothesis: a memoryless policy has no structural tendency to fall back onto a stable limit
+  cycle once perturbed, unlike an oscillator). Frame-stacking is the cheapest, most generic version
+  of that test, chosen specifically to avoid hand-authoring a per-robot CPG (`wm/policy/planner.py`
+  already states that cost is exactly what this project avoids). Result is ambiguous rather than a
+  clean answer: `history=8` fit the offline data almost perfectly (R2 +0.999, train loss 0.0001)
+  yet fell *sooner* than the baseline -- consistent with overfitting the exact recorded windows
+  rather than extracting anything that generalizes to slightly-off live states. `history=3`, with
+  less capacity to do that, never fell but didn't reach the distance bar either. This does not
+  confirm or rule out the phase hypothesis -- concatenating raw frames is not the same test as
+  giving the network real temporal processing (a hidden state), which would separate "needs
+  history" from "more raw dimensions costs generalization" more cleanly.
+
+**Where this leaves the acting side.** Every mechanism available from the existing world model
+(fine grading, coarse grading, gradient, more raw input) has now been tried once, honestly, against
+one pre-registered bar, with every result video watched in full before being trusted. None pass.
+The one thing not yet tried is a small recurrent (GRU) student -- real temporal processing rather
+than concatenated raw frames -- which would be a genuinely different mechanism, not a variant of
+one already tried.
+
+All four mechanisms' code has been removed from `sim/control/clone_b1.py` after being logged here
+(recoverable from git history if ever needed again); only `bc`/`eval` (mechanism 0) remain. Their
+checkpoints/videos were removed with the code.
+
+### F217. F216's baseline itself was buggy in four separate ways -- fixed one at a time, plain BC alone clears the pre-registered bar, closely matching the expert's own gait
+
+F216 tested four mechanisms for improving a B1 clone against the `B1MuJoCoEnv` default physics
+baseline and found none of them helped. Before extending that arc further (a CPG-shaped student,
+per a later hypothesis), the baseline itself turned out to have four independent, previously
+unflagged bugs -- found and fixed one at a time, each verified before moving to the next:
+
+| # | bug | fix | effect (same held-out clip throughout) |
+|---|---|---|---|
+| 1 | trained on `b1_flat.xml` (placeholder physics), evaluated on `b1_flat_real.xml` (system-identified) -- a known, named confound (F212) never actually checked | re-collected training data on `b1_flat_real.xml` directly, using the SAME expert policy checkpoints unmodified (confirmed first, cheaply: the policy alone, no retraining, already walks cleanly there) | falling stopped; travel dropped to 20% (stable-but-slow, a different failure) |
+| 2 | recorded actions are 20 Hz (subsampled from a native 50 Hz policy), but `D_real`/the student's own rollout replayed them one array-row per environment step at the env's native 50 Hz -- playing every recorded clip back 2.5x faster than it was recorded, using only 40% of the original decision resolution | hold each action for `DATA_DT` (0.05 s / 10 physics substeps), not `env.decimation`'s 0.02 s | 20% -> 29% |
+| 3 | the goal fed to the student is the WHOLE-CLIP mean Froude, which sits ~12% below the real cruising speed because it's dragged down by every clip's accel/decel edges (verified directly: first-10-frame mean 0.106, middle-20 steady-state mean 0.174, whole-clip mean 0.154) | `--trim_goal`: average over the steady-state window only, excluding `trim` frames from each end | 29% -> 37% |
+| 4 | the expert's own straight-line behaviour depends on an external proportional heading-hold controller (`rollout_b1_mujoco.py`'s `head_kp`, on by default -- confirmed by reading the collection script, not assumed) that feeds a live heading-error term into the policy's input; the student's 34-d state never included that signal, so it had no way to reproduce the correction, only to copy one trajectory that happened to stay straight | `--yaw_err_input`: append live heading error (against the episode's own start heading) as a 35th state number, both at train and eval time | drift roughly halved (53.8 deg -> 25.7 deg) but distance dropped (37% -> 23%) -- a real trade-off, not a bug: same total action effort (verified: mean \|action\| 4.78 vs 4.87, not lower), redirected toward correction instead of peak speed |
+
+**A fifth fix closed the remaining gap: the training data itself never demonstrated recovery.**
+Every existing clip starts at zero heading error by construction (the default spawn always faces
+the held target already), so bug 4's fix gave the student the right INPUT but no examples of what
+to DO with a large value of it. Added `--yaw0` to `rollout_b1_mujoco.py` (spawn rotated N degrees
+off the held target, pinning the target at the canonical heading instead of the perturbed start) and
+collected 6 new clips at +-10/20/30 degrees, confirmed to show real, scaled recovery (e.g. +25.6 ->
++1.8 deg over one clip) -- **the `sym` policy fell at every offset tested, even +-10 deg, and was
+excluded from this collection rather than teaching "the robot collapses" as a recovery example.**
+
+Retrained on the combined 22-clip speed set (16 original + 6 recovery), same bar, same discipline
+(video watched, not sampled):
 
 | student | travelled / D_real | upright | verdict |
 |---|---|---|---|
-| BC only (`b1_bc_forward.pt`, F212) | 52% | falls (frame ~60 of 66, near the end) | FAIL |
-| BC + 30 rounds DAgger (`b1_dagger_forward.pt`) | **31%** | falls (frame ~30 of 66, roughly twice as early) | FAIL |
+| plain BC, original bugged baseline (F212/F216) | 52% | falls | FAIL |
+| + all four bugs fixed, no recovery data | 23-37% (varies by fix) | stable | FAIL |
+| **+ recovery data (this entry)** | **65%** | **stable** (min head z 0.55 vs 0.58 settled) | **PASS** |
 
-The video confirms the number is not a rendering artifact: the DAgger student visibly crumples onto
-its back by the middle of the rollout, well before the BC-only student's later, milder tip-over.
-DAgger did not just fail to help -- it made the policy measurably worse and made it fall sooner.
+**Watched directly against the expert's own rendered trajectory for the same goal, side by side.**
+The expert's own reference walk is not perfectly clean either -- some real oscillation, not a
+textbook straight line -- and the student's gait was judged close to that same level of messiness,
+not held to a stricter standard than the ground truth itself.
 
-**Reading.** This is the direct, on-B1 confirmation of what F135/F136/F138 only established on the
-insect and this session had extrapolated rather than tested: grading candidate actions with the
-world-model teacher, at a fixed local perturbation scale, does not produce a useful training signal
-for this robot either. The likely mechanism carries over unchanged: `body_head`'s Froude read cannot
-discriminate between the small, nearby action perturbations DAgger samples, so `argmin` over those
-candidates picks close to noise, and refitting the student on that noise pulls it away from the
-clean expert labels in the buffer rather than sharpening them -- a plausible account of why it is
-worse than baseline, not just equal to it. **Both bars stay a pre-registered FAIL either way**, so
-this does not reopen F212's overall verdict on the B1 port -- it closes the one open question F212
-left standing (grading vs. clone-only) with a clean negative, on this embodiment, by measurement.
+**One unresolved anomaly, flagged rather than chased further per the pre-agreed scope boundary
+(more BC data/bugfixing stops here regardless of outcome).** The same checkpoint scored 0% travel
+(frozen in place) against a different goal clip that happened to be a training example in this run,
+not the held-out one -- not a fair test on its own (never held out), but odd enough to be worth
+someone checking later if this checkpoint is reused.
 
-**A latent bug fixed while running this**: `eval`'s `--out` shared `bc`'s own default
-(`wm/runs/students/b1_bc_forward.pt`), so running `eval` without `--out` wrote an eval-results
-`.npz` alongside a same-named `.pt` checkpoint (numpy appends `.npz` rather than overwriting the
-`.pt` file directly, so no checkpoint was lost, but this was a live footgun). Fixed: `eval` now
-defaults its `--out` to `results/wm/<student-name>_eval.npz`.
+**What this does and doesn't settle.** It settles that a properly-measured, properly-informed plain
+clone CAN clear the bar for this specific goal -- none of F216's four grading/gradient mechanisms
+were necessary for that, the blocker was measurement and missing-input bugs, not a need for a
+teacher. It does not settle the broader question the CPG/residual design (still to be run) was
+built to answer: whether the model earns its keep on TOP of a working baseline, since this baseline
+itself needed no such mechanism to start working.
 
-Script: `sim/control/teacher_student_b1.py` (renamed back from `clone_b1.py`; `improve_b1()` added,
-`--out` default fixed). Runs: `wm/runs/students/b1_dagger_forward.pt`, videos
-`results/wm/b1_bc_forward.mp4` / `results/wm/b1_dagger_forward.mp4`.
+Scripts: `sim/control/clone_b1.py` (`body_goal_trimmed`, `--trim_goal`, `--yaw_err_input`, `DATA_DT`
+substep fix, all added this entry). `sim/collect/rollout_b1_mujoco.py` (`--yaw0` added).
+`scripts/dataset/recollect_b1_flatreal.py` (`collect_recovery()`/`--yaw0_list` added). Data:
+`data/proprioceptive/beh12_b1_flatreal` (54 clips: 48 original + 6 recovery). Checkpoint:
+`wm/runs/students/b1_bc_flatreal_forward_trim12_yaw_recovery.pt`. Videos:
+`results/wm/b1_bc_flatreal_forward_trim12_yaw_recovery_heldout2.mp4` (student),
+`results/wm/expert_b1_ep2100_goal.mp4` (expert, same goal, for direct comparison).
 
-### F217. Coarse-candidate correction (the buildable half of "does grading help," once the state-aware half turned out not to exist) also fails, but travels farther before it does -- offline R2 diverges to negative while closed-loop distance improves
+### F218. The goal-conditioning gate (does a different Froude goal produce genuinely different B1 behaviour, on ground-truth expert data) is not yet passed -- speed and turn each fail in a different, now-diagnosed way, side not yet investigated
 
-Following F216, a second grading mechanism was proposed: instead of ranking small local action
-perturbations (proven broken), use `DirectFroudePlanner` -- F210's own mechanism, `body_head(proj(a))
-vs. goal`, no rollout, 90%+ family accuracy -- to pick among **coarse, qualitatively different**
-candidates instead. Before building it, found this specific framing does not exist: `DirectFroudePlanner`
-scores purely from a fixed goal and a candidate's own recorded actions, with no `e_t` and no notion
-of the live rollout's current state at all -- it cannot see or react to drift, so it cannot implement
-"correction at a drift point." The planner that DOES take the live state (`LatentPlanner`, rolling
-the FTM) is the one Slide 24/F127 already showed prefers the *worst* candidate. Neither combination
-gives a mechanism that is both state-aware and proven to discriminate well.
+Before touching cross-embodiment (a goal read from hexapod video) or babble (no privileged expert
+data), the cheaper, more fundamental question was raised: does the ALREADY-goal-conditioned
+`Student` architecture (it has always taken `(state, goal)`, since `teacher_student_insect.py`)
+actually change B1's behaviour when given a genuinely different goal, using B1's own ground-truth
+expert data? F217 only ever tested one goal family (forward) in isolation. This entry is the result
+of testing across all three behaviour families (`speed`/`turn`/`side`) -- **the gate is not yet
+passed**, and pinning down why involved ruling out several real candidate causes one at a time.
 
-**Built the honestly-available version instead**: relabel each of `b1_bc_all.pt`'s own 48 training
-clips with `DirectFroudePlanner`'s own coarse pick for that clip's goal (12-condition library, one
-clip per condition, `free_offset=True`, matching F210's own setting) instead of that clip's own
-recorded actions, then train the same `Student` architecture on the relabeled data, same held-out
-split as `b1_bc_all.pt` (its own saved `val_paths`, for an apples-to-apples comparison).
+**All-behaviour student, `yaw_err_input` on (F217's exact recipe, just on 54 mixed clips instead of
+22 forward-only ones): a NEW, different failure appeared -- static-pose collapse.** Speed and turn
+goals converged to a fixed, non-periodic action held constant for the whole episode (confirmed by
+logging the action trajectory directly: `|action|` normal (~4.8), but the vector itself barely
+changes step to step, and position freezes within ~10-20 steps and never moves again) -- not a dead
+network, a policy that found a stable STANDING equilibrium instead of a gait cycle. Side reached
+133% of `D_real` but fell.
 
-**Expected, stated before running: since the library holds only one clip per condition, most of the
-48 training clips are NOT their own condition's representative, so most examples get relabeled with
-a genuinely different episode's action trajectory paired against their own state** -- confirmed:
-the planner picked a clip's own condition as its own best match on only 6/48 training clips.
+**Ruled out, one at a time, each checked directly rather than assumed:**
+- **Fall-contaminated training data.** An earlier collection log remembered as "sym policy FELL on
+  every side/hard-turn condition" turned out not to describe the actual SAVED, windowed clips --
+  checked every turn/side clip's own `base_pos[:,2]` directly, all 32 stay in the normal
+  0.56-0.61 m range. Retracted; the saved data is clean.
+- **Action-normalization skew from mixing 3 behaviours.** Per-behaviour action statistics
+  (mean\|a\|, mean, std, min/max) are nearly identical across speed/turn/side. Not the cause.
+  scale of the network's output, `student.mean`/`student.std`) computed over the mixed set
+- **Undertraining / insufficient capacity.** Held-out MSE was already converged at 2000 epochs
+  (0.0102-0.0110); 5000 epochs did not improve it (still 0.0102-0.0104) and closed-loop behaviour
+  got noisier, not better (turn overshoot 93%->133%, still falling). Ruled out.
 
-| | held-out MSE (best epoch) | held-out R2 |
-|---|---|---|
-| plain BC on raw expert actions (`b1_bc_all.pt`, F212) | -- | 0.995 (offline, F212) |
-| **distilled on the planner's own coarse pick** | 1.42, rising to 8.53 by epoch 2000 (never converges) | **-0.418** |
+**Removing `yaw_err_input` eliminated the static collapse specifically** (all three goals produce
+real motion again, no freeze) but all three then FALL instead (75%/93%/120% of `D_real`,
+min head z ~0.09 vs ~0.58 settled). So `yaw_err_input` is a confirmed, real contributing cause of
+the freeze on multi-behaviour data -- plausibly because it means two different things depending on
+behaviour (an error to correct for `speed`, but the intended motion itself for `turn`) -- though
+this was never directly proven as the *mechanism*, only that removing it removes the symptom.
 
-Closed-loop, same bar, same goal clip, video watched for both:
+**Decisive check: even a TRAINING goal (fit to R2 0.99 offline) still falls in closed loop.** This
+rules out "can't generalize to unseen goals" as the explanation entirely -- it is the same
+compounding-drift instability F216 originally diagnosed for forward-only, before that case was
+fixed with targeted recovery data. Turn/side simply never received the equivalent treatment.
 
-| student | travelled / D_real | upright | verdict |
-|---|---|---|---|
-| plain BC, all 3 behaviours (`b1_bc_all.pt`, F212) | 30% | stays upright (crouched low, but above the fall threshold) | FAIL |
-| **distilled on coarse picks** | **58%** | **falls completely** (frame ~35 of 66, legs splayed) | FAIL |
+**Built the natural extension for `turn`: `--wz` added to `collect_recovery()`**
+(`scripts/dataset/recollect_b1_flatreal.py`) -- `heading_target` still starts at 0 (not the
+perturbed spawn heading) but then advances at the commanded turn rate exactly like an ordinary turn
+condition, so the robot must close a real initial offset while the target keeps moving. Collected 6
+clips (yaw0 in {-30,-20,-10,10,20,30} deg, wz=0.169 matching `turn_w0.024`'s own `gait3` rate,
+`gait3` only per the same fall-avoidance reasoning as the speed-recovery batch) -- confirmed by
+directly checking heading trajectories, e.g. -14.3 deg -> +13.8 deg against the target trajectory a
+perfectly-tracking robot would have reached (+17.2 deg): real, substantial convergence, not
+contamination.
 
-**Reading.** The offline regression signal is unambiguously worse -- diverging, not just weaker --
-because pairing one clip's proprioceptive state with a *different* clip's action sequence breaks
-the basic state-action consistency BC depends on (an action that was correct for the state it was
-recorded at is not necessarily correct for a different clip's state at the same index). That the
-closed-loop distance improves anyway (58% vs 30%) rather than getting uniformly worse is a repeat of
-F135's own warning, now on a second embodiment: **held-out regression fit does not predict
-closed-loop rollout quality.** The trade this policy makes -- travel farther, fall harder -- echoes
-F212's own physics-dependent pattern (fast-and-falling vs. stable-and-slow), this time produced by a
-labelling choice rather than a physics mismatch. **Neither student clears the pre-registered bar.**
+**Retrained on the augmented 60-clip set (54 + 6 turn-recovery), `yaw_err_input` back on: still
+fails, in a THIRD pattern.** Speed: 13% of `D_real`, stable (slow again, not frozen this time).
+Turn: 132%, falls. Neither the static-collapse symptom nor a clean pass -- a different, still
+unresolved failure mode. `side` was never given any recovery-style data at all and was not
+re-tested this round (it also has no existing external-correction mechanism to extend the way
+heading-hold gave `speed`/`turn` a natural analogue -- flagged, not yet designed).
 
-**What this closes and what it leaves open.** Between the two buildable variants of "does the model's
-grading capability improve a cloned policy" -- fine local perturbation (F216) and coarse candidate
-relabelling (this entry) -- both fail the walking bar, for two different, now-diagnosed reasons (a
-grading signal that cannot discriminate nearby actions; a relabelling scheme that breaks state-action
-consistency). Neither result bears on the untested third option -- a differentiable auxiliary loss
-computed by backpropagating through the frozen model at the student's own action, never sampling or
-relabelling anything -- which remains the one candidate mechanism not yet tried.
+**Where this leaves things, stated plainly.** The goal-conditioning gate -- "does changing the
+Froude goal (still self-supervised, ground-truth B1 data, no cross-embodiment yet) produce
+appropriately different behaviour, not just different-but-broken behaviour" -- has not passed for
+`turn`, and `speed`'s own result regressed from F217's clean 65% PASS once trained alongside
+turn/side data instead of alone. This is the same class of problem as everything else in this B1
+arc (compounding closed-loop drift, undemonstrated in single-behaviour recorded data), now shown to
+resist the SAME fix (recovery data) that worked cleanly for forward-only on the first attempt.
+Whether it needs more/better recovery coverage, a different state representation, or something else
+entirely is open. **Paused here at the user's explicit request** to redirect effort to writing
+(slide deck / report) rather than continue iterating further right now.
 
-Script: `sim/control/teacher_student_b1.py` (`distill_b1()` and the `distill` stage added; reuses
-`wm/policy/planner.py`'s existing `DirectFroudePlanner`, no new planner code). Runs:
-`wm/runs/students/b1_distill_all.pt`. Videos: `results/wm/b1_bc_all.mp4` / `results/wm/b1_distill_all.mp4`.
+Scripts: `sim/control/clone_b1.py` (unchanged this entry, all mechanisms already existed).
+`scripts/dataset/recollect_b1_flatreal.py` (`collect_recovery()` extended with `--wz`/
+`--recovery_ep0`). `sim/collect/rollout_b1_mujoco.py` (`--yaw0`, already added in F217, reused
+as-is). Data: `data/proprioceptive/beh12_b1_flatreal`, now 60 clips (48 original + 6 speed-recovery
++ 6 turn-recovery). Checkpoints tried, all FAIL on the multi-behaviour gate:
+`b1_bc_flatreal_all_trim12_yaw.pt`, `b1_bc_flatreal_all_trim12_noyaw.pt`,
+`b1_bc_flatreal_all_trim12_noyaw_5k.pt`, `b1_bc_flatreal_all_trim12_yaw_v2.pt`.
