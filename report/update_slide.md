@@ -288,12 +288,16 @@ purpose so the search across both literatures is visible:
 | cross-embodiment latent-goal planning (manipulation) | a shared latent goal space across different bodies is achievable | built from retargeted, temporally aligned paired demonstrations |
 | action-conditioned video world models | name the failure when prediction ignores the action | diagnosed on manipulation or single-body locomotion, never across embodiments — this is Section 6's own problem, still open, and Section 11 is where it gets confronted directly |
 
-**The key thing none of these three hand us: a shared GOAL.** Every one of them either stays inside
-one body (Hu et al.) or gets its cross-embodiment coordinate for free, because manipulation already
-has one — end-effector pose already means the same thing on every arm. Locomotion has no such
-task space. So before anything about *control* can even be asked, there has to be a coordinate that
-means the same thing on an 18-joint hexapod and a 12-joint quadruped, built with no kinematic model,
-no retargeting, and no paired demonstrations across the two bodies.
+**The key thing none of these three hand us: a shared GOAL.** Manipulation gets its cross-embodiment
+coordinate for free — end-effector pose already means the same thing on every arm, because the
+kinematics are known. Locomotion has no such prior knowledge at all. No kinematics, no task space,
+nothing but vision.
+
+**So a new shared coordinate has to be found, in that same sense — one number that means the same
+thing on any legged body. That's Froude.** But computing it still needs privileged knowledge of the
+body — true velocity, gravity, hip length (`v`, `g`, `L`) — to build the training label in the first
+place. That privilege is only there to *shape the network*: once trained, it reads Froude off video
+alone. Privileged at training time, proprioception-free at deployment.
 
 **That coordinate is the Froude number, and the claim rides on it entirely:**
 
@@ -323,11 +327,14 @@ a genuinely novel body would have to work with. The claim this thesis needs is t
 privileged read would, so that nothing about crossing bodies secretly depends on information the
 motivating scenario (an animal, a damaged robot, unknown hardware) could never actually supply.
 
-> **บทพูด (TH).** สามงานนี้ไม่มีตัวไหนให้ **เป้าหมายร่วม** มาเปล่า ๆ เลย — Hu et al. ไม่ข้ามร่างเลย, Huang
-> et al. ได้พิกัดร่วมมาฟรีเพราะ manipulation มี task space ร่วมอยู่แล้ว (ตำแหน่งปลายมือ) การเดินไม่มีของแบบ
-> นั้นให้ยืม **สิ่งที่ต้องมีก่อนจะถามเรื่องควบคุมด้วยซ้ำ คือพิกัดที่ความหมายเดียวกันบนหุ่น 18 ข้อต่อกับ 12
-> ข้อต่อ** โดยไม่ต้อง kinematic model ไม่ retarget ไม่ต้องจับคู่ข้อมูล
-> **พิกัดนั้นคือ Froude number และข้อเคลมทั้งหมดตั้งอยู่บนสมการนี้**: `Fr = v / sqrt(g·L)` — ความเร็วหาร
+> **บทพูด (TH).** สามงานนี้ไม่มีตัวไหนให้ **เป้าหมายร่วม** มาเปล่า ๆ เลย — **manipulation ได้พิกัดร่วมมาฟรี**
+> (ตำแหน่งปลายมือ) เพราะรู้ kinematics อยู่แล้ว **การเดินไม่มี prior knowledge อะไรเลย** ไม่มี kinematics
+> ไม่มี task space มีแค่ภาพ
+> **เลยต้องหาพิกัดร่วมใหม่ ในความหมายเดียวกันนั้น** — ตัวเลขเดียวที่ความหมายเหมือนกันบนหุ่นมีขาทุกตัว นั่นคือ
+> **Froude** แต่การจะคำนวณมันได้ ยังต้องใช้ความรู้พิเศษของร่างกาย (ความเร็วจริง, แรงโน้มถ่วง, ความยาวขา —
+> `v`, `g`, `L`) เพื่อสร้าง label ตอนเทรน — สิทธิพิเศษนี้มีไว้แค่ **สร้างเน็ตเวิร์ก** พอเทรนเสร็จแล้ว มันอ่าน
+> Froude จากวิดีโอล้วน ๆ ได้เลย **มีสิทธิพิเศษตอนเทรน ไม่ต้องมี proprioception ตอนใช้งานจริง**
+> **ข้อเคลมทั้งหมดตั้งอยู่บนสมการนี้**: `Fr = v / sqrt(g·L)` — ความเร็วหาร
 > ด้วยขนาดตัว หุ่นคนละขนาดที่เดินแบบเดียวกันได้ค่าเท่ากันเป๊ะ ถ้าไม่มีสมการนี้ก็ไม่มีเป้าหมายร่วมให้วางแผนไปหา
 > เลย ข้อเคลมเรื่องข้ามร่างทั้งหมดจะไม่มีอะไรค้ำ
 > **และตรงนี้คือจุดที่ทดสอบข้อเคลม "ไม่ใช้ข้อมูลพิเศษ" จริง ๆ**: เป้าหมายทำได้สองแบบ — อ่านตัวเลขจริงที่อัดไว้
@@ -340,8 +347,7 @@ motivating scenario (an animal, a damaged robot, unknown hardware) could never a
 
 ## 8. Methodology — Stage 2: it transfers, but not by sharing a latent
 
-Same setup style as Stage 1: a hypothesis, a term, a measurement. Froude is the shared target
-(Section 7). To force it to actually be shared across the two bodies' latents, add one loss term:
+Same as Stage 1: a hypothesis, an objective needs to be handed. Froude is the shared target. To force it to actually be shared across the two bodies' latents, add one loss term:
 
 ```
    L_body = || b_hat_t − b_t ||        b_hat_t = body_head(z_t)
@@ -361,18 +367,17 @@ Without the term, cross-robot readout is systematically wrong. With it, both dir
 positive — and the model is not preserving structure V-JEPA2 already supplied (the frozen-encoder
 row is itself negative on `insect→b1`); it is creating structure the encoder did not have.
 
-**The same thing, checked one level down, at the raw joint command instead of the Froude scalar.**
-This is a different measurement — not a second version of the number above, a decode-level one:
-does forcing the shared term also help a body still recover its *own* joint targets, and does it
-survive being read out on the other body's joints?
+**One term, two payoffs, checked side by side.** Left column: does the shared term also help a robot
+decode its *own* joint commands (18-D insect, 12-D B1)? Right column: same cross-robot R² as above,
+just placed next to it.
 
-| | within-robot joint error | cross-robot transfer |
+| | decode own joints (loss, lower better) | cross-robot transfer (same R² as above) |
 |---|---|---|
-| joint target, no body term | 0.3517 | −28.9 / −43.1 |
-| joint target + shared body term | **0.2183** | **+0.610 / +0.573** |
+| no body term | 0.3517 | −28.9 / −43.1 |
+| **+ shared body term** | **0.2183** | **+0.610 / +0.573** |
 
-The term does not just fix the cross-robot number — it improves the robot's own joint decoding by
-38%, at both levels of the pipeline.
+One term, two wins at once: 38% better at decoding the robot's own joints, and the same cross-robot
+transfer already shown above.
 
 **But "shared" is not the same claim as "transferred," and this is the open question the term does
 not settle.** The readout improving on both bodies is consistent with two different mechanisms: the
@@ -384,9 +389,9 @@ Section 9 is what happens when that question gets asked directly.
 > **บทพูด (TH).** ไอเดีย: Froude คือเป้าหมายร่วม (section 7) เพิ่ม loss term บังคับให้ latent สองหุ่น
 > ถูกอ่านออกมาตรงกันได้จริง (`L_body = ||b_hat_t − b_t||`) — สองหุ่นเดินที่ Froude เท่ากัน ถ้า readout ที่
 > fit จากหุ่นหนึ่งเอาไปใช้กับอีกหุ่นแล้วแย่ ก็เป็นความผิดของ representation ไม่ใช่คำถาม
-> **ผล**: ไม่มี term การอ่านข้ามหุ่นผิดเพี้ยนสิ้นเชิง (ติดลบหนัก) มี term แล้วทั้งสองทิศเป็นบวก และเช็คอีกชั้น
-> ที่ระดับคำสั่งข้อต่อดิบ (คนละตัวเลขกับด้านบน) ก็ดีขึ้นเหมือนกัน — แถมช่วยให้หุ่นถอดคำสั่งของตัวเองแม่นขึ้น
-> ด้วย (38%)
+> **ผล**: ไม่มี term การอ่านข้ามหุ่นผิดเพี้ยนสิ้นเชิง (ติดลบหนัก) มี term แล้วทั้งสองทิศเป็นบวก **term เดียว
+> ได้สองอย่างพร้อมกัน**: ถอดคำสั่งข้อต่อของหุ่นตัวเองแม่นขึ้น 38% และข้ามหุ่นได้ด้วย (ตัวเลข R² เดียวกับที่พูด
+> ไปแล้วด้านบน ไม่ใช่การทดสอบใหม่)
 > **แต่ "แชร์กันได้" ไม่เท่ากับ "เอาไปใช้จริง"** — readout ดีขึ้นอาจเป็นเพราะ latent แค่ normalize เนียนขึ้น
 > ไม่ได้แปลว่า network เข้าใจพิกัดร่วมจริง ๆ **นี่คือคำถามที่ค้างไว้ ให้ section 9 ไปตอบต่อ**
 
