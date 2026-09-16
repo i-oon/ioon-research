@@ -155,6 +155,8 @@
   \draw[line] (featuresB) -- node[above,labelbox] {$e_t^{B}$ context} (context);
   \coordinate (ctxToFtm) at (180,-9);
   \draw[clearline] (context) -- (ctxToFtm) -- (ftm.south);
+  \coordinate (ctxToMd) at (128,-9);
+  \draw[clearline] (ctxToMd) -- (128,-25.8) -- ($(md.west)+(0,-2.8)$);
 
   % -----------------------------------------------------------------------
   % Compact scalar terminal objectives.
@@ -265,6 +267,8 @@
     \draw[line] (ftFeaturesB) -- node[above,labelbox] {$e_t^{B}$ context} (ftContext);
     \coordinate (ftCtxToFtm) at (180,-9);
     \draw[clearline] (ftContext) -- (ftCtxToFtm) -- (ftFtm.south);
+    \coordinate (ftCtxToMd) at (128,-9);
+    \draw[clearline] (ftCtxToMd) -- (128,-25.8) -- ($(ftMd.west)+(0,-2.8)$);
 
     \node[loss] (ftBodyLoss) at (223,21) {$\mathcal L_{\mathrm{body}}$};
     \node[loss] (ftReconLoss) at (223,1) {$\mathcal L_{\mathrm{recon}}$};
