@@ -2,10 +2,15 @@
 
 Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaSim.
 
-> **Note on format.** Sections 1-10 below are written the way I actually talk through them with the
-> committee — plain background/methodology notes, not a numbered slide deck. From Part 2 onward
-> (Slide 11 on) the file is still in the earlier, more formal slide-by-slide format; that part
-> hasn't been reshaped yet.
+> **How to read this deck — one throughline, three stages.** Stage 1 (Sections 1–6) builds the
+> pipeline and forces a shared latent objective on a controlled testbed where every body shares one
+> joint space. Stage 2 (Sections 7–10, Slides 11–15) extends that objective to two bodies whose
+> action spaces share nothing, validates that the shared coordinate transfers, and then asks the
+> question that leaves open: does the resulting world model actually *use* the action it's given?
+> Two independent fixes answer it — one on the training objective (Slide 15), one on the camera
+> (Slides 13–14) — and both stay in, since neither one subsumes the other. Stage 3 (Slide 16 on) is
+> where the resulting model stands today: a closed-loop test of what those fixes bought, and two
+> real controllers built on top of it.
 
 ## 1. Background — A locomotion controller is fitted to one body
 
@@ -115,7 +120,7 @@ retreat to the way manipulation does: eighteen and twelve joint targets share no
 
 ---
 
-## 4. Methodology — Stage 1: cheap test and hypothesis from simple cross-morphology transfer
+## 4. Methodology — Stage 1, Experiment 1.1: does the decoder read the frame, or recall the nearest training body?
 
 **The bodies.** Training data uses six-legged walkers differing only in segment lengths. Held-out
 bodies are what the model is never trained on, and become the unseen-body test.
@@ -139,21 +144,23 @@ training body it most resembles.
 The probe lands close everywhere; the decoder implies a coxa **22% shorter than the body actually
 has**. The bigger model is the one that misreads it.
 
-**Swap test:** give the motion decoder body A's frame together with body B's latent. The two
-bodies' commands differ by 21°. It answers with body B's command, to within 6°. It followed the
-latent and ignored the frame it was holding.
+**Follow-up experiment: is the decoder reading the frame, or recalling the latent's nearest body?**
+Give the motion decoder body A's frame together with body B's latent — a conflict a decoder that
+reads geometry should resolve toward the frame it's holding. The two bodies' true commands differ by
+21°. The decoder answers with body B's command, to within 6°: it follows the latent and ignores the
+frame. **Interpretation:** the decoder has learned to recognise the closest body in its training set
+and recall that body's commands, not to read geometry from the frame it's given. Under this failure
+mode, "make the new body observe the old body and behave like it" would fail outright, because the
+model never learned the frame-action relationship that idea depends on.
 
-**Diagnosis.** The decoder learned to recognise the closest body in its training set and recall that
-body's commands. With this, the whole idea of "make the new body observe the old body and behave
-like it" would just fail outright, because the model doesn't understand the frame-action
-relationship at all — it's doing lookup, not reading geometry.
-
-**The fix has to be in the objective.** Capacity, access, and the contents of the latent were each
-ruled out first: rescaling the target, shrinking the decoder, stripping body identity adversarially,
-and handing the decoder a global view of the frame all failed or made transfer worse. What remained
-was the objective — no loss function ever forces reading geometry from the frame. Every body shares
-the intent and differs only in geometry, so add one loss term: take body A's latent, show the
-decoder body B's frame, and require body B's command (`A's latent, B's frame, B's command`).
+**Ruling out capacity and access before touching the objective.** Four candidate fixes were tested
+first — rescaling the target, shrinking the decoder, stripping body identity from the latent
+adversarially, and giving the decoder a global view of the frame — and each failed or made transfer
+worse. None of them change what the loss function actually requires the decoder to do, which is the
+property tying the four failures together. **The fix is therefore in the objective:** every body
+shares the same intent and differs only in geometry, so add one loss term that makes that explicit —
+take body A's latent, show the decoder body B's frame, and require body B's command (`A's latent,
+B's frame, B's command`).
 
 | held-out body test | without the term | with it |
 |---|---|---|
@@ -175,7 +182,7 @@ jobs: the image carries which body, the latent carries what movement.
 
 ---
 
-## 5. Methodology — Stage 1: to work, the held-out body has to sit inside the geometry the data spans
+## 5. Methodology — Stage 1, Experiment 1.2: transfer inside vs. outside the training geometry's span
 
 | | ground truth (IK) | control | with the cross-body loss |
 |---|---|---|---|
@@ -219,7 +226,7 @@ asked — check this before spending the training run, not after.
 
 ---
 
-## 6. Methodology — Stage 1: one frame nearly determines the command — the gait is a cycle
+## 6. Methodology — Stage 1, Experiment 1.3: how much of the command comes from the transition, not just the pose
 
 | what is `e_{t+1}` in the ITM | change |
 |---|---|
@@ -233,16 +240,12 @@ Without the transition, the motion decoder `MD(e_t, z_t)` cannot work — `z` is
 it needs. A wrong transition hurts *more* than no transition; removing the transition entirely costs
 31% accuracy. The latent action is genuinely sensitive to what the second frame contains.
 
-```
-   a gait is a limit cycle
-     one frame shows the pose
-       the pose fixes the phase
-         the phase fixes what comes next
-```
+| predict from 1 frame | t | t+1 | t+2 | t+4 | t+8 | t+16 | t+32 |
+|---|---|---|---|---|---|---|---|
+| error, deg (signal spread 11.3°) | 4.61 | 4.89 | 5.17 | 5.33 | 5.23 | 5.03 | 4.45 |
 
-| predict from 1 frame | t | t+8 | t+32 |
-|---|---|---|---|
-| error (signal spread 11.3°) | 3° | 3.4° | 2.9° |
+*(4-clip ridge fit — noisier than the rest of this deck's numbers; a cleaner 18-clip re-fit exists
+only at t/t+8/t+32, 3.00/3.40/2.86°, and agrees in kind.)*
 
 | steps ahead | `e_{t+h}` | `e_0` | beats `e_0` by |
 |---|---|---|---|
@@ -251,28 +254,60 @@ it needs. A wrong transition hurts *more* than no transition; removing the trans
 | 5 | 2.12 | 3.57 | 1.69× |
 | 10 | 2.98 | 4.36 | 1.46× |
 
-But the horizon barely matters — predicting 32 frames ahead is about as accurate as predicting the
-present. One frame already identifies which feet are swinging (81.5% accuracy against 50% by
-chance), and a second frame is worth only 1.11× on the step-to-step change. There is barely anything
-left in the transition for `z` to carry.
+Error does not grow with horizon out to 32 frames — but stated precisely, not overclaimed: 7 sampled
+offsets (above) is not enough to show an *oscillating*, periodic error curve, only that it stays
+roughly flat at the points sampled. One frame already identifies which feet are swinging (81.5%
+accuracy against 50% by chance), and a second frame is worth only 1.11× on the step-to-step change.
 
-Rolling the forward model `FTM(e_t, z_t)` forward with the *true* `z`: the action contributes under
-3% of what prediction needs, because the pose in a single frame already says what comes next. That
-gap — a module that works, a latent that carries real information, and `z` still worth almost
-nothing to prediction — is what Stage 1 leaves open.
+**What "the gait is periodic, period ≈19 frames" actually rests on.** That figure comes from a
+separate autocorrelation measurement, cited as a fact with no autocorrelation curve shown anywhere
+in the underlying record. Nobody has computed error in fine bins across a full cycle (e.g. every
+frame 0–31, or grouped 0–7/8–15/16–23/24–31) to actually show the error trace oscillate with that
+period — the evidence available shows flatness at sparse points, not periodicity as such. Real
+proof of periodicity is a specific, cheap experiment not yet run: bin the same ridge-regression
+error by offset-mod-19 (or plot it continuously over one full cycle) and check for the oscillation
+this hypothesis predicts.
 
-**Stage 1 can only prove the pipeline is promising and that the remaining problem is mostly the
-structural periodicity of locomotion.** It cannot yet prove that vision helps share behaviour where
-proprioception could not, because this setup doesn't have the variety needed for that — it needs a
-second body whose action space is genuinely disjoint from the first.
+```
+   a gait is a limit cycle — hypothesis, motivated by the numbers above
+     one frame already reads most of the phase (81.5% feet-swinging accuracy)
+       does the phase alone fix what comes next, with the action worth nothing extra?
+         not tested here — Stage 1 never isolates the action from the pose;
+         that isolation (real z vs. null z, through the forward model) is Experiment 2.3
+         and the periodicity claim itself is unproven at fine resolution — see above
+```
+
+**What this stage does and does not establish.** The forward model's rollout clearly captures real
+structure — it beats a trivial "hold the current frame still" baseline by 46–72% at every horizon
+tested (table above). But that comparison never isolates the action itself: it compares "run the
+model" against "don't run the model," not "the real action" against "a null action" through the
+same model. Stage 1 never ran that isolation. It's a real gap, not a rounding error — the "<3%"
+figure this project reports for the action's own contribution comes from a later, Stage 2-era
+measurement (Experiment 2.3, F142) that tested both bodies together; reporting it here as a Stage 1
+result would overstate what this stage alone shows.
+
+**Stage 1 can only prove the pipeline is promising and that the remaining problem is likely related
+to locomotion's structural periodicity** — "likely," not proven, since the periodicity claim itself
+is not yet shown at fine resolution (above). It cannot yet prove that vision helps share behaviour
+where proprioception could not, because this setup doesn't have the variety needed for that — it
+needs a second body whose action space is genuinely disjoint from the first.
 
 > **บทพูด (TH).** ไม่มี transition, MD ทำงานไม่ได้เลย — z แบกข้อมูลการเคลื่อนไหวไว้จริง transition ที่ผิด
-> ยิ่งแย่กว่าไม่มี transition ตัด transition ออกเสียแม่นยำแค่ 31% **แต่ horizon แทบไม่มีผล**: ทำนาย 32
-> เฟรมล่วงหน้า ≈ ทำนายปัจจุบัน เฟรมเดียวบอกได้แล้วว่าขาไหนกำลังยก (81.5% เทียบเหรียญ 50%) เฟรมที่สองมีค่า
-> เพิ่มแค่ 1.11 เท่า **เหลือให้ z แบกน้อยมาก** — ม้วน FTM ด้วย z จริง action มีค่าต่อการทำนายไม่ถึง 3% เพราะ
-> ท่าทางเฟรมเดียวบอกอนาคตไปแล้ว **Stage 1 พิสูจน์ได้แค่ว่า pipeline มีทางไปได้ และปัญหาที่เหลือเป็นเรื่อง
-> โครงสร้างวงรอบของการเดิน** ยังพิสูจน์ไม่ได้ว่าภาพช่วยแชร์พฤติกรรมที่ proprioception ทำไม่ได้ เพราะ setup
-> นี้ยังไม่มีหุ่นตัวที่สองที่ action space แยกจากตัวแรกจริง ๆ
+> ยิ่งแย่กว่าไม่มี transition ตัด transition ออกเสียแม่นยำแค่ 31%
+> **เรื่อง horizon**: ทดสอบ 7 จุด (t, t+1, t+2, t+4, t+8, t+16, t+32) error 4.61/4.89/5.17/5.33/
+> 5.23/5.03/4.45° (fit จาก 4 คลิป มี noise; re-fit ที่สะอาดกว่ามีแค่ 3 จุด 3.00/3.40/2.86° ตรงกัน) —
+> **error ไม่โตขึ้นตาม horizon แต่แค่นี้ยังพิสูจน์ "เป็นวงรอบ" ไม่ได้** 7 จุดพิสูจน์ได้แค่ว่า "ราบเรียบ" ไม่ใช่
+> "แกว่งเป็นคาบ" เฟรมเดียวบอกได้แล้วว่าขาไหนกำลังยก (81.5% เทียบเหรียญ 50%)
+> **ตัวเลข "คาบ ≈ 19 เฟรม" เองก็ยังไม่มีกราฟ autocorrelation ให้ดู** ไม่เคยมีใครแบ่งช่วง error เป็น 0-7/8-15/
+> 16-23/24-31 หรือ plot ทุกเฟรมตลอดหนึ่งคาบเพื่อดูการแกว่งจริง ๆ — **นี่คือการทดลองที่ยังต้องทำ ไม่ใช่ข้อสรุปที่มี
+> อยู่แล้ว**
+> **ข้อจำกัดที่ต้องพูดตรง ๆ**: FTM ทำนายได้ดีกว่า baseline ที่ไม่ขยับเลย 46-72% แต่การเทียบนั้นไม่ได้แยก action
+> ออกจาก pose เลย — เทียบแค่ "รันโมเดล" กับ "ไม่รันโมเดล" ไม่ใช่ "action จริง" กับ "action ว่างเปล่า" ผ่านโมเดล
+> เดียวกัน **stage นี้ยังไม่เคยแยกทดสอบแบบนั้น** ตัวเลข "<3%" ที่โปรเจกต์นี้ใช้อ้างเป็นของ stage 2 (experiment 2.3,
+> F142) ซึ่งวัดทั้งสองหุ่นพร้อมกัน เอามาใช้ตรงนี้จะเกินจริงจากที่ stage นี้พิสูจน์ได้เอง
+> **สรุป Stage 1**: พิสูจน์ได้แค่ว่า pipeline มีทางไปได้ และปัญหาที่เหลือ **น่าจะ**เกี่ยวกับความเป็นวงรอบของการเดิน
+> — ยังไม่ใช่ข้อพิสูจน์ เพราะความเป็นคาบเองยังไม่ได้วัดละเอียดพอ ยังพิสูจน์ไม่ได้ว่าภาพช่วยแชร์พฤติกรรมที่
+> proprioception ทำไม่ได้ เพราะ setup นี้ยังไม่มีหุ่นตัวที่สองที่ action space แยกจากตัวแรกจริง ๆ
 
 ---
 
@@ -345,7 +380,7 @@ motivating scenario (an animal, a damaged robot, unknown hardware) could never a
 
 ---
 
-## 8. Methodology — Stage 2: it transfers, but not by sharing a latent
+## 8. Methodology — Stage 2, Experiment 2.1a: does a shared-coordinate loss need to exist at all?
 
 Same as Stage 1: a hypothesis, an objective needs to be handed. Froude is the shared target. To force it to actually be shared across the two bodies' latents, add one loss term:
 
@@ -397,49 +432,12 @@ Section 9 is what happens when that question gets asked directly.
 
 ---
 
-## 9. Methodology — Stage 2: fine-tune to adapt to a genuinely different robot
+## 9. Methodology — Stage 2, Experiment 2.1b: should the shared-coordinate loss's gradient reshape z, or only train body_head?
 
-**The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
-that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
-on only a few of B1's own clips, rather than retraining from nothing?
-
-**The staged procedure this uses, assembled from pieces that already existed separately but had
-never been run as one pipeline before:**
-
-```
-  stage 1  wm.adapt        — fine-tune ONLY the inverse/forward model on B1's own clips
-  stage 2  fit_projector   — fit a separate network, the PROJECTOR: action → z, no frame pair needed
-  stage 3  wm.adapt3       — optional joint fine-tune (skipped here)
-  stage 4  fit_body_head   — refit the shared Froude head against the projector's own latent
-```
-
-**Why a projector exists at all.** The `z` used everywhere so far comes from the inverse model
-reading a *pair* of frames — it only exists once the next frame has already happened. At the moment
-a controller has to pick an action, that frame doesn't exist yet. The projector is a small separate
-network trained to guess what `z` an action *would* produce, from the action alone
-(`z = proj(action)`), so a control loop has something to plan with before the outcome is known.
-Section 10 uses both `z` sources side by side for exactly this reason.
-
-| B1, `z = proj` | forward ρ | lateral ρ | yaw ρ | median ρ |
-|---|---|---|---|---|
-| zero-shot, frozen head, no adaptation | 0.057 | 0.264 | 0.526 | 0.264 |
-| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
-
-Every channel more than doubles, forward included. **This is the actual cost of bringing up a new
-body**, stated as a number: a handful of B1's own clips through stages 1, 2 and 4, not full expert
-demonstrations and not training from scratch.
-
-> **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
-> หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune แค่คลิปไม่กี่คลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
-> **ขั้นตอน 4 stage**: (1) fine-tune inverse/forward model บนคลิป B1 (2) fit **projector** — เน็ตเวิร์ก
-> แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
-> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit shared Froude head **ผล**: ทุกช่องดีขึ้นเกินเท่าตัว
-> (median 0.264 → 0.572) — **นี่คือต้นทุนจริงของการเอาหุ่นตัวใหม่เข้ามา** ใช้แค่คลิปไม่กี่คลิปของมันเอง
-> ไม่ต้องมี demonstration เต็มรูปแบบ ไม่ต้องเทรนจากศูนย์
-
----
-
-## 10. Methodology — Stage 2: z had the signal all along; body_head just never learned to read it
+**Two separable questions, not one.** Section 8 asked whether the shared-coordinate loss needs to
+exist at all — it does; without it, cross-robot readout is systematically negative. This section
+asks a different question: once it exists, should its gradient also reshape `z`, or only train
+`body_head`?
 
 **Why `body_head` has to exist at all.** `z` is an opaque 64-number code — nothing in it is
 inherently "forward speed," and nothing guarantees coordinate 17 of the insect's `z` means the same
@@ -493,6 +491,16 @@ it — net result still 9× better despite the weaker `z`.
 **Not yet shown: this improves control** — only that `body_head` is now correctly direction-sensitive.
 Whether that becomes working closed-loop behaviour is separate, unproven.
 
+**Open item: the direct comparison this invites hasn't been run — but it's a cheap eval, not a
+retrain.** Section 8's insect↔B1 R² table (0.798/0.879/+0.544/+0.435, etc.) was measured on the
+co-trained version, where `L_body` still shapes `z`. Nobody has refit a shared head on *this*
+section's detached-`z` checkpoint and re-measured that same 4-way R² table — but that checkpoint
+(`beh12_body_stopgrad/best.pt`) is already fully trained jointly on both bodies (50 epochs, already
+on disk, already used downstream for babble/gecko work), with a projector already fitted on it.
+Closing this gap only needs fitting one readout and measuring R², the same protocol Section 8 used
+— no new pretraining. The action-lever gap above and Section 8's R² table remain different metrics
+on different checkpoints in the meantime — a real gap in the evidence, just an inexpensive one to close.
+
 > **บทพูด (TH).** ทำไมต้องมี body_head: z คือเลข 64 ตัวที่ไม่มีความหมายในตัวเอง ต้องมี "ใครสักคนอ่านมันเป็น"
 > — คือฟังก์ชันที่เทรนมาแมป z ไปยังพื้นที่ร่วม (Froude 3 ช่อง) ไม่ใช่ของช่วยตอนเทรน แต่คือสิ่งที่ทุกการใช้งาน
 > จริงเรียกใช้ (อ่านเป้าจากวิดีโอ, ให้คะแนน action ตอนควบคุม) ไม่มี body_head ก็ไม่มีข้อเคลมข้ามร่างเหลือทดสอบ
@@ -504,116 +512,78 @@ Whether that becomes working closed-loop behaviour is separate, unproven.
 > **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก เทรนใหม่รอบเดียว **ดีขึ้น ~9 เท่า**
 > **แต่ไม่ฟรี**: z เองอ่อนลงจริง (เหลือ 32-76% เพราะ L_body เคยช่วยสร้างสัญญาณด้วย) — trade คือ z อ่อนลง
 > แลกกับ body_head นิ่งพอเรียนได้จริง **ยังไม่ได้พิสูจน์ว่าคุมหุ่นได้จริง** แค่ไวต่อทิศทางที่ควรไวแล้วเท่านั้น
+> **ที่ยังไม่ได้ทำ**: ตาราง R² ข้ามหุ่นแบบเดียวกับ Section 8 แต่บน checkpoint ที่ detach z ตัวนี้ — ยังไม่มีใครรัน
+> **แต่ checkpoint (`beh12_body_stopgrad/best.pt`) เทรนจบแล้วบนทั้งสองหุ่นอยู่แล้ว** (มี projector fit ไว้แล้ว
+> ด้วย) แค่ fit head แล้ววัด R² เหมือน Section 8 ก็พอ **ไม่ต้องเทรนใหม่**
 
 ---
 
-# Part 2 — Crossing embodiments: the gap, and the attempt
+## 10. Methodology — Stage 2, Experiment 2.2: zero-shot vs. staged adaptation to a genuinely different robot
 
-*(from here down, the file is still in the earlier slide-by-slide format — not yet reshaped)*
+**The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
+that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
+on B1's own clips, rather than retraining from nothing?
 
-**With Stage 2's setup in place, cross-embodiment is ready on the readout side: `body_head` can now
-correctly read the shared coordinate out of `z`.** That does not touch the other open problem. Section
-6 already found that the action contributes under 3% to next-frame prediction — the forward model
-itself barely cares about the action at all, because the pose alone already determines what happens
-next. Nothing in Section 9 or 10 changes that; `body_head` and the forward model are different parts
-of the network, and fixing one says nothing about the other.
-
-**So this is where that problem gets mapped onto what the field already calls it.** Slide 11 picks
-the action-blindness problem back up and asks whether it has a name and a published fix elsewhere —
-it does, and rebuilding that fix faithfully is the next step.
-
-## Slide 11 — We rebuilt the field's own fix for this, faithfully
-
-With Stage 2's setup in place, cross-embodiment is ready on the readout side: body_head can now correctly read the shared coordinate out of z
-Is it a known problem ? :
-The action contributes under 3% to next-frame prediction, the forward model itself barely cares about the action, because the pose alone already determines what happens next.
-Remain problem :
-
-A world model conditioned on an action should predict a different future for a different action. 
-ActSWM (2607.26712) names the failure when: Context Collapse, the predictor extrapolates from the observation context and becomes insensitive to the action channel.
-
-UWM-JEPA (2605.25313) names the same thing from the training side: a teacher-forced target already contains the action's effect, so an action-invariant solution fits the loss perfectly. 
-
-AHA-WAM (2606.09811) takes adjacent-frame redundancy as a design premise and splits its horizon asynchronously to avoid it.
-**Every run that follows was pre-registered:** what would count as success was written down before
-the run started. **Six came out negative, and none of the criteria moved afterwards.**
-
-**Read this as a chain of eliminations, not a list of failures.** Each row closes one hypothesis
-about *where* the missing action-sensitivity lives, and each returns a number.
-
-| the hypothesis | the measurement | the result |
-|---|---|---|
-| the objective is wrong; the published fix will repair it | full rebuild, both bodies | one-step prediction fine; **3-4× worse than a frozen frame at two steps**, no sensitivity gained |
-| the weighting was off | swap the real action for a null one, re-predict | **under 3%** change — the true action is worth almost nothing |
-| one frame is too short a step | retrain at three-frame spacing | no change |
-| the action lives in what an action-blind model *misses* | probe that residual for the command | adds about **1%** |
-| a motion-organised representation will expose it | difference consecutive observations, same probes | the redundancy survives, and **cross-body transfer is destroyed** |
-| our own shared-coordinate term caused it | remove it entirely, controlled | **it got worse** — the term was a small *positive* contributor |
-
-**The sharpest of the six is worth watching rather than reading.** From a bit-identical reset, branch
-into two genuinely different behaviours — walk on, or turn away. They finish **42° apart in the
-world.** In the encoder's representation, that separation sits at **1.1× the noise floor between two
-runs of the same command.** The clip itself is on Slide 18, where the same one-action-many-outcomes
-question gets asked from a different angle.
-
-**The gap between what a human sees and what the encoder encodes is the finding.** This exact
-rebuild is revisited once more, later in the project, with one missing piece added — Part 5 is
-where that result belongs, not here.
-
-> **บทพูด (TH).** ขอย้ำว่า **ทั้งการวินิจฉัยและวิธีแก้ ไม่ใช่ของเราเอง** — วงการตั้งชื่อปัญหานี้ไว้แล้ว
-> (โมเดลไม่สนใจช่องคำสั่ง เพราะเดาจากภาพได้อยู่แล้ว) และเสนอวิธีแก้ไว้แล้วด้วย
-> เราจึง **สร้างวิธีของเขาขึ้นมาใหม่ให้ตรงที่สุด** ที่ต่างออกไปมีสี่จุด และทุกจุดมีเหตุผลจากการวัดของเราเอง
-> ไม่ใช่การเดา (เช่น margin 0.3 ของเขาทำให้ term ดับไปเลยในระบบเรา เราจึงใช้ 0.1)
-> และ **ทุกการทดลองเขียนเกณฑ์ตัดสินไว้ก่อนรัน** หกครั้งออกมาเป็นลบ และไม่มีการขยับเกณฑ์ย้อนหลังเลย
-> **การสร้างใหม่นี้ถูกกลับมาลองอีกครั้งทีหลัง โดยเพิ่มตัวที่ขาดไปหนึ่งชิ้น** — ผลอยู่ใน Part 5 ไม่ใช่ที่นี่
-
----
-
-## Slide 12 — The number underneath all six
-
-**One quantity explains every row above.** In third-person locomotion video, the joint command is
-readable from a **single frame**:
-
-| command recoverable from | one frame | a frame pair |
-|---|---|---|
-| six-legged insect | **0.78** | 0.89 |
-| — turning only | **0.93** | 0.96 |
-| quadruped | 0.16 | 0.34 |
-
-**Prior work found the ingredient; we measured how far it goes.** One group showed a frozen video
-encoder carries action structure recoverable by an inverse model, and noted in passing that a static
-tabletop scene lets per-frame appearance stand in for temporal context. **In periodic locomotion
-that substitution is nearly total:** one frame recovers 88% of what a pair recovers on the insect,
-and 97% on turning.
-
-**And this is the distinction that makes it a result rather than a restatement:**
+**The staged procedure this uses, assembled from pieces that already existed separately but had
+never been run as one pipeline before:**
 
 ```
-   RECOVERABLE FROM the observation     ≠     NECESSARY FOR predicting the next observation
-        the command reads out at 0.89              the same command is worth under 3%
-                              │
-                              ▼
-        in locomotion the ACTION-INVARIANT SOLUTION IS NEAR-OPTIMAL,
-        so a fix applied to the training target has nothing better to converge to
+  stage 1  wm.adapt        — fine-tune ONLY the inverse/forward model on B1's own clips
+  stage 2  fit_projector   — fit a separate network, the PROJECTOR: action → z, no frame pair needed
+  stage 3  wm.adapt3       — optional joint fine-tune (skipped here)
+  stage 4  fit_body_head   — refit the shared Froude head against the projector's own latent
 ```
 
-Honest scope: measured on two robots, in simulation, across twelve behaviour conditions. Not
-measured on manipulation.
+**Why a projector exists at all.** The `z` used everywhere so far comes from the inverse model
+reading a *pair* of frames — it only exists once the next frame has already happened. At the moment
+a controller has to pick an action, that frame doesn't exist yet. The projector is a small separate
+network trained to guess what `z` an action *would* produce, from the action alone
+(`z = proj(action)`), so a control loop has something to plan with before the outcome is known.
+Section 9 uses both `z` sources side by side for exactly this reason.
 
-> **บทพูด (TH).** ทั้งหกแถวในสไลด์ก่อนอธิบายได้ด้วยเลขตัวเดียว: **ในวิดีโอมุมที่สามของการเดิน
-> คำสั่งข้อต่ออ่านออกได้จากเฟรมเดียว** (0.78 จากเฟรมเดียว เทียบ 0.89 จากสองเฟรม — คือ 88% ของกันและกัน
-> และถ้าเป็นการเลี้ยวคือ 97%)
-> **งานก่อนหน้าเจอวัตถุดิบนี้แล้ว** (ว่า encoder มีข้อมูล action อยู่ และฉากนิ่ง ๆ ทำให้เฟรมเดียวแทนบริบทเวลาได้)
-> **แต่ไม่มีใครวัดว่าในการเดินที่เป็นวงรอบ มันแทนได้เกือบทั้งหมด**
-> และประโยคที่ทำให้มันเป็นผลงานไม่ใช่การพูดซ้ำคือ: **"ถอดออกมาได้" ไม่เท่ากับ "จำเป็นต่อการทำนาย"**
-> คำสั่งถอดออกมาได้ 0.89 แต่มีค่าต่อการทำนายไม่ถึง 3% → **คำตอบที่ไม่สนใจ action จึงเกือบดีที่สุดอยู่แล้ว**
-> การไปแก้ที่เป้าของการเทรนจึงไม่มีอะไรดีกว่านั้นให้ลู่เข้าหา
+| B1, `z = proj` | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|
+| zero-shot, frozen head, no adaptation | 0.057 | 0.264 | 0.526 | 0.264 |
+| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
+
+Every channel more than doubles, forward included. **But "a handful of clips" is only true of stage
+1 — stated precisely, not as one round number:**
+
+| stage | data it actually uses |
+|---|---|
+| 1 — `wm.adapt` (ITM/FTM fine-tune) | **9 B1 clips** — genuinely small, checked in the script's own defaults |
+| 2 — `fit_projector` | **all available clips**, both bodies — no small-sample limiter exists |
+| 4 — `fit_body_head` | 39 B1 clips, plus (most likely) all 48 hexapod clips for rehearsal |
+
+Only stage 1 is cheap by design. Stages 2 and 4 use most or all of the available B1 set, not a
+handful — so **the true cost of bringing up this body is closer to "the full B1 dataset across the
+later stages," not "9 clips."** The result (every channel more than doubling) still stands; the cost
+claim attached to it does not, as originally stated.
+
+> **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
+> หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune ด้วยคลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
+> **ขั้นตอน 4 stage**: (1) fine-tune inverse/forward model บนคลิป B1 (2) fit **projector** — เน็ตเวิร์ก
+> แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
+> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit shared Froude head **ผล**: ทุกช่องดีขึ้นเกินเท่าตัว
+> (median 0.264 → 0.572)
+> **แต่ "แค่คลิปไม่กี่คลิป" จริงแค่ stage 1 เดียว** (9 คลิป B1 เท่านั้น) — stage 2 ใช้คลิปทั้งหมดที่มีของทั้งสองร่าง
+> ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 39 คลิป บวก (น่าจะ) hexapod ทั้ง 48 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
+> "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป" ตามที่เคยพูดไว้** ผลลัพธ์ (ทุกช่องดีขึ้นเกินเท่าตัว) ยังจริงอยู่ แต่ข้อเคลม
+> เรื่องต้นทุนที่แนบไปด้วยไม่จริงตามที่เคยพูด
 
 ---
 
-# Part 3 — The principle
+**Stage 2 leaves one problem untouched.** `body_head` can now correctly read the shared coordinate
+out of `z` (Sections 8–10) — but that's a readout question. Whether the forward model actually
+*uses* the action it's conditioned on is a separate, untested one: `body_head` and the forward model
+are different parts of the network, so fixing the readout says nothing about the predictor. Two
+independent fixes answer it below.
 
-## Slide 13 — Pose determines the future, so the action is redundant
+> **Reading order note.** Slides 11–12 state the mechanism first and Slides 13–14 test the fix it
+> predicts, because that's the easier story to follow. Slide 15 is a second, independent fix —
+> found later, on different data — folded in after, not because it matters less.
+
+## Slide 11 — Motivation for Experiment 2.4: pose determines the future, so the action is redundant
 
 > **When the agent's own configuration is visible and determines what happens next, the action
 > carries no information the observation lacks — and a model trained to predict the next observation
@@ -662,7 +632,7 @@ visible in the pose.
 
 ---
 
-## Slide 14 — The principle explains results that are already published
+## Slide 12 — Motivation for Experiment 2.4, continued: the principle explains results that are already published
 
 **The pieces are not ours; the connection is.** Sort existing systems by the single question the
 principle says matters — *does the visible configuration determine the future?* — and their
@@ -703,13 +673,12 @@ re-measurements of those systems.
 
 ---
 
-# Part 4 — The prediction, tested
+**The prediction, tested.** If *pose determines the future* is what kills action-conditioning, then
+removing the agent's own pose from view should restore it — this is the second, independent fix,
+separate from Slide 15's objective-side one. What follows tests that directly and reports which
+half held.
 
-The principle makes a falsifiable prediction: if *pose determines the future* is what kills
-action-conditioning, then removing the agent's own pose from view should restore it. This part tests
-that directly, and reports which half held.
-
-## Slide 15 — Moving the camera onto the body removes the redundancy — and the shared coordinate survives it
+## Slide 13 — Experiment 2.4: the second, independent fix — move the camera onto the body
 
 **The cheapest test that could answer it, built to be discarded:** four textured walls and a ceiling
 around the spawn point, camera moved onto the robot's head. **Not an environment.**
@@ -758,12 +727,12 @@ that existed and were ignored, so that measurement needs the trained model.
 > ส่วนเดินหน้า/ไถลข้างลดลง — **อ่านยากขึ้นจากมุมนี้ แต่ยังข้ามร่างได้ นี่คือสรุปที่ซื่อสัตย์**
 
 **So what does removing that redundancy actually buy?** Not full behaviour, and not fine control —
-just the one thing it was tested for. The next slide draws that line precisely, then Part 5 builds
+just the one thing it was tested for. The next slide draws that line precisely, then Stage 3 builds
 the harder test (closed-loop, RL) that this result has to survive.
 
 ---
 
-## Slide 16 — What egocentric actually fixed, and what it didn't
+## Slide 14 — Experiment 2.4, continued: what egocentric actually fixed, and what it didn't
 
 **Five things were checked, not two.** Stated at its true strength, against chance and against the
 allocentric baseline:
@@ -777,33 +746,13 @@ allocentric baseline:
 | recover the command from (frame, z) | 0.982 | 0.847 | **−14%, a real cost** |
 
 **Two capabilities, not one, and egocentric only touches the first.** GATE C asks whether the
-forward model's prediction *depends* on the action at all — that was the whole problem Part 2
-diagnosed, and it is genuinely fixed. Ordering two similar actions within one behaviour is a
-different capability entirely — resolving which of two nearly-identical outcomes an action leads
-to — and egocentric moves it from one coin flip to another. **A model can attend to the action
-channel and still be unable to resolve a small difference in where that action leads.**
-
-**The same split, seen from the two mechanisms Part 5 actually builds:**
-
-| | behaviour selection (coarse) | action selection (fine) |
-|---|---|---|
-| what it can do | pick the best-matching *whole recorded clip* from a small library (walk, turn, strafe) | rank small variations of *the same* behaviour — nearly-identical actions, different magnitude |
-| maps to which row above | order two different behaviours | order two similar actions |
-| status | works | still near chance |
-
-**And two different ways Part 5 tries to route around the fine half:**
-
-| | teacher-graded policy | imagination-RL |
-|---|---|---|
-| mechanism | clone the expert first, then perturb around the student's own action and score each candidate for closest Froude to the goal | an actor-critic trained purely against the world model's *imagined* rollouts; the actor's parameters are updated by gradient, not discrete comparison |
-| what it needs | an existing library of the new body's actions — reconstructs the goal's behaviour from that | nothing recorded for the goal itself — reconstructs it through fresh exploration against the world model |
-| still needs, underneath | the same fine-grained ranking this table shows is missing | the critic to value nearby *imagined* futures precisely — the same gap, one level removed |
-
-**Why this matters for what comes next.** One path needs the ranking capability directly (grading
-discrete candidates); the other tries to avoid needing it at all (reward through exploration) — but
-its critic still has to tell nearby imagined outcomes apart to produce a useful gradient. Neither
-route escapes the gap this table measures; Part 5 is the record of both hitting it from a different
-angle.
+forward model's prediction *depends* on the action at all — the core action-blindness problem this
+whole arc addresses — and it is genuinely fixed here. Ordering two similar actions within one
+behaviour is a different capability entirely — resolving which of two nearly-identical outcomes an
+action leads to — and egocentric moves it from one coin flip to another. **A model can attend to the
+action channel and still be unable to resolve a small difference in where that action leads.** What
+that split means for Stage 3's own two control mechanisms is covered in that stage's own intro, not
+repeated here.
 
 > **บทพูด (TH).** เช็คไปทั้งหมด 5 อย่าง ไม่ใช่ 2 อย่าง: **สิ่งที่แก้ได้จริง** คือ (1) การทำนายขึ้นกับ action
 > ไหม (GATE C, 1.03 → 1.16/1.08) และ (2) อ่านการเลี้ยวจากพิกัดร่วมได้ไหม (0.07 → 0.64)
@@ -811,47 +760,176 @@ angle.
 > ระหว่างพฤติกรรมต่างกัน (55% → 52% ไม่เปลี่ยน เพราะทำได้อยู่แล้วตั้งแต่ต้น) ส่วนการถอดคำสั่งจาก (frame, z)
 > กลับแย่ลง 14% ด้วย
 > **นี่คือ 2 ความสามารถคนละอย่างกัน**: egocentric แก้ได้แค่ "สนใจ action ไหม" ไม่ได้แก้ "แยกออกไหมว่า action
-> ที่คล้ายกันสองอันนำไปสู่ผลต่างกันเล็กน้อยยังไง"
-> **มองจากฝั่งกลไกที่ Part 5 สร้างจริง**: behaviour selection (หยาบ) = เลือกคลิปที่บันทึกไว้ทั้งคลิป ยังทำได้ดี
-> action selection (ละเอียด) = จัดอันดับ action ที่ใกล้เคียงกันในพฤติกรรมเดียวกัน ยังใกล้เหรียญ
-> **สองทางที่ Part 5 ลองอ้อมปัญหานี้**: teacher-graded policy ต้องใช้ library ของ action หุ่นตัวใหม่ที่มีอยู่แล้ว
-> มา perturb แล้วให้คะแนน — ต้องการความสามารถจัดอันดับตรง ๆ / imagination-RL ไม่ต้องมี library เลย เรียนจากการ
-> สำรวจกับ world model แทน — แต่ critic ก็ยังต้องแยกอนาคตที่จินตนาการไว้ใกล้ ๆ กันให้ออก **คือช่องว่างเดียวกัน
-> แค่ย้ายไปอีกชั้นหนึ่ง** ไม่มีทางไหนหนีพ้นช่องว่างนี้ไปได้ Part 5 คือบันทึกของทั้งสองทางที่ไปชนมันคนละมุม
+> ที่คล้ายกันสองอันนำไปสู่ผลต่างกันเล็กน้อยยังไง" — ความหมายของเรื่องนี้ต่อกลไกสองแบบของ Stage 3 อยู่ใน intro
+> ของ stage นั้นแล้ว ไม่พูดซ้ำที่นี่
 
 ---
-# Part 5 — Where this stands
 
-> **How to read Part 5.** Everything here is about **motor babble** — the standard way a robot that
-> nobody has a controller for gets bootstrapped. B1 results and gecko results are kept apart: B1 was
-> in pretrain, gecko never was. **All gecko work is on Slide 27 alone** and appears in no flow
-> diagram or result table above it.
+## Slide 15 — Experiment 2.3: context collapse — a second, independent fix, found later
+
+**Where this starts: the command is already readable from one frame (R², ridge regression, held
+out by clip).**
+
+| command recoverable from | one frame | a frame pair |
+|---|---|---|
+| six-legged insect | **0.78** | 0.89 |
+| — turning only | **0.93** | 0.96 |
+| quadruped | 0.16 | 0.34 |
+
+**Prior work found the ingredient; we measured how far it goes.** One group showed a frozen video
+encoder carries action structure recoverable by an inverse model, and noted in passing that a static
+tabletop scene lets per-frame appearance stand in for temporal context. **In periodic locomotion
+that substitution is nearly total:** one frame recovers 88% of what a pair recovers on the insect,
+and 97% on turning.
+
+**That gap between "recoverable" and "necessary" is the actual problem.** Feeding the forward model
+the real recorded action instead of a null one changes its prediction error by under 3% (F142,
+measured across both bodies) — the model can already tell what happens next from the pose alone. The
+field has a name for this: **context collapse** (ActSWM, 2607.26712) — the predictor extrapolates
+from the observation context alone and becomes insensitive to the action channel.
+
+```
+   RECOVERABLE FROM the observation     ≠     NECESSARY FOR predicting the next observation
+        the command reads out at 0.89              the same command is worth under 3%
+                              │
+                              ▼
+        in locomotion the ACTION-INVARIANT SOLUTION IS NEAR-OPTIMAL,
+        so a fix applied to the training target has nothing better to converge to
+```
+
+**Diagnosis: the objective doesn't force separation far enough forward.** The pretraining loss
+separates a real action's rolled-forward prediction from a null action's over a multi-step window
+(the hinge), but only anchors prediction accuracy at step 1 — nothing stops steps 2 and beyond from
+diverging just to satisfy that separation cheaply.
+
+**Fix: add a reconstruction anchor matching the hinge's own horizon.** An existing, already-wired
+loss term (`lambda_rollout`, a multi-step auto-regressive consistency loss) supplies exactly the
+missing anchor — no new architecture, just a combination of flags nobody had run together before.
+Found and measured later than the camera fix (Slides 13–14), and on the original camera's data — a
+second, independent lever, not built on top of the first.
+
+| measurement | before this fix | after this fix |
+|---|---|---|
+| rollout error vs. a frozen frame (ratio; 1.0 = no better than not predicting at all) | 0.74 at step 1, climbing to **3.1–3.3×** by steps 2–5 | flat at **0.52–0.58×**, holds through step 10 |
+| real-vs-null separation, over training | rises then collapses: 0.02 → 0.14 → 0.50 → **0.008** | rises **0.0007 → 0.35** and holds |
+| B1's own action-ranking test* | 16.7% (4 of 24) | **20.8%** (5 of 24) |
+
+*\*Take the fixed hexapod checkpoint, adapt it to B1, then test: can it rank B1's real recorded
+action above small local variations of the same action? Chance is 5.9%. "Before/after" here means
+before vs. after this specific fix, not vs. any other change.*
+
+**What this does and doesn't claim.** The fix works, and the resulting checkpoint is what the rest
+of this project's B1 work is built on. It does not mean the redundancy problem is gone: a follow-up
+check on the same run found the family's own real actions are barely more separated in the data than
+repeats of the same clip — the fix recovers what headroom exists, it doesn't manufacture more.
+That's consistent with, not a rival to, the camera fix already shown: two independent levers on the
+same underlying redundancy, never tested together.
+
+> **บทพูด (TH).** เริ่มจากตัวเลขเดิม: **คำสั่งข้อต่ออ่านออกได้จากเฟรมเดียว** (R², ridge regression, held out
+> by clip) — แมลง 0.78 จากเฟรมเดียว 0.89 จากคู่ ถ้าเลี้ยวอย่างเดียว 0.93→0.96 B1 ต่ำกว่ามาก 0.16→0.34
+> **ช่องว่างระหว่าง "อ่านออก" กับ "จำเป็น" คือปัญหาจริง**: ป้อน action จริงแทน action ว่างเปล่า เปลี่ยน error
+> การทำนายไม่ถึง 3% (F142, วัดทั้งสองหุ่น) — วงการเรียกอาการนี้ว่า **context collapse** (ActSWM)
+> **สาเหตุที่วัดได้**: loss เดิมบังคับแยก action จริงกับ action ว่างเปล่าไปหลายสเต็ปข้างหน้า (hinge) แต่ยึด
+> ความแม่นการทำนายไว้แค่สเต็ปแรก — สเต็ปถัดไปเลยหนีไปได้ง่าย ๆ เพื่อสนองแค่ hinge
+> **วิธีแก้**: เพิ่ม anchor การทำนายให้ครอบคลุมเท่ากับ horizon ของ hinge (ใช้ loss ที่มีอยู่แล้ว `lambda_rollout`
+> แค่ไม่เคยเปิดคู่กัน) — **ค้นพบทีหลังกล้อง egocentric และบนข้อมูลกล้องเดิม เป็นคันโยกที่สองที่แยกจากกันจริง ๆ
+> ไม่ได้ต่อยอดจากอันแรก**
+> **ก่อนแก้ → หลังแก้**: rollout error เทียบเฟรมนิ่ง จาก 0.74 พุ่งเป็น 3.1-3.3 เท่า ตอน step 2-5 → คงที่
+> 0.52-0.58 เท่า ถึง step 10 / separation จริง-เท็จ จาก แกว่งแล้วยุบ (0.02→0.14→0.50→0.008) → ไต่ขึ้น
+> 0.0007→0.35 แล้วคงที่ / การจัดอันดับ action ของ B1 จาก 16.7% → **20.8%** (สุ่มได้ 5.9%)
+> **ข้อจำกัด**: เช็คต่อจากรันนี้พบว่า action จริงในข้อมูลเองก็แทบไม่ต่างจากคลิปซ้ำของเงื่อนไขเดียวกัน — วิธีนี้
+> ดึงสัญญาณที่มีอยู่ออกมาได้เกือบหมดแล้ว ไม่ได้สร้างสัญญาณเพิ่ม **สอดคล้องกับวิธีแก้กล้อง ไม่ใช่คู่แข่งกัน** —
+> คันโยกสองอันที่แยกกันจริง บนความซ้ำซ้อนเดียวกัน ยังไม่เคยทดสอบร่วมกันเลย
+
+---
+# Stage 3 — Closed-loop control and real controllers
+
+**Why this stage exists.** Stage 2 fixed whether the model uses the action at all (Slides 11, 15–16)
+and whether the camera exposes or hides it (same slides). This stage asks a different, practical
+question: can the fixed model actually *select* the right behaviour once scoring is added on top?
+An early version scored candidates by raw frame/embedding distance and got almost nothing for it
+(18–23%, barely above the 28% chance floor) — because that space carries plenty that has nothing to
+do with the dynamics. Switching the comparison space to the shared Froude coordinate instead
+(Slide 18) is what turns selection on. That's the throughline for everything below.
+
+**Two capabilities, not one — Slide 14 already drew this line, restated here because it's what the
+rest of this stage is organized around:**
+
+| | behaviour selection (coarse) | action selection (fine) |
+|---|---|---|
+| what it can do | pick the best-matching *whole recorded clip* from a small library (walk, turn, strafe) | rank small variations of *the same* behaviour — nearly-identical actions, different magnitude |
+| status (Slide 14) | order different behaviours: 55%→52%, already worked | order similar actions: 33%→47%, still near a coin |
+
+**Two different ways this stage tries to route around the fine half:**
+
+| | teacher-graded policy | imagination-RL |
+|---|---|---|
+| mechanism | clone the expert first, then perturb around the student's own action and score each candidate for closest Froude to the goal | an actor-critic trained purely against the world model's *imagined* rollouts; the actor's parameters are updated by gradient, not discrete comparison |
+| what it needs | an existing library of the new body's actions — reconstructs the goal's behaviour from that | nothing recorded for the goal itself — reconstructs it through fresh exploration against the world model |
+| still needs, underneath | the same fine-grained ranking above, still missing | the critic to value nearby *imagined* futures precisely — the same gap, one level removed |
+
+**Why this matters for what follows.** One path needs the ranking capability directly (grading
+discrete candidates); the other tries to avoid needing it at all (reward through exploration) — but
+its critic still has to tell nearby imagined outcomes apart to produce a useful gradient. Neither
+route escapes the gap in the table above; Slide 16 is imagination-RL hitting it, and later slides
+are the teacher-graded route hitting the same wall from a different angle.
+
+> **How to read the rest of this stage.** Slides 16–24 are the closed-loop diagnostics and the
+> controllers, on bodies already in pretrain. Slides 25–26 are a separate topic — **motor babble**,
+> the standard way to bootstrap a robot nobody has a controller for. B1 and gecko results are kept
+> apart there: B1 was in pretrain, gecko never was, and all gecko work stays on Slide 26 alone.
 >
-> **บทพูด (TH).** ตั้งแต่ part นี้ไปคือเรื่อง **motor babble** — วิธีมาตรฐานที่ใช้ตั้งต้นหุ่นที่ยังไม่มี controller
-> ขอแยก B1 กับ gecko ให้ชัด: **B1 เคยอยู่ใน pretrain แต่ gecko ไม่เคย**
-> **เรื่อง gecko อยู่ที่สไลด์ 27 หน้าเดียว** ไม่ปนกับแผนภาพหรือตารางไหนข้างบนเลย
+> **บทพูด (TH).** เหตุผลที่ stage นี้มีอยู่: stage 2 แก้เรื่อง "โมเดลใช้ action ไหม" กับ "กล้องเปิดหรือปิดสัญญาณ
+> นั้น" ไปแล้ว (สไลด์ 15, 13-14) stage นี้ถามคำถามที่ใช้งานจริงกว่า — พอมีระบบให้คะแนนแล้ว เลือกพฤติกรรมที่ถูกได้
+> จริงไหม ตอนแรกให้คะแนนด้วยระยะห่างของภาพ/embedding ได้ผลแทบไม่ต่างจากสุ่ม (18-23% เทียบสุ่ม 28%) เพราะพื้นที่
+> นั้นมีเรื่องที่ไม่เกี่ยวกับพลศาสตร์ปนอยู่เยอะ พอเปลี่ยนไปให้คะแนนในพิกัด Froude ร่วมแทน (สไลด์ 18) การเลือกถึง
+> เริ่มทำงานจริง — นี่คือเส้นเรื่องหลักของทั้ง stage นี้
+> **สองความสามารถคนละอย่าง**: behaviour selection (หยาบ) เลือกคลิปที่บันทึกไว้ทั้งคลิป ทำได้ดีอยู่แล้ว (55%→52%)
+> action selection (ละเอียด) จัดอันดับ action ที่ใกล้เคียงกัน ยังใกล้เหรียญ (33%→47%)
+> **สองทางที่ stage นี้ลองอ้อมปัญหานี้**: teacher-graded policy ต้องใช้ library ของ action หุ่นตัวใหม่ที่มีอยู่
+> แล้ว มา perturb แล้วให้คะแนน — ต้องการความสามารถจัดอันดับตรง ๆ / imagination-RL ไม่ต้องมี library เลย เรียนจาก
+> การสำรวจกับ world model แทน — แต่ critic ก็ยังต้องแยกอนาคตที่จินตนาการไว้ใกล้ ๆ กันให้ออก **คือช่องว่างเดียวกัน
+> แค่ย้ายไปอีกชั้นหนึ่ง** ไม่มีทางไหนหนีพ้นช่องว่างนี้ไปได้
+> **ส่วนที่เหลือ**: สไลด์ 16-24 คือ closed-loop กับ controller บนหุ่นที่เคยอยู่ใน pretrain สไลด์ 25-26 คือ
+> **motor babble** คนละเรื่อง — วิธีตั้งต้นหุ่นที่ยังไม่มี controller แยก B1 กับ gecko ชัดเจน (B1 เคยอยู่ใน
+> pretrain, gecko ไม่เคย) เรื่อง gecko อยู่ที่สไลด์ 26 หน้าเดียว
 
 ---
 
----
+## Slide 16 — Experiment 3.1: imagination-RL — the wall is the rollout
 
-## Slide 17 — Imagination-RL: the wall is the rollout
-
-**The natural next step after Slide 16, and exactly where its unfixed half bites.** Slide 16 drew a
+**The natural next step after Slide 14, and exactly where its unfixed half bites.** Slide 14 drew a
 line between two capabilities: the model *depends on* the action (GATE C, fixed) and the model can
 *order* two similar actions by outcome (still near chance). A policy trained on imagined rollouts
 needs the second one, not the first — its critic has to value slightly different futures accurately
-enough to tell them apart, every step, to build a correct return. **This is not a new failure Part 5
+enough to tell them apart, every step, to build a correct return. **This is not a new failure Stage 3
 introduces; it is that same still-open ranking gap, and imagining many steps in a row only compounds
 it.**
+
+**The true-value numbers, from the isolation test — frozen FTM, no re-grounding, 5,000 iterations,
+a target that provably cannot move:**
+
+| | first quarter | last quarter | reading |
+|---|---|---|---|
+| realized return | −37.3 | **−39.6** | no improvement — flat, slightly worse |
+| critic's own value estimate | −82 | **−421** | 5× drift, chasing its own bootstrap target, not the real return |
+| gap: value − realized return | — | **−381.9** | what the critic believes and what's actually happening have split apart |
+
+**First fix (symlog critic + return normalisation), same budget, replicated twice:**
+
+| | before | after |
+|---|---|---|
+| realized return | −37.3 → −39.6 (flat/worse) | **−37.5 → −9.0 / −9.2** (converges, replicated) |
+
+**That fix works — and the wall reappears one level up, once the critic is asked to value nearby
+imagined futures precisely enough to rank them, not just converge on average:**
 
 ```
   looked like: the actor exploits the frozen FTM's blind spots
         │
-        ▼  isolation test: 5,000 iterations, frozen FTM, no re-grounding at all
-  actually was: the critic never converges, even against a STATIC target
-        │
-        ▼  four real stabilisation fixes, in order (table below)
+        ▼  isolation test above: not exploitation — the critic never converges
+        ▼  first fix (table above) makes the critic converge
+        ▼  proper apples-to-apples check (Monte Carlo discounted return, bar below)
   best Dreamer variant still fails the pre-registered bar
         │
         ▼  switch algorithm entirely (PPO -- no bootstrapped imagined-rollout value)
@@ -879,101 +957,70 @@ failure mode Koopman Dreamer (2607.19719) names.
 
 ---
 
-> **บทพูด (TH).** ต่อจากสไลด์ 16 ตรง ๆ: สไลด์ 16 แยกไว้ว่า "โมเดล**สนใจ** action ไหม" (GATE C, แก้แล้ว)
+> **บทพูด (TH).** ต่อจากสไลด์ 14 ตรง ๆ: สไลด์ 14 แยกไว้ว่า "โมเดล**สนใจ** action ไหม" (GATE C, แก้แล้ว)
 > กับ "โมเดล**จัดลำดับ** สอง action ที่ใกล้เคียงกันได้ไหม" (ยังใกล้เหรียญอยู่) เป็นคนละความสามารถกัน
 > policy ที่เทรนจากการจินตนาการ rollout ต้องการอย่างหลัง ไม่ใช่อย่างแรก — critic ต้องให้คะแนนอนาคตที่ต่างกัน
-> นิดเดียวได้แม่นพอจะแยกออก ทุกสเต็ป ถึงจะสร้าง return ที่ถูกต้องได้ **นี่ไม่ใช่ปัญหาใหม่ที่ Part 5 เจอ แต่คือ
+> นิดเดียวได้แม่นพอจะแยกออก ทุกสเต็ป ถึงจะสร้าง return ที่ถูกต้องได้ **นี่ไม่ใช่ปัญหาใหม่ที่ Stage 3 เจอ แต่คือ
 > ช่องว่างเรื่องการจัดลำดับเดิมที่ยังไม่แก้ และการจินตนาการหลายสเต็ปติดกันยิ่งขยายปัญหานั้นให้ใหญ่ขึ้น**
 >
 > สไลด์นี้คือความพยายามใช้ RL บนโลกจำลอง (imagination) แล้วมันไม่ผ่าน
-> ตอนแรกคิดว่า actor ไปหาช่องโหว่ของ forward model แต่จริง ๆ คือ **critic ไม่ลู่เข้าเลย** แม้เป้านิ่ง ๆ
-> แก้ 4 อย่างตามตำรา Dreamer แล้วก็ยังไม่ผ่านเกณฑ์ เปลี่ยนไปใช้ PPO ซึ่งคนละอัลกอริทึมกันเลย ก็ไปชนกำแพงเดียวกัน
-> แปลว่าปัญหาไม่ใช่อัลกอริทึม แต่เป็นการเอา forward model แบบ 1 สเต็ปมาม้วนต่อกันยาว ๆ
+> **ตัวเลขจริงจาก isolation test** (frozen FTM, 5,000 iterations, เป้าที่ขยับไม่ได้เลย): realized return
+> ไตรมาสแรก -37.3 → ไตรมาสสุดท้าย **-39.6** ไม่ดีขึ้น ส่วน critic เองกลับลอยไป -82 → **-421** (ห่างจาก
+> return จริง -381.9) — แปลว่า critic ไล่ตามเป้าของตัวเอง ไม่ใช่ return จริง
+> **แก้ครั้งแรก** (symlog critic + return normalization) เทรนซ้ำสองรอบ: return ลู่เข้าจริง -37.5 → **-9.0
+> ถึง -9.2**
+> แต่กำแพงโผล่มาอีกชั้นหนึ่ง: ตอนแรกคิดว่า actor ไปหาช่องโหว่ของ forward model แต่จริง ๆ คือ **critic ไม่ลู่เข้า
+> เลยตอนแรก** พอแก้แล้ว ต้องเช็คแบบเข้มกว่านี้ (MC discounted return) แก้ 4 อย่างตามตำรา Dreamer แล้วก็ยังไม่ผ่าน
+> เกณฑ์ เปลี่ยนไปใช้ PPO ซึ่งคนละอัลกอริทึมกันเลย ก็ไปชนกำแพงเดียวกัน แปลว่าปัญหาไม่ใช่อัลกอริทึม แต่เป็นการเอา
+> forward model แบบ 1 สเต็ปมาม้วนต่อกันยาว ๆ
 
 ---
 
-## Slide 18 — Sequence context does not fix it
-
-
-```
-  FTM(frame_t, action_t) → frame_t+1        one observation, one action
-        │
-        ▼  same action means different things at different points in a gait cycle
-  one-action-many-outcomes, no phase context to disambiguate them
-        │
-        ▼  Yu / WMP: locomotion world models are recurrent-over-HISTORY
-              frame-SEQUENCE + command-SEQUENCE → next state
-        │
-        ▼  premise checked on GROUND TRUTH first, no model in the loop
-  signal exists in the data (table below) → not a task property, a model gap
-        │
-        ▼  every combination of {pooled, spatial-preserved} x {non-recurrent, recurrent}
-             that is cheaply testable — command-sequence + delta-target held fixed throughout
-  ALL FOUR fail the bar (table below), including the one that is genuinely
-  spatial + recurrent at once — the widest miss of the four
-```
+## Slide 17 — Experiment 3.2: the sharpest version of one-action-many-outcomes, and what actually targets it
 
 **What "one action, many outcomes" looks like, concretely.** From a bit-identical reset, branch into
 two genuinely different behaviours — walk on, or turn away. A human tells them apart instantly; they
-finish 42° apart in the world. In the encoder's own representation, that separation sits at 1.1× the
-noise floor between two runs of the *same* command (Slide 11) — exactly the kind of ambiguity phase
-context is supposed to resolve.
+finish 42° apart in the world. In the third-person encoder's own representation, that separation
+sits at just **1.1× the noise floor** between two runs of the *same* command (F154) — the sharpest
+version of the action-blindness problem measured anywhere in this project.
 
 ![two futures a human separates instantly; the encoder does not](../results/deck/insect_forward-vs-turn.mp4)
 
-**Slide 17's imagination-RL already hit this same wall once** — switching algorithms (Dreamer → PPO)
-changed nothing, tracing the failure to one place: the FTM is **stateless, single-step** (confirmed
-— no hidden state between calls, not an RSSM). The standard locomotion fix (Yu, WMP) conditions on
-frame-*history* and command-*sequence* instead. Two separate questions, in order:
+**An earlier attempt at this went after the objective/architecture side instead — adding recurrent
+history to the forward model — and it never re-measured this specific test.** Four architectures
+were tried against a related but different kill-gate and all four failed (a real, closed result on
+its own terms — sequence-context does not recover the fine-magnitude signal it was aimed at). But
+none of them were built to close *this* gap, so cutting that material here rather than reporting it
+as if it addressed one-action-many-outcomes.
 
-**Question 1 — is there even a signal to find? Checked on raw ground truth, no model involved:**
+**What was built specifically for this problem is the fix already shown.** F154 is the finding; F155
+— the egocentric camera (Slides 13–14) — was designed as its direct answer: a head camera cannot show
+the robot its own pose, so the pose can no longer make two different behaviours look alike from the
+outside.
 
-| ground-truth check | value |
-|---|---|
-| corr(\|Δaction\|, \|ΔFroude\|), within one fixed behaviour | +0.432 |
-| permutation p-value (n = 20,000) | 0.002 |
-| ridge, leave-one-out R² | 0.204 |
-
-**Yes — real, non-random signal exists in the data.** So if adding history fails, that failure would
-mean a model gap, not a task property.
-
-**Question 2 — can a model actually recover it? Four architectures, same kill-gate (bar: gap >
-0.110), tested twice — a short probe, then the most promising one retrained at full strength:**
-
-| architecture | spatial preserved? | recurrent? | gap, short probe | gap, full budget |
-|---|---|---|---|---|
-| pooled mean-vector per frame → GRU | no | yes | +0.036 | not retrained — no reason to |
-| learned attention-pool per frame → GRU | no — still pools every frame | yes | +0.058 | not retrained — no reason to |
-| full token grid, self-attention across frames | yes | no | +0.048 | not retrained — no reason to |
-| **ConvGRU: spatial hidden state, pooled only at final read-out** | **yes** | **yes** | **+0.069, best of four** | **−0.006 — worse than the probe** |
-| stateless single-step FTM (reference) | — | — | +0.042 | — |
-
-**The one variant with real short-probe evidence reverses at full strength.** ConvGRU looked like
-the lead worth retraining — genuinely spatial *and* recurrent, closest to the bar of the four. Ten
-times the training (20,000 vs 2,000 iterations, full clip set) made it worse, not better, and a
-separate check ruled out a training-collapse artefact (the model's own output still varies
-meaningfully, just undershoots magnitude — this is a real result, not a degenerate zero). **All four
-architectures have now failed at their real strength, on either body.** The sequence-context
-hypothesis is **ruled out, not unconfirmed** — the signal Question 1 found real is simply not
-recoverable by adding history, in any of the four structurally distinct ways tried. **The actual
-fix — stop-gradient, not more context — is Section 10's own result, already covered there rather
-than repeated here.**
+**Honest gap, not yet closed.** This exact bit-identical branch test has not been re-run under the
+egocentric camera to report a direct before/after number here. What's confirmed instead is the
+broader evidence already on Slide 14: GATE C (does prediction depend on the action at all) goes from
+unmoved-by-six-interventions to genuinely fixed once the camera changes. Whether that specifically
+closes *this* 1.1×-noise-floor gap is the next experiment to run, not yet answered.
 
 ---
 
-> **บทพูด (TH).** imagination-RL (สไลด์ 17) ชนกำแพงนี้มาก่อนแล้วครั้งหนึ่ง — เปลี่ยนอัลกอริทึม (Dreamer → PPO)
-> ก็ยังพัง สาเหตุคือ forward model ของเราเป็นแบบ **สเต็ปเดียว ไม่มีความจำ** ซึ่งงาน locomotion เขาไม่ทำกัน
-> เขาใช้ประวัติ แยกเป็น 2 คำถาม:
-> **คำถามที่ 1 — สัญญาณมีจริงไหม** เช็คบน ground truth ล้วน ๆ ไม่มีโมเดล — **มีจริง** (p=0.002, R²=0.204)
-> **คำถามที่ 2 — โมเดลดึงออกมาได้จริงไหม** ลอง 4 สถาปัตยกรรม ครั้งแรกทดสอบสั้น ๆ ก่อน — **ตกหมดทั้ง 4 แบบ**
-> อันที่ดูมีหวังที่สุด (ConvGRU, spatial+recurrent พร้อมกัน, +0.069) เอาไปเทรนเต็มที่ (นาน 10 เท่า) กลับ
-> **แย่ลงกว่าเดิม** (-0.006) เช็คแล้วไม่ใช่ collapse ของโมเดล เป็นผลจริง
-> **สรุป: ตัดสมมติฐาน sequence-context ทิ้งเลย ไม่ใช่แค่ยังไม่ยืนยัน — ทางแก้จริง (stop-gradient) อยู่ใน
-> Section 10 แล้ว ไม่พูดซ้ำที่นี่**
+> **บทพูด (TH).** "action เดียว หลายผลลัพธ์" หน้าตาเป็นแบบนี้: reset ที่เหมือนกันเป๊ะ แตกเป็นสองพฤติกรรมจริง
+> (เดินต่อ/เลี้ยวหนี) คนแยกออกทันที ห่างกัน 42° ในโลกจริง แต่ใน representation ของ encoder มุมที่สาม ห่างกันแค่
+> **1.1 เท่าของ noise floor** เอง (F154) — เป็นเวอร์ชันที่คมที่สุดของปัญหา action-blindness ในโปรเจกต์นี้
+> **ความพยายามก่อนหน้านี้ไปแก้ที่ฝั่ง objective/architecture แทน** — เพิ่ม recurrent history ให้ forward model
+> ลอง 4 สถาปัตยกรรม ตกหมดทั้ง 4 (เป็นผลจริงในตัวเอง — sequence-context ไม่ช่วยเรื่อง fine-magnitude) **แต่ไม่มี
+> อันไหนวัดปัญหานี้โดยตรงเลย** เลยตัดเนื้อหานั้นออก ไม่เอามาอ้างว่าแก้ปัญหานี้
+> **สิ่งที่สร้างมาเพื่อปัญหานี้โดยตรงคือวิธีที่แสดงไปแล้ว**: F155 (กล้อง egocentric, สไลด์ 13-14) ถูกออกแบบมา
+> เป็นคำตอบตรงของ F154 — กล้องบนหัวไม่เห็นท่าทางตัวเอง เลยทำให้สองพฤติกรรมดูเหมือนกันจากภายนอกไม่ได้อีก
+> **ข้อจำกัดที่ต้องพูดตรง ๆ**: ยังไม่เคยเอาการทดสอบ bit-identical นี้ไปรันซ้ำใต้กล้อง egocentric เพื่อได้ตัวเลข
+> ก่อน-หลังตรง ๆ ที่นี่ สิ่งที่ยืนยันได้คือหลักฐานกว้างกว่าจากสไลด์ 14 (GATE C แก้แล้วจริง) ส่วนว่าปิดช่องว่าง
+> 1.1 เท่านี้ได้ไหม คือการทดลองถัดไปที่ต้องทำ ยังไม่มีคำตอบ
 
 ---
 
-## Slide 19 — What the coordinate fixed
+## Slide 18 — Experiment 3.3: scoring in the shared coordinate vs. raw frame distance
 
 
 **Scoring in the right space is what turned selection on.** Frame distance reads the current frame,
@@ -1020,7 +1067,7 @@ is coarse and works.**
 
 ---
 
-## Slide 20 — Controller vs. what we test, and what Froude is
+## Slide 19 — Controller vs. what we test, and what Froude is
 
 ```
   A CONTROLLER / POLICY                 WHAT WE TEST (a "closed loop")
@@ -1036,8 +1083,8 @@ is coarse and works.**
 | what "survival" proves | the policy is stable | **nothing — it cannot fall by construction** |
 | what it DOES prove | — | **was the goal read, and the right motion chosen** |
 
-**Everything on this slide and through Slide 27 is about selection, not control, and was true when
-measured.** A real controller exists now — Slide 28, dated, separate, and bounded — but it does not
+**Everything on this slide and through Slide 26 is about selection, not control, and was true when
+measured.** A real controller exists now — Slide 27, dated, separate, and bounded — but it does not
 retroactively apply to any result below: those numbers are about picking the right recorded clip
 from a library, and remain exactly what they say they are.
 
@@ -1058,7 +1105,7 @@ a *goal* gets built and scored from it:
   score = | candidate Froude − goal Froude |   → pick the smallest
 ```
 
-Crossing the two gives the 2×2 (A/B/C/D) on Slide 22 — separated **on purpose**, since bundling
+Crossing the two gives the 2×2 (A/B/C/D) on Slide 21 — separated **on purpose**, since bundling
 them confounded an earlier version of this test.
 
 > **บทพูด (TH).** ผมเองก็สับสนบ่อย ขอแยกให้ชัด
@@ -1070,37 +1117,40 @@ them confounded an earlier version of this test.
 > **เป้าผลิตได้ 2 แบบ** (อ่านตัวเลขที่อัดไว้ = มีข้อมูลพิเศษ / ถอดจากวิดีโอ = แบบที่ใช้จริง)
 > **ให้คะแนนได้ 2 แบบ** (Direct ไม่ใช้ world model / Rollout ใช้) — ที่ต้องแยกสองแกนนี้เพราะเวอร์ชันก่อนเรามัดรวมกัน เลยสรุปไม่ได้ว่าตัวไหนพัง
 
-## Slide 21 — Before the correct pipeline (Section 9): the wrong mechanism, tried first
+## Slide 20 — Experiment 2.2, control: does the staged procedure matter, or would any fine-tune do?
 
-**The staged 4-step adaptation pipeline and its results are Section 9 — not repeated here.** What
-belongs on this slide instead is the mistake that came before it, since it's the reason the correct
-pipeline had to be assembled at all:
+**The staged 4-step adaptation pipeline and its results are Section 10 — not repeated here.** This
+slide reports the control that motivated building it as four separate stages instead of one
+fine-tune call: does adaptation require the staged procedure specifically, or does a naive,
+single-step fine-tune reach the same place?
 
 ```
-  wrong mechanism, tried first: wm.train --init_ckpt
+  control: wm.train --init_ckpt
     jointly retrains ITM+FTM+decoder+body_head+probe under the FULL pretrain loss
     → B1 got WORSE than zero-shot (0.264 → 0.231), forward went negative
         │
-        ▼  the actual question: "are we even running LAC-WM's adaptation?" — NO
-        ▼  Section 9's 4-stage procedure is the answer: every channel more than doubles once
-           run correctly, forward included — never once positive under the wrong mechanism
+        ▼  diagnostic question: does this measure "does adaptation work,"
+           or "is this even LAC-WM's adaptation"?
+        ▼  the latter — Section 10's 4-stage procedure answers the real question:
+           every channel more than doubles once run correctly, forward included,
+           never once positive under the naive control
 ```
 
-**The whole "B1 got worse" episode was a tooling error, not a result about the claim.** Worth
-keeping separate from Section 9 precisely because it's a different kind of lesson: not "does
-adaptation work," but "were we even running adaptation at all" — a process failure, caught only by
-asking that second question instead of accepting the first wrong number.
+**The naive control is a process check, not a result about the claim.** It shows the staged
+procedure is load-bearing: collapsing it into one joint retrain does not merely underperform, it
+reverses the sign of the result — which is why Section 10 runs four separate stages rather than one
+fine-tune call.
 
-> **บทพูด (TH).** ตารางและขั้นตอน 4 stage ที่ถูกต้องอยู่ใน Section 9 แล้ว ไม่พูดซ้ำที่นี่
+> **บทพูด (TH).** ตารางและขั้นตอน 4 stage ที่ถูกต้องอยู่ใน Section 10 แล้ว ไม่พูดซ้ำที่นี่
 > สไลด์นี้เก็บไว้แค่ **ความผิดพลาดที่เกิดก่อนหน้านั้น** เพราะเป็นเหตุผลที่ต้องมาประกอบ pipeline ที่ถูกต้องขึ้นใหม่
 > ตอนแรกเรา "fine-tune" ด้วยวิธีที่ผิดสนิท — มันไป retrain ทุกอย่างพร้อมกันด้วย loss ของการ pretrain
 > ผลคือ B1 **แย่ลงกว่าไม่ทำอะไรเลย** (0.264 → 0.231) เสียเวลาไล่หาว่าทำไมมันพัง ทั้งที่คำถามที่ถูกคือ
 > "เราใช้วิธี adaptation จริง ๆ หรือยัง" — **คำตอบคือยัง** บทเรียน: **มันเป็นบั๊กเครื่องมือ ไม่ใช่ข้อสรุปว่าวิธีเราไม่เวิร์ก**
-> และเป็นบทเรียนคนละแบบกับ Section 9: ไม่ใช่ "adaptation ได้ผลไหม" แต่คือ "เรารัน adaptation จริงหรือยัง"
+> และเป็นบทเรียนคนละแบบกับ Section 10: ไม่ใช่ "adaptation ได้ผลไหม" แต่คือ "เรารัน adaptation จริงหรือยัง"
 
 ---
 
-## Slide 22 — The 2×2: which half is broken
+## Slide 21 — Experiment 3.4: the 2×2 — which half is broken, goal source or scoring mechanism
 
 
 ```
@@ -1130,7 +1180,7 @@ planning decisions, the vision goal selects the right behaviour family in **92%*
 median distance of **0.043**, against **90–92%** and **0.062** for the privileged recorded goal
 (random pick: 0.143) — the vision goal matches or beats the privileged one overall.
 
-**Reminder (Slide 20): selections from a library, not a controller.** Nothing here can fall.
+**Reminder (Slide 19): selections from a library, not a controller.** Nothing here can fall.
 
 **📹 VIDEO — C vs D.** Three panels, aligned by elapsed time (the two bodies record at 20 Hz and
 50 Hz, so matching by frame index puts the goal 2.5× ahead). Goal panel shows both what the system
@@ -1155,7 +1205,7 @@ read and the true value; footer shows both errors.
 
 ---
 
-## Slide 23 — ITM's inferred transition earns its keep — it's not just "any nonlinearity"
+## Slide 22 — Experiment 3.5: does ITM's inferred transition earn its keep, or would any nonlinearity do?
 
 **The claim: ITM's own transition structure beats reading the raw frame pair directly, even with a
 matched-capacity nonlinear reader.** Three independent ways to fit the same target, same held-out
@@ -1198,7 +1248,7 @@ latent) rather than only through candidate-selection accuracy.
 
 ---
 
-## Slide 24 — Timeline: progress against the proposed procedure, so far
+## Slide 23 — Timeline: progress against the proposed procedure, so far
 
 Solo thesis — one researcher owns every stage below (design, implementation, diagnosis, writing);
 the advisor's role is milestone review between stages, as already stated in the proposal's own
@@ -1227,13 +1277,13 @@ this deck) · final defense **end of Nov**.
 
 ---
 
-## Slide 25 — Next plan: the remaining milestones
+## Slide 24 — Next plan: the remaining milestones
 
 **One open scientific decision, three writing-track tasks, and one parked extension.**
 
 | item | status | what happens next |
 |---|---|---|
-| B1 multi-behaviour goal-conditioning gate | paused, failing (Slide 32) | push toward a pass, attempt babble if it clears in time, or write up the current bounded state as the thesis's own characterization of the limit — decided once writing starts |
+| B1 multi-behaviour goal-conditioning gate | paused, failing (Slide 31) | push toward a pass, attempt babble if it clears in time, or write up the current bounded state as the thesis's own characterization of the limit — decided once writing starts |
 | babble-based real claim (the actual thesis claim, step 2) | not started | gated on the line above — only worth attempting if the gate clears |
 | PPO goal-conditioning extension | parked | same open question as the gate above, moved into a slower RL setting — held until the gate resolves, not attempted in parallel |
 | Chapter 4 (Experiments and Results) | can start now | draft-able directly from Parts 1–4 plus the closed-loop and controller work already measured |
@@ -1244,7 +1294,7 @@ negative result, or gets left open for future work — that choice, not new expe
 determines the shape of the final two chapters.
 
 > **บทพูด (TH).** เหลือ 1 การตัดสินใจเชิงวิทยาศาสตร์, 3 งานเขียน, 1 งานที่พักไว้
-> **เกณฑ์ multi-behaviour ของ B1** (พักไว้ ยังไม่ผ่าน สไลด์ 32): ดันต่อจนผ่าน / ลอง babble ถ้าทันเวลา /
+> **เกณฑ์ multi-behaviour ของ B1** (พักไว้ ยังไม่ผ่าน สไลด์ 31): ดันต่อจนผ่าน / ลอง babble ถ้าทันเวลา /
 > หรือเขียนสถานะปัจจุบันเป็นข้อจำกัดที่บอกขอบเขตชัดเจน — ตัดสินใจตอนเริ่มเขียนจริง
 > **babble-based real claim** (ข้อเคลมจริงของวิทยานิพนธ์): ยังไม่เริ่ม รอเกณฑ์ข้างบนผ่านก่อน
 > **PPO goal-conditioning**: พักไว้ คำถามเดียวกับข้างบน แค่ย้ายไปอยู่ใน RL — รอให้เกณฑ์หลักจบก่อน ไม่ทำขนาน
@@ -1254,7 +1304,7 @@ determines the shape of the final two chapters.
 
 ---
 
-## Slide 26 — Motor babble, and what we added
+## Slide 25 — Motor babble, and what we added
 
 
 ```
@@ -1300,7 +1350,7 @@ half-works (0.427); adapting on that body's own babble takes it to 0.572.
 
 ---
 
-## Slide 27 — Gecko: the actual unseen body
+## Slide 26 — Gecko: the actual unseen body
 
 
 **Separate from everything above.** B1 was in pretrain. Gecko was not — no URDF, no kinematics, no
@@ -1351,15 +1401,15 @@ coordinate** — it bounds which bodies this method reaches.
 ---
 
 
-## Slide 28 — A real controller now walks, on B1, bounded
+## Slide 27 — A real controller now walks, on B1, bounded
 
-**Referenced from Slide 20.** Everything above this slide is selection from a library of recorded
+**Referenced from Slide 19.** Everything above this slide is selection from a library of recorded
 clips. This is a network that invents its own motion from state, trained by RL, that can fall —
 and does not, and moves.
 
 **Two real bugs, not six failed mechanisms, explain a whole prior arc of null results.** Building a
 real-physics RL controller (Q21 step 3: real MuJoCo physics, the world model only scoring the action
-just taken, never rolled forward — deliberately not the mechanism that killed Slide 17's
+just taken, never rolled forward — deliberately not the mechanism that killed Slide 16's
 imagination-RL attempt) produced a policy frozen at a single pose across six independently-tested
 fixes (action-space reachability, reward-scale calibration, no-fall-termination, correlated
 exploration noise, a command curriculum, a feet-air-time reward). Two bugs, found by testing a
@@ -1392,11 +1442,11 @@ training-time proxy:
 > a policy that falls every two seconds still finishes upright. **The cause is a change made earlier
 > in this same arc**: removing episode-termination-on-fall (to defeat the "standing still is safe"
 > optimum) made falling cheap, and a forward dive is the fastest way to earn forward Froude. This is
-> Slide 20's own warning, walked into: *what survival proves — nothing.*
+> Slide 19's own warning, walked into: *what survival proves — nothing.*
 
 **Bounded, stated precisely.** This is `reward_mode="true_froude"` — ground truth, a diagnostic
 never available on a genuinely novel body — not yet the WM-only reward
-(`body_head(proj(action))`, Slides 21-24's own subject) that a deployed system would actually have;
+(`body_head(proj(action))`, Slides 20-23's own subject) that a deployed system would actually have;
 that test is the immediate next step, on this same now-corrected environment. Lateral and yaw
 tracking remain weak (goal 0.302/0.254, achieved 0.009/-0.048) — this controller tracks forward
 speed, not the full three-channel goal.
@@ -1412,9 +1462,9 @@ speed, not the full three-channel goal.
 
 ---
 
-## Slide 29 — A second, independent controller attempt: imitation instead of RL, same discipline, same result
+## Slide 28 — A second, independent controller attempt: imitation instead of RL, same discipline, same result
 
-**Same rigor as Slide 28, a different route and a different failure mode.** Slide 28's controller is
+**Same rigor as Slide 27, a different route and a different failure mode.** Slide 27's controller is
 trained by RL and invents its own motion from state. This asks the same question a different way:
 clone a policy directly from B1's own recorded expert clips (34-d proprioceptive state → 12-d joint
 target), pre-register the same kind of bar in advance (upright the whole window **and** ≥50% of the
@@ -1453,7 +1503,7 @@ training and evaluation was never controlled going in.
 
 ---
 
-## Slide 30 — Grading the clone with the world model: seen on the insect first, now measured directly on B1
+## Slide 29 — Grading the clone with the world model: seen on the insect first, now measured directly on B1
 
 **This exact failure was already visible on the insect — tested directly there too, not just
 assumed to carry over.** A teacher-graded policy: the same world-model scoring, applied instead to
@@ -1473,10 +1523,10 @@ not separate.
 **Built for B1 anyway, rather than left as an assumption carried over from the insect.** Grading
 small variations of one behaviour asks the model to rank outcomes physics itself barely separates,
 so no representation can order them — the same mechanism as above. Built the grading stage for B1
-anyway, using the properly-fit shared head (Slide 23), to check that reasoning directly rather than
+anyway, using the properly-fit shared head (Slide 22), to check that reasoning directly rather than
 keep assuming it.
 
-**Same physics, same clip, same bar as Slide 29; the only addition is 30 rounds of grading small
+**Same physics, same clip, same bar as Slide 28; the only addition is 30 rounds of grading small
 perturbations of the cloned policy's own action against the shared head's Froude prediction, and
 refitting on the winner.**
 
@@ -1529,15 +1579,15 @@ way.
 
 ---
 
-## Slide 31 — Slide 29's own baseline was buggy in four separate ways; fixed, plain cloning passes
+## Slide 30 — Slide 28's own baseline was buggy in four separate ways; fixed, plain cloning passes
 
-**Same student, same physics family, four independent bugs found in Slide 29/30's own setup —
+**Same student, same physics family, four independent bugs found in Slide 28/30's own setup —
 not a new mechanism, the measurement underneath it.** Each was found and fixed one at a time, each
 verified before moving to the next, on the same held-out clip throughout:
 
 | # | bug | fix |
 |---|---|---|
-| 1 | trained on placeholder-physics data, evaluated on the system-identified model — the exact confound Slide 29 already names, never actually checked | re-collected training data directly on the system-identified model |
+| 1 | trained on placeholder-physics data, evaluated on the system-identified model — the exact confound Slide 28 already names, never actually checked | re-collected training data directly on the system-identified model |
 | 2 | recorded actions are 20 Hz, replayed one row per 50 Hz physics step — every clip played back 2.5× too fast, at 40% of its recorded resolution | hold each action for its real 0.05 s, not the environment's 0.02 s substep |
 | 3 | the goal fed to the student is the whole-clip mean Froude, dragged 12% below cruising speed by every clip's accel/decel edges | average only the steady-state middle window |
 | 4 | the expert's straight-line behaviour depends on a live external heading-correction signal the student's state never included | append live heading error as a 35th state input |
@@ -1564,31 +1614,31 @@ pinned at the canonical heading — six new clips, confirmed to show real, scale
 
 | student | travelled / expert distance | upright | verdict |
 |---|---|---|---|
-| plain BC, Slide 29's original buggy baseline | 52% | falls | FAIL |
+| plain BC, Slide 28's original buggy baseline | 52% | falls | FAIL |
 | + all four bugs fixed, no recovery data | 23-37% (varies by fix) | stable | FAIL |
 | **+ recovery data** | **65%** | **stable** | **PASS** |
 
 **What this settles, and what it doesn't.** A properly-measured, properly-informed plain clone
-*can* clear the bar for this one goal — none of Slide 30's grading/gradient mechanisms were
+*can* clear the bar for this one goal — none of Slide 29's grading/gradient mechanisms were
 necessary, the blocker was measurement and a missing input, not a need for a teacher. It does not
 settle whether a teacher earns its keep *on top of* a baseline that already works, since this one
 needed no such mechanism to start working. And this result is forward-walking only, in isolation —
-Slide 32 is what happened when the same goal-conditioned student was asked to handle more than one
+Slide 31 is what happened when the same goal-conditioned student was asked to handle more than one
 behaviour at once.
 
-> **บทพูด (TH).** นักเรียนตัวเดิม ฟิสิกส์ตระกูลเดิมจากสไลด์ 29/30 — **เจอบั๊กสี่ตัวในสิ่งที่วัดผล ไม่ใช่กลไกใหม่**
-> แก้ทีละตัว: (1) ฟิสิกส์เทรน/ประเมินไม่ตรงกัน — confound ที่สไลด์ 29 เอ่ยไว้แต่ไม่เคยเช็คจริง (2) เล่นคลิปเร็วเกิน 2.5
+> **บทพูด (TH).** นักเรียนตัวเดิม ฟิสิกส์ตระกูลเดิมจากสไลด์ 28/30 — **เจอบั๊กสี่ตัวในสิ่งที่วัดผล ไม่ใช่กลไกใหม่**
+> แก้ทีละตัว: (1) ฟิสิกส์เทรน/ประเมินไม่ตรงกัน — confound ที่สไลด์ 28 เอ่ยไว้แต่ไม่เคยเช็คจริง (2) เล่นคลิปเร็วเกิน 2.5
 > เท่า (3) เป้าหมายที่ป้อนถูกดึงต่ำลงจากช่วงเร่ง/ชะลอความเร็ว (4) ไม่มีสัญญาณแก้ทิศทางที่ expert ใช้จริง
 > แก้ครบสี่ข้อ **ยังไม่ผ่านเกณฑ์** (23-37%) เพราะไม่มีข้อมูลตัวอย่าง "หลุดแล้วกลับมา" เลยสักคลิป — เพิ่มคลิปที่ปล่อย
 > ให้หันเบี่ยงจากเป้า 10/20/30 องศาแล้วบังคับให้กลับมา **ผ่านทันที 65%** ยืนได้ตลอด
-> **สรุป**: การ clone เฉย ๆ ที่วัดถูกต้องก็ผ่านได้ ไม่ต้องมีตัวช่วยให้คะแนนแบบสไลด์ 30 เลย — ปัญหาคือการวัดกับ
-> input ที่ขาดไป ไม่ใช่ตัวโมเดล **แต่นี่คือเดินหน้าอย่างเดียว** สไลด์ 32 คือตอนให้ทำหลายพฤติกรรมพร้อมกัน
+> **สรุป**: การ clone เฉย ๆ ที่วัดถูกต้องก็ผ่านได้ ไม่ต้องมีตัวช่วยให้คะแนนแบบสไลด์ 29 เลย — ปัญหาคือการวัดกับ
+> input ที่ขาดไป ไม่ใช่ตัวโมเดล **แต่นี่คือเดินหน้าอย่างเดียว** สไลด์ 31 คือตอนให้ทำหลายพฤติกรรมพร้อมกัน
 
 ---
 
-## Slide 32 — Reframed, and where the multi-behaviour gate still fails
+## Slide 31 — Reframed, and where the multi-behaviour gate still fails
 
-**A methodological correction came before this result, and governs how to read it.** Slide 31's
+**A methodological correction came before this result, and governs how to read it.** Slide 30's
 student is trained and tested on B1's *own full expert data* — every goal it is asked about has a
 labelled demonstration behind it. That is a fair, cheap **gate**: does a goal-conditioned clone even
 change behaviour correctly when given a different goal, before anything cross-embodiment is
@@ -1602,7 +1652,7 @@ full expert demonstrations, only babble.
   privileged, NOT the thesis claim        gated on step 1 passing first
 ```
 
-**The gate is not yet passed.** Slide 31 only ever tested one goal family (forward) in isolation.
+**The gate is not yet passed.** Slide 30 only ever tested one goal family (forward) in isolation.
 Asked to condition on speed, turn, *and* side goals from the same 54-clip mixed set, using the exact
 same recipe that passed alone, a new failure appeared:
 
@@ -1621,7 +1671,7 @@ contributing cause of the freeze, not the whole story.
 
 **The decisive check: even a training goal, fit to R² 0.99 offline, still falls in closed loop.**
 This rules out "can't generalise to unseen goals" entirely — it is the same compounding closed-loop
-drift Slide 29 already diagnosed for forward-only, before recovery data fixed that one case. Turn
+drift Slide 28 already diagnosed for forward-only, before recovery data fixed that one case. Turn
 and side simply never received the equivalent treatment. Built the natural extension — recovery
 clips for turn, spawned off-heading with the target advancing at the real turn rate instead of
 sitting still — and retrained on the enlarged 60-clip set:
@@ -1637,13 +1687,13 @@ needs more/better recovery coverage, a different state representation, or someth
 open. **Paused here** to redirect effort to writing.
 
 **One further avenue considered and also paused, for the same reason.** The one existing real
-controller (Slide 28) has no goal input at all — its network only ever tracks one fixed goal it was
+controller (Slide 27) has no goal input at all — its network only ever tracks one fixed goal it was
 trained against, the Froude channel is used to *shape the reward*, never fed to the policy. Making
 it genuinely goal-conditioned (so a goal read from another body's video could later drive it) needs
 a real architecture change and a full retrain, not a rerun — and it is the identical open question
 above, moved into a slower, noisier setting to debug. Held for after this gate resolves.
 
-> **บทพูด (TH).** ก่อนอ่านผลนี้ต้องปรับกรอบก่อน: **สไลด์ 31 เทรนและทดสอบบนข้อมูล expert เต็มของ B1 เอง** —
+> **บทพูด (TH).** ก่อนอ่านผลนี้ต้องปรับกรอบก่อน: **สไลด์ 30 เทรนและทดสอบบนข้อมูล expert เต็มของ B1 เอง** —
 > ทุกเป้าหมายมีตัวอย่างสาธิตรองรับ นี่คือ **ด่านทดสอบราคาถูก** ว่ากลไก goal-conditioning ทำงานถูกไหม ก่อนจะไป
 > ข้ามร่างกายจริง **ยังไม่ใช่ข้อเคลมของวิทยานิพนธ์** ซึ่งต้องใช้หุ่นใหม่ที่ไม่มี expert data เต็ม มีแค่ babble
 > **ด่านนี้ยังไม่ผ่าน**: ให้เทรนพร้อมกันสามพฤติกรรม (เดินหน้า/เลี้ยว/ไถลข้าง) เจอ **การแช่แข็งท่ายืนนิ่ง** ในเดินหน้า/
@@ -1652,7 +1702,7 @@ above, moved into a slower, noisier setting to debug. Held for after this gate r
 > ออก อาการแช่แข็งหายแต่กลับไปล้มแทน **แม้แต่เป้าหมายที่เคยเห็นตอนเทรนก็ยังล้ม** — พิสูจน์ว่าไม่ใช่เรื่อง generalize
 > แต่คือ compounding drift แบบเดียวกับที่เจอตอนเดินหน้า เพิ่มข้อมูล recovery สำหรับการเลี้ยวแล้วเทรนใหม่ — **ยังไม่ผ่าน
 > อีก เป็นความล้มเหลวแบบที่สาม** (เดินหน้าช้าแต่นิ่ง, เลี้ยวยังล้ม) **หยุดตรงนี้** เพื่อไปโฟกัสงานเขียน
-> **อีกทางที่พักไว้เหมือนกัน**: PPO controller ตัวเดียวที่เดินได้จริง (สไลด์ 28) ไม่มีช่องรับเป้าหมายเลย ถ้าจะทำให้
+> **อีกทางที่พักไว้เหมือนกัน**: PPO controller ตัวเดียวที่เดินได้จริง (สไลด์ 27) ไม่มีช่องรับเป้าหมายเลย ถ้าจะทำให้
 > รับเป้าได้ต้องแก้สถาปัตยกรรมและเทรนใหม่ทั้งหมด ซึ่งเป็นคำถามเดียวกับด้านบน แค่ย้ายไปอยู่ใน RL ที่ช้าและวุ่นกว่า
 
 ---

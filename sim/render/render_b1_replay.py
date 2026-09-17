@@ -64,14 +64,17 @@ def main():
                          "frame, and the sideways clips stayed 100%% clipped at 1.7x. Widening "
                          "the angle is the only motion that adds room on the side the robot is "
                          "leaving (F104). Left at 1.0 for every collected set.")
-    ap.add_argument("--cam_fov", type=float, default=24.0,
-                    help="perspective angle in degrees, overriding the scene's. **The two scenes ship "
-                         "identical 15-deg cameras, and that is not the same as an identical view.** "
-                         "The field is 2.11 m wide at the robot; the B1 is 1.29 m across and travels "
-                         "up to 1.56 m, needing 2.85 m, while the insect needs 1.75 m and fits. "
-                         "Matched camera parameters produced a quadruped clipped in 36-100%% of "
-                         "frames beside an insect clipped in none (F104). What has to match is that "
-                         "both robots stay whole, not that the two numbers agree.")
+    ap.add_argument("--cam_fov", type=float, default=0.0,
+                    help="perspective angle in degrees, overriding the scene's. 0 -> 24 deg for the "
+                         "fixed third-person shot, 90 deg for --ego (see the override below). "
+                         "**The two scenes ship identical 15-deg cameras, and that is not the same "
+                         "as an identical view.** The third-person field is 2.11 m wide at the "
+                         "robot; the B1 is 1.29 m across and travels up to 1.56 m, needing 2.85 m, "
+                         "while the insect needs 1.75 m and fits. Matched camera parameters produced "
+                         "a quadruped clipped in 36-100%% of frames beside an insect clipped in none "
+                         "(F104). What has to match there is that both robots stay whole, not that "
+                         "the two numbers agree -- a framing concern that does not exist for --ego, "
+                         "where the robot's own body is not the subject.")
     ap.add_argument("--spawn", type=float, nargs=2, default=(0.0, 0.0), metavar=("X", "Y"),
                     help="replay from this world x y; use the same value as the insect collector")
     ap.add_argument("--ego", action="store_true",
@@ -108,6 +111,16 @@ def main():
     ap.add_argument("--travel", type=float, default=0.0,
                     help="stop once the body has moved this far (m); keeps it inside the fixed frame")
     args = ap.parse_args()
+    if args.cam_fov <= 0:
+        # **The 24 deg default was never meant for --ego.** It exists to keep the whole B1 body in
+        # frame for the fixed third-person shot (F104) -- a concern that does not apply when the
+        # camera is mounted on the robot looking outward. Left at 24 for --ego, every clip was
+        # effectively shot through a telephoto lens: hex's own egocentric collector forces 90 deg
+        # whenever `--view egocentric` is used (`collect_ik.py`), and B1 silently inherited the
+        # wrong default instead of getting the same override, for every ego clip collected before
+        # this fix. Verified: at 24 deg a corner never enters frame even across 75 degrees of real
+        # yaw; at 90 deg (matching hex) it does, on the same clip.
+        args.cam_fov = 90.0 if args.ego else 24.0
 
     T = np.load(args.traj)
     base_pos, base_quat, jpos = T["base_pos"], T["base_quat"], T["joint_pos"]

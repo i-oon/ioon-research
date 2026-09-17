@@ -17780,3 +17780,39 @@ as-is). Data: `data/proprioceptive/beh12_b1_flatreal`, now 60 clips (48 original
 + 6 turn-recovery). Checkpoints tried, all FAIL on the multi-behaviour gate:
 `b1_bc_flatreal_all_trim12_yaw.pt`, `b1_bc_flatreal_all_trim12_noyaw.pt`,
 `b1_bc_flatreal_all_trim12_noyaw_5k.pt`, `b1_bc_flatreal_all_trim12_yaw_v2.pt`.
+
+### F219. A fourth instance of the hexapod's turn-sign instability, and this one does not invert -- it saturates
+
+**Extending the 12-condition hexapod recipe to 24** (backward speed, opposite-direction turn, two
+more strafe levels per side, `scripts/dataset/collect_beh24.py`) needed a mirrored turn family:
+`turn_conditions(sign=-1.0)`, the same per-level `--spin` negation `--spin_sign` has always used
+internally. Backward speed (`--lead 0.75`) and B1's mirrored turn (`wz` negated) both verified
+clean -- real sign reversal, confirmed by displacement and by `yaw_rate()`. Hexapod's turn did not:
+`--spin -0.56` measured yaw +0.071, next to the unmodified positive table's own +0.077 at the same
+level -- not inverted, indistinguishable from the positive case.
+
+**This is the fourth documented instance of hex turn-sign non-robustness** (F66, F106/F108, F174),
+and the first to test something none of the other three did: **both signs present in the same
+collection, same session, same scene**, rather than one sign replacing the other body-wide to match
+a reference. Ruled out session/scene staleness the same way F174 did: killed CoppeliaSim, restarted
+it fresh, re-ran the identical `--spin -0.56` condition. Result: yaw +0.069, reproducing the first
+run to two decimals. Not a random per-launch flake -- deterministic given the current scene/CPG
+code, same as F174 found for its own (different) symptom.
+
+**The symptom is not F174's.** F174 was a full-table inversion: the established positive reference
+came out negative, fixed by flipping the whole table with `--spin_sign -1`. Here the table was never
+touched -- only a new negative-signed condition was added alongside the untouched positive one, and
+the positive one still reads correctly (+0.073 at `turn_s0.56`, matching the +0.077 reference). What
+fails is one-directional saturation: negative `--spin`, at any magnitude tried (-0.56 up to -2.0),
+never produces negative yaw. Root cause not identified, consistent with all three prior instances
+never finding one either.
+
+**Consequence.** Negating `--spin` cannot be trusted to mirror the hexapod's turn direction, in this
+condition or in general, without a fresh per-instance check like the one done here -- and unlike
+backward speed or B1's turn, no fix was found this session. `turn_neg` is parked for the hexapod:
+dropped from the 24-condition set for this body, at the user's explicit call, rather than spending
+more time on a bug class with a 0-for-4 track record on root-causing. B1's mirrored turn is
+unaffected (direct `wz` command through a trained policy, not a hand-tuned oscillator) and stays in.
+
+Scripts: `scripts/dataset/collect_beh24.py` (`TURN_NEG`, added; not merged into any dataset).
+Data collected for the diagnostic only, in `/tmp` scratch space, not retained.
