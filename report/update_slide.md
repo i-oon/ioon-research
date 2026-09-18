@@ -608,11 +608,23 @@ different body through staged adaptation, cheaper than retraining from nothing. 
 clips; output: adapted `z`'s correlation (ρ) to Froude, per channel, zero-shot vs. staged. Answers
 **Objective 2** — correspondence-free transfer, under a specific adaptation procedure.
 
-**⚠ Flagged for re-verification.** A parallel session (`doc/START_HERE.md`) found a smaller,
-confirmed 2-of-9-clip leak between this measurement's train and held-out sets — a real, if less
-severe, version of the same split bug affecting Slide 22. The 0.264→0.572 result below is not
-withdrawn (the leak is described as smaller here than there), but should be read as pending
-confirmation from the clean retrain in progress, not as fully settled.
+**Confirmed clean, 2026-09-19 — the flagged leak below is resolved.** The clean retrain
+(`wm/runs/beh12_hinge_cleansplit/`, stratified split, zero train/held-out overlap, verified by
+construction) landed and was scored on a genuinely external held-out set (never touched by any
+adaptation stage), independently reproduced on two machines:
+
+| | train | **TRUE held-out** |
+|---|---|---|
+| B1 | 0.665 | **0.730** |
+| hexapod (rehearsal) | 0.597 | **0.659** |
+
+Ratio is MSE against predicting the target's mean — below 1.0 means real signal, not memorization.
+**Both bodies generalize for real**, and held-out barely differs from train for either, the
+signature of a fit that transfers rather than memorizes. This is a different metric than the
+0.264→0.572 per-channel-ρ table below (overall fit quality vs. per-channel correlation) — it
+replaces that number as the trustworthy one, not as a directly comparable one. The 0.264→0.572
+table stands as the original, leak-flagged measurement; not yet re-run at per-channel resolution on
+this clean checkpoint.
 
 **The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
 that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
@@ -655,9 +667,9 @@ later stages," not "9 clips."** The result (every channel more than doubling) st
 claim attached to it does not, as originally stated.
 
 **Finding / remaining gap.** Staged 4-step adaptation more than doubles every channel vs. zero-shot
-on B1, forward included — flagged above for a small confirmed split leak, pending re-verification.
-Not yet tested: whether the forward model, now well-calibrated to *read* the action, actually *uses*
-it when predicting — bridges to Experiment 2.3/2.4.
+on B1, forward included — and the clean retrain confirms both bodies generalize for real (0.730/0.659
+held-out, above). Not yet tested: whether the forward model, now well-calibrated to *read* the
+action, actually *uses* it when predicting — bridges to Experiment 2.3/2.4.
 
 > **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
 > หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune ด้วยคลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
@@ -665,6 +677,9 @@ it when predicting — bridges to Experiment 2.3/2.4.
 > แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
 > (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit Cross-Body Head **ผล**: ทุกช่องดีขึ้นเกินเท่าตัว
 > (median 0.264 → 0.572)
+> **ยืนยันแล้วด้วย clean retrain (19 ก.ย.)**: fit บน split ที่ไม่มี leak เลย วัด held-out จริงๆ ได้ B1 0.730,
+> hexapod 0.659 (ต่ำกว่า 1.0 = มีสัญญาณจริง ไม่ใช่จำข้อมูล) ทั้งสองหุ่น**สรุปได้ว่า generalize จริง** — คนละหน่วย
+> กับตัวเลข ρ ด้านบน (นี่คือ MSE ratio ภาพรวม ไม่ใช่ ρ แยกราย channel) แทนที่ความน่าเชื่อถือ ไม่ใช่แทนที่ตัวเลข
 > **แต่ "แค่คลิปไม่กี่คลิป" จริงแค่ stage 1 เดียว** (9 คลิป B1 เท่านั้น) — stage 2 ใช้คลิปทั้งหมดที่มีของทั้งสองร่าง
 > ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 39 คลิป บวก (น่าจะ) hexapod ทั้ง 48 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
 > "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป" ตามที่เคยพูดไว้** ผลลัพธ์ (ทุกช่องดีขึ้นเกินเท่าตัว) ยังจริงอยู่ แต่ข้อเคลม

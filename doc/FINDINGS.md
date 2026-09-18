@@ -18411,3 +18411,39 @@ large sample size (32 branch points x 32 samples, seed 0) after the fix: hit rat
 Spearman rho 0.022, regret 0.0093 -- statistically indistinguishable from the pre-fix numbers above.
 **The goal-averaging bug was real and worth fixing, but it was not the explanation for F201's
 non-reproduction -- the gate sits at chance either way.**
+
+### F229. The `_cleantrain`/`_cleanheldout` directories were entirely broken symlinks on this machine -- fixed locally, and F222's clean held-out result reproduced exactly
+
+After merging origin/main's F222 (the clean-split held-out result, B1 0.730/hexapod 0.659), tried
+to reproduce it independently with `eval_body_head_true_heldout.py` once the checkpoint
+(`wm/runs/beh12_hinge_cleansplit/`) was copied over. Failed immediately: every one of the 72 files
+across all four `beh12_{b1,c10f10t10}_ego_flat_clean{train,heldout}` directories is a symlink
+pointing at an absolute path on a different machine (`/home/aria/ioon-research/...`), not present
+here -- these were committed as symlinks (`make_clean_split.py`'s own disk-space-saving mechanism
+on aria-desktop) rather than resolved to real files, contradicting `doc/START_HERE.md`'s own claim
+that the B1 equivalent was "committed to git as real files."
+
+**Not a data problem -- every symlink's target file exists locally**, just under
+`data/egocentric/beh12_{b1,c10f10t10}_ego_flat/` (the non-`_clean*` source directories) rather than
+at the aria-desktop path recorded in the symlink. Verified all 72 targets present before touching
+anything.
+
+**First fix attempt used an absolute local path and was itself wrong the same way** -- pointing
+each symlink at `$(pwd)/data/egocentric/<base>/<file>` reproduces the exact bug being fixed, just
+with this machine's own path instead of aria-desktop's; committing that would break the *next*
+machine to clone the repo. **Corrected to relative symlinks** (`../<base>/<file>`, both directories
+being siblings under `data/egocentric/`) -- resolves correctly regardless of the repo's absolute
+location on disk, so it survives a clone anywhere. Verified: `readlink` on a fixed file returns
+`../beh12_b1_ego_flat/b1_ep0.npz`, and the evaluation below reproduces identically under this
+version too.
+
+**Reproduced F222 exactly** after the fix: B1 train 0.665 / held-out 0.730, hexapod train 0.597 /
+held-out 0.659 -- matches to three decimal places, confirming the result independently of the
+machine it was first measured on.
+
+**This is a real, committable fix, not a local workaround** -- the relative-symlink version is
+portable and should be committed so this doesn't silently re-break on the next clone or the next
+machine to pull `main`.
+
+Scripts: none changed. Data fix: 72 symlinks across the four `_clean{train,heldout}` directories,
+re-pointed from an absolute aria-desktop path to a relative sibling-directory path.
