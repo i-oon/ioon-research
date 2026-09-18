@@ -36,6 +36,7 @@ import sys
 
 import numpy as np
 import torch
+from scipy.stats import spearmanr
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, ROOT)
@@ -74,13 +75,23 @@ def embed_and_target(encoder, itm, paths, spec, channels, chunk, cache_path):
     return torch.cat(zs), torch.cat(ys)
 
 
+CHANNEL_NAMES = ("forward", "lateral", "yaw")
+
+
 def score(md, z, y, mean, std, device):
     y_std = ((y - mean) / std).to(device)
     with torch.no_grad():
         pred = md.body(None, z.to(device))
     err = torch.nn.functional.mse_loss(pred, y_std).item()
     base = torch.nn.functional.mse_loss(y_std.mean(0, keepdim=True).expand_as(y_std), y_std).item()
-    return err, base, err / max(base, 1e-9)
+    # 2026-09-19 addition: per-channel Spearman rho between predicted and true (real, not
+    # standardised, since rho is scale-invariant) -- the metric Section 10's own table reports,
+    # never re-measured on this checkpoint until now. Additive: the MSE-ratio line above is
+    # unchanged.
+    pred_np = pred.cpu().numpy()
+    y_np = y.numpy()
+    rhos = [float(spearmanr(pred_np[:, c], y_np[:, c]).statistic) for c in range(y_np.shape[1])]
+    return err, base, err / max(base, 1e-9), rhos
 
 
 def main():
@@ -128,12 +139,16 @@ def main():
         cache = os.path.join(ROOT, args.cache_dir, f"eval_true_heldout_{embodiment}.pt")
         z_tr, y_tr = embed_and_target(encoder, itm, train_paths, spec, channels, args.chunk, cache)
         z_he, y_he = embed_and_target(encoder, itm, held_paths, spec, channels, args.chunk, cache)
-        err_tr, base_tr, ratio_tr = score(md, z_tr, y_tr, mean, std, device)
-        err_he, base_he, ratio_he = score(md, z_he, y_he, mean, std, device)
+        err_tr, base_tr, ratio_tr, rho_tr = score(md, z_tr, y_tr, mean, std, device)
+        err_he, base_he, ratio_he, rho_he = score(md, z_he, y_he, mean, std, device)
+        names = [CHANNEL_NAMES[c] if c < len(CHANNEL_NAMES) else f"ch{c}" for c in channels]
         print(f"{embodiment:<10} train ({len(train_paths):>2} clips, {len(z_tr):>4} transitions)"
              f"  MSE {err_tr:.4f}  mean {base_tr:.4f}  ratio {ratio_tr:.3f}")
         print(f"{embodiment:<10} TRUE HELD-OUT ({len(held_paths):>2} clips, {len(z_he):>4} "
              f"transitions)  MSE {err_he:.4f}  mean {base_he:.4f}  ratio {ratio_he:.3f}")
+        print(f"{embodiment:<10} held-out rho  " +
+             "  ".join(f"{n}={r:+.3f}" for n, r in zip(names, rho_he)) +
+             f"  median={np.median(rho_he):+.3f}")
         return ratio_tr, ratio_he
 
     print(f"checkpoint: {args.ckpt}\n")

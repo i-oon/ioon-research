@@ -18447,3 +18447,30 @@ machine to pull `main`.
 
 Scripts: none changed. Data fix: 72 symlinks across the four `_clean{train,heldout}` directories,
 re-pointed from an absolute aria-desktop path to a relative sibling-directory path.
+
+### F230. Section 10's per-channel rho, re-measured on the clean checkpoint -- not simply better than the leak-affected claim, mixed by channel
+
+F222 (and F229's reproduction of it) only reported the aggregate MSE ratio, not the per-channel
+Spearman rho (forward/lateral/yaw) Section 10's own deck table actually needs. Extended
+`eval_body_head_true_heldout.py` to also compute per-channel rho between the fitted `body_head`'s
+prediction and the true value on the same TRUE held-out set F222/F229 already validated -- additive,
+the existing MSE-ratio line is unchanged.
+
+**Result, `beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`, true held-out:**
+
+| | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|
+| B1 | +0.261 | +0.578 | +0.474 | +0.474 |
+| hexapod (rehearsal) | +0.714 | +0.403 | +0.558 | +0.558 |
+
+**This is not simply an improvement on the original leak-affected claim (0.572/0.449/0.670/0.572)
+-- it is mixed, by channel.** Lateral improved (0.449 -> 0.578). Forward and yaw are weaker than
+what was claimed (0.572 -> 0.261, 0.670 -> 0.474). The leak inflated some channels and not others;
+there was never a reason to expect uniform inflation. Median rho (+0.474) still clears the old
+zero-shot baseline (+0.264) by a real margin, but "every channel more than doubles" (the original
+entry's own claim) does not hold at this resolution. **The zero-shot baseline itself has never been
+re-measured on a clean split either** -- so even the comparison to +0.264 is provisional, not
+confirmed the way the staged numbers above are.
+
+Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (per-channel
+Spearman rho added to `score()`, printed per embodiment -- existing MSE-ratio output unchanged).

@@ -608,23 +608,28 @@ different body through staged adaptation, cheaper than retraining from nothing. 
 clips; output: adapted `z`'s correlation (ρ) to Froude, per channel, zero-shot vs. staged. Answers
 **Objective 2** — correspondence-free transfer, under a specific adaptation procedure.
 
-**Confirmed clean, 2026-09-19 — the flagged leak below is resolved.** The clean retrain
-(`wm/runs/beh12_hinge_cleansplit/`, stratified split, zero train/held-out overlap, verified by
-construction) landed and was scored on a genuinely external held-out set (never touched by any
-adaptation stage), independently reproduced on two machines:
+**Confirmed clean, 2026-09-19 — the flagged leak is resolved, and the per-channel table is
+re-measured, not just the aggregate.** The clean retrain (`wm/runs/beh12_hinge_cleansplit/`,
+stratified split, zero train/held-out overlap, verified by construction) landed and was scored on a
+genuinely external held-out set (never touched by any adaptation stage), independently reproduced
+on two machines:
 
-| | train | **TRUE held-out** |
-|---|---|---|
-| B1 | 0.665 | **0.730** |
-| hexapod (rehearsal) | 0.597 | **0.659** |
+| | train ratio | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|---|---|
+| B1 | 0.665 | **0.730** | +0.261 | +0.578 | +0.474 | +0.474 |
+| hexapod (rehearsal) | 0.597 | **0.659** | +0.714 | +0.403 | +0.558 | +0.558 |
 
-Ratio is MSE against predicting the target's mean — below 1.0 means real signal, not memorization.
-**Both bodies generalize for real**, and held-out barely differs from train for either, the
-signature of a fit that transfers rather than memorizes. This is a different metric than the
-0.264→0.572 per-channel-ρ table below (overall fit quality vs. per-channel correlation) — it
-replaces that number as the trustworthy one, not as a directly comparable one. The 0.264→0.572
-table stands as the original, leak-flagged measurement; not yet re-run at per-channel resolution on
-this clean checkpoint.
+Ratio is MSE against predicting the target's mean, below 1.0 means real signal. **Both bodies
+generalize for real** — held-out barely differs from train for either, the signature of a fit that
+transfers rather than memorizes.
+
+**This replaces the leak-affected 0.572/0.449/0.670/0.572 claim below, and it is not simply better —
+lateral improved (0.449→0.578), but forward and yaw are weaker than what was claimed (0.572→0.261,
+0.670→0.474).** The leak inflated some channels and not others; there was no reason to expect it
+inflated all four equally. Median ρ (+0.474) still clears the old zero-shot baseline (+0.264) by a
+real margin, but "every channel more than doubles" no longer holds at this resolution — and that
+zero-shot baseline itself was never re-measured on a clean split, so even that comparison is
+provisional, not confirmed like the staged numbers above are.
 
 **The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
 that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
@@ -650,10 +655,9 @@ Section 9 uses both `z` sources side by side for exactly this reason.
 | B1, `z = proj` | forward ρ | lateral ρ | yaw ρ | median ρ |
 |---|---|---|---|---|
 | zero-shot, frozen head, no adaptation | 0.057 | 0.264 | 0.526 | 0.264 |
-| **correct staged adaptation** | **0.572** | **0.449** | **0.670** | **0.572** |
+| staged adaptation, original (leak-affected, superseded above) | 0.572 | 0.449 | 0.670 | 0.572 |
 
-Every channel more than doubles, forward included. **But "a handful of clips" is only true of stage
-1 — stated precisely, not as one round number:**
+**But "a handful of clips" is only true of stage 1 — stated precisely, not as one round number:**
 
 | stage | data it actually uses |
 |---|---|
@@ -666,20 +670,22 @@ handful — so **the true cost of bringing up this body is closer to "the full B
 later stages," not "9 clips."** The result (every channel more than doubling) still stands; the cost
 claim attached to it does not, as originally stated.
 
-**Finding / remaining gap.** Staged 4-step adaptation more than doubles every channel vs. zero-shot
-on B1, forward included — and the clean retrain confirms both bodies generalize for real (0.730/0.659
-held-out, above). Not yet tested: whether the forward model, now well-calibrated to *read* the
-action, actually *uses* it when predicting — bridges to Experiment 2.3/2.4.
+**Finding / remaining gap.** The clean retrain confirms both bodies generalize for real (held-out
+ratio 0.730/0.659, median ρ +0.474/+0.558) — lateral improved over the original claim, forward and
+yaw came in weaker, and the zero-shot baseline this compares against was never re-measured cleanly.
+Not yet tested: whether the forward model, now well-calibrated to *read* the action, actually *uses*
+it when predicting — bridges to Experiment 2.3/2.4.
 
 > **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
 > หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune ด้วยคลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
 > **ขั้นตอน 4 stage**: (1) fine-tune inverse/forward model บนคลิป B1 (2) fit **projector** — เน็ตเวิร์ก
 > แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
-> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit Cross-Body Head **ผล**: ทุกช่องดีขึ้นเกินเท่าตัว
-> (median 0.264 → 0.572)
-> **ยืนยันแล้วด้วย clean retrain (19 ก.ย.)**: fit บน split ที่ไม่มี leak เลย วัด held-out จริงๆ ได้ B1 0.730,
-> hexapod 0.659 (ต่ำกว่า 1.0 = มีสัญญาณจริง ไม่ใช่จำข้อมูล) ทั้งสองหุ่น**สรุปได้ว่า generalize จริง** — คนละหน่วย
-> กับตัวเลข ρ ด้านบน (นี่คือ MSE ratio ภาพรวม ไม่ใช่ ρ แยกราย channel) แทนที่ความน่าเชื่อถือ ไม่ใช่แทนที่ตัวเลข
+> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit Cross-Body Head **ตัวเลขเดิม (มี leak)**: median 0.264 → 0.572
+> **ยืนยันแล้วด้วย clean retrain (19 ก.ย.), วัดใหม่ครบทั้ง ratio และ ρ แยกราย channel**: B1 held-out ratio
+> 0.730, hexapod 0.659 (ต่ำกว่า 1.0 = มีสัญญาณจริง ไม่ใช่จำข้อมูล) — ρ ราย channel ของ B1: forward +0.261,
+> lateral +0.578, yaw +0.474, median +0.474 **ไม่ใช่ดีขึ้นทุกช่องแบบที่เคยพูดไว้** — lateral ดีขึ้นจริง
+> (0.449→0.578) แต่ forward กับ yaw แย่กว่าที่เคยอ้างไว้ (0.572→0.261, 0.670→0.474) median ยังชนะ zero-shot
+> เดิม (0.264) แต่เทียบกับ zero-shot ที่ยังไม่เคยวัดใหม่แบบสะอาดเหมือนกัน
 > **แต่ "แค่คลิปไม่กี่คลิป" จริงแค่ stage 1 เดียว** (9 คลิป B1 เท่านั้น) — stage 2 ใช้คลิปทั้งหมดที่มีของทั้งสองร่าง
 > ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 39 คลิป บวก (น่าจะ) hexapod ทั้ง 48 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
 > "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป" ตามที่เคยพูดไว้** ผลลัพธ์ (ทุกช่องดีขึ้นเกินเท่าตัว) ยังจริงอยู่ แต่ข้อเคลม
