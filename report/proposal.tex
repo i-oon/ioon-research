@@ -1134,7 +1134,7 @@ end-to-end except for the frozen encoder, and shared across both embodiments wit
 embedding $e_t$; the Inverse Transition Model infers the latent action $z_t$ from $(e_t, e_{t+1})$; the Forward
 Transition Model predicts $\hat{e}_{t+1}$ from $(e_t, z_t)$ (loss $\mathcal{L}_{\text{recon}}$); and the Motion
 Decoder maps $z_t$ back to a body-specific joint command $\hat{a}_t$ (loss $\mathcal{L}_{\text{motion}}$) through a
-per-embodiment head. Not pictured: the shared body-motion head trained alongside this loop (Section 3.4.4), which
+per-embodiment head. Not pictured: the shared cross-body head trained alongside this loop (Section 3.4.4), which
 is what actually carries the cross-embodiment claim.}
 \label{fig:pipeline}
 \end{figure}
@@ -1156,7 +1156,7 @@ Inverse Transition Model & $[e_t, e_{t+1}]$ (512 tokens) & $z_t \in \mathbb{R}^{
 Forward Transition Model & $[e_t, z_t]$ & $\hat{e}_{t+1} \in \mathbb{R}^{1408}$ & Yes\\
 Motion Decoder (per-embodiment head) & ($e_t$ as context, $z_t$ as query) & $\hat{a}_t \in \mathbb{R}^{18}$ /
   $\mathbb{R}^{12}$ (joint targets, rad) & Yes\\
-Body-motion head (shared, frame-blind) & $z_t$ only & $\hat{v}_t \in \mathbb{R}^3$ (forward, lateral, yaw;
+Cross-body head (shared, frame-blind) & $z_t$ only & $\hat{v}_t \in \mathbb{R}^3$ (forward, lateral, yaw;
   Froude-scaled, dimensionless) & Yes\\
 Action projector (per-embodiment) & $a_t$ (control time, no future frame available) & $z_t \in \mathbb{R}^{64}$ & Yes\\
 \hline
@@ -1192,7 +1192,7 @@ command keeps its original leg ordering, which would make the Motion Decoder's t
 frame shows.
 
 \textbf{What is confirmed as load-bearing, and what is not.} This chapter describes the architecture and protocol
-that Chapter 4 shows actually carries the cross-embodiment claim: the shared body-motion head. A further module,
+that Chapter 4 shows actually carries the cross-embodiment claim: the shared cross-body head. A further module,
 a \textbf{state head} reading body motion off the Forward Transition Model's own predicted change rather than off
 $z_t$ directly, was built and evaluated during this project as a candidate fix for a problem Chapter 4 documents
 (Section 4.3); its offline evaluation is promising but its effect on the capability it was meant to fix did not
@@ -1259,7 +1259,7 @@ condition (Section 2.3.2, Section 3.4.4): forward, hexapod \texttt{speed\_c8.8} 
 vs.\ 0.084); strafe, hexapod \texttt{side\_L\_lvl1} against B1 \texttt{side\_L\_lvl1} (lateral 0.189 vs.\ 0.153).
 Every pair is the strongest available condition on each behaviour axis, not the weakest chosen for visual
 convenience, and both members of a pair are within 24\% of each other on the dimensionless quantity the shared
-body-motion head is trained against.}
+cross-body head is trained against.}
 \label{fig:filmstrip}
 \end{figure}
 
@@ -1330,7 +1330,7 @@ correspondence with each other, $\mathcal{L}_{\text{motion}}$ alone cannot force
 both bodies: nothing prevents the shared trunk from partitioning by embodiment underneath two separately-fitted
 heads. That is exactly the job of the next module.
 
-\subsection{Body-Motion Head: the module that carries the cross-embodiment claim}
+\subsection{Cross-Body Head: the module that carries the cross-embodiment claim}
 A single head, shared by both embodiments and given no access to the frame, maps $z_t$ alone to the Froude-scaled
 body-motion coordinate of Section 2.3 (forward, lateral, yaw), supervised by $\mathcal{L}_{\text{body}}$. Being
 frame-blind is deliberate: a head that could see the frame could identify which robot it is looking at and learn
@@ -1438,7 +1438,7 @@ construction. Every result in this chapter states which regime it was measured u
 \end{itemize}
 
 \subsection{Primary evidence and the value-over-raw-command check}
-The \textbf{primary evidence} for the thesis is the shared body-motion head's transfer: does a goal observed on
+The \textbf{primary evidence} for the thesis is the shared cross-body head's transfer: does a goal observed on
 one embodiment's video, read through $z_t$ and the shared head, select or drive the matching behaviour on the
 other. This test is clean because it examines the shared coordinate on its own, needs only the held-out
 embodiment's video, and does not depend on a comparison against the native command.
@@ -1689,7 +1689,7 @@ model of either body?
 \end{enumerate}
 
 \subsection{Setup}
-The shared body-motion head of Section 3.4.4, trained with $\lambda_{\text{body}}=0.5$ across both embodiments,
+The shared cross-body head of Section 3.4.4, trained with $\lambda_{\text{body}}=0.5$ across both embodiments,
 supervises $z_t$ against Froude-scaled forward/lateral/yaw velocity through a single head with no per-embodiment
 parameters and no access to the frame. Selection is tested by reading a goal clip from one embodiment through
 the trunk and the shared head, then choosing whichever of the target embodiment's own twelve recorded conditions
@@ -2099,7 +2099,7 @@ actually does and does not use it for. Chapter 4 reported this as three experime
 of Section 1.2:
 
 \noindent\textbf{Objective 1 (learn a shared coordinate with no privileged information)} is met. The shared
-body-motion head (Section 3.4.4), trained with no morphology label and no kinematic model for either the hexapod
+cross-body head (Section 3.4.4), trained with no morphology label and no kinematic model for either the hexapod
 or the Unitree B1, produces a Froude-scaled forward/lateral/yaw coordinate that both bodies' latents map onto
 (Experiment 2, Section 4.2).
 
@@ -2356,7 +2356,7 @@ Motion Decoder (total) & $(e_t, z_t) \to \hat{a}_t$ & cross-attention backbone,
 \quad shared backbone & reads behaviour from $z$ vs.\ frame & hidden 512 & 4{,}957{,}184\\
 \quad per-embodiment head & latent $\to$ this body's joints & linear, 18-D / 12-D & 272{,}914 /
   269{,}836\\
-Body-motion head & $z \to$ body motion, frame-blind, one head for every embodiment &
+Cross-body head & $z \to$ body motion, frame-blind, one head for every embodiment &
   LayerNorm $\to 64 \to 128 \to$ \texttt{body\_dim} & 8{,}577\\
 Action projector & $a \to z$ (control time, when the ITM's required future frame is unavailable) &
   per-embodiment MLP, depth 2, width 512 & 305{,}216 / 302{,}144\\

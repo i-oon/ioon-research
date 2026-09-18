@@ -61,12 +61,13 @@ def main():
     del encoder, cache
     torch.cuda.empty_cache()
 
-    clips = [c for c in clips if c["cond"] == args.cond or FAMILY(c["cond"]) == args.cond]
+    # `fwd_m3d` clips carry no `condition` field (only `behavior="walk"` for all of them) --
+    # the body geometry (e.g. c10f10t10) lives in the filename, written by the collector, not in
+    # any data field `gather()` reads. Filter on the filename instead.
+    clips = [c for c in clips if args.cond in c["path"]]
     if not clips:
-        conds = sorted({c["cond"] for c in gather(os.path.join(ROOT, args.data), args.embodiment,
-                                                    None, ck, {}, args.chunk, 1, device)}) \
-            if False else []
-        raise SystemExit(f"no clips matched --cond {args.cond}")
+        raise SystemExit(f"no clips matched --cond {args.cond} in filename; "
+                          f"paths look like: {[c['path'] for c in clips][:3]}")
     print(f"{len(clips)} clips matching {args.cond}")
 
     uniq_ids = list(range(len(clips)))

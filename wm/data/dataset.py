@@ -356,11 +356,19 @@ class MultiEmbodimentPairs(Dataset):
         # first run at lambda_body 0.5 was measurably active and changed nothing, because a term
         # that small cannot move a gradient. `action` is standardised for this same reason a few
         # lines above.
-        if "body_motion" in self.clips[0]:
+        if self.clips and "body_motion" in self.clips[0]:
             self.body_channels = tuple(body_channels)
             pooled = np.concatenate([c["body_motion"][:, self.body_channels] for c in self.clips])
             self.body_stats = (pooled.mean(0),
                                np.maximum(pooled.std(0), 1e-6)) if body_stats is None else body_stats
+        elif not self.clips:
+            # --val_fraction 0 (by design, e.g. the clean-split retrain -- all clips go to train,
+            # the real held-out check happens externally against a separate directory) makes
+            # val_sources empty, which reached self.clips[0] unguarded and crashed. An empty
+            # validation set is not an error; fall back to train_set's own already-computed stats,
+            # passed in as `body_stats`, so downstream code sees a consistent, valid empty val_set.
+            self.body_channels = tuple(body_channels)
+            self.body_stats = body_stats
         else:
             self.body_stats = None
             self.body_channels = tuple(body_channels)
@@ -481,6 +489,10 @@ class EmbodimentBatchSampler(Sampler):
 
     def _batches_per_group(self):
         counts = {name: -(-len(v) // self.batch_size) for name, v in self.groups.items()}
+        if not counts:
+            # empty dataset (e.g. --val_fraction 0's empty val_set) -- zero batches, not a crash.
+            # max() on an empty sequence is what used to raise here.
+            return {}
         if self.balance:
             most = max(counts.values())
             return {name: most for name in counts}
