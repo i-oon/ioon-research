@@ -507,47 +507,20 @@ learning a shared coordinate, or just better-scaled normalization — bridges di
 ## 9. Methodology — Stage 2, Experiment 2.1b: should the shared-coordinate loss's gradient reshape z, or only train body_head?
 
 **Assumption / Input→Output / Answers.** The bottleneck is the Cross-Body Head's own training
-dynamics (competing gradients reshaping `z` every step), not the information content of `z` itself.
-Input: frozen `z`; output: a freshly-trained head's Froude prediction, real-vs-mean cosine gap.
-Answers **Objective 2** — which training regime is required for the transfer to actually be usable.
+dynamics, not the information content of `z` itself. Input: frozen `z`; output: a freshly-trained
+head's Froude prediction, real-vs-mean cosine gap. Answers **Objective 2**.
 
-**Two separable questions, not one.** Section 8 asked whether the shared-coordinate loss needs to
-exist at all — it does; without it, cross-robot readout is systematically negative. This section
-asks a different question: once it exists, should its gradient also reshape `z`, or only train the
-Cross-Body Head?
-
-**Why the Cross-Body Head has to exist at all.** `z` is an opaque 64-number code — nothing in it is
-inherently "forward speed," and nothing guarantees coordinate 17 of the insect's `z` means the same
-thing as coordinate 17 of B1's `z`. Somebody has to know how to read it — a trained function mapping
-`z` onto the one space that *is* shared: the three-channel Froude coordinate. That's the Cross-Body
-Head, and it's not a training-time extra — it's what every real use calls: reading a goal off video,
-scoring an action at control time (`score(a) = |body_head(proj(a)) − goal|`). No Cross-Body Head, no
-cross-embodiment claim to test.
-
-**"z already contains Froude" only ever means: some function fitted on z can read it out.** Not that
-the raw numbers in z are Froude, or line up the same way across bodies for free. Even the test below
-uses a small trained network to do that reading — that network *is* the Cross-Body Head's job, just
-done separately. The question is whether the real one is trained well.
-
-**Test: is the signal there regardless of whether the real head found it?** Freeze the same `z`
-Section 8 already used, bolt on a fresh head, train it on Froude alone, nothing else competing:
+**Test: freeze the same `z` Section 8 used, bolt on a fresh head, train it on Froude alone.**
 
 | latent source | action-lever gap (bar 0.110) |
 |---|---|
 | inverse model, read from a real frame pair | +1.048 to +1.226 |
 | projector, read from the action alone | +1.049 to +1.092 |
 
-**Passes by ~10×.** So `z` was never the problem — the original Cross-Body Head, co-trained alongside
-it, simply never learned to read it this well.
+Passes by ~10× — `z` was not the problem; the original co-trained head never learned to read it
+this well.
 
-**Why not.** The reconstruction, motion, and body-motion losses all push gradient into the same `z`,
-every step. The Cross-Body Head is trying to learn `z → Froude` while `z` itself keeps getting
-reshaped by two losses that have nothing to do with Froude — a moving target it never converges
-against.
-
-**Fix: stop the body-motion loss's gradient from reaching `z`.** The Cross-Body Head still trains,
-but can no longer push back and reshape `z` — `z` is now shaped by reconstruction and motion alone.
-One line, one full retrain, same hex+B1 recipe as Section 8:
+**Fix: `z.detach()` before the Cross-Body Head, one full retrain:**
 
 | action-lever, real retrain | value |
 |---|---|
@@ -558,54 +531,32 @@ One line, one full retrain, same hex+B1 recipe as Section 8:
 | channel | gap (real − mean) |
 |---|---|
 | forward | +0.238 |
-| lateral | +0.031 (weakest, still positive) |
+| lateral | +0.031 |
 | yaw | +0.243 |
 
-**Not free — `z` gets measurably worse.** The body-motion loss's gradient wasn't pure competition, it
-was also doing real work shaping `z`. Cut it, and `z` develops only **32-76%** of its old signal. A
-real trade: `z` comes out weaker, the Cross-Body Head trains against a stable target instead and
-actually learns to use it — net result still 9× better despite the weaker `z`.
+**Not free.** `z` develops only **32-76%** of its old signal once detached — the body-motion loss's
+gradient was also doing real work shaping `z`, not just competing with it.
 
-**Not yet shown: this improves control** — only that the Cross-Body Head is now correctly
-direction-sensitive. Whether that becomes working closed-loop behaviour is separate, unproven.
-
-**Does this checkpoint's `z` still share meaning across bodies, once a head is fit on only one of
-them?** A stricter test than Section 8's: instead of one head co-trained on both bodies at once
-(where the two bodies could still be leaking structure into each other through the shared training
-run), fit a Cross-Body Head on *each* body's data alone, then score each head on the *other* body it
-never trained on — an unmixed reading of whatever `z` already carries.
+**Cross-body transfer, tested stricter than Section 8:** a head fit on *each* body's data alone,
+scored on the body it never trained on.
 
 | this checkpoint's `z`, head fit separately per body | insect→insect | b1→b1 | insect→b1 | b1→insect |
 |---|---|---|---|---|
 | held-out R² | +0.274 | +0.157 | **−0.397** | **−0.594** |
 
-**Same-body readout still works, weaker than the co-trained head (0.798/0.879 → 0.274/0.157) —
-cross-body transfer does not survive at all.** Both cross directions are negative: worse than
-predicting the target body's own mean. Read together with the trade already shown above (`z`
-retains 32-76% of its old signal once detached), the remaining signal is enough for a body to read
-its own motion back out, but not enough to carry across bodies without the joint training run's
-own gradient tying the two together — sharing was doing real work, not just adding noise to fight.
+Same-body readout works, weaker than the co-trained head (0.798/0.879 → 0.274/0.157). Both
+cross-body directions are negative — worse than the target body's own mean.
 
-**Finding / remaining gap.** `z` was never the bottleneck for same-body readout — the co-trained
-head was; `z.detach()` clears that bar by ~9×. But cross-body transfer specifically depends on the
-joint training itself: fit separately, it collapses to negative R² in both directions. Not yet
-shown: that same-body direction-sensitivity improves actual control — bridges to Experiment 2.2.
+**Finding / remaining gap.** `z` was never the bottleneck for same-body readout; `z.detach()` clears
+the bar by ~9×. Cross-body transfer specifically requires the joint training run — fit separately,
+it collapses to negative R² both directions. Not yet shown: whether this improves actual control —
+bridges to Experiment 2.2.
 
-> **บทพูด (TH).** ทำไมต้องมี body_head: z คือเลข 64 ตัวที่ไม่มีความหมายในตัวเอง ต้องมี "ใครสักคนอ่านมันเป็น"
-> — คือฟังก์ชันที่เทรนมาแมป z ไปยังพื้นที่ร่วม (Froude 3 ช่อง) ไม่ใช่ของช่วยตอนเทรน แต่คือสิ่งที่ทุกการใช้งาน
-> จริงเรียกใช้ (อ่านเป้าจากวิดีโอ, ให้คะแนน action ตอนควบคุม) ไม่มี body_head ก็ไม่มีข้อเคลมข้ามร่างเหลือทดสอบ
-> **"z มีสัญญาณอยู่แล้ว" แปลว่าแค่ "มีฟังก์ชันอ่านออกได้"** ไม่ใช่ตัวเลขดิบเป็น Froude เอง — แม้แต่ตอนทดสอบก็
-> ยังต้องมีเน็ตเวิร์กเล็ก ๆ อ่านมันอยู่ดี (นั่นคืองานของ body_head) คำถามจริงคือ head ตัวจริงเทรนมาดีพอไหม
-> **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
-> **ปัญหาคือ**: body_head ตัวเดิมเทรนพร้อม loss อื่น (recon, motion) ที่แย่ง gradient เข้า z ตลอด z เลย
-> ขยับตลอดเวลา body_head ไล่จับเป้าที่วิ่งหนีไม่ทัน
-> **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก เทรนใหม่รอบเดียว **ดีขึ้น ~9 เท่า**
-> **แต่ไม่ฟรี**: z เองอ่อนลงจริง (เหลือ 32-76% เพราะ L_body เคยช่วยสร้างสัญญาณด้วย) — trade คือ z อ่อนลง
-> แลกกับ body_head นิ่งพอเรียนได้จริง **ยังไม่ได้พิสูจน์ว่าคุมหุ่นได้จริง** แค่ไวต่อทิศทางที่ควรไวแล้วเท่านั้น
-> **เทสเข้มกว่า Section 8**: fit head แยกทีละหุ่น (ไม่ co-train พร้อมกัน) แล้วเอาไปวัดข้ามหุ่นที่ไม่เคยเห็น
-> **ผล**: อ่านหุ่นตัวเองยังได้อยู่ (0.274, 0.157) แต่**ข้ามหุ่นพังสนิท** (insect→b1 −0.397, b1→insect −0.594
-> ติดลบทั้งคู่ แย่กว่าเดาค่าเฉลี่ยของหุ่นเป้าหมายเอง) — แปลว่าการแชร์ข้ามหุ่นต้อง**เทรนร่วมกัน**จริงๆ ไม่ใช่แค่มี
-> สัญญาณเหลือพอ
+> **บทพูด (TH).** **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
+> **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก **ดีขึ้น ~9 เท่า**
+> **แต่ไม่ฟรี**: z เหลือแค่ 32-76% ของสัญญาณเดิม
+> **เทสเข้มกว่า Section 8**: fit head แยกทีละหุ่น แล้ววัดข้ามหุ่นที่ไม่เคยเห็น
+> **ผล**: อ่านหุ่นตัวเองยังได้ (0.274, 0.157) แต่**ข้ามหุ่นพังสนิท** (insect→b1 −0.397, b1→insect −0.594)
 
 ---
 
