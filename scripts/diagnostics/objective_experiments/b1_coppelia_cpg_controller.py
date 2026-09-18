@@ -17,9 +17,23 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, ROOT)
-sys.path.insert(0, os.path.join(ROOT, "sim", "collect"))
-from collect_b1_cpg_babble import ACTION_SCALE, DEFAULT_IL, PHASE, il_to_sdk  # noqa: E402
 from wm.data.embodiment import body_velocity, heading, yaw_rate  # noqa: E402
+
+# **Inlined rather than imported, deliberately -- same reasoning as `wm/policy/b1_coppelia_env.py`.**
+# These were pulled from `collect_b1_cpg_babble.py`, which broke this script's import once already
+# when a parallel session moved it to `sim/collect/_archive/`.
+DEFAULT_IL = np.array([0.061, -0.066, 0.058, -0.054,
+                       1.064,  1.060, 1.077,  1.068,
+                      -1.914, -1.935, -1.914, -1.913])
+ACTION_SCALE = 0.25
+IL_TO_SDK = np.array([3, 0, 9, 6, 4, 1, 10, 7, 5, 2, 11, 8])
+PHASE = {"FL": 0.0, "RR": 0.0, "FR": 0.5, "RL": 0.5}
+
+
+def il_to_sdk(v):
+    out = np.empty(12)
+    out[IL_TO_SDK] = np.asarray(v)
+    return out
 
 LEGS_IL = ("FL", "FR", "RL", "RR")
 LEFT_LEGS = {"FL", "RL"}

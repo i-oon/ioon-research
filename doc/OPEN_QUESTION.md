@@ -284,15 +284,20 @@ propagation (8.3% on F195's gate) -- **diagnosed, not accepted: `wm.adapt`'s sta
 a plain one-step MSE loss and nothing else, and directly measuring it (`b1_adaptation_sep_check.py`)
 showed it erodes 38-62% of the pretrain's hinge-built separation on B1's own data.**
 
-**RESOLVED, 2026-09-12 (F201, corrected in place -- an earlier "CLOSED, negative" verdict here was
-premature and has been replaced, not stacked on).** Adding the same K=1 hinge term to `wm.adapt`
-itself (`--lambda_hinge`, anchored by the existing one-step MSE by construction) cut the erosion to
-23-51% and lifted the gate to **20.8% (5/24) -- the best B1 reward-quality-gate result measured
-anywhere in this project, exceeding even the original expert-fit baseline (16.7%).** The count is
-one real, working fix (F199's hexapod-level anchor + carrying it through B1's own adaptation),
-not six nulls. **Step 3 (RL controller) is no longer blocked by an exhausted-fixes wall** -- it
-depends now on whatever further margin the gate needs, a live, open, promising direction rather
-than a closed negative one.
+**WITHDRAWN, 2026-09-18 (F224) -- the 2026-09-12 "RESOLVED" verdict below was itself premature.**
+Adding the same K=1 hinge term to `wm.adapt` cut the measured erosion to 23-51% and reportedly
+lifted the gate to 20.8% (5/24) at the time. **That number does not reproduce on the exact same
+checkpoint**: re-tested at the original sample size (5 seeds, landing 4.2-8.3%) and at 4x the sample
+size (2 seeds, chance 3.0%, landing 1.0-2.1%), every run sits at or below chance. **Step 3 (RL
+controller) is blocked again by the same exhausted-fixes wall** -- nothing currently on record
+clears this gate at a sample size large enough to trust it. Original text, kept for how the (wrong)
+conclusion was reached: "Adding the same K=1 hinge term to `wm.adapt` itself (`--lambda_hinge`,
+anchored by the existing one-step MSE by construction) cut the erosion to 23-51% and lifted the gate
+to 20.8% (5/24) -- the best B1 reward-quality-gate result measured anywhere in this project,
+exceeding even the original expert-fit baseline (16.7%). The count is one real, working fix (F199's
+hexapod-level anchor + carrying it through B1's own adaptation), not six nulls. Step 3 (RL
+controller) is no longer blocked by an exhausted-fixes wall -- it depends now on whatever further
+margin the gate needs, a live, open, promising direction rather than a closed negative one."
 
 **But the fix does not transfer to babble-fit (F202), and this exposes a shared prerequisite
 neither remaining path can skip.** The same hinge fix, tried on `b1_babble_ego_flat` (the actual

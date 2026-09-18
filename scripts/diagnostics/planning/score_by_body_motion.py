@@ -45,7 +45,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.adapt3 import FAMILY, gather  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
-from wm.data.embodiment import body_velocity  # noqa: E402
+from wm.data.embodiment import body_velocity, yaw_rate  # noqa: E402
 from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -54,13 +54,24 @@ from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
 def forward_speed(path, embodiment):
     """The clip's dimensionless forward speed per frame -- channel 0 of the shared target."""
+    return full_body_motion(path, embodiment)[:, 0]
+
+
+def full_body_motion(path, embodiment):
+    """The clip's true (forward, lateral, yaw) per frame -- all channels this test can grade,
+    not just forward. Used for continuous regret (2026-09-18 addition, see docstring below):
+    hit/miss family accuracy throws away how close a "miss" actually was, in the same units the
+    rest of this deck reports Froude error in."""
     with np.load(os.path.join(ROOT, path), allow_pickle=True) as z:
         if "head" in z.files:
             pos, quat = z["head"].astype("float64"), z["body_quat"].astype("float64")
         else:
             pos, quat = z["base_pos"].astype("float64"), z["base_quat"].astype("float64")
         dt = float(z["dt"]) if "dt" in z.files else 0.05
-    return body_velocity(pos, quat, dt, embodiment)[:, 0]
+    height = float(np.median(pos[:, 2]))
+    v = body_velocity(pos, quat, dt, embodiment)
+    w = yaw_rate(quat, dt, embodiment, height)
+    return np.concatenate([v, w], axis=1)
 
 
 def main():
@@ -130,20 +141,24 @@ def main():
     mean, std = ck["body_stats"]
     mean, std = float(np.asarray(mean).ravel()[0]), float(np.asarray(std).ravel()[0])
     speed = {c["path"]: forward_speed(os.path.join(args.data, c["path"]), name) for c in clips}
+    # 2026-09-18 addition: ground-truth (forward, lateral, yaw) per candidate, entirely independent
+    # of what the model predicts -- used only for continuous regret below, never for scoring itself.
+    true_motion = {c["path"]: full_body_motion(os.path.join(args.data, c["path"]), name)
+                   for c in clips}
 
     # cross-embodiment goals: one clip per (behaviour, level) of the other robot, and its measured
     # forward speed. Keyed on the recorded fields, never on the condition string -- the two robots
     # name their conditions after their own controls and only the sideways names coincide (F116).
-    cross, cross_e = {}, {}
+    cross, cross_e, cross_motion = {}, {}, {}
     if args.goal_dir:
         for gp in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
             with np.load(gp, allow_pickle=True) as z:
                 key = (str(z["behaviour"]), int(z["level"]))
                 cond = str(z["condition"])
             if key not in cross:
-                cross[key] = (cond, forward_speed(os.path.join(args.goal_dir,
-                                                               os.path.basename(gp)),
-                                                  args.goal_embodiment))
+                gpath = os.path.join(args.goal_dir, os.path.basename(gp))
+                cross[key] = (cond, forward_speed(gpath, args.goal_embodiment))
+                cross_motion[key] = full_body_motion(gpath, args.goal_embodiment)
         print(f"cross-embodiment goals: {len(cross)} conditions from {args.goal_dir}")
         if args.mode in ("C", "D"):
             enc2 = VJEPA2FrameEncoder(dtype=torch.float32)
@@ -202,6 +217,12 @@ def main():
             # here is the *goal's*, since that is what the rule was asked for.
             per = {}
             n = 0
+            # 2026-09-18 addition: continuous regret on the deciding (mismatched-vs-goal) column --
+            # a discrete family hit/miss throws away how close a "miss" actually was. Regret =
+            # true distance-to-goal of the candidate the score actually picked, minus the true
+            # distance-to-goal of the best real candidate available -- ground truth on both sides,
+            # entirely independent of what the score itself used to decide.
+            regret_sum, regret_n = 0.0, 0
             for c, t in picks:
                 if t + h >= clips[c]["n"]:
                     continue
@@ -282,14 +303,32 @@ def main():
                         row = per.setdefault(gf, [0, 0])
                         row[0] += got == gf
                         row[1] += 1
+                        if args.goal_dir and gk in cross_motion:
+                            gm = cross_motion[gk][t:t + h].mean(0)
+                            kk = min(len(gm), true_motion[clips[c]["path"]].shape[1])
+                            true_dists = np.array([
+                                np.abs(true_motion[clips[cand[kn]]["path"]][t:t + h].mean(0)[:kk]
+                                       - gm[:kk]).sum()
+                                for kn in keep])
+                            picked = int(err.argmin())
+                            regret_sum += float(true_dists[picked] - true_dists.min())
+                            regret_n += 1
                 n += 1
             d = max(n, 1)
+            regret_line = (f"  mean regret (true units, ground truth both sides): "
+                           f"{regret_sum / max(regret_n, 1):.4f}  (n={regret_n})"
+                           if regret_n else "")
             print(f"  {h:>8}{hit['matched']/d:>10.0%}{hit['mm_demo']/d:>21.0%}"
                   f"{hit['mm_goal']/d:>21.0%}{n:>7}   "
                   + "  ".join(f"{k} {v[0]/max(v[1],1):.0%}" for k, v in sorted(per.items())))
+            if regret_line:
+                print(regret_line)
 
     print("\n  chance is 28%. **Only the last column decides** -- the first two are passable by a")
     print("  rule that names the behaviour already visible and never reads the goal (F114, F118).")
+    print("  regret is on the deciding column only, in the same real units as the rest of this")
+    print("  deck's Froude-error numbers -- 0 means the score always picked the true best candidate,")
+    print("  even on trials it graded as a family 'miss'.")
 
 
 if __name__ == "__main__":
