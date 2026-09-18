@@ -50,7 +50,7 @@ from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
-CKPT = "wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt"
+CKPT = "wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt"
 N_PER_BEHAVIOUR = 3  # matches the raw-z check exactly, for a like-for-like comparison
 
 SOURCES = {

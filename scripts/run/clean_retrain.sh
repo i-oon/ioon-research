@@ -30,9 +30,15 @@
   --out wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/projector_b1.pt
 
 # 4. Stage 4 — fit body_head (with hexapod rehearsal, per the established fix for the
-#    catastrophic-forgetting regression)
+#    catastrophic-forgetting regression). --ckpt is the STAGE 1 (adapt) output, not stage 2's --
+#    fit_body_head.py's own --ckpt help text says so explicitly ("not the pretrain: stage 1 moves
+#    what z means"), and only adapted_b1.pt carries config/itm/ftm/md/body_stats, which this
+#    script needs unconditionally. projector_b1.pt is a much smaller file (projector weights
+#    only) that fit_body_head.py loads separately, and ONLY if --latent is "projector" or "both"
+#    (default here is "itm", which never touches it) -- pointing --ckpt at it directly crashed
+#    with KeyError: 'config'.
 .venv/bin/python3 -m wm.fit_body_head \
-  --ckpt wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/projector_b1.pt \
+  --ckpt wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/adapted_b1.pt \
   --data data/egocentric/beh12_b1_ego_flat_cleantrain --embodiment b1 \
   --also hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain \
   --out wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt
