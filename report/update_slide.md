@@ -569,20 +569,27 @@ actually learns to use it — net result still 9× better despite the weaker `z`
 **Not yet shown: this improves control** — only that the Cross-Body Head is now correctly
 direction-sensitive. Whether that becomes working closed-loop behaviour is separate, unproven.
 
-**Open item: the direct comparison this invites hasn't been run — but it's a cheap eval, not a
-retrain.** Section 8's insect↔B1 R² table (0.798/0.879/+0.544/+0.435, etc.) was measured on the
-co-trained version, where the body-motion loss still shapes `z`. Nobody has refit a Cross-Body Head
-on *this* section's detached-`z` checkpoint and re-measured that same 4-way R² table — but that
-checkpoint
-(`beh12_body_stopgrad/best.pt`) is already fully trained jointly on both bodies (50 epochs, already
-on disk, already used downstream for babble/gecko work), with a projector already fitted on it.
-Closing this gap only needs fitting one readout and measuring R², the same protocol Section 8 used
-— no new pretraining. The action-lever gap above and Section 8's R² table remain different metrics
-on different checkpoints in the meantime — a real gap in the evidence, just an inexpensive one to close.
+**Does this checkpoint's `z` still share meaning across bodies, once a head is fit on only one of
+them?** A stricter test than Section 8's: instead of one head co-trained on both bodies at once
+(where the two bodies could still be leaking structure into each other through the shared training
+run), fit a Cross-Body Head on *each* body's data alone, then score each head on the *other* body it
+never trained on — an unmixed reading of whatever `z` already carries.
 
-**Finding / remaining gap.** `z` was never the bottleneck — the co-trained head was; `z.detach()`
-clears the bar by ~9×, at the cost of a measurably weaker `z`. Not yet shown: that this improves
-actual control, and the 4-way cross-body R² re-test on this checkpoint — bridges to Experiment 2.2.
+| this checkpoint's `z`, head fit separately per body | insect→insect | b1→b1 | insect→b1 | b1→insect |
+|---|---|---|---|---|
+| held-out R² | +0.274 | +0.157 | **−0.397** | **−0.594** |
+
+**Same-body readout still works, weaker than the co-trained head (0.798/0.879 → 0.274/0.157) —
+cross-body transfer does not survive at all.** Both cross directions are negative: worse than
+predicting the target body's own mean. Read together with the trade already shown above (`z`
+retains 32-76% of its old signal once detached), the remaining signal is enough for a body to read
+its own motion back out, but not enough to carry across bodies without the joint training run's
+own gradient tying the two together — sharing was doing real work, not just adding noise to fight.
+
+**Finding / remaining gap.** `z` was never the bottleneck for same-body readout — the co-trained
+head was; `z.detach()` clears that bar by ~9×. But cross-body transfer specifically depends on the
+joint training itself: fit separately, it collapses to negative R² in both directions. Not yet
+shown: that same-body direction-sensitivity improves actual control — bridges to Experiment 2.2.
 
 > **บทพูด (TH).** ทำไมต้องมี body_head: z คือเลข 64 ตัวที่ไม่มีความหมายในตัวเอง ต้องมี "ใครสักคนอ่านมันเป็น"
 > — คือฟังก์ชันที่เทรนมาแมป z ไปยังพื้นที่ร่วม (Froude 3 ช่อง) ไม่ใช่ของช่วยตอนเทรน แต่คือสิ่งที่ทุกการใช้งาน
@@ -595,9 +602,10 @@ actual control, and the 4-way cross-body R² re-test on this checkpoint — brid
 > **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก เทรนใหม่รอบเดียว **ดีขึ้น ~9 เท่า**
 > **แต่ไม่ฟรี**: z เองอ่อนลงจริง (เหลือ 32-76% เพราะ L_body เคยช่วยสร้างสัญญาณด้วย) — trade คือ z อ่อนลง
 > แลกกับ body_head นิ่งพอเรียนได้จริง **ยังไม่ได้พิสูจน์ว่าคุมหุ่นได้จริง** แค่ไวต่อทิศทางที่ควรไวแล้วเท่านั้น
-> **ที่ยังไม่ได้ทำ**: ตาราง R² ข้ามหุ่นแบบเดียวกับ Section 8 แต่บน checkpoint ที่ detach z ตัวนี้ — ยังไม่มีใครรัน
-> **แต่ checkpoint (`beh12_body_stopgrad/best.pt`) เทรนจบแล้วบนทั้งสองหุ่นอยู่แล้ว** (มี projector fit ไว้แล้ว
-> ด้วย) แค่ fit head แล้ววัด R² เหมือน Section 8 ก็พอ **ไม่ต้องเทรนใหม่**
+> **เทสเข้มกว่า Section 8**: fit head แยกทีละหุ่น (ไม่ co-train พร้อมกัน) แล้วเอาไปวัดข้ามหุ่นที่ไม่เคยเห็น
+> **ผล**: อ่านหุ่นตัวเองยังได้อยู่ (0.274, 0.157) แต่**ข้ามหุ่นพังสนิท** (insect→b1 −0.397, b1→insect −0.594
+> ติดลบทั้งคู่ แย่กว่าเดาค่าเฉลี่ยของหุ่นเป้าหมายเอง) — แปลว่าการแชร์ข้ามหุ่นต้อง**เทรนร่วมกัน**จริงๆ ไม่ใช่แค่มี
+> สัญญาณเหลือพอ
 
 ---
 

@@ -18494,3 +18494,39 @@ measured this session rather than one confirmed and one carried over from the le
 
 Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (no further
 changes -- run against the pretrain checkpoint instead of the adapted one).
+
+### F232. Section 9's own open item, closed with a stricter test than originally scoped: on the z.detach() checkpoint, a head fit separately per body does not transfer across bodies at all
+
+Section 9 (`z.detach()` before `body_head`, the fix that cleared the action-lever bar by ~9x) left
+one open item: re-measure Section 8's 4-way insect/B1 R² table on this checkpoint. Section 8's own
+table was measured on a head co-trained jointly on both bodies at once -- which leaves open whether
+any apparent cross-body sharing there was really `z` carrying a shared coordinate, or the two
+bodies' gradients leaking into each other through the same training run. Ran a stricter version
+instead: fit a Cross-Body Head on `beh12_body_stopgrad/best.pt`'s `z` using **only** hexapod data,
+and a second one using **only** B1 data (`wm.fit_body_head`, no `--also`), then score each on the
+body it never trained on (`cross_body_head_4way.py`, new -- reuses `eval_body_head_true_heldout.py`'s
+embedding/scoring logic).
+
+| this checkpoint's `z`, head fit separately per body | insect->insect | b1->b1 | insect->b1 | b1->insect |
+|---|---|---|---|---|
+| held-out R2 | +0.274 | +0.157 | **-0.397** | **-0.594** |
+
+**Same-body readout still works, weaker than the co-trained head (Section 8: 0.798/0.879 ->
+0.274/0.157 here) -- cross-body transfer does not survive at all when the heads are fit
+separately.** Both cross directions are negative, worse than predicting the target body's own
+mean. Combined with Section 9's own finding that `z.detach()` leaves 32-76% of the pretrain's
+signal intact: enough signal survives for a body to read its own motion back out, but the cross-body
+sharing specifically depends on the joint training run itself, not on `z` containing some portable,
+body-agnostic content that any head could recover independently.
+
+**Reading against Section 8, precisely.** This is a stricter test than Section 8's own protocol
+(separately-fit heads, not co-trained), so it is not a literal re-measurement of Section 8's
+0.798/0.879/+0.544/+0.435 numbers on the new checkpoint -- it answers a related but sharper
+question (does the shared coordinate survive fitting blind to the other body) with a clear negative.
+Whether the ORIGINAL co-trained protocol, replicated on this exact checkpoint, would also show
+degraded cross-body numbers (matching Section 9's already-confirmed same-body weakening) remains
+untested.
+
+Scripts: `scripts/diagnostics/objective_experiments/cross_body_head_4way.py` (new). Checkpoints:
+`wm/runs/beh12_body_stopgrad/head_hexonly.pt`, `head_b1only.pt` (both new, `wm.fit_body_head` with
+no `--also`, everything else default).
