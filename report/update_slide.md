@@ -537,26 +537,32 @@ this well.
 **Not free.** `z` develops only **32-76%** of its old signal once detached — the body-motion loss's
 gradient was also doing real work shaping `z`, not just competing with it.
 
-**Cross-body transfer, tested stricter than Section 8:** a head fit on *each* body's data alone,
-scored on the body it never trained on.
+**Two ways to fit the head on this checkpoint, same `z`, same 4-cell format** (a head fit *jointly*
+on both bodies has no real "cross" cell — same function, scored on each body's data):
 
-| this checkpoint's `z`, head fit separately per body | insect→insect | b1→b1 | insect→b1 | b1→insect |
+| held-out R² | insect→insect | b1→b1 | insect→b1 | b1→insect |
 |---|---|---|---|---|
-| held-out R² | +0.274 | +0.157 | **−0.397** | **−0.594** |
+| fit separately per body | **+0.274** | **+0.157** | −0.397 | −0.594 |
+| fit jointly, one shared head | 0.133 | 0.139 | 0.139 | 0.133 |
+| Section 8, co-trained (not detached) | 0.798 | 0.879 | +0.544 | +0.435 |
 
-Same-body readout works, weaker than the co-trained head (0.798/0.879 → 0.274/0.157). Both
-cross-body directions are negative — worse than the target body's own mean.
+Separate fitting: strong same-body, negative cross-body. Joint fitting: weak and uniform everywhere
+— one mediocre function that can't tell the bodies apart, not evidence of shared structure. Neither
+reaches Section 8's numbers on the non-detached checkpoint.
 
-**Finding / remaining gap.** `z` was never the bottleneck for same-body readout; `z.detach()` clears
-the bar by ~9×. Cross-body transfer specifically requires the joint training run — fit separately,
-it collapses to negative R² both directions. Not yet shown: whether this improves actual control —
-bridges to Experiment 2.2.
+**Finding / remaining gap.** `z.detach()` fixes same-body readout (~9× on the action-lever bar) but
+costs cross-body sharing: separate heads fail outright, a joint head only reaches uniform mediocrity.
+Whatever produced Section 8's real cross-body numbers needs `z`'s gradient un-detached — the fix
+here is a same-body fix, not a cross-body one. Not yet shown: whether same-body direction-sensitivity
+improves actual control — bridges to Experiment 2.2.
 
 > **บทพูด (TH).** **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
 > **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก **ดีขึ้น ~9 เท่า**
 > **แต่ไม่ฟรี**: z เหลือแค่ 32-76% ของสัญญาณเดิม
-> **เทสเข้มกว่า Section 8**: fit head แยกทีละหุ่น แล้ววัดข้ามหุ่นที่ไม่เคยเห็น
-> **ผล**: อ่านหุ่นตัวเองยังได้ (0.274, 0.157) แต่**ข้ามหุ่นพังสนิท** (insect→b1 −0.397, b1→insect −0.594)
+> **ข้ามหุ่น**: fit แยกทีละหุ่น → อ่านหุ่นตัวเองดี (0.274, 0.157) แต่ข้ามหุ่นพังสนิท (−0.397, −0.594) / fit
+> ร่วมหัวเดียว → กลางๆ เท่ากันหมดทุกช่อง (0.133-0.139) ไม่ใช่สัญญาณข้ามหุ่นจริง แค่ฟังก์ชันเดียวที่แยกหุ่นไม่ออก
+> **สรุป**: z.detach() แก้ปัญหาอ่านหุ่นตัวเองได้ แต่การแชร์ข้ามหุ่น (ตัวเลขจริงของ Section 8) ต้องพึ่ง gradient
+> ที่ยังไม่ตัด
 
 ---
 

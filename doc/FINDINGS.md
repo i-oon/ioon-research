@@ -18523,10 +18523,28 @@ body-agnostic content that any head could recover independently.
 (separately-fit heads, not co-trained), so it is not a literal re-measurement of Section 8's
 0.798/0.879/+0.544/+0.435 numbers on the new checkpoint -- it answers a related but sharper
 question (does the shared coordinate survive fitting blind to the other body) with a clear negative.
-Whether the ORIGINAL co-trained protocol, replicated on this exact checkpoint, would also show
-degraded cross-body numbers (matching Section 9's already-confirmed same-body weakening) remains
-untested.
 
-Scripts: `scripts/diagnostics/objective_experiments/cross_body_head_4way.py` (new). Checkpoints:
-`wm/runs/beh12_body_stopgrad/head_hexonly.pt`, `head_b1only.pt` (both new, `wm.fit_body_head` with
-no `--also`, everything else default).
+**The original co-trained protocol, replicated on this exact checkpoint (not left untested any
+more)** -- one Cross-Body Head fit jointly on both bodies at once (`--also`, matching Section 8's
+own recipe), `head_joint.pt`:
+
+| held-out R2 | insect->insect | b1->b1 | insect->b1 | b1->insect |
+|---|---|---|---|---|
+| fit separately per body (above) | +0.274 | +0.157 | -0.397 | -0.594 |
+| fit jointly, one shared head | 0.133 | 0.139 | 0.139 | 0.133 |
+| Section 8, co-trained, NOT detached | 0.798 | 0.879 | +0.544 | +0.435 |
+
+**A joint head has no real "cross" cell -- it's the same function scored on each body's data, so
+insect->b1 necessarily equals b1->b1 and b1->insect necessarily equals insect->insect.** The
+honest read is 2 numbers, not 4: ~0.13-0.14 on both bodies, uniformly weak. This is not evidence of
+recovered cross-body sharing -- it's one mediocre generalist function that cannot tell the two
+bodies apart, a different failure mode from separate-fitting's catastrophic negative, not a fix for
+it. Neither protocol reaches Section 8's own numbers on the non-detached checkpoint. **Whatever
+produced Section 8's genuine cross-body result (same-body strong AND cross-body positive,
+distinctly) needs `z`'s gradient un-detached -- `z.detach()` is a same-body fix, and on the
+evidence here, not a cross-body one.**
+
+Scripts: `scripts/diagnostics/objective_experiments/cross_body_head_4way.py` (new, extended with
+`--hex_ckpt`/`--b1_ckpt`/`--hex_dir`/`--b1_dir` args -- pass the same checkpoint to both to score a
+joint head). Checkpoints: `wm/runs/beh12_body_stopgrad/head_hexonly.pt`, `head_b1only.pt`,
+`head_joint.pt` (all new, `wm.fit_body_head`, `--also` only for the joint one).

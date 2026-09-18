@@ -13,6 +13,7 @@ no duplicated feature code. Scores against a fixed 80/20 clip-level split (seed=
 `fit_body_head.py` itself uses, since these checkpoints don't have a `make_clean_split.py`-style
 external held-out directory.
 """
+import argparse
 import glob
 import os
 import sys
@@ -86,11 +87,18 @@ def r2(pred, true):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--hex_ckpt", default="wm/runs/beh12_body_stopgrad/head_hexonly.pt",
+                    help="pass the SAME path as --b1_ckpt to score one jointly-fit head instead "
+                         "of two separately-fit ones")
+    ap.add_argument("--b1_ckpt", default="wm/runs/beh12_body_stopgrad/head_b1only.pt")
+    ap.add_argument("--hex_dir", default="data/allocentric/beh12_c10f10t10_flat")
+    ap.add_argument("--b1_dir", default="data/allocentric/beh12_b1_flat")
+    args = ap.parse_args()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    hex_ckpt = "wm/runs/beh12_body_stopgrad/head_hexonly.pt"
-    b1_ckpt = "wm/runs/beh12_body_stopgrad/head_b1only.pt"
-    hex_dir = "data/allocentric/beh12_c10f10t10_flat"
-    b1_dir = "data/allocentric/beh12_b1_flat"
+    hex_ckpt, b1_ckpt = args.hex_ckpt, args.b1_ckpt
+    hex_dir, b1_dir = args.hex_dir, args.b1_dir
 
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
