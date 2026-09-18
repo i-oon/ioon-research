@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Four commands, nothing else. Run manually, one at a time.
 
-# 1. Fresh clean pretrain (hexapod only)
+# 1. Fresh clean pretrain (hexapod only). 24 train / 12 val / 12 test (val and test are
+#    disjoint, stratified, 1-per-condition each -- see scripts/dataset/make_clean_split.py).
+#    --val_sources points wm.train at the pre-built val directory directly; --sources is then
+#    used entirely for training, val_fraction is not used at all here.
 .venv/bin/python3 -m wm.train \
   --sources hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain \
-  --val_fraction 0 \
+  --val_sources hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleanval \
   --lambda_recon 1.0 --lambda_motion 1.0 --lambda_body 0.5 \
   --lambda_hinge 0.5 --lambda_rollout 1.0 --lambda_readout 1.0 \
   --hinge_margin 0.1 --hinge_K 2 \
