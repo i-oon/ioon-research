@@ -23,11 +23,8 @@ airl-insect-walking/
 amp/
 wm/runs/
 
-data/ik_walk_100_framed/
-data/ik_turn/
-data/ik_all/
-data/hexapod/
-data/_archive/
+data/allocentric
+data/gecko
 
 results/dataset/**/emb.npz
 Egocentric_VSM/

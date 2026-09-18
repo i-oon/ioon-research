@@ -106,6 +106,13 @@ same crash), and `scripts/diagnostics/objective_experiments/froude_match_timevar
 3. Chase a real fix for hexapod's turn-direction bug (4-for-4 unsolved historically), or
    permanently drop `turn_neg` for hexapod and document the asymmetry.
 4. How to correct Slides 22/23/Section 9 once a clean checkpoint exists.
+5. **New, found by the slide-deck session, 2026-09-18, not yet run (F221 in FINDINGS.md):** the
+   exact same whole-clip-mean-goal bug F220 fixed for the 2×2 test also sits in
+   `sim/control/teacher_student_insect.py:body_goal()` — the goal function behind the entire
+   F135/F136/F164/F165/F166 fine-action-ranking arc ("coarse works, fine doesn't"). Diagnosed by
+   reading the code only; whether fixing it changes that arc's conclusion is untested — needs a
+   live CoppeliaSim run (unlike F220's diagnostic), so it's blocked on the same no-GPU rule above.
+   Read F221 before touching `teacher_label_quality.py` or re-opening the fine-ranking question.
 
 **Update from a parallel slide-deck session, 2026-09-18 (this machine, same day as the migration
 above) — item 4 partially actioned, here's the current state of the deck:**

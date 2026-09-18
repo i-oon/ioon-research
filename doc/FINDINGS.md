@@ -14742,6 +14742,39 @@ not fixable by retargeting what it predicts.
 Runs: `froude_action_lever.py` (scratch, not yet moved into the repo), same checkpoint
 (`teacher_state.pt`) and data as F180, no training involved.
 
+**Addendum, this session (2026-09-18): a stronger, more decisive version of the same premise
+check -- replace `z` (64-D) with ground-truth Froude (3-D) as the action decoder's ENTIRE
+conditioning code, not just the FTM's forecasting target -- collapses even harder.** Motivated by
+a proposal to collapse the whole pipeline's bottleneck: `ITM(e_t,e_t+1) -> froude_t`,
+`FTM(froude_t, e_t) -> e_t+1`, `MD(froude_t, e_t) -> a_t`, with no separate `z` at all. Before
+paying for a full retrain (~9 hours per this arc's own note), checked the narrow, decisive
+question first: freshly fit two copies of the real `MotionDecoder` cross-attention architecture
+(clean-split checkpoint, `body_head_b1_hex_clean.pt`, frozen ITM/frame tokens, same optimizer/
+epochs) -- one conditioned on real `z`, one on ground-truth `body_motion[t]` (the best case for the
+proposal, no `body_head` regression error in the way) -- and compared action-reconstruction
+accuracy, held out, on both bodies:
+
+| | hexapod held-out R2 | B1 held-out R2 | hexapod train R2 | B1 train R2 |
+|---|---|---|---|---|
+| decoder(x_t, real z) | **+0.655** | **+0.274** | +0.767 | +0.998 |
+| decoder(x_t, ground-truth Froude) | +0.023 | +0.006 | +0.942 | +0.998 |
+
+**The Froude-conditioned decoder fits training data fine (matches or beats `z` on train, both
+bodies) but collapses to the mean-baseline on held out (R2 ~0 on both bodies) while `z` still
+carries real signal.** This is not a close call or a capacity-matching nuance -- Froude alone lets
+the decoder memorize the small training set (only 24 clips/body) but leaves nothing to generalize
+with, because a 3-D net-outcome summary cannot disambiguate the many different actions (different
+gaits, same net speed) that share one Froude value, exactly the failure this arc's `+0.055 ->
+-0.051` result (above) already pointed at from a different angle. `MotionDecoder`'s own
+architecture comment explains the mechanism directly: the conditioning code is the cross-attention
+QUERY that retrieves from the frame's visual tokens -- a 64-D query can ask for much more than a
+3-D one can. **Collapsing `z` to Froude entirely is ruled out by this premise check; do not build
+the retrain.**
+
+Script: `scripts/diagnostics/objective_experiments/froude_bottleneck_action_ceiling.py` (new,
+mini-batched after an initial full-batch OOM on the shared 16GB card). Checkpoint:
+`wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`, BIAS-2.
+
 **Addendum, same day: every prior attack on the action-lever was on TRAINING (loss, target,
 gradient, data, horizon); the one category never tried is ARCHITECTURE.** The FTM
 (`wm/models/ftm.py`) is confirmed, from the code, to be a stateless single-step predictor --
@@ -16794,9 +16827,9 @@ Scripts: `sim/collect/collect_b1_coppelia_babble.py`,
 
 ### F201. B1's reward-quality gate: five fixes inside B1's own adaptation stage failed, but the sixth -- carrying the hexapod pretrain's hinge separation through B1 adaptation instead of discarding it -- works, and produces the best result measured
 
-**⚠ WITHDRAWN by F224 (2026-09-18).** Fix #6's headline number below, 20.8% (5/24), does not
+**⚠ WITHDRAWN by F228 (2026-09-18).** Fix #6's headline number below, 20.8% (5/24), does not
 reproduce on the exact same checkpoint -- not even approximately, and not from a sample too small
-to trust. See F224 for the full re-test (5 seeds at the original sample size, all landing at
+to trust. See F228 for the full re-test (5 seeds at the original sample size, all landing at
 4.2-8.3%; 2 further seeds at 4x the sample size landing at 1.0-2.1%, against a 3.0% chance rate).
 **Read this entry's table and "best result" language as historical -- what fix #6 actually measures
 is now closer to F195's original at-or-below-chance finding than to a real improvement.** Kept in
@@ -17001,7 +17034,7 @@ scale (~10^6 total steps across all runs) tested against a reference that used ~
 to search for a single missing mechanism is no longer well-supported by the evidence; the two
 live options are (a) a much larger compute budget than tested so far, unverified to help, or (b)
 returning to the candidate-scoring line (F201/F202) -- though F201's own "works on B1 itself" basis
-is withdrawn (F224): the candidate-scoring line's B1-only result is no longer an established
+is withdrawn (F228): the candidate-scoring line's B1-only result is no longer an established
 fallback, only babble data quality's separate open status remains as originally noted.
 
 Scripts: `wm/policy/b1_real_ppo.py` (`--curriculum_updates`), `wm/policy/b1_mujoco_env.py`
@@ -17095,7 +17128,7 @@ explains the whole gap, and that the rollout failure is structural rather than a
 checkpoint (citing F118/F126). That conclusion was reached on `wm/runs/b1_adapt/body_head_b1_hex.pt`,
 **before F199's anchored hinge existed**. Since that fix demonstrably restored action sensitivity on
 the hexapod pretrain (F199 -- F201's own claim that this also propagated to B1's gate is withdrawn,
-F224) and enabled a working controller (F206, on a ground-truth reward, not this gate's own scorer),
+F228) and enabled a working controller (F206, on a ground-truth reward, not this gate's own scorer),
 whether it also revives rollout was an open, unrun question. It is now run.
 
 **Caveats stated before the numbers.** The old checkpoint no longer exists in the repo
@@ -17597,6 +17630,97 @@ still lose to ITM; neither closes the gap.
 Script: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py` (extended in place with
 `PairMLP`/`mlp_fit`/`mlp_predict`, no new file).
 
+**Correction, clean split: the ranking reverses once the leak is fixed, but the two measurements
+answer different questions.** F214/F215's numbers above came from this script's own ad-hoc
+25%-split, seed=0, of the full (unsplit) hexapod directory -- the identical leaked-split bug class
+F222 found and fixed, and this script's `CKPT` also still pointed at
+`beh12_hinge_multistep_anchor_v2`'s `body_head_b1_hex_v2.pt`, a checkpoint superseded by this
+session's clean retrain. Re-run against the stratified `_cleantrain`/`_cleanheldout` split
+(seed=42) and the current `body_head_b1_hex_clean.pt` checkpoint, with an overlap-check guard added
+(same pattern as `eval_body_head_true_heldout.py`):
+
+| method | held-out median\|err\| | held-out mean\|err\| | held-out R2 (vs train mean) |
+|---|---|---|---|
+| linear ridge (no ITM, no z) | 0.0357 | 0.0412 | **+0.862** |
+| MLP, same capacity as body_head, no ITM | 0.0280 | 0.0356 | **+0.884** |
+| existing body_head(ITM(.)) | 0.0596 | 0.0585 | +0.650 |
+
+Train split (24 clips), for reference: linear +0.961, MLP +0.984, ITM +0.734 -- same ranking as
+held-out at every split, the opposite ranking from the original (leaked) result above, where ITM
+beat both baselines.
+
+**First objection raised and then closed: was this just the cost of sharing?** The `body_head`
+above is the multi-embodiment fit -- one set of weights asked to serve hexapod AND B1 jointly
+(`wm/models/motion_decoder.py`: one function, no embodiment key, deliberately blind to which body
+it's reading) -- while the table's linear/MLP baselines were fit on hexapod alone, with no B1 data
+and no obligation to share anything. A hexapod-only specialist beating a shared head at a
+hexapod-only task would prove nothing about ITM itself. **Controlled for directly**: refit
+linear/MLP on the exact same union of both bodies' `_cleantrain` clips `body_head` itself was fit
+on (matching `wm.fit_body_head.py --also hexapod=...`'s own recipe), scored per body against each
+body's own `_cleanheldout` set:
+
+| method | hexapod held-out R2 | B1 held-out R2 | both pooled held-out R2 |
+|---|---|---|---|
+| linear ridge (no ITM, no z) | +0.832 | +0.779 | +0.801 |
+| MLP, same capacity as body_head, no ITM | **+0.881** | **+0.885** | **+0.884** |
+| existing body_head(ITM(.)) | +0.650 | +0.302 | +0.446 |
+
+**The sharing tax is not the explanation -- ITM+body_head still loses on both bodies, by a wider
+margin on B1 than on hexapod.** Ruling out the sharing confound, if anything, widened the gap
+(B1's ITM R2 dropped to +0.302, the weakest of any cell in either table version). F214/F215's
+original claim -- "ITM's transition structure earns its keep over linear/MLP" -- does not survive
+a leak-free, sharing-controlled measurement and is retracted.
+
+**What is left standing, and what is not.** F214's separate clustering result (89% of within-body
+behaviour signal in `body_head`'s Froude output surviving the cross-embodiment jump, geometric, not
+a regression fit) is a different measurement and is not touched by this correction --
+`body_head_hidden_share.py`'s `CKPT` was updated to the clean checkpoint for consistency but its
+own numbers (a forward-only geometry check, no fitting) have not been re-run yet, so that claim's
+status under the clean checkpoint is still open, separately.
+
+**One real confound still uncontrolled, stated so the retraction isn't overstated either: this
+comparison is not purely "does temporal transition structure help," it also lets the baselines see
+strictly more information than ITM does.** `z` is a fixed-size bottleneck (`cfg.z_dim`) shaped
+jointly by every loss in the pipeline (reconstruction, next-embedding prediction, hinge, rollout,
+body) -- not optimized only for Froude. The linear/MLP baselines here see the full, uncompressed
+`concat(pooled(e_t), pooled(e_next))` pair and are fit for this one task alone. A baseline built
+with strictly more task-specific freedom beating a general-purpose bottleneck built to serve many
+objectives at once is a real result, but "the bottleneck loses information useful for reading
+Froude" and "ITM's transition modeling adds nothing" are different claims -- this experiment
+establishes the first, not the second. Still open, not yet run: the same linear/MLP baselines
+applied to `z` itself (ITM's output) rather than the raw pair, which would isolate whether the
+bottleneck or the transition-vs-no-transition question is doing the work.
+
+**That control, run: once the input is held constant at `z`, `body_head` is roughly on par with a
+freshly-refit head, not clearly beaten.** Same union-fit recipe, only the input changed from the
+raw pair to `z` itself:
+
+| method | hexapod held-out R2 | B1 held-out R2 | both pooled held-out R2 |
+|---|---|---|---|
+| linear(z) | +0.610 | **+0.366** | +0.467 |
+| MLP(z) | **+0.723** | +0.243 | +0.441 |
+| existing body_head(ITM(z)) | +0.650 | +0.302 | +0.446 |
+
+No consistent winner: MLP(z) beats `body_head` on hexapod but loses on B1; linear(z) beats
+`body_head` on B1 but loses on hexapod; pooled, all three sit within 0.44-0.47 of each other. This
+settles the confound raised above: **the loss to the pair-baselines is specifically about `z`'s
+compression throwing away information, not about `body_head`'s own fit being poor given what `z`
+retains.** `body_head` is not underperforming a fresh head trained on the identical input; it is
+tied with one. The transition-vs-no-transition question the docstring originally set out to answer
+is still open in the strict sense (nothing here isolates ITM's cross-attention structure from a
+simpler pooling of the same two frames), but "ITM/body_head don't work" is not what this data says
+-- "the bottleneck they compress into is lossy relative to the raw pixels" is.
+
+**One reason to trust the ranking direction more than the exact numbers.** The MLP baselines (pair
+and z alike) are fit on only 48 clips total (24 hexapod + 24 B1, `--epochs 3000`, 128 hidden units)
+and repeatedly reach train R2 = +1.000 -- a memorization signature at this sample size, not evidence
+the representation makes Froude trivial to read. The held-out MLP numbers above are noisier for
+this reason than the linear ones; the linear(z) vs `body_head` comparison (both closer to +0.5,
+neither near a perfect train fit) is the more trustworthy half of this table.
+
+Script: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py` (extended in place with the
+per-body union-fit and the `z`-input baselines, no new file).
+
 ### F216. Does the model help turn the B1 clone into a working walker? Four mechanisms tried, none clear the pre-registered bar, and the reasons why are now specific rather than "it doesn't work"
 
 F212 cloned B1 straight from its own recorded (state, goal) -> action pairs and never cleared the
@@ -17827,7 +17951,254 @@ unaffected (direct `wz` command through a trained policy, not a hand-tuned oscil
 Scripts: `scripts/dataset/collect_beh24.py` (`TURN_NEG`, added; not merged into any dataset).
 Data collected for the diagnostic only, in `/tmp` scratch space, not retained.
 
-### F220. The gait's periodicity, actually measured for the first time -- real, but the dominant period is ~6.6 frames, not the ~19 this project had been citing
+### F220. The 2x2 ablation's own goal is the wrong shape for the real planner -- a time-varying, per-timestep re-measurement replaces it, and the direct-beats-rollout result survives at the right resolution
+
+**The mechanism that makes this necessary.** `wm/policy/planner.py`'s `score_offsets` picks a
+horizon-window from ANY candidate clip at ANY offset to match a goal, every timestep -- confirmed
+directly in its own comment ("there is no visual-continuity reason a candidate's window must start
+at the live episode's [start]"). It never selects a whole clip, or a clip's condition label, as an
+atomic unit. `final_2x2x2_test.py`'s mode A/D (`load_goals`) reads the goal as `body_motion.mean(0)`
+-- one constant 3-vector for the whole clip -- and scores whether the picked candidate's FAMILY
+matches that constant at each decision step. That is a mismatch of resolution: a goal that changes
+every frame (a turn accelerating into its steady state, say) is not well served by a single mean,
+and "right family" is blind to how close the match actually is at that instant. This is not the
+same claim as the leakage found in F-numbers above (which is about which clips a split touches);
+this is about whether the goal itself is even shaped like what the planner is actually being asked
+to track.
+
+**Correcting for both, on a real checkpoint, real B1 planners, no mocked mechanism.** Built
+`scripts/diagnostics/objective_experiments/froude_match_timevarying.py`
+(`wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`, B1 candidates
+from `beh12_b1_ego_flat`, goal = hexapod `turn_s0.05`): reads the goal fresh at EVERY timestep,
+both physics (privileged `body_motion`) and vision-read (`ITM(e_t,e_t+k)->body_head`, per-pair, no
+`.mean(0)`), and reports the continuous L2 distance from whatever gets picked to the goal's value
+AT THAT SAME TIMESTEP -- three time series (forward/lateral/yaw), not one aggregate percentage.
+
+| comparison | mean |achieved-goal| |
+|---|---|
+| goal reading alone (vision-read vs. physics, no planner) | 0.024 |
+| direct scoring, physics goal | 0.038 |
+| direct scoring, vision goal | 0.034 (vision goal, no worse than physics -- consistent with F210) |
+| rollout scoring, physics goal (fixed `e_t`, see caveat) | 0.082 |
+
+**Direct beats rollout survives at the corrected resolution, same direction as every prior
+measurement of this (F118, F126, F184, F185, F188), now shown per-timestep rather than as a
+family-accuracy rate:** rollout's error is ~2.2x direct's, and visually it swings both above and
+below the goal on forward/lateral throughout the trial rather than tracking it, where direct locks
+onto the right family by step 10-15 and stays close. Unlike the original whole-clip-mean version of
+this test, rollout here does NOT collapse onto one constant wrong candidate across the whole trial
+-- it picks from across all 12 B1 conditions over the run, just poorly. The failure mode reads as
+genuine mis-scoring throughout, not a single frozen bad pick.
+
+**Rollout's `e_t` here is a real simplification, not a live closed loop.** `RolloutFroudePlanner`
+needs the controlled body's own live observation embedding every step; there is no running episode
+in this diagnostic, so `e_t` is one fixed B1 frame, held constant for the whole trial. A true closed
+loop would update it as the body actually moved. Read the rollout number as the scoring mechanism
+in isolation, not evidence about a live control episode.
+
+**A methodology bug caught and fixed before trusting the rollout number.** An earlier, inline
+version of this same check saved `physics_goal_traj[:len(achieved)]` (the first N *consecutive*
+frames) instead of the frames actually sampled at the strided decision timesteps (0, 2, 4, ...) --
+silently misaligning goal and achieved by up to one horizon's worth of frames near the end of the
+trial, and inflating the first printed rollout error to 0.090 against the corrected 0.082 above
+(the table's own number). Caught by the user asking why
+two plots of the same data showed a different-looking goal line; fixed by indexing both goal and
+achieved off the identical `steps` array by construction, not by re-deriving one from the other's
+length.
+
+**What this does not yet cover.** One goal clip, one body pair, one horizon (2). The vision-goal +
+rollout cell (mode C) was not run. Coverage of the achievable (fwd, lat, yaw) space was checked
+separately (pooled per-window nearest-neighbour density across all 24 beh24 hex conditions, median
+normalised distance 0.047-0.06, no gaps found except at the natural edges of the range) and is a
+reasonable proxy for whether good matches exist everywhere a goal might land, but is not a
+substitute for this per-timestep check on the actual goal that matters.
+
+Scripts: `scripts/diagnostics/objective_experiments/froude_match_timevarying.py` (consolidated,
+checked-in; supersedes three inline/scratch versions used earlier in the same session). Outputs:
+`results/deck/froude_{1,2,3}_*.png`, `results/deck/froude_match_2x2_*.png`.
+
+---
+
+### F221. The same whole-clip-mean-goal resolution bug F220 fixed for the 2×2 test is also the goal
+function behind the entire F135/F136/F164/F165/F166 fine-ranking arc -- diagnosed by code reading,
+not yet re-run
+
+**Not a new bug -- the same one, found in a second place.** F220 fixed `final_2x2x2_test.py`'s
+`load_goals` reading the goal as `body_motion.mean(0)`, one constant vector for the whole clip, and
+scoring the picked candidate against that constant at every decision step. `sim/control/
+teacher_student_insect.py:body_goal()`, the goal function `scripts/diagnostics/planning/
+teacher_label_quality.py` uses for F135/F136/F164/F165/F166 (the entire coarse-vs-fine
+action-ranking arc), does the identical thing:
+
+```python
+def body_goal(clip_path, embodiment, channels):
+    motion = np.asarray(load(clip_path, REGISTRY[embodiment])["body_motion"])[:, channels]
+    return motion.mean(0)   # one constant vector, whole clip
+```
+
+This single value is computed once and used as a fixed target across every branch point tested
+(`branch = np.linspace(6, min(len(seed) - horizon - 1, 50), states)` -- roughly the whole clip,
+15 points by default), never re-read at the branch point's own local time. Same resolution
+mismatch F220 named: a goal that changes over the clip (accelerating into a steady gait, say) is
+not well served by a single mean, and neither the student's replayed action nor the teacher's pick
+is being judged against what the goal actually is at that instant.
+
+**What this could explain, stated as a hypothesis, not a result.** F136's own numbers -- student
+0.1299, teacher 0.1304, nearly indistinguishable -- were read as "physics barely separates the
+candidates." An equally consistent reading: both arms are being scored against a smeared,
+wrong-resolution target, which adds noise to *both* measurements and could mask a real ranking
+signal underneath. F166's own later correction (candidate separation raised synthetically to 10%
+via a sigma sweep, ranking still only 42%) is not obviously explained by this bug alone -- but it
+was never tested with a corrected, per-branch-point goal either, so it doesn't rule this out.
+
+**What would settle it, mirroring F220's fix exactly.** Replace the single `body_goal()` call with
+a goal read fresh at each branch point's own local window (the goal clip's own `body_motion` at
+the corresponding time, not the whole-clip mean), re-score both the student's replayed action and
+the teacher's pick against that, and compare win-rate/separation numbers before vs. after the fix,
+same branch points, same checkpoint. Everything else in `teacher_label_quality.py` (physics-judged
+execution, the `repeat_control` noise floor, the realizability/upright check) is independent of
+this bug and does not need to change.
+
+**Not yet run.** This needs a live CoppeliaSim instance plus GPU encoding (`teacher_label_quality.py`'s
+`local` arm drives the simulator directly, unlike F220's diagnostic which only needed a candidate
+library) -- held pending the standing no-GPU-without-permission rule (hardware fault, aria-desktop,
+2026-09-18). Diagnosed by reading `body_goal()` and `teacher_label_quality.py` directly, not by
+running anything.
+
+Scripts: none run. `sim/control/teacher_student_insect.py:body_goal()` (the bug, unfixed),
+`scripts/diagnostics/planning/teacher_label_quality.py` (the caller, unfixed).
+
+### F222. The first clean, leak-free measurement of Section 9's claim: both bodies' held-out fit is real, corrected once after the first attempt measured the wrong held-out set entirely
+
+**What this replaces.** Section 9's original table (0.264 -> 0.572) was measured against a random
+25%-split, seed=0, that turned out to have zero overlap with the model's real, deterministic
+held-out set -- every number in it was train-set/memorized performance, not generalization (see
+the leakage finding this session opened with). This is the same recipe -- pretrain, adapt to B1
+(9 clips, stratified), fit projector, fit body_head with hexapod rehearsal -- re-run end to end on
+`scripts/dataset/make_clean_split.py`'s stratified split (seed=42, 1 clip per condition held out,
+verified zero overlap with train). Checkpoint chain: `wm/runs/beh12_hinge_cleansplit/` on BIAS-2.
+
+**Fixed two real code bugs to get this to run at all, neither specific to this data.**
+`wm.train --val_fraction 0` (wanted: use every train clip, since the real held-out check is the
+separate clean-split directory, not an internal validation carve-out) crashed on an empty
+validation set in two places (`MultiEmbodimentPairs.__init__`, `EmbodimentBatchSampler.
+_batches_per_group()`, both now guard the empty case) and, more fundamentally, cannot work at all
+-- `wm.train`'s own checkpoint-selection mechanism picks `best.pt` by comparing `val_metrics`
+every epoch, which needs real validation data to mean anything. Fixed properly, not patched around:
+added `--val_sources` (`wm/config.py`, `wm/train.py`) so a pre-built, stratified validation
+directory can be given directly, instead of only ever auto-splitting one shared pool by a fraction.
+Final split: 24 train / 12 val / 12 test per body, all three disjoint, val and test never touched
+by the same decision. Separately, stage 4 (`wm.fit_body_head --ckpt`) was pointed at the wrong
+upstream checkpoint -- stage 2's projector output (`{projector, ckpt, val_paths, action_dims}`
+only, no `config`/`itm`), not stage 1's adapt output, which is what the script's own `--ckpt` help
+text says it needs ("not the pretrain: stage 1 moves what z means"). Wrong in the very first draft
+of this command this session, never caught until it actually ran.
+
+**A third bug, this time in how the result itself was read, not in getting the pipeline to run --
+caught by the user asking a clarifying question about the data pipeline, not by anything this
+entry's own review caught first.** `wm.fit_body_head`'s own printed "held out" column is **not**
+the external `_cleanheldout` set -- it's `--val_frac` (default 0.2, never overridden) applied as a
+random split of whichever directory `--data`/`--also` was pointed at. Stage 4 was correctly run
+with `--data ..._cleantrain` (all 24 clips available for fitting, on purpose, since the real check
+was meant to happen separately), which means the "held out" it printed was actually an internal,
+non-stratified ~4-5-clip random subset of the TRAIN pool -- not the careful, stratified 12-clip
+test set at all. The first version of this entry reported that number (1.054 for B1) as the real
+held-out result. It measured something else.
+
+**Corrected with a standalone script that never splits anything itself**
+(`scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py`): every clip in
+`_cleantrain` scored as train, every clip in the real `_cleanheldout` (12 clips, the same ones
+`make_clean_split.py` built and this whole clean-retrain arc has been protecting) scored as held
+out, with a hard refusal if any filename appears in both. Same MSE/mean/ratio metric as
+`fit_body_head.py`'s own `report()`, so the numbers are directly comparable.
+
+**Corrected result, body_head fit ratio = MSE / predicting-the-mean-MSE (below 1.0 is genuine
+signal):**
+
+| | train (fit_body_head's own pool) | TRUE held-out (`_cleanheldout`, never seen at any stage) |
+|---|---|---|
+| B1 | 0.665 | **0.730** |
+| hexapod (rehearsal) | 0.597 | **0.659** |
+
+**Both bodies generalize for real, and the gap between train and true held-out is small for
+both** -- the opposite conclusion from the first (wrong) version of this entry. B1's 0.730 is
+comfortably better than the mean-baseline and close to its own train number (0.665), the signature
+of a fit that learned something that transfers, not one that memorized 9+24 specific clips. This
+is still weaker than hexapod's own 0.659 (more rehearsal data, same body pretrained on), but it is
+not the "barely-better-than-the-mean" result first reported.
+
+**Read together with F220/F221's own resolution-mismatch caveat**, this MSE-ratio number is still
+a whole-clip-level metric, the same coarser resolution those findings argue is the wrong shape for
+what the real planner does -- worth eventually re-reading this same clean checkpoint with a
+per-timestep check, not just accepting these ratios as the final word on B1's cross-embodiment fit.
+
+**Not yet done:** re-measuring Slides 22 and 23 against this same clean checkpoint and split (only
+Section 9's own claim was re-run here). Both are affected by the same original leakage and neither
+has been re-measured yet.
+
+Scripts: `scripts/dataset/make_clean_split.py`, `scripts/run/clean_retrain.sh`,
+`scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (the correction), fixes
+in `wm/data/dataset.py`, `wm/config.py`, `wm/train.py`. Run on BIAS-2. Checkpoint:
+`wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`.
+
+---
+
+### F223. beh24 assembled into final egocentric training directories for both bodies, and cross-body Froude calibration checked -- mostly matched, two accepted gaps
+
+**What "beh24" is.** The 12-condition behaviour library (`beh12`) doubled to 24 per body: the
+original 8 forward-speed/positive-turn conditions kept unchanged, plus 16 new/recalibrated
+conditions (side walking at all 4 levels -- recalibrated together, not just the 2 new ones --
+backward speed, and negative turn). Both bodies' raw collections went through several superseded
+versions this session (recalibration passes, the FOV fix) before landing on a final source; which
+directory was actually canonical was not documented anywhere, so it was determined by correlating
+each raw directory's file mtimes against `results/beh24_final_v2/`'s already-reviewed QC videos
+(each video's mtime lands 3-13 minutes after its true source clip's, and 12+ hours after the
+superseded ones) rather than guessed:
+
+  hexapod canonical: `beh24_hex_side_raw` (8), `beh24_hex_speedbwd_raw` (4),
+  `beh24_hex_turnneg_raw` (4) -- NOT `beh24_hex_new12_raw`, the superseded first attempt.
+  B1 canonical: `beh24_b1_new16_fovfix_raw` (all 16 in one dir, FOV-fixed) -- NOT `new12_raw`,
+  `new12_raw_v2`, or `side01_recal_raw`.
+
+**Assembly.** `merge_behaviour_dirs.py` (the tool that built the original ego_flat dirs) can't
+combine four separate source locations -- it requires one `--src` tree with balanced speed/turn/side
+counts and refuses to write into a non-empty `--out`. Two new scripts do the combine directly:
+`scripts/dataset/build_beh24_hex_ego_flat.py` (copies the 8 unchanged conditions byte-identical from
+`beh12_c10f10t10_ego_flat`, tags and adds the 16 new ones with fresh non-colliding episode numbers)
+and `build_beh24_b1_ego_flat.py` (same idea, simpler: the B1 raw dir was already tagged and already
+rendered -- confirmed directly, its clips carry real frame pixel statistics and
+`condition`/`behaviour`/`level`/`expert_episode`/`embodiment` fields already, not raw MuJoCo-only
+data needing a fresh CoppeliaSim pass -- so no simulator run was needed at all for this step, just a
+copy). Both original beh12 `side_L/R_lvl0/lvl1` conditions were dropped in favour of their
+recalibrated `beh24_*_side_raw`/`new16_fovfix_raw` replacements, not kept alongside them.
+Output: `data/egocentric/beh24_c10f10t10_ego_flat`, `data/egocentric/beh24_b1_ego_flat`, 96 clips
+(24 conditions x 4) each. Verified byte-for-byte identical to the frames that produced the
+already-reviewed `beh24_final_v2` videos before trusting either directory.
+
+**Cross-body Froude match, `scripts/dataset/check_beh24_froude_match.py`** (rank-matches
+speed/turn conditions by achieved-magnitude order since command units differ per body; matches
+side conditions by literal name since both bodies share that naming):
+
+| group | worst pair | relative diff |
+|---|---|---|
+| speed fwd/bwd | speed_c8.15 vs speed_vx0.40 | 13.4% |
+| side L/R | side_R_lvl3 vs side_R_lvl3 | 15.1% |
+| **turn pos/neg, smallest 2 levels** | turn_s0.05 vs turn_w0.008 | **29.1%** |
+| turn pos/neg, smallest 2 levels | turn_s0.15 vs turn_w0.024 | **32.8%** |
+
+Everything else (10 of 12 turn pairs, all speed pairs, all side pairs) is under 16%. **Accepted as
+is, not recalibrated**: the smallest two turn levels are calibrated ~30% off between bodies, and
+hexapod's own `side_L_lvl2`/`lvl3` achieved Froude is mildly rank-inverted (lvl2 measures 0.1407,
+lvl3 0.1362 -- should be the other way around, ~3% apart, likely noise rather than a real
+miscalibration; `side_R` and both of B1's side directions are correctly monotonic). Consistent with
+this session's standing call on the side-walk/head-yaw behavioural overlap (F219's neighbourhood):
+imperfect calibration is acceptable diversity, not a blocker, given the planner matches Froude
+per-timestep rather than depending on any one condition being clean.
+
+Scripts: `scripts/dataset/build_beh24_hex_ego_flat.py`, `build_beh24_b1_ego_flat.py`,
+`check_beh24_froude_match.py`. Not yet done: no training run has used `beh24_*_ego_flat` yet --
+this session's clean retrain (F222) deliberately stayed on beh12 to keep that result isolated.
+### F224. The gait's periodicity, actually measured for the first time -- real, but the dominant period is ~6.6 frames, not the ~19 this project had been citing
 
 The deck (`report/update_slide.md` Slide 6) had been citing "period ≈19 frames" as a fact with no
 autocorrelation curve behind it anywhere in the record -- flagged by the user as needing a real
@@ -17865,7 +18236,7 @@ starting-frame window across all `h`, was shrinking/shifting before). Plots:
 `results/deck/periodicity_curve_fixed.png` (h=0-45, superseded by the wider sweep, kept for
 comparison). `results/deck/periodicity_curve.png` is the pre-fix, confounded run -- do not cite it.
 
-### F221. F127's family-accuracy selection test rechecked with a continuous grade (regret) alongside the discrete one -- discrete "misses" turn out to be small misses, not far ones
+### F225. F127's family-accuracy selection test rechecked with a continuous grade (regret) alongside the discrete one -- discrete "misses" turn out to be small misses, not far ones
 
 The user flagged the same class of problem raised earlier about `reward_quality_gate_b1.py`
 (discrete top-1 hit/miss grading a continuous quantity throws away how close a "miss" was) against
@@ -17906,7 +18277,7 @@ Scripts: `scripts/diagnostics/planning/score_by_body_motion.py` (`full_body_moti
 computation added to the scoring loop -- existing hit/miss logic untouched). Cache:
 `results/wm/cache/b1_body3_scoretest.pt`, `results/wm/cache/bodycal_hexapod.pt`.
 
-### F222. The withdrawn "92% across all 12 goal conditions" claim now has a real replacement -- direct beats rollout on 12/12 conditions, vision-read goal still costs nothing on average
+### F226. The withdrawn "92% across all 12 goal conditions" claim now has a real replacement -- direct beats rollout on 12/12 conditions, vision-read goal still costs nothing on average
 
 Slide 21's corrected per-timestep methodology (`froude_match_timevarying.py`) had only ever been run
 on one goal clip (`turn_s0.05`). The withdrawn "92%" claim it replaced was scoped to all 12 hexapod
@@ -17917,7 +18288,7 @@ user: extend to all 12 to complete Experiment 3.4.
 (no new methodology) that runs the identical per-timestep direct/rollout/physics/vision comparison
 across all 12 conditions in one process (one model+encoder load, not 12).
 
-**Checkpoint substitution, same as F221 and for the same reason.** The exact checkpoint the
+**Checkpoint substitution, same as F225 and for the same reason.** The exact checkpoint the
 single-clip number used (`beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`)
 is not on this machine. Ran on the nearest available sibling (`beh12_hex-b1_body3/
 stage3_b1_nce_s0.pt`) instead. Sanity check: `turn_s0.05` alone on this checkpoint gives
@@ -17942,9 +18313,9 @@ two numbers are not directly comparable and 92% should not be requoted alongside
 Scripts: `scripts/diagnostics/objective_experiments/froude_match_all12.py` (new). Reuses
 `froude_match_timevarying.py`'s `read_vision_goal_per_timestep`/`run_direct`/`run_rollout` verbatim.
 
-### F223. `collect_b1_cpg_babble.py`'s move to `_archive/` had silently broken three more live imports; inlined everywhere per the project's own already-established fix, not re-patched with another import path
+### F227. `collect_b1_cpg_babble.py`'s move to `_archive/` had silently broken three more live imports; inlined everywhere per the project's own already-established fix, not re-patched with another import path
 
-Running `reward_quality_gate_b1.py` (F221/F222's session) hit `ModuleNotFoundError:
+Running `reward_quality_gate_b1.py` (F225/F226's session) hit `ModuleNotFoundError:
 collect_b1_cpg_babble` -- the file moved to `sim/collect/_archive/` at some point after this script
 was written, and its `sys.path` still pointed at the old location. Checking before just re-pointing
 the path: `wm/policy/b1_coppelia_env.py` already has a comment documenting that this exact move
@@ -17977,9 +18348,9 @@ Scripts touched: `scripts/diagnostics/objective_experiments/reward_quality_gate_
 `sim/collect/collect_b1_coppelia_babble.py`. No behavioural change to any of them -- same constants,
 same values, verified against the archived source before inlining.
 
-### F224. F201's "20.8%" reward-quality-gate result does not reproduce, on the confirmed-correct checkpoint -- withdrawn, and the real fault was the sample size, not the checkpoint
+### F228. F201's "20.8%" reward-quality-gate result does not reproduce, on the confirmed-correct checkpoint -- withdrawn, and the real fault was the sample size, not the checkpoint
 
-Re-running `reward_quality_gate_b1.py` (F221's fix already applied) against the exact checkpoint
+Re-running `reward_quality_gate_b1.py` (F225's fix already applied) against the exact checkpoint
 F201 names (`wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`,
 confirmed correct -- matches F201/F214's own description of it: `adapted` shows 9 B1 clips/1000
 steps sourced from `beh12_hinge_multistep_anchor_v2/best.pt`, `body_head_fit` shows 6000 epochs on
@@ -18000,7 +18371,7 @@ or the script was wrong, checked whether the discrepancy could just be sampling 
 Hit rate swings 4.2-8.3% across seeds -- exactly the size of noise expected from moving 1 trial out
 of 24 -- but **never once lands near 20.8% in 5 tries.** If 20.8% were the true rate with this much
 natural variance, it should appear occasionally. It doesn't. Regret, by contrast, is remarkably
-stable across all 5 seeds (0.0044-0.0048) -- confirming the continuous grade (F221's fix) is already
+stable across all 5 seeds (0.0044-0.0048) -- confirming the continuous grade (F225's fix) is already
 trustworthy at this sample size, while the discrete hit-rate never was.
 
 **Scaled up 4x (32 branch points, 32 samples/sigma = 96 trials, chance drops to 3.0% with the wider
@@ -18025,7 +18396,7 @@ wall. That basis is gone. The gate should be treated as **still failing, at or b
 same place F195 left it, until a new fix is found and re-verified at a large enough sample size to
 trust (n=96, not n=24, going forward -- this entry's own comparison is the reason why).
 
-Scripts: no code changes beyond F221/F223's fixes, already in place. Command:
+Scripts: no code changes beyond F225/F227's fixes, already in place. Command:
 `reward_quality_gate_b1.py --ckpt wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt --branch_points 32 --samples 32 --seed {0,1}`
 for the large-sample rows; `--seed {0..4}` at defaults for the small-sample rows.
 

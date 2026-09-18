@@ -284,7 +284,7 @@ propagation (8.3% on F195's gate) -- **diagnosed, not accepted: `wm.adapt`'s sta
 a plain one-step MSE loss and nothing else, and directly measuring it (`b1_adaptation_sep_check.py`)
 showed it erodes 38-62% of the pretrain's hinge-built separation on B1's own data.**
 
-**WITHDRAWN, 2026-09-18 (F224) -- the 2026-09-12 "RESOLVED" verdict below was itself premature.**
+**WITHDRAWN, 2026-09-18 (F228) -- the 2026-09-12 "RESOLVED" verdict below was itself premature.**
 Adding the same K=1 hinge term to `wm.adapt` cut the measured erosion to 23-51% and reportedly
 lifted the gate to 20.8% (5/24) at the time. **That number does not reproduce on the exact same
 checkpoint**: re-tested at the original sample size (5 seeds, landing 4.2-8.3%) and at 4x the sample

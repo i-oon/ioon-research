@@ -90,6 +90,13 @@ class Config:
     # from one embodiment at a time and routed to that embodiment's decoder head.
     sources: tuple = ()
     val_fraction: float = 0.1
+    # Explicit "name=dir" validation sources, same format as `sources`. When given, `sources` is
+    # used ENTIRELY for training (val_fraction is ignored) and `val_sources` supplies validation
+    # directly -- for when the val set must be a specific, pre-built, stratified directory rather
+    # than embodiment_split's own trailing-episode-number slice of one shared pool. Needed because
+    # that auto-split cannot express "held out one clip per condition" -- it only takes a fraction
+    # from the tail of each body's sorted clip list.
+    val_sources: tuple = ()
 
     # Bodies withheld from cross-embodiment training, so Stage 2 has a generalisation test at all.
     # Two embodiments cannot hold each other out -- removing one leaves one -- and `sources` takes

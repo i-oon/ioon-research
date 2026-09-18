@@ -429,9 +429,23 @@ def build_models(cfg, device, heads=None, n_bodies=0):
 def build_cross_embodiment(cfg, root):
     """Datasets, sampler and decoder heads for training across embodiments."""
     specs = [tuple(s.split("=", 1)) for s in cfg.sources]
-    train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
-                                                  heldout_bodies=tuple(cfg.heldout_bodies),
-                                                  clips_per_body=tuple(cfg.clips_per_body))
+    if cfg.val_sources:
+        # Explicit, pre-built val directory (e.g. a stratified held-out set embodiment_split's
+        # own trailing-slice-per-body convention cannot express). val_fraction=0 through
+        # embodiment_split on each spec list on its own just returns "every clip as train" for
+        # that list -- reused here twice, once per role, rather than duplicating its own
+        # exclude/heldout_bodies/usable_clips logic.
+        train_sources, _ = embodiment_split(specs, 0, root,
+                                            heldout_bodies=tuple(cfg.heldout_bodies),
+                                            clips_per_body=tuple(cfg.clips_per_body))
+        val_specs = [tuple(s.split("=", 1)) for s in cfg.val_sources]
+        val_sources, _ = embodiment_split(val_specs, 0, root,
+                                          heldout_bodies=tuple(cfg.heldout_bodies),
+                                          clips_per_body=tuple(cfg.clips_per_body))
+    else:
+        train_sources, val_sources = embodiment_split(specs, cfg.val_fraction, root,
+                                                      heldout_bodies=tuple(cfg.heldout_bodies),
+                                                      clips_per_body=tuple(cfg.clips_per_body))
     rollout_k = 2 if cfg.lambda_rollout > 0 else 1
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
