@@ -18474,3 +18474,23 @@ confirmed the way the staged numbers above are.
 
 Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (per-channel
 Spearman rho added to `score()`, printed per embodiment -- existing MSE-ratio output unchanged).
+
+### F231. Zero-shot baseline, measured cleanly at last: B1 fails outright before adaptation (ratio 1.061, worse than the mean), on the same held-out set F230's staged number was measured on
+
+F230 flagged that the zero-shot comparison point (`+0.264` median rho) was never re-measured on a
+clean split. Closed directly: ran `eval_body_head_true_heldout.py` against
+`wm/runs/beh12_hinge_cleansplit/best.pt` -- the hexapod-only pretrain, before `wm.adapt` ever
+touches B1 -- on the identical clean held-out set F222/F229/F230 used.
+
+| B1 | held-out ratio | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|---|
+| zero-shot (this entry) | **1.061** | +0.178 | +0.125 | +0.187 | +0.178 |
+| staged adaptation (F230) | 0.730 | +0.261 | +0.578 | +0.474 | +0.474 |
+
+**Zero-shot is worse than predicting the mean** (ratio >1.0) -- not just weak, genuinely failing --
+while staged adaptation clears the mean by a real margin on the same held-out clips. This is now a
+fully clean, apples-to-apples comparison: same split, same held-out set, same metric, both points
+measured this session rather than one confirmed and one carried over from the leaked measurement.
+
+Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (no further
+changes -- run against the pretrain checkpoint instead of the adapted one).

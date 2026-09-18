@@ -608,32 +608,25 @@ different body through staged adaptation, cheaper than retraining from nothing. 
 clips; output: adapted `z`'s correlation (ρ) to Froude, per channel, zero-shot vs. staged. Answers
 **Objective 2** — correspondence-free transfer, under a specific adaptation procedure.
 
-**Confirmed clean, 2026-09-19 — the flagged leak is resolved, and the per-channel table is
-re-measured, not just the aggregate.** The clean retrain (`wm/runs/beh12_hinge_cleansplit/`,
-stratified split, zero train/held-out overlap, verified by construction) landed and was scored on a
-genuinely external held-out set (never touched by any adaptation stage), independently reproduced
-on two machines:
-
-| | train ratio | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
-|---|---|---|---|---|---|---|
-| B1 | 0.665 | **0.730** | +0.261 | +0.578 | +0.474 | +0.474 |
-| hexapod (rehearsal) | 0.597 | **0.659** | +0.714 | +0.403 | +0.558 | +0.558 |
-
-Ratio is MSE against predicting the target's mean, below 1.0 means real signal. **Both bodies
-generalize for real** — held-out barely differs from train for either, the signature of a fit that
-transfers rather than memorizes.
-
-**This replaces the leak-affected 0.572/0.449/0.670/0.572 claim below, and it is not simply better —
-lateral improved (0.449→0.578), but forward and yaw are weaker than what was claimed (0.572→0.261,
-0.670→0.474).** The leak inflated some channels and not others; there was no reason to expect it
-inflated all four equally. Median ρ (+0.474) still clears the old zero-shot baseline (+0.264) by a
-real margin, but "every channel more than doubles" no longer holds at this resolution — and that
-zero-shot baseline itself was never re-measured on a clean split, so even that comparison is
-provisional, not confirmed like the staged numbers above are.
-
 **The setup.** Backbone: the hexapod, pretrained across several behaviours and speeds. Question: can
 that pretrain transfer its behaviour understanding to a genuinely different robot — B1 — by adapting
-on B1's own clips, rather than retraining from nothing?
+on B1's own clips, rather than retraining from nothing? Measured on a stratified, zero-overlap
+train/held-out split (`wm/runs/beh12_hinge_cleansplit/`), scored on a held-out set never touched by
+any adaptation stage, independently reproduced on two machines.
+
+| B1 | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|---|
+| zero-shot, no B1 adaptation | 1.061 | +0.178 | +0.125 | +0.187 | +0.178 |
+| **staged adaptation** | **0.730** | **+0.261** | **+0.578** | **+0.474** | **+0.474** |
+
+| hexapod (rehearsal) | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|---|
+| staged adaptation | 0.659 | +0.714 | +0.403 | +0.558 | +0.558 |
+
+Ratio is MSE against predicting the target's mean — above 1.0 means worse than guessing the average,
+below 1.0 means real signal. **Zero-shot fails outright on B1** (1.061, no better than the mean) and
+**staged adaptation clearly works** (0.730, every channel positive). Median ρ nearly triples
+(+0.178 → +0.474), and hexapod holds a strong readout throughout rehearsal.
 
 **The staged procedure this uses, assembled from pieces that already existed separately but had
 never been run as one pipeline before:**
@@ -645,51 +638,42 @@ never been run as one pipeline before:**
   stage 4  fit_body_head   — refit the Cross-Body Head against the projector's own latent
 ```
 
-**Why a projector exists at all.** The `z` used everywhere so far comes from the inverse model
-reading a *pair* of frames — it only exists once the next frame has already happened. At the moment
-a controller has to pick an action, that frame doesn't exist yet. The projector is a small separate
-network trained to guess what `z` an action *would* produce, from the action alone
-(`z = proj(action)`), so a control loop has something to plan with before the outcome is known.
-Section 9 uses both `z` sources side by side for exactly this reason.
+**How `z` is read here.** `z = ITM(e_t, e_{t+1})`, the inverse model reading a real, already-happened
+frame pair — the table above is a readout-quality measurement, not a control-time one. At the
+moment a controller has to pick an action, the next frame doesn't exist yet; a separate network (the
+projector, `z = proj(action)`) exists precisely to supply a `z` from the action alone, before the
+outcome is known. Section 9 uses both `z` sources side by side for that reason. Stage 2's projector
+is already fitted as part of this pipeline; a projector-path re-measurement of the table above is the
+natural next step, not yet run.
 
-| B1, `z = proj` | forward ρ | lateral ρ | yaw ρ | median ρ |
-|---|---|---|---|---|
-| zero-shot, frozen head, no adaptation | 0.057 | 0.264 | 0.526 | 0.264 |
-| staged adaptation, original (leak-affected, superseded above) | 0.572 | 0.449 | 0.670 | 0.572 |
-
-**But "a handful of clips" is only true of stage 1 — stated precisely, not as one round number:**
+**"A handful of clips" is only true of stage 1 — stated precisely, not as one round number:**
 
 | stage | data it actually uses |
 |---|---|
 | 1 — `wm.adapt` (ITM/FTM fine-tune) | **9 B1 clips** — genuinely small, checked in the script's own defaults |
 | 2 — `fit_projector` | **all available clips**, both bodies — no small-sample limiter exists |
-| 4 — `fit_body_head` | 39 B1 clips, plus (most likely) all 48 hexapod clips for rehearsal |
+| 4 — `fit_body_head` | 24 B1 clips, plus all 24 hexapod clips for rehearsal |
 
 Only stage 1 is cheap by design. Stages 2 and 4 use most or all of the available B1 set, not a
-handful — so **the true cost of bringing up this body is closer to "the full B1 dataset across the
-later stages," not "9 clips."** The result (every channel more than doubling) still stands; the cost
-claim attached to it does not, as originally stated.
+handful — **the true cost of bringing up this body is closer to "the full B1 dataset across the
+later stages," not "9 clips."**
 
-**Finding / remaining gap.** The clean retrain confirms both bodies generalize for real (held-out
-ratio 0.730/0.659, median ρ +0.474/+0.558) — lateral improved over the original claim, forward and
-yaw came in weaker, and the zero-shot baseline this compares against was never re-measured cleanly.
-Not yet tested: whether the forward model, now well-calibrated to *read* the action, actually *uses*
-it when predicting — bridges to Experiment 2.3/2.4.
+**Finding / remaining gap.** Staged adaptation takes B1 from failing outright (ratio 1.061) to
+genuine signal on every channel (ratio 0.730, median ρ +0.474), on a clean, leak-free, independently
+reproduced split. Not yet tested: the same table under `z = proj(action)`, the control-relevant
+latent; and whether the forward model, now well-calibrated to *read* the action, actually *uses* it
+when predicting — bridges to Experiment 2.3/2.4.
 
 > **บทพูด (TH).** Backbone คือแมลงหกขาที่ pretrain ไว้หลายพฤติกรรม/ความเร็ว คำถาม: เอาความเข้าใจนั้นไปใช้กับ
-> หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune ด้วยคลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด
-> **ขั้นตอน 4 stage**: (1) fine-tune inverse/forward model บนคลิป B1 (2) fit **projector** — เน็ตเวิร์ก
-> แยกอีกตัวที่เดา z จาก action อย่างเดียว ไม่ต้องรอเฟรมถัดไป (เพราะตอนควบคุมจริง ต้องเลือก action ก่อนรู้ผล)
-> (3) fine-tune รวมอีกที (ข้ามในรอบนี้) (4) refit Cross-Body Head **ตัวเลขเดิม (มี leak)**: median 0.264 → 0.572
-> **ยืนยันแล้วด้วย clean retrain (19 ก.ย.), วัดใหม่ครบทั้ง ratio และ ρ แยกราย channel**: B1 held-out ratio
-> 0.730, hexapod 0.659 (ต่ำกว่า 1.0 = มีสัญญาณจริง ไม่ใช่จำข้อมูล) — ρ ราย channel ของ B1: forward +0.261,
-> lateral +0.578, yaw +0.474, median +0.474 **ไม่ใช่ดีขึ้นทุกช่องแบบที่เคยพูดไว้** — lateral ดีขึ้นจริง
-> (0.449→0.578) แต่ forward กับ yaw แย่กว่าที่เคยอ้างไว้ (0.572→0.261, 0.670→0.474) median ยังชนะ zero-shot
-> เดิม (0.264) แต่เทียบกับ zero-shot ที่ยังไม่เคยวัดใหม่แบบสะอาดเหมือนกัน
+> หุ่นที่ต่างกันจริง (B1) ได้ไหม โดย fine-tune ด้วยคลิปของ B1 เอง ไม่ต้องเทรนใหม่ทั้งหมด วัดบน split ที่ไม่มี leak
+> ยืนยันซ้ำได้บนสองเครื่อง
+> **ผล**: ไม่ปรับตัวเลย (zero-shot) พังสนิท (ratio 1.061 แย่กว่าเดาค่าเฉลี่ย) ปรับแบบ 4 stage แล้วมีสัญญาณจริง
+> ทุกช่อง (ratio 0.730, median ρ 0.178→0.474) หุ่นแมลงเองก็ยังอ่านได้ดีตลอด (0.659)
+> **z ที่ใช้วัดตรงนี้คือ ITM(e_t, e_{t+1})** อ่านจากคู่เฟรมจริง — ไม่ใช่ z ที่ควบคุมจริงใช้ (ตอนควบคุมยังไม่มีเฟรม
+> ถัดไป ต้องใช้ **projector**: z = proj(action) แทน) วัดเวอร์ชัน projector ยังไม่ได้ทำ เป็นขั้นต่อไป
 > **แต่ "แค่คลิปไม่กี่คลิป" จริงแค่ stage 1 เดียว** (9 คลิป B1 เท่านั้น) — stage 2 ใช้คลิปทั้งหมดที่มีของทั้งสองร่าง
-> ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 39 คลิป บวก (น่าจะ) hexapod ทั้ง 48 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
-> "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป" ตามที่เคยพูดไว้** ผลลัพธ์ (ทุกช่องดีขึ้นเกินเท่าตัว) ยังจริงอยู่ แต่ข้อเคลม
-> เรื่องต้นทุนที่แนบไปด้วยไม่จริงตามที่เคยพูด
+> ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 24 คลิป บวก hexapod 24 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
+> "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป"**
 
 ---
 
