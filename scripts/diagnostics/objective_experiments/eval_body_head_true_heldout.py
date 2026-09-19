@@ -84,6 +84,23 @@ def embed_and_target(encoder, itm, paths, spec, channels, chunk, cache_path):
 CHANNEL_NAMES = ("forward", "lateral", "yaw")
 
 
+def action_lever_gap(md, z_real, z_train_mean, y_std, device):
+    """Real-z vs mean-z cosine gap, same methodology as `stopgrad_action_lever_check.py` and
+    `cross_body_head_4way.py`: does this checkpoint's OWN body_head change its prediction
+    meaningfully with the specific sample's z, or would the training set's own mean z (a single
+    constant, fed for every sample) do about as well? 2026-09-19 addition, tests this checkpoint's
+    actual embedded body_head directly -- no separate refit."""
+    import torch.nn.functional as Fn
+    with torch.no_grad():
+        pred_real = md.body(None, z_real.to(device))
+        z_mean_batch = z_train_mean.to(device).unsqueeze(0).expand(z_real.shape[0], -1)
+        pred_mean = md.body(None, z_mean_batch)
+    y = y_std.to(device)
+    cos_real = Fn.cosine_similarity(pred_real, y, dim=-1)
+    cos_mean = Fn.cosine_similarity(pred_mean, y, dim=-1)
+    return float(cos_real.median()), float(cos_mean.median())
+
+
 def score(md, z, y, mean, std, device):
     y_std = ((y - mean) / std).to(device)
     with torch.no_grad():
@@ -178,6 +195,10 @@ def main():
         print(f"{embodiment:<10} held-out rho  " +
              "  ".join(f"{n}={r:+.3f}" for n, r in zip(names, rho_he)) +
              f"  median={np.median(rho_he):+.3f}")
+        y_he_std = ((y_he - mean) / std).to(device)
+        real_cos, mean_cos = action_lever_gap(md, z_he, z_tr.mean(0), y_he_std, device)
+        print(f"{embodiment:<10} action-lever  real_cos={real_cos:+.3f}  mean_cos={mean_cos:+.3f}"
+             f"  gap={real_cos - mean_cos:+.3f}  (bar: 0.110)")
         return ratio_tr, ratio_he
 
     print(f"checkpoint: {args.ckpt}\n")

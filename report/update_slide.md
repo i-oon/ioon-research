@@ -550,19 +550,28 @@ Separate fitting: strong same-body, negative cross-body. Joint fitting: weak and
 — one mediocre function that can't tell the bodies apart, not evidence of shared structure. Neither
 reaches Section 8's numbers on the non-detached checkpoint.
 
-**Finding / remaining gap.** `z.detach()` fixes same-body readout (~9× on the action-lever bar) but
-costs cross-body sharing: separate heads fail outright, a joint head only reaches uniform mediocrity.
-Whatever produced Section 8's real cross-body numbers needs `z`'s gradient un-detached — the fix
-here is a same-body fix, not a cross-body one. Not yet shown: whether same-body direction-sensitivity
-improves actual control — bridges to Experiment 2.2.
+**Resolved: `z.detach()` was never necessary.** The hinge + multi-step-anchor fix alone (Section
+10's own checkpoint, `beh12_hinge_cleansplit` — no `z.detach()`) already clears the action-lever
+bar on its own embedded head, with the cross-body R² intact:
+
+| | R² held-out ratio | action-lever gap (bar 0.110) |
+|---|---|---|
+| B1 | 0.730 | **+0.978** |
+| hexapod | 0.659 | **+0.686** |
+
+Both clear the bar by 6-9×, on the checkpoint's own body_head, no separate refit needed. `z.detach()`
+was solving a problem the hinge fix had already solved — detaching on top of an already-working
+fix only costs cross-body sharing for no corresponding action-lever gain.
+
+**Finding / remaining gap.** `z.detach()` is superseded, not needed: the hinge + multi-step-anchor
+fix alone gets same-body readout, cross-body R², and action-lever sensitivity together. Section 10's
+checkpoint is this version. Not yet shown: whether this converts to actual control — bridges to
+Experiment 2.2.
 
 > **บทพูด (TH).** **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
-> **แก้ด้วย** `z.detach()` — body_head เทรนได้ แต่บีบ z ไม่ได้อีก **ดีขึ้น ~9 เท่า**
-> **แต่ไม่ฟรี**: z เหลือแค่ 32-76% ของสัญญาณเดิม
-> **ข้ามหุ่น**: fit แยกทีละหุ่น → อ่านหุ่นตัวเองดี (0.274, 0.157) แต่ข้ามหุ่นพังสนิท (−0.397, −0.594) / fit
-> ร่วมหัวเดียว → กลางๆ เท่ากันหมดทุกช่อง (0.133-0.139) ไม่ใช่สัญญาณข้ามหุ่นจริง แค่ฟังก์ชันเดียวที่แยกหุ่นไม่ออก
-> **สรุป**: z.detach() แก้ปัญหาอ่านหุ่นตัวเองได้ แต่การแชร์ข้ามหุ่น (ตัวเลขจริงของ Section 8) ต้องพึ่ง gradient
-> ที่ยังไม่ตัด
+> **z.detach() ไม่จำเป็นเลย**: checkpoint ของ Section 10 เอง (`beh12_hinge_cleansplit`, ไม่ตัด gradient)
+> ผ่าน action-lever ด้วยตัวเองอยู่แล้ว (B1 +0.978, หุ่นแมลง +0.686, เกิน 6-9 เท่าของเกณฑ์) **พร้อมกับ** R² ข้ามหุ่นที่ดี
+> (0.730, 0.659) — z.detach() แก้ปัญหาที่ hinge fix แก้ไปแล้ว ตัด gradient เพิ่มมีแต่เสียการแชร์ข้ามหุ่นเปล่าๆ
 
 ---
 

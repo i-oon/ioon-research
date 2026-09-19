@@ -18633,3 +18633,79 @@ Scripts: `scripts/diagnostics/objective_experiments/cross_body_head_4way.py` (ne
 `--hex_ckpt`/`--b1_ckpt`/`--hex_dir`/`--b1_dir` args -- pass the same checkpoint to both to score a
 joint head). Checkpoints: `wm/runs/beh12_body_stopgrad/head_hexonly.pt`, `head_b1only.pt`,
 `head_joint.pt` (all new, `wm.fit_body_head`, `--also` only for the joint one).
+
+### F233. `z.detach()` (F199-201, F232) was never necessary -- the hinge + multi-step-anchor fix alone already clears the action-lever bar with cross-body R2 intact, on the checkpoint Section 10 has been using all along
+
+F232 found `z.detach()` trades away cross-body sharing (negative R2, separately-fit heads) for
+same-body action-lever sensitivity, and asked whether the trade could be avoided. User's proposed
+experiment: retrain `beh12_hinge_multistep_anchor_v2`'s exact recipe (hinge + multi-step
+reconstruction anchor, no `z.detach()`) and check its action-lever gap directly. **Checked
+`wm/runs/beh12_hinge_cleansplit`'s config first: it already IS that recipe** (`lambda_hinge=0.5,
+hinge_margin=0.1, hinge_K=2, lambda_rollout=1.0`, no detach flag) -- the checkpoint underlying
+every one of Section 10's numbers today (F222, F229-F231), never tested for action-lever gap until
+now. Extended `eval_body_head_true_heldout.py` with the same real-z-vs-mean-z cosine gap used in
+F232 (`action_lever_gap()`, tests the checkpoint's OWN embedded body_head directly, no refit
+needed) and ran it on the same clean held-out set F229-F231 already validated.
+
+| | R2 held-out ratio | action-lever gap (bar 0.110) |
+|---|---|---|
+| B1 | 0.730 | **+0.978** |
+| hexapod | 0.659 | **+0.686** |
+
+**Both clear the action-lever bar by 6-9x, on the checkpoint's own body_head, with the cross-body
+R2 (0.730/0.659) fully intact.** Contrast with `z.detach()` (F232): comparable action-lever gaps
+(0.544-1.124) but cross-body R2 collapses to negative (separately-fit) or uniform-mediocre
+(jointly-fit). **The honest reading: `z.detach()` was solving a problem the hinge + multi-step-anchor
+fix had already solved on its own.** Detaching the gradient on top of an already-working fix costs
+cross-body sharing for no corresponding action-lever gain -- it is not a needed part of the
+recipe, and Section 9's own text describing it as "the fix" should be read as superseded by this
+entry, not as the current recommendation.
+
+**What this does not settle.** `beh12_hinge_cleansplit`'s pretrain uses the full `beh12` clean
+split (24 hexapod clips); whether this same conclusion (hinge fix alone suffices, detach
+unnecessary) holds on `beh24` or on the original (non-clean-split) data is untested -- this entry
+only establishes it on the one checkpoint already in continuous use for Section 10.
+
+Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py`
+(`action_lever_gap()` added, printed per embodiment alongside the existing ratio/rho lines --
+additive, no existing output changed). Checkpoint: `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/
+body_head_b1_hex_clean.pt` (already existing, no new training).
+
+### F234. beh12 vs beh24, same clean-split eval protocol, both bodies: real accuracy cost confirmed on hexapod (~2x, matches the user's own estimate), smaller on B1, with a genuine per-channel gain on B1's forward
+
+`wm/runs/beh24_hinge_cleansplit/` (pushed by the parallel session, same push that brought the
+missing `beh24_*_ego_flat_clean{train,heldout,val}` directories) hit the identical broken-symlink
+bug F229 already fixed once (72 files there, 192 here -- same absolute aria-desktop path, same
+relative-symlink fix applied). Once fixed, ran the identical `eval_body_head_true_heldout.py`
+protocol used for beh12 (F230/F231) on beh24's own B1-adapted checkpoint, then reran beh12 with the
+now-merged `--conditions`/raw-unit-MSE script (a parallel-session addition) for a fair, same-units
+comparison:
+
+| | B1 ratio | B1 raw MSE | hexapod ratio | hexapod raw MSE |
+|---|---|---|---|---|
+| beh12 | 0.730 | 0.00308 | 0.659 | 0.00173 |
+| beh24 | 0.761 | 0.00381 | 0.695 | 0.00356 |
+| beh24/beh12 | 1.10x | **1.24x worse** | 1.05x | **2.06x worse** |
+
+**Confirms the user's own estimate almost exactly, but only on the hexapod side** (2.06x vs. the
+~2x claimed) -- hexapod gets 16 new conditions added on top of its original 8 in beh24, spreading
+the same fixed model capacity thinner. B1's cost is real but smaller (1.24x), and B1's own
+per-channel picture is not uniformly worse:
+
+| B1 rho | forward | lateral | yaw | median |
+|---|---|---|---|---|
+| beh12 | +0.261 | +0.578 | +0.474 | +0.474 |
+| beh24 | **+0.613** | +0.491 | +0.405 | +0.491 |
+
+Forward nearly triples on B1 with beh24 -- plausibly because beh24 adds real backward-motion
+coverage for B1 that beh12 never had at all, giving the model genuine bidirectional forward signal
+to learn from where beh12 only ever showed one direction.
+
+**Read as a real, mixed trade-off, not a win for either dataset.** beh24 costs measurable
+per-condition accuracy (confirmed ~2x on hexapod) but buys real new capability (backward motion,
+opposite turn direction) beh12 structurally could not represent. Neither "beh24 is strictly better"
+nor "beh12 is strictly better" is supported by this data.
+
+Scripts: none changed beyond F233's `eval_body_head_true_heldout.py` extension (already had
+`--conditions`/raw-unit MSE from the parallel session's own push). Data fix: 192 symlinks across
+`beh24_{b1,c10f10t10}_ego_flat_clean{train,heldout,val}`, same relative-path fix as F229.
