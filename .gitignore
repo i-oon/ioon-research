@@ -20,9 +20,12 @@ results/wm/cache/
 
 airl-insect-walking/
 
+# *cache
 amp/
 wm/runs/
 
+wm/cache/
+results/wm/cache_zeroshot/
 data/allocentric
 data/gecko
 
