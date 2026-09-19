@@ -10,6 +10,12 @@ internal --val_frac split, which silently measures something else entirely.
         --also_train_dir data/egocentric/beh12_c10f10t10_ego_flat_cleantrain \\
         --also_heldout_dir data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout
 
+**`--conditions`**: restrict scoring to a comma-separated subset of conditions, in both `--data`
+and `--also` pools. Added to compare a checkpoint trained on a bigger condition set (e.g. beh24)
+against one trained on a smaller one (beh12) using only the conditions they both have -- otherwise
+the two checkpoints' overall ratios are answering different-difficulty questions (F223's addendum),
+not a fair head-to-head.
+
 **Why this script exists and is not just `fit_body_head.py --epochs 0`.** `fit_body_head.py`'s own
 `report()` splits "held out" by taking `--val_frac` (default 0.2) of whichever `--data`/`--also`
 directory it was GIVEN -- a random, non-stratified subset of *whatever pool it's pointed at*. Point
@@ -84,6 +90,13 @@ def score(md, z, y, mean, std, device):
         pred = md.body(None, z.to(device))
     err = torch.nn.functional.mse_loss(pred, y_std).item()
     base = torch.nn.functional.mse_loss(y_std.mean(0, keepdim=True).expand_as(y_std), y_std).item()
+    # raw-unit (actual Froude, not standardized) MSE too -- the ratio's denominator uses THIS
+    # checkpoint's own std, which differs across checkpoints trained on different-width target
+    # distributions (see --conditions docstring); raw MSE is checkpoint-independent and is what
+    # settles whether a ratio gap reflects a real absolute-error difference or just a shrunk
+    # denominator on a narrow subgroup.
+    pred_raw = (pred.cpu() * std) + mean
+    raw_mse = torch.nn.functional.mse_loss(pred_raw, y).item()
     # 2026-09-19 addition: per-channel Spearman rho between predicted and true (real, not
     # standardised, since rho is scale-invariant) -- the metric Section 10's own table reports,
     # never re-measured on this checkpoint until now. Additive: the MSE-ratio line above is
@@ -91,7 +104,7 @@ def score(md, z, y, mean, std, device):
     pred_np = pred.cpu().numpy()
     y_np = y.numpy()
     rhos = [float(spearmanr(pred_np[:, c], y_np[:, c]).statistic) for c in range(y_np.shape[1])]
-    return err, base, err / max(base, 1e-9), rhos
+    return err, base, err / max(base, 1e-9), raw_mse, rhos
 
 
 def main():
@@ -105,7 +118,12 @@ def main():
     ap.add_argument("--also_heldout_dir", default="")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--cache_dir", default="results/wm/cache")
+    ap.add_argument("--conditions", default="",
+                    help="comma-separated condition names to restrict scoring to (both --data "
+                         "and --also pools) -- e.g. for a subset comparison between two datasets "
+                         "that only share some conditions. Empty means no filtering.")
     args = ap.parse_args()
+    conditions = set(c for c in args.conditions.split(",") if c) or None
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ck = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
@@ -128,10 +146,20 @@ def main():
 
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
 
+    def filter_conditions(paths):
+        if conditions is None:
+            return paths
+        kept = []
+        for p in paths:
+            with np.load(p, allow_pickle=True) as d:
+                if str(d["condition"]) in conditions:
+                    kept.append(p)
+        return kept
+
     def run(embodiment, train_dir, heldout_dir):
         spec = REGISTRY[embodiment]
-        train_paths = sorted(glob.glob(os.path.join(ROOT, train_dir, "*.npz")))
-        held_paths = sorted(glob.glob(os.path.join(ROOT, heldout_dir, "*.npz")))
+        train_paths = filter_conditions(sorted(glob.glob(os.path.join(ROOT, train_dir, "*.npz"))))
+        held_paths = filter_conditions(sorted(glob.glob(os.path.join(ROOT, heldout_dir, "*.npz"))))
         overlap = set(os.path.basename(p) for p in train_paths) & \
                  set(os.path.basename(p) for p in held_paths)
         if overlap:
@@ -139,13 +167,14 @@ def main():
         cache = os.path.join(ROOT, args.cache_dir, f"eval_true_heldout_{embodiment}.pt")
         z_tr, y_tr = embed_and_target(encoder, itm, train_paths, spec, channels, args.chunk, cache)
         z_he, y_he = embed_and_target(encoder, itm, held_paths, spec, channels, args.chunk, cache)
-        err_tr, base_tr, ratio_tr, rho_tr = score(md, z_tr, y_tr, mean, std, device)
-        err_he, base_he, ratio_he, rho_he = score(md, z_he, y_he, mean, std, device)
+        err_tr, base_tr, ratio_tr, raw_tr, rho_tr = score(md, z_tr, y_tr, mean, std, device)
+        err_he, base_he, ratio_he, raw_he, rho_he = score(md, z_he, y_he, mean, std, device)
         names = [CHANNEL_NAMES[c] if c < len(CHANNEL_NAMES) else f"ch{c}" for c in channels]
         print(f"{embodiment:<10} train ({len(train_paths):>2} clips, {len(z_tr):>4} transitions)"
-             f"  MSE {err_tr:.4f}  mean {base_tr:.4f}  ratio {ratio_tr:.3f}")
+             f"  MSE {err_tr:.4f}  mean {base_tr:.4f}  ratio {ratio_tr:.3f}  raw-unit MSE {raw_tr:.5f}")
         print(f"{embodiment:<10} TRUE HELD-OUT ({len(held_paths):>2} clips, {len(z_he):>4} "
-             f"transitions)  MSE {err_he:.4f}  mean {base_he:.4f}  ratio {ratio_he:.3f}")
+             f"transitions)  MSE {err_he:.4f}  mean {base_he:.4f}  ratio {ratio_he:.3f}"
+             f"  raw-unit MSE {raw_he:.5f}")
         print(f"{embodiment:<10} held-out rho  " +
              "  ".join(f"{n}={r:+.3f}" for n, r in zip(names, rho_he)) +
              f"  median={np.median(rho_he):+.3f}")
