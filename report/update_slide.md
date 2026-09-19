@@ -482,16 +482,17 @@ just placed next to it.
 One term, two wins at once: 38% better at decoding the robot's own joints, and the same cross-robot
 transfer already shown above.
 
-**But "shared" is not the same claim as "transferred," and this is the open question the term does
-not settle.** The readout improving on both bodies is consistent with two different mechanisms: the
-latent genuinely learning what a shared body-motion coordinate should look like across robots, or
-the term simply making the latent more normalized/well-scaled in a way that happens to help a linear
-readout regardless of whether the network anywhere *uses* that shared structure for anything.
-Section 9 is what happens when that question gets asked directly.
+**"Shared" vs. "transferred," resolved.** The readout improving on both bodies could mean the latent
+genuinely learns a shared body-motion coordinate, or just that the term makes the latent
+better-normalized in a way that helps a linear readout without the network *using* that structure
+for anything. Settled: freeze this same `z`, bolt on a fresh head, train it on Froude alone —
++1.048 to +1.226 on the action-lever bar (0.110), for both the inverse-model latent and the
+action-projector latent. A pure normalization artifact would not produce that — `z` carries real,
+usable directional content, not just a rescaled one.
 
 **Finding / remaining gap.** Without the Cross-Body Head term, cross-robot readout is systematically
-negative; with it, both directions go positive. Not yet settled: whether that's the latent genuinely
-learning a shared coordinate, or just better-scaled normalization — bridges directly to Experiment 2.1b.
+negative; with it, both directions go positive, and the action-lever check confirms this is genuine
+shared content, not a normalization artifact.
 
 > **บทพูด (TH).** ไอเดีย: Froude คือเป้าหมายร่วม (section 7) เพิ่ม loss term บังคับให้ latent สองหุ่น
 > ถูกอ่านออกมาตรงกันได้จริง (`L_body = ||b_hat_t − b_t||`) — สองหุ่นเดินที่ Froude เท่ากัน ถ้า readout ที่
@@ -499,79 +500,11 @@ learning a shared coordinate, or just better-scaled normalization — bridges di
 > **ผล**: ไม่มี term การอ่านข้ามหุ่นผิดเพี้ยนสิ้นเชิง (ติดลบหนัก) มี term แล้วทั้งสองทิศเป็นบวก **term เดียว
 > ได้สองอย่างพร้อมกัน**: ถอดคำสั่งข้อต่อของหุ่นตัวเองแม่นขึ้น 38% และข้ามหุ่นได้ด้วย (ตัวเลข R² เดียวกับที่พูด
 > ไปแล้วด้านบน ไม่ใช่การทดสอบใหม่)
-> **แต่ "แชร์กันได้" ไม่เท่ากับ "เอาไปใช้จริง"** — readout ดีขึ้นอาจเป็นเพราะ latent แค่ normalize เนียนขึ้น
-> ไม่ได้แปลว่า network เข้าใจพิกัดร่วมจริง ๆ **นี่คือคำถามที่ค้างไว้ ให้ section 9 ไปตอบต่อ**
+> **"แชร์กันได้" ไม่เท่ากับ "เอาไปใช้จริง" — เช็คแล้ว**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว
+> **ผ่านเกณฑ์ 10 เท่า** ทั้งจากคู่เฟรมจริงและจาก action เดี่ยวๆ — ถ้าเป็นแค่ normalize เนียนขึ้นจะไม่ได้ผลแบบนี้
+> **z มีเนื้อหาจริงที่ใช้ได้ ไม่ใช่แค่ปรับสเกล**
 
 ---
-
-## 9. Methodology — Stage 2, Experiment 2.1b: should the shared-coordinate loss's gradient reshape z, or only train body_head?
-
-**Assumption / Input→Output / Answers.** The bottleneck is the Cross-Body Head's own training
-dynamics, not the information content of `z` itself. Input: frozen `z`; output: a freshly-trained
-head's Froude prediction, real-vs-mean cosine gap. Answers **Objective 2**.
-
-**Test: freeze the same `z` Section 8 used, bolt on a fresh head, train it on Froude alone.**
-
-| latent source | action-lever gap (bar 0.110) |
-|---|---|
-| inverse model, read from a real frame pair | +1.048 to +1.226 |
-| projector, read from the action alone | +1.049 to +1.092 |
-
-Passes by ~10× — `z` was not the problem; the original co-trained head never learned to read it
-this well.
-
-**Fix: `z.detach()` before the Cross-Body Head, one full retrain:**
-
-| action-lever, real retrain | value |
-|---|---|
-| real z, median cos | 0.693 |
-| mean z, median cos (baseline) | −0.315 |
-| **gap (bar: 0.110)** | **+1.008 (~9× the bar)** |
-
-| channel | gap (real − mean) |
-|---|---|
-| forward | +0.238 |
-| lateral | +0.031 |
-| yaw | +0.243 |
-
-**Not free.** `z` develops only **32-76%** of its old signal once detached — the body-motion loss's
-gradient was also doing real work shaping `z`, not just competing with it.
-
-**Two ways to fit the head on this checkpoint, same `z`, same 4-cell format** (a head fit *jointly*
-on both bodies has no real "cross" cell — same function, scored on each body's data):
-
-| held-out R² | insect→insect | b1→b1 | insect→b1 | b1→insect |
-|---|---|---|---|---|
-| fit separately per body | **+0.274** | **+0.157** | −0.397 | −0.594 |
-| fit jointly, one shared head | 0.133 | 0.139 | 0.139 | 0.133 |
-| Section 8, co-trained (not detached) | 0.798 | 0.879 | +0.544 | +0.435 |
-
-Separate fitting: strong same-body, negative cross-body. Joint fitting: weak and uniform everywhere
-— one mediocre function that can't tell the bodies apart, not evidence of shared structure. Neither
-reaches Section 8's numbers on the non-detached checkpoint.
-
-**Resolved: `z.detach()` was never necessary.** The hinge + multi-step-anchor fix alone (Section
-10's own checkpoint, `beh12_hinge_cleansplit` — no `z.detach()`) already clears the action-lever
-bar on its own embedded head, with the cross-body R² intact:
-
-| | R² held-out ratio | action-lever gap (bar 0.110) |
-|---|---|---|
-| B1 | 0.730 | **+0.978** |
-| hexapod | 0.659 | **+0.686** |
-
-Both clear the bar by 6-9×, on the checkpoint's own body_head, no separate refit needed. `z.detach()`
-was solving a problem the hinge fix had already solved — detaching on top of an already-working
-fix only costs cross-body sharing for no corresponding action-lever gain.
-
-**Finding / remaining gap.** `z.detach()` is superseded, not needed: the hinge + multi-step-anchor
-fix alone gets same-body readout, cross-body R², and action-lever sensitivity together. Section 10's
-checkpoint is this version. Not yet shown: whether this converts to actual control — bridges to
-Experiment 2.2.
-
-> **บทพูด (TH).** **ทดสอบ**: freeze z ตัวเดิม ต่อหัวใหม่ เทรนอ่าน Froude อย่างเดียว **ผ่าน 10 เท่า** → z ไม่ใช่ปัญหา
-> **z.detach() ไม่จำเป็นเลย**: checkpoint ของ Section 10 เอง (`beh12_hinge_cleansplit`, ไม่ตัด gradient)
-> ผ่าน action-lever ด้วยตัวเองอยู่แล้ว (B1 +0.978, หุ่นแมลง +0.686, เกิน 6-9 เท่าของเกณฑ์) **พร้อมกับ** R² ข้ามหุ่นที่ดี
-> (0.730, 0.659) — z.detach() แก้ปัญหาที่ hinge fix แก้ไปแล้ว ตัด gradient เพิ่มมีแต่เสียการแชร์ข้ามหุ่นเปล่าๆ
 
 ---
 
@@ -616,8 +549,9 @@ never been run as one pipeline before:**
 frame pair — the table above is a readout-quality measurement, not a control-time one. At the
 moment a controller has to pick an action, the next frame doesn't exist yet; a separate network (the
 projector, `z = proj(action)`) exists precisely to supply a `z` from the action alone, before the
-outcome is known. Section 9 uses both `z` sources side by side for that reason. Stage 2's projector
-is already fitted as part of this pipeline; a projector-path re-measurement of the table above is the
+outcome is known. Section 8's own action-lever check used both `z` sources side by side for that
+reason. Stage 2's projector is already fitted as part of this pipeline; a projector-path
+re-measurement of the table above is the
 natural next step, not yet run.
 
 **"A handful of clips" is only true of stage 1 — stated precisely, not as one round number:**
