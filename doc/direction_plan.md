@@ -60,11 +60,12 @@ and directly measuring it (`b1_adaptation_sep_check.py`) showed it erodes 38-62%
 hinge-built action-sensitivity on B1's own frames — the same MSE-dominance mechanism recurring one
 stage downstream. Fix: a K=1 hinge term added to `wm.adapt` itself (`--lambda_hinge`, anchored by
 the existing one-step MSE by construction, so it can't reproduce F141's unanchored-multi-step
-divergence). Result after the fix: **20.8% (5/24) — the best B1 reward-quality-gate result measured
-anywhere in this project, exceeding the original expert-fit baseline (16.7%).** The honest count is
-one real, working fix, not six failed ones. `doc/OPEN_QUESTION.md` Q21 step 3 (RL controller) is no
-longer blocked by an exhausted-fixes wall — it now depends on how much further margin the gate
-needs, a live, open, promising direction.
+divergence). Result reported after the fix, 20.8% (5/24), **is withdrawn (F228, 2026-09-18) — it
+does not reproduce on the same checkpoint.** Re-tested at the original sample size (5 seeds, 4.2-8.3%)
+and at 4x the sample size (2 seeds, chance 3.0%, landing 1.0-2.1%): every run sits at or below
+chance, matching F195's original finding, not a real improvement. `doc/OPEN_QUESTION.md` Q21 step 3
+(RL controller) is blocked again by the same exhausted-fixes wall F201 had thought was cleared — no
+fix currently on record clears this gate at a sample size large enough to trust.
 
 **A separate, corrected understanding, not yet acted on (F197).** A prior claim in this project's
 own reasoning — that stage-3 InfoNCE "has a specific history of not transferring across bodies" —

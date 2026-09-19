@@ -48,9 +48,12 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "diagnostics", "objective_experiments"))
-sys.path.insert(0, os.path.join(ROOT, "sim", "collect", "_archive"))
-from collect_b1_cpg_babble import ACTION_SCALE, DEFAULT_IL, PHASE, il_to_sdk  # noqa: E402
+# 2026-09-18: `ACTION_SCALE`/`DEFAULT_IL`/`PHASE`/`il_to_sdk` now come from
+# `b1_coppelia_cpg_controller.py` (already imported below, and no longer via `collect_b1_cpg_babble`
+# -- that import broke once already when a parallel session moved that file to `_archive/`;
+# `b1_coppelia_cpg_controller.py` now carries its own inlined copy instead of re-exporting).
 from b1_coppelia_cpg_controller import (  # noqa: E402
+    ACTION_SCALE, DEFAULT_IL, PHASE, il_to_sdk,
     FOOT_ALIASES_SDK, JOINT_ALIASES_SDK, JOINT_LIMITS, LEFT_LEGS, LEGS_IL, MAX_FORCE,
     ROOT_ALIAS, SENSOR_ALIAS, TOUCH_SDK_TO_IL, clip_sdk_targets, settle,
 )

@@ -35,11 +35,17 @@ from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, os.path.join(ROOT, "sim", "collect"))
-from collect_b1_cpg_babble import DEFAULT_IL as DEFAULT_IL_CPG  # noqa: E402 -- sanity cross-check only
 from rollout_b1_mujoco import (  # noqa: E402
     DEFAULT_IL, ACTION_SCALE, il_to_sdk, sdk_to_il, FOOT_FORCE_THRESH, _TOUCH_SDK_TO_IL_LEG,
     load_actor,
 )
+
+# **Inlined rather than imported, deliberately -- same reasoning as `wm/policy/b1_coppelia_env.py`.**
+# This was pulled from `collect_b1_cpg_babble.py` purely for the sanity cross-check below; the
+# import broke once already when a parallel session moved that file to `sim/collect/_archive/`.
+DEFAULT_IL_CPG = np.array([0.061, -0.066, 0.058, -0.054,
+                           1.064,  1.060, 1.077,  1.068,
+                          -1.914, -1.935, -1.914, -1.913])
 
 assert np.allclose(DEFAULT_IL, DEFAULT_IL_CPG), "DEFAULT_IL differs between the two scripts -- fix before trusting anything below"
 

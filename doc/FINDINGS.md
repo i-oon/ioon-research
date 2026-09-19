@@ -16856,6 +16856,14 @@ Scripts: `sim/collect/collect_b1_coppelia_babble.py`,
 
 ### F201. B1's reward-quality gate: five fixes inside B1's own adaptation stage failed, but the sixth -- carrying the hexapod pretrain's hinge separation through B1 adaptation instead of discarding it -- works, and produces the best result measured
 
+**⚠ WITHDRAWN by F228 (2026-09-18).** Fix #6's headline number below, 20.8% (5/24), does not
+reproduce on the exact same checkpoint -- not even approximately, and not from a sample too small
+to trust. See F228 for the full re-test (5 seeds at the original sample size, all landing at
+4.2-8.3%; 2 further seeds at 4x the sample size landing at 1.0-2.1%, against a 3.0% chance rate).
+**Read this entry's table and "best result" language as historical -- what fix #6 actually measures
+is now closer to F195's original at-or-below-chance finding than to a real improvement.** Kept in
+place rather than deleted, per this file's own rule against erasing a superseded finding.
+
 **Superseded in place, same day.** This entry originally read "six fixes have now failed, the wall
 is characterized" -- written after F199's hexapod-level fix appeared not to propagate to B1. That
 reading was premature: the propagation failure had a real, findable, fixable cause (below), and
@@ -17054,8 +17062,9 @@ not just its transfer to a genuinely novel body, is the thing that has not worke
 scale (~10^6 total steps across all runs) tested against a reference that used ~10^8. Continuing
 to search for a single missing mechanism is no longer well-supported by the evidence; the two
 live options are (a) a much larger compute budget than tested so far, unverified to help, or (b)
-returning to the candidate-scoring line (F201/F202), which is blocked by babble data quality on a
-genuinely novel body but already works on B1 itself (F201's 20.8%).
+returning to the candidate-scoring line (F201/F202) -- though F201's own "works on B1 itself" basis
+is withdrawn (F228): the candidate-scoring line's B1-only result is no longer an established
+fallback, only babble data quality's separate open status remains as originally noted.
 
 Scripts: `wm/policy/b1_real_ppo.py` (`--curriculum_updates`), `wm/policy/b1_mujoco_env.py`
 (`goal_scale`/`set_goal_scale`, `_feet_air_time_reward`). Runs:
@@ -17146,9 +17155,10 @@ Scripts: `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py`.
 **Why this was run.** F188 concluded that the candidate-scoring mechanism, not the goal source,
 explains the whole gap, and that the rollout failure is structural rather than a property of its
 checkpoint (citing F118/F126). That conclusion was reached on `wm/runs/b1_adapt/body_head_b1_hex.pt`,
-**before F199/F201's anchored hinge existed**. Since that fix demonstrably restored action
-sensitivity (F199-F201) and enabled a working controller (F206), whether it also revives rollout was
-an open, unrun question. It is now run.
+**before F199's anchored hinge existed**. Since that fix demonstrably restored action sensitivity on
+the hexapod pretrain (F199 -- F201's own claim that this also propagated to B1's gate is withdrawn,
+F228) and enabled a working controller (F206, on a ground-truth reward, not this gate's own scorer),
+whether it also revives rollout was an open, unrun question. It is now run.
 
 **Caveats stated before the numbers.** The old checkpoint no longer exists in the repo
 (`wm/runs/b1_adapt/` is gone), so the old column is F188's **recorded** values, not a re-run, and
@@ -18272,3 +18282,300 @@ Script: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.p
 Not yet done: diagnosing which of the candidate explanations above (if any) accounts for the
 regression; no training run has used `beh24_*_ego_flat` for anything besides this one clean-split
 retrain.
+
+### F224. The gait's periodicity, actually measured for the first time -- real, but the dominant period is ~6.6 frames, not the ~19 this project had been citing
+
+The deck (`report/update_slide.md` Slide 6) had been citing "period ≈19 frames" as a fact with no
+autocorrelation curve behind it anywhere in the record -- flagged by the user as needing a real
+measurement. `scripts/diagnostics/objective_experiments/periodicity_curve.py` already existed for
+exactly this (single-frame ridge-regression command-recoverability error vs. offset, on
+`fwd_m3d`/c10f10t10, matching F26/F46's own metric) but had only ever been run at 7 sparse offsets.
+
+**Found and fixed a real confound in the script before trusting its output.** The per-offset window
+was `range(1, T-h-1)` -- shrinking and shifting earlier as `h` grows, so larger offsets were scored
+on a smaller, earlier-biased subset of starting frames than smaller offsets. A first full sweep
+(h=0..45) under this bug showed a strong monotonic downward trend (3.42° at h=0 to 2.23° at h=45)
+that looked like it might be a real "prediction gets easier at longer horizons" effect but was
+suspect given `n_test` fell from 624 to 247 over the same range. Fixed: hold the starting-frame
+range fixed (sized for the largest `h` requested) so every offset scores the identical set of
+frames, only `h` changes. `n_test` is now constant (78 at max_h=58) across the whole sweep.
+
+**Result, confound removed, h=0..58 (26 clips, `beh12_hexonly/best.pt`, held out by clip):** the
+downward trend disappears -- the corrected curve oscillates around a roughly flat ~2.0-2.5°
+envelope, confirming F26/F46's original "looks flat at 7 points" was itself not wrong, just
+under-sampled. FFT of the corrected curve: one clearly dominant spectral component at **period
+≈6.6 frames** (~3x the power of any other component), plus a real, secondary component at **period
+≈19.7 frames** -- close to the previously-cited "≈19" figure, but not the dominant one.
+
+**Read precisely.** The gait genuinely is periodic (this project's first real evidence of that, not
+an assumption) -- but the fine-grained structure runs at roughly a third of the previously-assumed
+period. The ≈19-20 frame figure isn't wrong exactly; it shows up as a real, weaker harmonic, plausibly
+a beat/subharmonic of the faster ≈6.6-frame cycle (6.6×3 ≈ 19.8), consistent with a hexapod's tripod
+gait having sub-structure beyond a single alternation. Not yet investigated: what specifically
+recurs every ~6.6 frames (a single leg's swing-stance, one tripod's sub-phase) versus every ~19-20
+(a full stride) -- would need per-leg phase data, not attempted here.
+
+Scripts: `scripts/diagnostics/objective_experiments/periodicity_curve.py` (confound fix: fixed
+starting-frame window across all `h`, was shrinking/shifting before). Plots:
+`results/deck/periodicity_curve_fixed_58.png` (h=0-58, the reported result),
+`results/deck/periodicity_curve_fixed.png` (h=0-45, superseded by the wider sweep, kept for
+comparison). `results/deck/periodicity_curve.png` is the pre-fix, confounded run -- do not cite it.
+
+### F225. F127's family-accuracy selection test rechecked with a continuous grade (regret) alongside the discrete one -- discrete "misses" turn out to be small misses, not far ones
+
+The user flagged the same class of problem raised earlier about `reward_quality_gate_b1.py`
+(discrete top-1 hit/miss grading a continuous quantity throws away how close a "miss" was) against
+`score_by_body_motion.py`, the script behind F127/Slide 18's headline cross-embodiment
+selection-accuracy numbers (68-70% pooled, per-family breakdown). Checked the script directly first:
+unlike the whole-clip-mean bug already found and fixed in the 2x2 test (F127 predates that fix),
+this one already reads the goal at true per-timestep resolution at horizon 1 (no averaging at all)
+and at a short matching window for horizons 3/5/10 -- not the same bug, but still graded by a
+discrete family-match hit/miss, the same class of problem as the B1 gate.
+
+**Fix, mirroring the reward-quality-gate fix: added `regret`** -- true distance-to-goal of the
+candidate the score actually picked, minus the true distance-to-goal of the best real candidate
+available, in real (forward/lateral/yaw) Froude units, computed from each clip's own recorded
+trajectory (`full_body_motion()`, new), entirely independent of what the model predicted. This is
+additive, not a replacement -- the existing hit/miss columns are unchanged.
+
+**Rerun on the nearest available sibling checkpoint** (`beh12_hex-b1_body3/stage3_b1_nce_s0.pt` --
+F127's own exact checkpoint, `..._bodyfit_proj.pt`, is not on this machine; checkpoints move via
+Google Drive only). Pooled family accuracy reproduces F127's shape (62-73% vs. F127's 68-70%) though
+individual per-family numbers shift some (e.g. `speed` 11-24% here vs. F127's 41-62% -- expected,
+not the same checkpoint):
+
+| horizon | pooled | side_L | side_R | speed | turn | mean regret |
+|---|---|---|---|---|---|---|
+| 1 | 62% | 78% | 83% | 20% | 47% | **0.041** |
+| 3 | 64% | 76% | 80% | 24% | 55% | **0.032** |
+| 5 | 67% | 73% | 93% | 14% | 64% | **0.034** |
+| 10 | 73% | 92% | 84% | 11% | 70% | **0.026** |
+
+**Regret is small and shrinks with horizon, even on the family the discrete grade calls weakest.**
+`speed` scores only 11-24% by family-match, but the mean regret across all trials (including
+`speed`'s) is 0.026-0.041 and falls as horizon grows -- the picks the score actually makes stay close
+to the true best candidate in real units, even on trials graded a "miss." The two grades are asking
+different questions on purpose (did you name the right family, vs. how far off in real units were
+you), and a coarse selector can look weak on the first while looking fine on the second.
+
+Scripts: `scripts/diagnostics/planning/score_by_body_motion.py` (`full_body_motion()` added, regret
+computation added to the scoring loop -- existing hit/miss logic untouched). Cache:
+`results/wm/cache/b1_body3_scoretest.pt`, `results/wm/cache/bodycal_hexapod.pt`.
+
+### F226. The withdrawn "92% across all 12 goal conditions" claim now has a real replacement -- direct beats rollout on 12/12 conditions, vision-read goal still costs nothing on average
+
+Slide 21's corrected per-timestep methodology (`froude_match_timevarying.py`) had only ever been run
+on one goal clip (`turn_s0.05`). The withdrawn "92%" claim it replaced was scoped to all 12 hexapod
+goal conditions, so the single-clip result never actually closed that gap -- asked directly by the
+user: extend to all 12 to complete Experiment 3.4.
+
+**Built `froude_match_all12.py`**, a thin loop over `froude_match_timevarying.py`'s own functions
+(no new methodology) that runs the identical per-timestep direct/rollout/physics/vision comparison
+across all 12 conditions in one process (one model+encoder load, not 12).
+
+**Checkpoint substitution, same as F225 and for the same reason.** The exact checkpoint the
+single-clip number used (`beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`)
+is not on this machine. Ran on the nearest available sibling (`beh12_hex-b1_body3/
+stage3_b1_nce_s0.pt`) instead. Sanity check: `turn_s0.05` alone on this checkpoint gives
+direct/physics 0.0280, direct/vision 0.0385 -- close to the original single-clip numbers (0.038,
+0.034), confirming the substitution does not distort the shape of the result.
+
+**Result, all 12 conditions, real Froude units:**
+
+| comparison | mean error | range |
+|---|---|---|
+| direct, physics goal (privileged) | 0.0495 | 0.0280-0.0935 |
+| direct, vision-read goal | 0.0438 | 0.0238-0.0729 |
+| rollout, physics goal | 0.1044 | 0.0695-0.2062 |
+
+**Direct beats rollout on 12 of 12 conditions**, mean error less than half. **Vision-read goal costs
+nothing on average and beats the privileged number** (0.0438 vs. 0.0495) -- the single-clip finding,
+now confirmed project-wide rather than on one condition. This is the intended replacement for the
+withdrawn 92% claim: same scope (all 12 conditions), corrected methodology (per-timestep, not
+whole-clip-mean), but a continuous real-unit distance rather than a family-match percentage -- the
+two numbers are not directly comparable and 92% should not be requoted alongside this one.
+
+Scripts: `scripts/diagnostics/objective_experiments/froude_match_all12.py` (new). Reuses
+`froude_match_timevarying.py`'s `read_vision_goal_per_timestep`/`run_direct`/`run_rollout` verbatim.
+
+### F227. `collect_b1_cpg_babble.py`'s move to `_archive/` had silently broken three more live imports; inlined everywhere per the project's own already-established fix, not re-patched with another import path
+
+Running `reward_quality_gate_b1.py` (F225/F226's session) hit `ModuleNotFoundError:
+collect_b1_cpg_babble` -- the file moved to `sim/collect/_archive/` at some point after this script
+was written, and its `sys.path` still pointed at the old location. Checking before just re-pointing
+the path: `wm/policy/b1_coppelia_env.py` already has a comment documenting that this exact move
+broke this exact import once before, "taking down 7 dependent scripts," and the project's own fix
+was to **inline the constants, deliberately, not re-import** (stated trade-off: a second copy that
+can drift, accepted to stop the breakage recurring while the pipeline is in flux).
+
+**Checked whether that fix was actually applied everywhere it needed to be. It wasn't.** Two more
+scripts were still live-importing the moved file, silently broken (would fail the moment run):
+`b1_coppelia_live_policy.py` (one constant, for a sanity cross-check assertion) and
+`b1_coppelia_cpg_controller.py` (four constants/functions, core to its own CPG logic). A third,
+`reward_quality_gate_b1.py` itself, was the one caught in the act here. `collect_b1_coppelia_babble.py`
+was already correctly pointed at `_archive/` and not broken.
+
+**Fixed all three the same way as the established precedent -- inlined, not re-pointed at
+`_archive/` again**, since patching the path is exactly what breaks again the next time the archive
+moves. `collect_b1_coppelia_babble.py` (already working) was also switched from importing the
+archived file to importing the same constants from `b1_coppelia_cpg_controller.py` (already
+imported there for other symbols), removing the last live dependency on `_archive/` anywhere in the
+active codebase -- the archive is now imported by nothing.
+
+Also fixed, separately: the archived file's own `MODEL` path (`os.path.join(ROOT, ...)`) computes
+`ROOT` by counting directories up from its own location, which changed by one level when it moved
+into `_archive/` -- silently pointed `MODEL` at `sim/sim/assets/...` (nonexistent) for any script
+still importing it. Not fixed in place (the archive is frozen); worked around by inlining `MODEL`'s
+correct value directly in the scripts that need it, same as the other constants.
+
+Scripts touched: `scripts/diagnostics/objective_experiments/reward_quality_gate_b1.py`,
+`b1_coppelia_live_policy.py`, `b1_coppelia_cpg_controller.py`,
+`sim/collect/collect_b1_coppelia_babble.py`. No behavioural change to any of them -- same constants,
+same values, verified against the archived source before inlining.
+
+### F228. F201's "20.8%" reward-quality-gate result does not reproduce, on the confirmed-correct checkpoint -- withdrawn, and the real fault was the sample size, not the checkpoint
+
+Re-running `reward_quality_gate_b1.py` (F225's fix already applied) against the exact checkpoint
+F201 names (`wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`,
+confirmed correct -- matches F201/F214's own description of it: `adapted` shows 9 B1 clips/1000
+steps sourced from `beh12_hinge_multistep_anchor_v2/best.pt`, `body_head_fit` shows 6000 epochs on
+`beh12_b1_ego_flat`) gave **4.2% (1/24)**, not 20.8% (5/24). No exact command line for the original
+20.8% run was ever recorded in this file, only its output log -- so before assuming the checkpoint
+or the script was wrong, checked whether the discrepancy could just be sampling noise at n=24.
+
+**It is not.** 5 seeds at the original sample size (8 branch points x 3 sigmas = 24 trials):
+
+| seed | hit rate | Spearman rho | regret |
+|---|---|---|---|
+| 0 | 4.2% (1/24) | 0.128 | 0.0047 |
+| 1 | 8.3% (2/24) | 0.216 | 0.0044 |
+| 2 | 8.3% (2/24) | 0.104 | 0.0046 |
+| 3 | 8.3% (2/24) | 0.180 | 0.0048 |
+| 4 | 4.2% (1/24) | 0.052 | 0.0046 |
+
+Hit rate swings 4.2-8.3% across seeds -- exactly the size of noise expected from moving 1 trial out
+of 24 -- but **never once lands near 20.8% in 5 tries.** If 20.8% were the true rate with this much
+natural variance, it should appear occasionally. It doesn't. Regret, by contrast, is remarkably
+stable across all 5 seeds (0.0044-0.0048) -- confirming the continuous grade (F225's fix) is already
+trustworthy at this sample size, while the discrete hit-rate never was.
+
+**Scaled up 4x (32 branch points, 32 samples/sigma = 96 trials, chance drops to 3.0% with the wider
+candidate pool) to get a properly-powered read, 2 seeds:**
+
+| seed | hit rate | Spearman rho | regret |
+|---|---|---|---|
+| 0 | 2.1% (2/96) | 0.064 | 0.0085 |
+| 1 | 1.0% (1/96) | 0.035 | 0.0087 |
+
+**At or below the 3.0% chance rate, consistent between seeds, and consistent with F195's original
+finding** (the checkpoint *before* the hinge fix, "at or below chance") -- not with F201's claimed
+improvement. The honest reading: fix #6 (the hinge term carried through B1 adaptation) either does
+not work the way F201 concluded, or the 20.8% figure came from a genuinely different run
+configuration that was never recorded -- either way, 20.8% cannot be trusted as this project's
+current best reward-quality-gate result, and nothing yet re-establishes what, if anything, the
+hinge-through-adaptation fix actually buys on this gate.
+
+**Consequence for Q21 step 3 (RL controller).** F201's own text says this result is what unblocked
+treating the reward-quality gate as "a live, open, promising question" rather than an exhausted
+wall. That basis is gone. The gate should be treated as **still failing, at or below chance**, the
+same place F195 left it, until a new fix is found and re-verified at a large enough sample size to
+trust (n=96, not n=24, going forward -- this entry's own comparison is the reason why).
+
+Scripts: no code changes beyond F225/F227's fixes, already in place. Command:
+`reward_quality_gate_b1.py --ckpt wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt --branch_points 32 --samples 32 --seed {0,1}`
+for the large-sample rows; `--seed {0..4}` at defaults for the small-sample rows.
+
+**Addendum, same day -- a second, real bug the user caught, checked, fixed, and it does not change
+the verdict.** `goal_fr` was computed once as `body_motion.mean(0)` over the ENTIRE goal clip and
+reused identically at every branch point, regardless of where in the expert clip's own episode that
+branch point sat -- the same whole-clip-mean anti-pattern this project already found and fixed in
+`final_2x2x2_test.py`/`froude_match_timevarying.py`, just not caught in this script until now.
+Fixed: the goal is now read from a short local window in the goal clip, matched to the same
+fractional progress through the episode as the current branch point (`goal_at()`, new). Rerun at the
+large sample size (32 branch points x 32 samples, seed 0) after the fix: hit rate 1.0% (1/96),
+Spearman rho 0.022, regret 0.0093 -- statistically indistinguishable from the pre-fix numbers above.
+**The goal-averaging bug was real and worth fixing, but it was not the explanation for F201's
+non-reproduction -- the gate sits at chance either way.**
+
+### F229. The `_cleantrain`/`_cleanheldout` directories were entirely broken symlinks on this machine -- fixed locally, and F222's clean held-out result reproduced exactly
+
+After merging origin/main's F222 (the clean-split held-out result, B1 0.730/hexapod 0.659), tried
+to reproduce it independently with `eval_body_head_true_heldout.py` once the checkpoint
+(`wm/runs/beh12_hinge_cleansplit/`) was copied over. Failed immediately: every one of the 72 files
+across all four `beh12_{b1,c10f10t10}_ego_flat_clean{train,heldout}` directories is a symlink
+pointing at an absolute path on a different machine (`/home/aria/ioon-research/...`), not present
+here -- these were committed as symlinks (`make_clean_split.py`'s own disk-space-saving mechanism
+on aria-desktop) rather than resolved to real files, contradicting `doc/START_HERE.md`'s own claim
+that the B1 equivalent was "committed to git as real files."
+
+**Not a data problem -- every symlink's target file exists locally**, just under
+`data/egocentric/beh12_{b1,c10f10t10}_ego_flat/` (the non-`_clean*` source directories) rather than
+at the aria-desktop path recorded in the symlink. Verified all 72 targets present before touching
+anything.
+
+**First fix attempt used an absolute local path and was itself wrong the same way** -- pointing
+each symlink at `$(pwd)/data/egocentric/<base>/<file>` reproduces the exact bug being fixed, just
+with this machine's own path instead of aria-desktop's; committing that would break the *next*
+machine to clone the repo. **Corrected to relative symlinks** (`../<base>/<file>`, both directories
+being siblings under `data/egocentric/`) -- resolves correctly regardless of the repo's absolute
+location on disk, so it survives a clone anywhere. Verified: `readlink` on a fixed file returns
+`../beh12_b1_ego_flat/b1_ep0.npz`, and the evaluation below reproduces identically under this
+version too.
+
+**Reproduced F222 exactly** after the fix: B1 train 0.665 / held-out 0.730, hexapod train 0.597 /
+held-out 0.659 -- matches to three decimal places, confirming the result independently of the
+machine it was first measured on.
+
+**This is a real, committable fix, not a local workaround** -- the relative-symlink version is
+portable and should be committed so this doesn't silently re-break on the next clone or the next
+machine to pull `main`.
+
+Scripts: none changed. Data fix: 72 symlinks across the four `_clean{train,heldout}` directories,
+re-pointed from an absolute aria-desktop path to a relative sibling-directory path.
+
+### F230. Section 10's per-channel rho, re-measured on the clean checkpoint -- not simply better than the leak-affected claim, mixed by channel
+
+F222 (and F229's reproduction of it) only reported the aggregate MSE ratio, not the per-channel
+Spearman rho (forward/lateral/yaw) Section 10's own deck table actually needs. Extended
+`eval_body_head_true_heldout.py` to also compute per-channel rho between the fitted `body_head`'s
+prediction and the true value on the same TRUE held-out set F222/F229 already validated -- additive,
+the existing MSE-ratio line is unchanged.
+
+**Result, `beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`, true held-out:**
+
+| | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|
+| B1 | +0.261 | +0.578 | +0.474 | +0.474 |
+| hexapod (rehearsal) | +0.714 | +0.403 | +0.558 | +0.558 |
+
+**This is not simply an improvement on the original leak-affected claim (0.572/0.449/0.670/0.572)
+-- it is mixed, by channel.** Lateral improved (0.449 -> 0.578). Forward and yaw are weaker than
+what was claimed (0.572 -> 0.261, 0.670 -> 0.474). The leak inflated some channels and not others;
+there was never a reason to expect uniform inflation. Median rho (+0.474) still clears the old
+zero-shot baseline (+0.264) by a real margin, but "every channel more than doubles" (the original
+entry's own claim) does not hold at this resolution. **The zero-shot baseline itself has never been
+re-measured on a clean split either** -- so even the comparison to +0.264 is provisional, not
+confirmed the way the staged numbers above are.
+
+Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (per-channel
+Spearman rho added to `score()`, printed per embodiment -- existing MSE-ratio output unchanged).
+
+### F231. Zero-shot baseline, measured cleanly at last: B1 fails outright before adaptation (ratio 1.061, worse than the mean), on the same held-out set F230's staged number was measured on
+
+F230 flagged that the zero-shot comparison point (`+0.264` median rho) was never re-measured on a
+clean split. Closed directly: ran `eval_body_head_true_heldout.py` against
+`wm/runs/beh12_hinge_cleansplit/best.pt` -- the hexapod-only pretrain, before `wm.adapt` ever
+touches B1 -- on the identical clean held-out set F222/F229/F230 used.
+
+| B1 | held-out ratio | forward rho | lateral rho | yaw rho | median rho |
+|---|---|---|---|---|---|
+| zero-shot (this entry) | **1.061** | +0.178 | +0.125 | +0.187 | +0.178 |
+| staged adaptation (F230) | 0.730 | +0.261 | +0.578 | +0.474 | +0.474 |
+
+**Zero-shot is worse than predicting the mean** (ratio >1.0) -- not just weak, genuinely failing --
+while staged adaptation clears the mean by a real margin on the same held-out clips. This is now a
+fully clean, apples-to-apples comparison: same split, same held-out set, same metric, both points
+measured this session rather than one confirmed and one carried over from the leaked measurement.
+
+Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (no further
+changes -- run against the pretrain checkpoint instead of the adapted one).

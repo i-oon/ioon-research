@@ -73,6 +73,11 @@ def main():
     uniq_ids = list(range(len(clips)))
     test_clips = set(uniq_ids[1::2])
 
+    # 2026-09-18 fix: the window `range(1, T-h-1)` shrinks and shifts earlier as h grows, so larger
+    # h was scored on a smaller, earlier-biased subset of starting frames than smaller h -- not the
+    # same measurement repeated at different offsets. Hold the starting-frame range FIXED across
+    # every h (sized for the largest h requested) so the only thing that changes between rows is h
+    # itself, not which frames get scored.
     rows = []
     for h in range(0, args.max_h + 1):
         E, A, clip_id = [], [], []
@@ -80,9 +85,9 @@ def main():
             e = c["e"].float()
             a = np.rad2deg(c["a"].numpy() if torch.is_tensor(c["a"]) else c["a"])
             T = len(e)
-            if T <= h + 1:
+            if T <= args.max_h + 1:
                 continue
-            for t in range(1, T - h - 1):
+            for t in range(1, T - args.max_h - 1):
                 E.append(e[t].flatten().half())
                 A.append(a[t + h])
                 clip_id.append(ci)
