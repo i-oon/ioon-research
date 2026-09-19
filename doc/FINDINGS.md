@@ -14775,6 +14775,35 @@ Script: `scripts/diagnostics/objective_experiments/froude_bottleneck_action_ceil
 mini-batched after an initial full-batch OOM on the shared 16GB card). Checkpoint:
 `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`, BIAS-2.
 
+**Addendum, same day: a third variant -- AUGMENT rather than replace, give FTM ground-truth Froude
+alongside the full `z`, not instead of it -- also does not move the action-lever gap.** Different
+premise from the two ruled out above: `froude_t = body_head(z_t)` is already fully derivable from
+`z_t`, so concatenating it on adds no new information -- the only way it could help is by removing
+an optimization burden, if FTM otherwise struggles to extract the Froude-relevant slice of a 64-D
+bottleneck shaped jointly by five other losses (F215's own finding). Tested directly: froze the
+ITM from the clean hexapod checkpoint, freshly trained two `ForwardTransitionModel` copies from
+scratch on the identical next-embedding-MSE objective and data (`_cleantrain`/`_cleanheldout`,
+100 epochs, batch 64) -- one conditioned on `z` alone (64-D), one on `concat(z, body_motion[t])`
+(67-D, ground truth, not `body_head`'s noisy prediction) -- then compared the real-z-vs-mean-z
+action-lever gap (F173/F180's own metric) on held out data:
+
+| | real | mean (action-blind) | gap |
+|---|---|---|---|
+| baseline FTM (z only) | 0.5441 | 0.5014 | +0.0428 |
+| augmented FTM (z + ground-truth Froude) | 0.5441 | 0.5019 | +0.0422 |
+
+**Gap difference -0.0006 -- noise, not an improvement.** Explicitly handing FTM the Froude signal
+it could already derive from `z` did not make its predicted direction any more sensitive to the
+real action. This closes the "maybe it's an extraction burden, not a capability wall" reading: the
+wall is FTM's basic action-sensitivity itself, unmoved by loss target (F180's own retarget test),
+by replacing the bottleneck entirely (the two premise checks above), or now by augmenting it with
+the exact signal that was supposed to help. Three different ways of getting Froude in front of the
+forward model, three null results.
+
+Script: `scripts/diagnostics/objective_experiments/ftm_froude_conditioning_check.py` (new). Run on
+BIAS-2, GPU 1 (the beh24 retrain was running on GPU 0 at the same time). Checkpoint:
+`wm/runs/beh12_hinge_cleansplit/best.pt`.
+
 **Addendum, same day: every prior attack on the action-lever was on TRAINING (loss, target,
 gradient, data, horizon); the one category never tried is ARCHITECTURE.** The FTM
 (`wm/models/ftm.py`) is confirmed, from the code, to be a stateless single-step predictor --
@@ -18186,5 +18215,60 @@ imperfect calibration is acceptable diversity, not a blocker, given the planner 
 per-timestep rather than depending on any one condition being clean.
 
 Scripts: `scripts/dataset/build_beh24_hex_ego_flat.py`, `build_beh24_b1_ego_flat.py`,
-`check_beh24_froude_match.py`. Not yet done: no training run has used `beh24_*_ego_flat` yet --
-this session's clean retrain (F222) deliberately stayed on beh12 to keep that result isolated.
+`check_beh24_froude_match.py`.
+
+**Addendum, next day (2026-09-19): the beh24 clean retrain ran end to end, and the true held-out
+result is a small regression from beh12, not an improvement.** Same recipe as beh12's clean retrain
+(F222) -- `scripts/dataset/make_clean_split_beh24.py` (seed=42, same one-test-one-val-per-condition
+methodology, 48/24/24 per body instead of beh12's 24/12/12) and `clean_retrain_beh24.sh` (identical
+hyperparameters to `clean_retrain.sh`, only the data paths and run name differ) -- checkpoint
+`wm/runs/beh24_hinge_cleansplit/`. Scored with the same `eval_body_head_true_heldout.py` used to
+catch F222's original measurement bug, so this number is leak-free from the start, no correction
+needed:
+
+| | beh12 held-out ratio (F222) | beh24 held-out ratio |
+|---|---|---|
+| B1 | 0.730 | **0.761** |
+| hexapod | 0.659 | **0.695** |
+
+**Both got worse, by 0.03-0.04 ratio -- but "worse" needs the right comparison, and this isn't a
+same-difficulty regression.** beh24's real point was never data volume; it's direction coverage.
+beh12 was one-sided on every Froude axis -- forward speed only (no backward), one turn direction
+only, side magnitude levels 0-1 only (roughly half the achievable lateral range). beh24 completes
+all three axes with genuine +/- coverage. A model scoring 0.695/0.761 on the FULL bidirectional
+task is not doing worse than one scoring 0.659/0.730 on HALF of it in any way the raw ratio
+comparison captures -- the two numbers are answering different, differently-hard questions, not the
+same question twice. Read this as "the honest, complete-coverage number is a bit higher than the
+easier, one-sided number was," not as "more data hurt."
+
+**The controlled comparison, run: it is interference, not just a harder task.** Scored both
+checkpoints (`eval_body_head_true_heldout.py`, extended with a `--conditions` filter) on ONLY the
+8 conditions beh12 and beh24 share byte-identically (forward speed x4, positive turn x4 -- side is
+excluded, since it was recalibrated, not shared). The standardized ratio blew up far past the
+full-set gap -- beh24's checkpoint scored WORSE than predicting the mean on these shared
+conditions (B1 1.499, hexapod 1.468) against beh12's checkpoint solidly beating the mean (B1 0.769,
+hexapod 0.864) -- large enough to ask whether it was real or an artifact of each checkpoint
+standardizing against a different-width target distribution (beh24's std, fit over a much wider
+range including large side/turn/speed-backward magnitudes, shrinks these 8 conditions' own
+variance in standardized units, which alone inflates a ratio without any real accuracy change).
+Checked directly by adding a raw-unit (actual Froude, not standardized) MSE, which is
+checkpoint-independent:
+
+| | beh12 checkpoint raw MSE | beh24 checkpoint raw MSE | increase |
+|---|---|---|---|
+| B1 held-out | 0.00112 | 0.00234 | **2.1x** |
+| hexapod held-out | 0.00120 | 0.00201 | **1.7x** |
+
+**Real, not an artifact.** Absolute prediction error on the exact same 8 conditions roughly
+doubled after training on the fuller 24-condition set. Completing the direction coverage did not
+just make the task harder in a way that dilutes the average -- it cost real accuracy on the
+conditions the model used to handle well, the signature of interference/capacity competition
+between the new and old conditions under the same fixed model size and 50-epoch budget, not of a
+uniformly-harder-but-equally-well-learned task.
+
+Script: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (extended with
+`--conditions` and raw-unit MSE reporting, no new file).
+
+Not yet done: diagnosing which of the candidate explanations above (if any) accounts for the
+regression; no training run has used `beh24_*_ego_flat` for anything besides this one clean-split
+retrain.
