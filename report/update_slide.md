@@ -640,6 +640,11 @@ when predicting — bridges to Experiment 2.3/2.4.
 > ไม่มีตัวจำกัดจำนวนเลย stage 4 ใช้ B1 24 คลิป บวก hexapod 24 คลิปด้วย **ต้นทุนจริงเลยใกล้เคียง
 > "ข้อมูล B1 ทั้งชุด" มากกว่า "9 คลิป"**
 
+**Control checked: is the staged 4-step procedure load-bearing, or would any fine-tune do?** A naive
+single call (`wm.train --init_ckpt`, retraining ITM+FTM+decoder+body_head jointly under the full
+pretrain loss) made B1 *worse than zero-shot*, not just weaker — confirming the staged procedure is
+load-bearing, not incidental.
+
 ---
 
 **Stage 2 leaves one problem untouched.** The Cross-Body Head can now correctly read the shared coordinate
@@ -1241,46 +1246,6 @@ them confounded an earlier version of this test.
 > **Froude นิยามไว้แล้วใน Section 7** ตรงนี้แค่พูดว่า **เป้าหมาย**ถูกสร้างขึ้นมายังไง
 > **เป้าผลิตได้ 2 แบบ** (อ่านตัวเลขที่อัดไว้ = มีข้อมูลพิเศษ / ถอดจากวิดีโอ = แบบที่ใช้จริง)
 > **ให้คะแนนได้ 2 แบบ** (Direct ไม่ใช้ world model / Rollout ใช้) — ที่ต้องแยกสองแกนนี้เพราะเวอร์ชันก่อนเรามัดรวมกัน เลยสรุปไม่ได้ว่าตัวไหนพัง
-
-## Slide 20 — Experiment 2.2, control: does the staged procedure matter, or would any fine-tune do?
-
-**Assumption / Input→Output / Answers.** The staged 4-step adaptation procedure is load-bearing, not
-incidental — a naive single-step fine-tune would not reach the same place. Input: B1's own clips,
-naive vs. staged adaptation; output: Froude correlation per channel. Answers **Objective 2** — a
-control validating the method its own result depends on.
-
-**The staged 4-step adaptation pipeline and its results are Section 10 — not repeated here.** This
-slide reports the control that motivated building it as four separate stages instead of one
-fine-tune call: does adaptation require the staged procedure specifically, or does a naive,
-single-step fine-tune reach the same place?
-
-```
-  control: wm.train --init_ckpt
-    jointly retrains ITM+FTM+decoder+body_head+probe under the FULL pretrain loss
-    → B1 got WORSE than zero-shot (0.264 → 0.231), forward went negative
-        │
-        ▼  diagnostic question: does this measure "does adaptation work,"
-           or "is this even LAC-WM's adaptation"?
-        ▼  the latter — Section 10's 4-stage procedure answers the real question:
-           every channel more than doubles once run correctly, forward included,
-           never once positive under the naive control
-```
-
-**The naive control is a process check, not a result about the claim.** It shows the staged
-procedure is load-bearing: collapsing it into one joint retrain does not merely underperform, it
-reverses the sign of the result — which is why Section 10 runs four separate stages rather than one
-fine-tune call.
-
-**Finding / remaining gap.** The naive retrain reverses the sign of the result; the staged procedure
-is confirmed load-bearing, not incidental. No remaining gap — a closed control, validating Section
-10's design choice rather than opening a new question.
-
-> **บทพูด (TH).** ตารางและขั้นตอน 4 stage ที่ถูกต้องอยู่ใน Section 10 แล้ว ไม่พูดซ้ำที่นี่
-> สไลด์นี้เก็บไว้แค่ **ความผิดพลาดที่เกิดก่อนหน้านั้น** เพราะเป็นเหตุผลที่ต้องมาประกอบ pipeline ที่ถูกต้องขึ้นใหม่
-> ตอนแรกเรา "fine-tune" ด้วยวิธีที่ผิดสนิท — มันไป retrain ทุกอย่างพร้อมกันด้วย loss ของการ pretrain
-> ผลคือ B1 **แย่ลงกว่าไม่ทำอะไรเลย** (0.264 → 0.231) เสียเวลาไล่หาว่าทำไมมันพัง ทั้งที่คำถามที่ถูกคือ
-> "เราใช้วิธี adaptation จริง ๆ หรือยัง" — **คำตอบคือยัง** บทเรียน: **มันเป็นบั๊กเครื่องมือ ไม่ใช่ข้อสรุปว่าวิธีเราไม่เวิร์ก**
-> และเป็นบทเรียนคนละแบบกับ Section 10: ไม่ใช่ "adaptation ได้ผลไหม" แต่คือ "เรารัน adaptation จริงหรือยัง"
 
 ---
 
