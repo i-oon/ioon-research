@@ -18709,3 +18709,486 @@ nor "beh12 is strictly better" is supported by this data.
 Scripts: none changed beyond F233's `eval_body_head_true_heldout.py` extension (already had
 `--conditions`/raw-unit MSE from the parallel session's own push). Data fix: 192 symlinks across
 `beh24_{b1,c10f10t10}_ego_flat_clean{train,heldout,val}`, same relative-path fix as F229.
+
+---
+
+### F235. Slide 22's two remaining claims (ITM-beats-raw-pair, 89% cross-embodiment clustering), re-run on the clean checkpoint: both collapse
+
+F215's "correction, clean split" entry already reversed the R2 table (`linear_vs_itm_froude.py`) but
+left the clustering half (`body_head_hidden_share.py`, F214's 89% figure) explicitly marked "still
+open, separately." Both re-run now against `beh12_hinge_cleansplit`'s
+`body_head_b1_hex_clean.pt` (the checkpoint underlying every clean number in this document since
+F222).
+
+**R2 table, reproduced (matches F215's clean-split correction almost exactly, independent run):**
+
+| method | hexapod held-out R2 | B1 held-out R2 | both pooled held-out R2 |
+|---|---|---|---|
+| linear(pair), no ITM | +0.832 | +0.779 | +0.801 |
+| MLP(pair), no ITM | +0.855 | +0.867 | +0.862 |
+| existing body_head(ITM(.)) | +0.650 | +0.302 | +0.446 |
+
+Raw frame pair, never touching ITM or `z` at all, generalizes clearly better than the actual
+pipeline. This is not new (F215 already found it) -- restated here only because Slide 22 still
+carried the pre-correction numbers and the pending "re-run" flag.
+
+**Clustering, re-run for the first time on the clean checkpoint (F214's own number, never
+previously re-verified):**
+
+| representation | cross-embodiment gap | within-embodiment gap | ratio | 3-fold held-out gaps |
+|---|---|---|---|---|
+| raw z (64-D) | 0.184 | 0.224 | 82% | -- |
+| body_head hidden (128-D) | 0.065 | 0.109 | 60% | -- |
+| body_head Froude output (3-D) | 0.231 | 0.684 | **34%** (was 89%) | **+0.556 / -0.013 / -0.061** (was 0.75/0.89/0.91, all positive) |
+
+The 89% figure does not survive: on the clean checkpoint the ratio drops to 34%, and the
+train/test-split version of the same check (identity direction fit on 2 of 3 seeds per cell,
+tested on the third) now gives one positive fold and two indistinguishable from zero -- the
+"all three folds strongly positive" result F214 reported was itself a leaked-split artifact, not a
+property that survived into the clean retrain.
+
+**Reading.** Both of Slide 22's headline numbers were measuring the leaked, non-stratified split,
+not genuine cross-embodiment structure. What both corrected numbers agree on is the same story
+Section 8's action-lever result and Slide 15's context-collapse fix already established: `z` is a
+lossy bottleneck relative to the raw frame pair, and what does clear the bar (Froude readout
+sensitivity, F233's action-lever gap; behaviour selection, F226) does so downstream of `z`
+through `body_head`'s own fit, not through `z` itself carrying more information than the raw pixels.
+This experiment was designed to argue the opposite (that ITM's structure earns its keep) and, once
+measured cleanly, argues against it instead.
+
+Scripts: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py`,
+`scripts/diagnostics/cross_embodiment/body_head_hidden_share.py` (both already pointed at the clean
+checkpoint from the parallel session's earlier edits; no code changes needed, only execution).
+
+---
+
+### F236. Where the FTM's own auto-regressive rollout stops earning its keep, on the clean B1 checkpoint -- a concrete horizon number for any future imagination-RL redo
+
+**Why this matters now.** F179's whole arc (Section/Slide 16) established the imagination-RL wall
+traces to "the FTM's rollout, not the algorithm," and that gamma=0.99 (~100-step effective horizon)
+was used without ever separately checking how far this specific FTM's own predictions stay
+trustworthy. Before any redo of that arc, the missing number is: at what k does auto-regressive
+rollout stop beating "predict no change at all"?
+
+**Measured directly** (`rollout_horizon_accuracy.py`, unmodified, already built for exactly this
+question -- fed forward auto-regressively with real single-step z at each step, matching
+`lambda_rollout`'s own training convention): `beh12_hinge_cleansplit`'s
+`body_head_b1_hex_clean.pt`, B1 data (`beh12_b1_ego_flat`, 48 clips, 66 frames each, `--stride 4`),
+k from 1 to 60 (near the full clip length):
+
+| k | 1 | 2 | 3 | 5 | 8 | 12 | 16 | 20 | 30 | 40 | 50 | 60 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ratio (model MSE / copy-forward MSE) | 0.622 | 0.614 | 0.633 | 0.678 | 0.738 | 0.804 | 0.779 | 0.830 | 0.837 | 0.852 | 0.851 | 0.874 |
+
+Ratio stays below 1.0 everywhere tested (the model never gets worse than doing nothing, even at
+k=60) but climbs steadily and monotonically from 0.62 at k=1 toward 0.87 by k=60 -- most of the
+model's edge over "predict no change" is gone by the time k reaches the 20s-30s (already at 0.80-0.84
+there), and what's left by k=60 is a thin, shrinking margin (0.874, i.e. only 12.6% better than
+doing nothing).
+
+**Reading, concrete and actionable.** This does not contradict F179's conclusion; it gives it a
+number. Gamma=0.99's ~100-step effective horizon asks the critic to trust FTM predictions far
+beyond where this curve was even measurable (clips cap at 66 frames) and well past where the
+model's edge over the trivial baseline has mostly evaporated (already thin by k=20-30). A future
+redo of the imagination-RL arc should pick its imagination horizon H from this curve directly (e.g.
+H in the 15-25 range, where the model still retains most of its advantage, ratio ~0.78-0.83) rather
+than from a discount-factor convention chosen without reference to the FTM's own measured rollout
+fidelity -- the earlier attempt to shorten the horizon (gamma 0.99 -> 0.95, Slide 16) picked a
+shorter horizon without this curve to justify where "shorter" should stop, and got a worse, static
+policy; this curve is the missing piece that attempt was reasoning without.
+
+**Scope, stated plainly.** This measures rollout fidelity only (does e_t+k stay close to truth) --
+it says nothing about whether a critic trained inside a k<=25 imagination window would actually
+converge or produce a working policy; that is exactly the open question a redo would need to test
+next, now with a principled horizon to start from instead of an arbitrary one.
+
+Script: `scripts/diagnostics/objective_experiments/rollout_horizon_accuracy.py` (no changes, run
+with `--ckpt_a`/`--ckpt_b` both pointed at the same checkpoint since this run asks about rollout
+fidelity itself, not the lambda_rollout before/after comparison the script was originally built
+for). Cache: `results/wm/cache/ego_b1.pt` (pre-existing, covers the full unsplit
+`beh12_b1_ego_flat` pool).
+
+---
+
+### F237. Redoing F179's isolation test at F236's recommended horizon: the actor's realized return
+improves, but the plain EMA critic still diverges unboundedly -- shortening the horizon alone does
+not fix the critic pathology, isolating it from the compounding-rollout-error hypothesis
+
+**Why this test.** F179's whole arc trained the critic to bootstrap over GAMMA=0.99's ~100-step
+effective horizon and never converged (drifted to -421 while the true return stayed near -40);
+F236 then measured that this checkpoint's own FTM rollout only stays meaningfully better than
+"predict no change" out to about k=20-30. The natural next question, never asked before because
+F179's own script was never committed to git: does training the SAME kind of actor-critic, but
+truncated to a horizon F236 actually supports, fix the divergence on its own -- before reaching for
+symlog/return-normalization/two-hot (F179's own stabilization ladder)?
+
+**Rebuilt from scratch** (`scripts/diagnostics/objective_experiments/rl_imagination_isolation_v2.py`,
+since the original was never committed -- confirmed via `git log`, no `.py` in the commit that added
+F179's `.npz` results). Deliberately vanilla: plain EMA target critic, no symlog, no return
+normalization, no two-hot -- exactly F179's rung (1), the one that "failed outright" at the long
+horizon, now re-run at H=12 (even shorter than F236's 15-25 suggestion, chosen after two GPU OOMs at
+batch 64 and 16 forced batch down to 4 for a thermally lighter run). 2,000 iterations, frozen FTM,
+one fixed real branch state, one fixed goal (a real B1 clip's own steady-state Froude, held
+constant) -- the same "target that provably cannot move" shape as the original isolation test.
+
+**Result, full training curve, `eval_iter` every 50:**
+
+| iter | eval_realized (actual, discounted) | eval_value0 (critic's belief) | gap |
+|---|---|---|---|
+| 0 | -23.9 | -0.1 | +23.8 |
+| 200 | -11.0 | -21.6 | -10.6 |
+| 500 | -10.0 | -29.0 | -19.0 |
+| 1000 | -9.8 | -37.5 | -27.7 |
+| 1500 | -9.5 | -44.0 | -34.5 |
+| 1999 | -8.3 | -50.7 | -42.3 |
+
+**Two things happened at once, and they point in opposite directions.** The actor's real,
+achieved return genuinely improves and then holds steady (-23.9 -> roughly -9 to -11 from iter 200
+onward) -- comparable in kind to F179's own short-horizon "fix" (-37.5 -> -9.0/-9.2). But the
+critic's own value belief never stabilizes at all: it drifts monotonically and increasingly negative
+throughout training (-0.1 -> -50.7), the identical unbounded-divergence signature F179's rung (1)
+showed at H~100 (there: -82 -> -421). **The horizon here is roughly a tenth of the original's, and
+the plain EMA critic still diverges the same way.**
+
+**Reading.** This separates two things F179's own framing had partly conflated: whether the actor
+can learn a real improvement from truncated imagination (yes, here, even at H=12, even with a
+diverging critic underneath it -- plausibly because most of the return at this horizon comes from
+real, differentiable per-step rewards along the rollout, not from the critic's bootstrap term at the
+very end), and whether the plain EMA critic itself is stable (no, unrelated to horizon length in this
+comparison). F179's own stabilization ladder (symlog + return normalization, rung 2) was motivated
+by the long-horizon MC-check failing; this result suggests that fix is not compensating for
+horizon-induced compounding error specifically, since the same raw divergence appears at a horizon
+short enough that compounding rollout error should matter far less (F236: ratio 0.80-0.84 at k=20-30,
+i.e. still close to the trivial baseline at this test's H=12). The plain EMA target critic looks
+unstable more or less independent of horizon; a shorter horizon does not substitute for the
+stabilization ladder, it is orthogonal to it.
+
+**Not yet tried, the natural next step:** combine both -- F236's shorter horizon AND F179's rung-2
+stabilization (symlog critic + return normalization) in the same run, and re-check against the
+pre-registered MC bar. Neither fix alone has been tested at a horizon actually supported by this
+checkpoint's own measured rollout fidelity; this entry only shows that the horizon change by itself
+is not the fix.
+
+Script: `scripts/diagnostics/objective_experiments/rl_imagination_isolation_v2.py` (new). Projector:
+`wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/projector_clean.pt` (fit fresh this session, F236's
+checkpoint never had one). Run: `results/wm/closed_loop/rl_imagination_isolation_v2_h12.npz`
+(H=12, batch=4, 2000 iters; two earlier attempts at batch 64 and batch 16 hit CUDA OOM on this
+machine's 16 GB card, backprop through H sequential FTM calls holding the full computation graph
+being the memory cost -- batch 4-8 is the stable range found here).
+
+**Same-day follow-up: the untested combination (F236's short horizon + F179's rung-2
+stabilization) was run -- the critic still diverges, just as badly, even though the critic's own
+training loss goes to near zero.** Added symlog-space critic regression and DreamerV3-style return
+normalization to the same script (`--stabilize`), same H=12, same 2000-iteration budget:
+
+| iter | eval_realized | eval_value0 | gap | critic_loss |
+|---|---|---|---|---|
+| 0 | -15.0 | -0.3 | +14.7 | 5.47 |
+| 250 | -11.7 | -21.9 | -10.2 | 0.051 |
+| 1000 | -6.9 | -36.4 | -29.6 | 0.006 |
+| 1999 | -7.0 | -45.3 | -38.3 | 0.002 |
+
+**The actor's real behaviour improved further** (first-quarter mean realized -12.2 -> last-quarter
+-7.1, a cleaner curve than the unstabilized run's -15.6 -> -9.5). **But the critic's own belief
+diverges by essentially the same final magnitude as the plain, unstabilized version** (-45.3 here
+vs -50.7 unstabilized) -- symlog + return normalization did not fix it at this horizon either.
+**The tell is `critic_loss` collapsing to ~0.002 while the gap grows to -38**: the critic is fitting
+its own training target almost perfectly, but that target is itself built recursively from the
+EMA target network's own (drifting) bootstrap at every step -- nothing in this loop ever anchors the
+critic to a real, non-bootstrapped ground truth, so a target that drifts and a critic that chases it
+perfectly are consistent with each other and with unboundedly diverging from the truth
+simultaneously. Shortening the horizon changes how much of the return is real, differentiable
+reward versus bootstrapped estimate, but does not by itself remove this self-referential loop, and
+neither does compressing the target's scale (symlog) or normalizing the actor's gradient (return
+normalization) -- both rungs of F179's own stabilization ladder, tried together, still fail here.
+
+**Reading, updated.** Two separate interventions (F236's shorter horizon, F179's own rung-2 fixes)
+each individually plausible, tried together for the first time, both fail to stop the critic's
+divergence -- while the actor, driven substantially by real per-step differentiable reward rather
+than the critic's bootstrap at this short a horizon, keeps improving regardless. This points away
+from "horizon too long" or "critic scale miscalibrated" as the root cause and toward the bootstrap
+target's circularity itself (an EMA target network with no periodic anchor to a real, non-recursive
+value estimate) as the more likely one -- matching a known instability mode in bootstrapped
+actor-critic methods generally, not specific to this project's FTM. Not yet tried: a periodic hard
+reset of the target critic to a Monte-Carlo-estimated (not bootstrapped) value at long intervals, or
+capping how many consecutive iterations the target network can drift before being re-anchored.
+
+Script: same file, `--stabilize` flag (new). Run:
+`results/wm/closed_loop/rl_imagination_isolation_v2_h12_stab.npz`.
+
+**Same-day, second follow-up: periodic hard-reset to a real Monte Carlo anchor -- the actor
+converges to a stable, independently-verified good policy for the first time in this arc's
+history.** The self-referential-bootstrap diagnosis above suggests the fix is to periodically break
+the loop with a real, non-bootstrapped ground truth rather than compress/rescale it. Added
+`--anchor_every`: every 200 iterations, roll the CURRENT deterministic actor forward `--mc_horizon`
+20 real steps (within F236's still-reliable window, `torch.no_grad()`, no critic anywhere in this
+computation), regress the critic directly onto that one real number for 10 extra gradient steps,
+then hard-copy the target network from it -- same H=12, same symlog + return normalization as the
+run above, 2000 iterations:
+
+| iter | eval_realized | eval_value0 | gap | MC-return at nearest anchor |
+|---|---|---|---|---|
+| 0 | -15.4 | -19.6 | -4.1 | -22.2 (anchor @ 0) |
+| 200 | -6.5 | -5.0 | +1.5 | -10.4 (anchor @ 200) |
+| 600 | -2.7 | -1.9 | +0.8 | -4.3 (anchor @ 600) |
+| 1200 | -2.7 | -2.6 | +0.1 | -4.4 (anchor @ 1200) |
+| 1800 | -2.8 | -2.6 | +0.3 | -4.5 (anchor @ 1800) |
+| 1999 | -2.7 | -16.8 | -14.0 | (150 iters past last anchor) |
+
+**Two things converged that never had before.** First, `eval_realized` itself -- not just the
+critic's belief -- stabilizes tightly around -2.6 to -2.9 from iter 250 onward and stays there for
+the remaining ~1750 iterations (first-quarter mean -6.7, last-quarter mean -2.7), a real policy
+improvement that holds rather than drifting worse the way both earlier runs in this arc did.
+Second, and independently: the ground-truth MC-return measured fresh at each anchor point *also*
+improves and then holds steady (-22.2 -> roughly -4.1 to -4.7 from iter 200 on) -- two different
+measurements, one fast (12-step training rollout) and one slow and bootstrap-free (20-step MC),
+agreeing that the policy itself has genuinely gotten better and stopped degrading. Neither of the
+two earlier runs in this arc (plain, or symlog+return-norm alone) held a stable `eval_realized`
+this long or this tightly.
+
+**What is NOT fixed: the critic's raw value between anchors still drifts the identical way.**
+Immediately after each anchor the gap is small (+0.1 to +1.5) but widens back to -7 to -17 by the
+time 150-200 iterations have passed and the next anchor arrives -- the periodic hard reset corrects
+the drift, it does not stop it from recurring. A held-out check right before an anchor (i.e. worst
+case, not cherry-picked) still shows the critic 5-6x off from the truth in relative terms. The
+critic is not a reliable value function on its own between anchors; what changed is that the actor
+no longer needs it to be, because periodic grounding keeps correcting its trajectory before the
+drift compounds into the actor's own gradient badly enough to undo the improvement.
+
+**Reading.** This is the first result in this arc (predating F179) where the actor's real,
+independently-verified behaviour converges and holds, rather than merely converging on one proxy
+metric while a stricter check (F179's own MC bar) fails it. It does not mean the critic-stabilization
+problem is solved in general -- it is solved *for this fixed start state and fixed goal*, worked
+around by periodically injecting ground truth rather than by fixing the critic's own learning
+dynamics. Whether this generalizes to a diverse batch of start states/goals (not the single fixed
+pair this whole arc has used, matching F179's own "isolation test" design) or to a real closed-loop
+deployment is untested and is the natural next step, now that the isolation-test version has a
+result worth carrying forward instead of a wall.
+
+Script: same file, `--anchor_every`/`--mc_horizon`/`--anchor_steps` (new). Run:
+`results/wm/closed_loop/rl_imagination_isolation_v2_h12_anchor.npz`.
+
+**Same-day, third follow-up: the anchored recipe does NOT generalize past the single fixed
+(start, goal) pair it was tuned on.** The periodic-anchor result above used one fixed start state
+and one fixed goal throughout, the isolation test's own deliberate design. Rebuilt goal-conditioned
+(`scripts/diagnostics/objective_experiments/rl_imagination_isolation_v3.py`, new file, not a patch):
+actor and critic now take `concat(pooled(e_t), goal)`, trained on a pool of 12 tasks (one real B1
+clip per condition, `_cleantrain`, own first frame as start + own steady-state Froude as goal),
+evaluated continuously on both that train pool and a genuinely held-out pool (the other 12 clips,
+`_cleanheldout`, one per condition, never anchored or trained on). Same recipe otherwise: H=12,
+symlog critic + return normalization, periodic MC-anchor every 200 iterations (3 random training
+tasks anchored per point, not all 12, for compute reasons).
+
+| | first-quarter mean | last-quarter mean |
+|---|---|---|
+| train pool (12 tasks, seen during training) | -30.6 | -29.1 |
+| held-out pool (12 tasks, never trained/anchored on) | -30.6 | -30.2 |
+
+**Essentially flat.** Compare to the single-pair version's -15.4 -> -2.7 -- a >5x improvement there,
+against a statistically marginal ~1-2 point wobble here, on both the train pool (which the anchor
+mechanism directly touches) and the held-out pool (which it never does). Per-anchor MC-returns
+logged during training (spanning roughly -11 to -58 depending on which of the 12 conditions got
+sampled) show no consistent trend either.
+
+**Reading.** The single-pair result (F237's second follow-up) is not evidence of a policy that
+generalizes -- it is at least consistent with (not proven to be, but not ruled out either) simply
+memorizing the one state/goal pair it never had to generalize past. Going goal-conditioned exposes
+the actual difficulty this arc has danced around since Slide 14: producing a small, useful gradient
+signal that differentiates 12 different goals through the same frozen FTM/projector/body_head chain
+is a harder learning problem than fitting one fixed target, and 2000 iterations at 4 tasks/iteration
+was not enough budget to make visible progress on it here. This does not contradict F236's own
+finding (the FTM's rollout fidelity is condition-independent, a property of k alone) -- it is a
+separate claim, about whether an actor/critic built on top of that fidelity can learn to read a goal
+input, which this run does not yet answer either way (could still work with more iterations, a
+larger network, or more tasks sampled per anchor point -- none of which were tried here). Filed as
+open, not as a negative proof: the budget given was small relative to the single-task version's own
+2000 iterations solving a problem with a much smaller effective search space (no goal input at all).
+
+Script: `scripts/diagnostics/objective_experiments/rl_imagination_isolation_v3.py` (new). Run:
+`results/wm/closed_loop/rl_imagination_isolation_v3_multi.npz`.
+
+---
+
+### F238. How many B1 clips does stage 4 (`fit_body_head`) actually need -- a real clip-count sweep, not an estimate
+
+**Why this test.** Section 10's own staged-adaptation pipeline uses close to the full 24-clip B1
+training pool for stages 2 and 4, despite the whole point of staged adaptation being a pretrained
+backbone that should need less. Never measured directly until now.
+
+**Setup.** A fresh B1-adapted checkpoint (`wm.adapt`, same recipe as the deck's own -- 9 clips,
+1000 steps, `lambda_hinge=0.5`), then `fit_body_head` run independently at four B1 clip-count
+budgets (3, 6, 12, 24 clips, stratified round-robin across the 12 conditions, `also
+hexapod=beh12_c10f10t10_ego_flat_cleantrain` unchanged throughout), each scored on the same real,
+disjoint 12-clip `_cleanheldout` set (`eval_body_head_true_heldout.py`, never used for fitting):
+
+| B1 clips used | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|---|
+| 3 | 1.530 | +0.169 | +0.191 | +0.359 | +0.191 |
+| 6 | 0.865 | +0.218 | +0.512 | +0.391 | +0.391 |
+| 12 | 0.736 | +0.326 | +0.551 | +0.466 | +0.466 |
+| 24 (full) | 0.694 | +0.428 | +0.537 | +0.466 | +0.466 |
+
+**Reading.** A real cliff, not a smooth curve: 3 clips fails outright (ratio > 1, worse than
+predicting the mean); 6 clips already clears the bar (0.865); **12 clips (half the pool) gets to
+0.736, within a few points of the full 24-clip result (0.694)** -- most of the value of the full
+set is captured at half of it. Forward ρ is the one channel that keeps improving all the way to 24
+(+0.326 -> +0.428); lateral/yaw are already flat by 12. This directly answers Section 10's own open
+question: stage 4 does not need close to the full B1 set to get most of its value, roughly half
+does, though the very low end (3 clips) is a real failure, not just a weaker version of the same
+result.
+
+**Scope.** This sweeps stage 4 only (`fit_body_head`), using the curated behaviour library, not
+random motor babble -- the babble-data-efficiency question (would babble clips do as well as
+curated behaviour clips at the same count) is still open and untested.
+
+Scripts: `wm.adapt` (fresh checkpoint, `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/b1_adapted_prebody.pt`),
+`wm.fit_body_head` (run 4x, `--data` pointed at stratified clip-count subsets), unchanged
+`eval_body_head_true_heldout.py`. Subset dirs: `data/egocentric/beh12_b1_ego_flat_subset{3,6,12,24}`
+(relative symlinks into `_cleantrain`).
+
+---
+
+### F239. Direct null-vs-real action test, run for the first time on Stage 1's own single-embodiment setup (not just Stage 2/F142)
+
+**Why this test.** Section 6 (Experiment 1.3) motivated a "the action might be redundant" concern
+from indirect evidence (one-frame phase-readability, gait periodicity) but never ran the direct
+test -- null action vs. real action through the forward model -- on Stage 1's own single-embodiment
+setup. That direct test (F142) had only ever been run on the later, two-body Stage 2 setup. Run
+here on the one surviving Stage-1-era checkpoint (`wm/runs/beh12_hexonly/best.pt`,
+`data/allocentric/beh12_c10f10t10_flat`, `scripts/diagnostics/objective_experiments/action_necessity.py`,
+unmodified):
+
+| lag | family | real | null | shuffled | mean | hold-still | **null/real** | real beats null |
+|---|---|---|---|---|---|---|---|---|
+| 1 | all | 1.5706 | 1.6238 | 1.6863 | 1.6491 | 2.3087 | **1.034** | 87.2% |
+| 1 | side | 1.5100 | 1.5984 | 1.6412 | 1.6223 | 2.0999 | 1.059 | 93.9% |
+| 1 | speed | 1.6144 | 1.6532 | 1.7047 | 1.6680 | 2.4785 | 1.024 | 85.3% |
+| 1 | turn | 1.5880 | 1.6202 | 1.7131 | 1.6573 | 2.3502 | 1.020 | 82.4% |
+
+**Result: the same pattern F142 found on the two-body setup holds on Stage 1's own single-embodiment
+one.** `null/real` = 1.034 pooled -- the real action changes one-step prediction error by about 3%,
+essentially F142's own <3% figure, now confirmed on the setup Section 6 actually uses rather than
+inferred from it. `real/hold` = 0.680 -- the model clearly beats "predict no motion," so it is
+reading real structure; it just isn't using the action to do it, matching F142's own reading
+exactly ("predictable, but the action still buys nothing").
+
+**This closes Section 6's own open item directly, rather than motivating it indirectly.** No
+periodicity curve or phase-readability probe is needed to make this specific point -- the direct
+test settles it in one run, on the exact setup in question.
+
+Script: `scripts/diagnostics/objective_experiments/action_necessity.py` (no changes; already built
+for exactly this test, simply never pointed at a still-surviving Stage-1 checkpoint before).
+
+**Same-day extension: the pattern holds at every horizon tested, 1 to 16 frames, not just one
+step.** The script already supports a `--lags` sweep (each lag `k` is one direct application,
+`ITM(e_0,e_k)` -> `FTM(e_0, z)`, predicting `e_k`); re-run with `--lags 1 2 3 5 8 16` on the same
+checkpoint/data:
+
+| lag | `FTM(e_0,ITM(e_0,e_lag))` | `FTM(e_0,ITM(e_0,e_0))` | `e_0` held still | **null/real** |
+|---|---|---|---|---|
+| 1 | 1.571 | 1.624 | 2.309 | 1.034 |
+| 2 | 1.905 | 2.055 | 2.935 | 1.079 |
+| 3 | 2.166 | 2.353 | 3.277 | 1.087 |
+| 5 | 2.502 | 2.677 | 3.618 | 1.070 |
+| 8 | 2.726 | 2.820 | 3.759 | 1.034 |
+| 16 | 3.457 | 3.554 | 4.636 | 1.028 |
+
+`null/real` stays in a narrow 1.03-1.09 band across the whole sweep -- no horizon where the action
+starts to matter. `real` error stays comfortably below `hold-still` at every lag (the model reads
+real, growing structure throughout), while the null/real gap itself neither opens nor closes with
+distance. This rules out "the action would matter if you looked further ahead" as an explanation
+for the flat one-step result -- it is flat because the action is not used, not because one step is
+too short a window to see it in.
+
+---
+
+### F240. Does `null/real` still hold up on the FULLY combined checkpoint (egocentric + hinge + rollout together), not just egocentric alone? Yes, at every lag tested
+
+**Why this test.** F157's GATE C measured `null/real` on `wm/runs/beh12_ego` -- egocentric only, no
+hinge, no rollout -- and found a real, sustained improvement over the allocentric 1.03 baseline
+(1.16-1.19 across lags 1-5). Whether that survives once the hinge/rollout fix (Slide 15's own lever)
+is layered on top, on the exact checkpoint (`beh12_hinge_cleansplit`) every clean number in this
+deck already runs on, had never been checked.
+
+**Result** (`action_necessity.py`, unmodified, `beh12_hinge_cleansplit/best.pt`, held-out hexapod
+clips, `_cleanheldout`):
+
+| lag | null/real | real/hold | real beats null | reading |
+|---|---|---|---|---|
+| 1 | 1.062 | 0.577 | 87.4% | predictable, action buys something |
+| 2 | 1.106 | 0.538 | 94.9% | **viable** |
+| 3 | 1.115 | 0.534 | 95.9% | **viable** |
+| 5 | 1.109 | 0.536 | 96.9% | **viable** |
+| 8 | 1.093 | 0.541 | 96.1% | predictable, action buys nothing |
+
+**Holds up.** `null/real` stays in the 1.06-1.12 range at every lag, comfortably clear of the 1.03
+allocentric floor and of the ~1.0 collapse the LDAD arm showed is possible when a fix trades away
+action-sensitivity for something else. Two of five lags cross the script's own "viable" threshold.
+Not as strong as egocentric-alone's best lags (F157: 1.16-1.19) but this is a held-out, stratified,
+leak-free split F157 did not have, and the fix stacks on top of egocentric rather than trading it
+away -- unlike the LDAD arm, which looked better on other metrics while `null/real` silently fell
+back to 1.0.
+
+Script: `scripts/diagnostics/objective_experiments/action_necessity.py` (unmodified). Checkpoint:
+`wm/runs/beh12_hinge_cleansplit/best.pt`. Data: `data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout`.
+
+---
+
+### F241. Section 10's held-out B1 table re-measured under `z = proj(action)` -- the projector path is weaker than the ITM path overall, not catastrophically, and better on forward
+
+**Why.** Section 10's table read `z = ITM(e_t, e_{t+1})`, which needs the future frame. At selection time
+only `z = proj(action)` exists, and that path had never been scored on held-out data.
+
+**Result** (`scripts/diagnostics/objective_experiments/proj_path_eval.py`; `beh12_hinge_cleansplit`
+B1 head as-is, fresh `projector_clean.pt` fit on `_cleantrain`, 12 disjoint `_cleanheldout` clips, 780
+transitions, same head and clips for both rows):
+
+| `z` source | held-out ratio | forward ρ | lateral ρ | yaw ρ | median ρ |
+|---|---|---|---|---|---|
+| `ITM(e_t,e_t+1)` | 0.730 | +0.261 | +0.578 | +0.474 | +0.474 |
+| `proj(action)` | 0.860 | **+0.438** | +0.393 | +0.376 | +0.393 |
+
+The ITM row reproduces Section 10 exactly (sanity check). The projector path still beats the mean
+(ratio < 1.0), which is enough for ordering candidates from different behaviours, but it is worse on
+lateral/yaw and overall ratio; forward is better (+0.438 vs. +0.261).
+
+**Caveat.** The head was fit on ITM `z` (stage 4 default), not refit on projector `z`; a head fit with
+`--latent projector/both` may close part of the gap. Not run.
+
+**Reading.** The projector is not the single bottleneck: the ITM route is itself mediocre (ratio 0.73,
+forward ρ 0.26), and fine-ranking failures appeared through both. It does cost lateral/yaw signal.
+
+---
+
+### F242. Direct action selection over a B1 motor-babble library (no expert clips, goal read per timestep) -- it works, at about 90% of the expert library's quality on this metric, once every stage is fitted on the babble
+
+**Test** (`scripts/diagnostics/objective_experiments/babble_library_eval.py`, drivers `scripts/run/babble_library_compare.sh`
+and `babble_library_full_adapt.sh`, logs `results/wm/dataset/b1_babble/library_*_log.txt`). Candidate library =
+a set of B1 clips; goal = one hexapod clip per condition (12), physics goal read at `goal_t` every `horizon=2`
+steps (never a clip mean); the planner picks the candidate whose `body_head(proj(a))` is closest to `goal_t`,
+graded by the TRUE local Froude of the picked clip at the same offset, real Froude units. Also reported per
+library: the **oracle** (best candidate at every step by ground truth = the library's own ceiling) and a **random** pick.
+
+**Libraries** (all from the files themselves): `b1_babble_v2_ego_flat` (36 clips, 12 fwd/12 lat/12 yaw by filename,
+body low z 0.35-0.40, lateral/yaw one-sided and small, no `condition` field); `b1_babble_coppelia_spring_ego_flat`
+(40 clips, forward-only 0.124-0.216, upright z ~0.49, 0 falls); expert = `beh12_b1_ego_flat_cleantrain` (24 clips).
+
+| library | protocol | selected | oracle | random | share of random-to-oracle gap recovered |
+|---|---|---|---|---|---|
+| expert (24) | clean pipeline | 0.0733 | 0.0315 | 0.1216 | 54% |
+| babble v2 (36) | projector on babble only | 0.1273 | 0.0437 | 0.1272 | 0% |
+| babble spring (40) | projector on babble only | 0.1097 | 0.0739 | 0.1109 | 3% |
+| **babble v2 (36)** | **stages 1, 2, 4 all on babble** | **0.0928** | 0.0437 | 0.1272 | **41%** |
+| **babble spring (40)** | **stages 1, 2, 4 all on babble** | **0.0930** | 0.0739 | 0.1109 | **48%** |
+
+**The first pass looked like a failure and was an unfair test**: only the projector was fit on babble, so the
+expert-fit head misread babble `z`. Fitting every stage on the babble (what a new body actually has) moves both
+libraries from ~chance to 41-48%, close to the expert library's 54%.
+
+**The two libraries limit differently.** v2 covers goal space well (oracle 0.044, near expert's 0.032) but its
+scorer loses more (0.049). Spring's scorer is better (loss 0.019) but the library is forward-only, so even the
+oracle misses the lateral goals (side_* oracle 0.12-0.16, selected 0.15-0.19).
+
+**Scope.** 12 goals, one run, no seed variance; libraries and expert differ in size and composition (24/36/40);
+projector and head are fit in-sample on each library (the deployment protocol, applied equally to all three);
+goals are hexapod clips read by physics, not by vision.

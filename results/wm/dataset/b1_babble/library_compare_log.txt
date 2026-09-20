@@ -1,0 +1,84 @@
+=== LIBRARY beh12_b1_ego_flat_cleantrain ===
+library: data/egocentric/beh12_b1_ego_flat_cleantrain  (24 candidates)
+      speed_c5.8  selected 0.0693  oracle 0.0274  random 0.0970
+      speed_c7.1  selected 0.0756  oracle 0.0207  random 0.1034
+      turn_s0.05  selected 0.0610  oracle 0.0199  random 0.0906
+      turn_s0.15  selected 0.0645  oracle 0.0203  random 0.0908
+      turn_s0.29  selected 0.0643  oracle 0.0274  random 0.0977
+      turn_s0.56  selected 0.0618  oracle 0.0410  random 0.1293
+     speed_c8.15  selected 0.0991  oracle 0.0333  random 0.1310
+     side_L_lvl0  selected 0.0842  oracle 0.0465  random 0.1462
+     side_L_lvl1  selected 0.0585  oracle 0.0220  random 0.1420
+     side_R_lvl0  selected 0.0991  oracle 0.0748  random 0.1418
+     side_R_lvl1  selected 0.0405  oracle 0.0197  random 0.1611
+      speed_c8.8  selected 0.1019  oracle 0.0253  random 0.1284
+
+MEAN over 12 goals:  selected 0.0733   oracle 0.0315   random 0.1216
+scorer loss (selected - oracle) 0.0418;  share of the random-to-oracle gap recovered 54%
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 14292.00it/s]
+b1         36 clips, 693 of 3564 transitions held out
+epoch   50  train 4.3475
+epoch  100  train 3.9752
+epoch  150  train 3.7768
+epoch  200  train 3.6718
+epoch  250  train 3.5931
+epoch  300  train 3.5278
+
+embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
+b1              4.0250      0.734        0.1162      0.698
+
+Ratios are against predicting the mean z: below 1.0 is better than knowing nothing,
+and the rollout column is the one that decides whether planning can use this.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/projector_lib_b1_babble_v2_ego_flat.pt
+=== LIBRARY b1_babble_v2_ego_flat ===
+library: data/egocentric/b1_babble_v2_ego_flat  (36 candidates)
+      speed_c5.8  selected 0.1340  oracle 0.0347  random 0.1181
+      speed_c7.1  selected 0.1498  oracle 0.0311  random 0.1346
+      turn_s0.05  selected 0.1359  oracle 0.0290  random 0.1127
+      turn_s0.15  selected 0.1129  oracle 0.0294  random 0.1126
+      turn_s0.29  selected 0.1038  oracle 0.0384  random 0.1186
+      turn_s0.56  selected 0.1301  oracle 0.0719  random 0.1467
+     speed_c8.15  selected 0.1668  oracle 0.0542  random 0.1659
+     side_L_lvl0  selected 0.1087  oracle 0.0425  random 0.1068
+     side_L_lvl1  selected 0.1477  oracle 0.0498  random 0.1199
+     side_R_lvl0  selected 0.0773  oracle 0.0322  random 0.0893
+     side_R_lvl1  selected 0.0919  oracle 0.0593  random 0.1338
+      speed_c8.8  selected 0.1692  oracle 0.0516  random 0.1674
+
+MEAN over 12 goals:  selected 0.1273   oracle 0.0437   random 0.1272
+scorer loss (selected - oracle) 0.0837;  share of the random-to-oracle gap recovered -0%
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 14622.04it/s]
+b1         40 clips, 1272 of 6360 transitions held out
+epoch   50  train 3.4125
+epoch  100  train 3.2277
+epoch  150  train 3.1748
+epoch  200  train 3.1260
+epoch  250  train 3.0659
+epoch  300  train 2.9991
+
+embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
+b1              3.4259      0.603        0.1054      0.569
+
+Ratios are against predicting the mean z: below 1.0 is better than knowing nothing,
+and the rollout column is the one that decides whether planning can use this.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/projector_lib_b1_babble_coppelia_spring_ego_flat.pt
+=== LIBRARY b1_babble_coppelia_spring_ego_flat ===
+library: data/egocentric/b1_babble_coppelia_spring_ego_flat  (40 candidates)
+      speed_c5.8  selected 0.0564  oracle 0.0311  random 0.0670
+      speed_c7.1  selected 0.0662  oracle 0.0368  random 0.0646
+      turn_s0.05  selected 0.0694  oracle 0.0304  random 0.0723
+      turn_s0.15  selected 0.0738  oracle 0.0357  random 0.0772
+      turn_s0.29  selected 0.0859  oracle 0.0467  random 0.0867
+      turn_s0.56  selected 0.1240  oracle 0.0892  random 0.1212
+     speed_c8.15  selected 0.0837  oracle 0.0508  random 0.0769
+     side_L_lvl0  selected 0.1641  oracle 0.1203  random 0.1677
+     side_L_lvl1  selected 0.1474  oracle 0.1168  random 0.1592
+     side_R_lvl0  selected 0.1716  oracle 0.1196  random 0.1666
+     side_R_lvl1  selected 0.1886  oracle 0.1569  random 0.1932
+      speed_c8.8  selected 0.0849  oracle 0.0529  random 0.0780
+
+MEAN over 12 goals:  selected 0.1097   oracle 0.0739   random 0.1109
+scorer loss (selected - oracle) 0.0358;  share of the random-to-oracle gap recovered 3%
+ALL DONE

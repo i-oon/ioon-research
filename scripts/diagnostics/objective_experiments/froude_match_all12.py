@@ -116,13 +116,35 @@ def main():
             steps_r, ach_r = run_rollout(rollout_planner, e_t_fixed, goal_p_std, spec, args.horizon)
             err_rollout = float(np.linalg.norm(ach_r - goal_p_real[steps_r], axis=1).mean())
 
-        row = dict(condition=cond, direct_physics=err_direct_physics,
-                   direct_vision=err_direct_vision, rollout=err_rollout, n=len(steps_d))
+        # the missing 2x2 cell: the same rollout mechanism (same fixed e_t), fed the vision-read goal
+        err_rollout_vision = None
+        if rollout_planner is not None:
+            steps_rv, ach_rv = run_rollout(rollout_planner, e_t_fixed, (goal_v_real - mean) / std,
+                                           spec, args.horizon)
+            err_rollout_vision = float(np.linalg.norm(ach_rv - goal_v_real[steps_rv], axis=1).mean())
+
+        # how far the vision-read goal is from the true (physics) goal, same steps, same units and norm
+        goal_read_err = float(np.linalg.norm(goal_v_real[steps_d] - goal_p_real[steps_d], axis=1).mean())
+
+        # the same vision-driven picks graded against the TRUE goal instead of against the goal that was read
+        dv_vs_true = float(np.linalg.norm(ach_dv - goal_p_real[steps_dv], axis=1).mean())
+        rv_vs_true = (float(np.linalg.norm(ach_rv - goal_p_real[steps_rv], axis=1).mean())
+                      if rollout_planner is not None else None)
+
+        row = dict(condition=cond, goal_read_err=goal_read_err, dv_vs_true=dv_vs_true, rv_vs_true=rv_vs_true, direct_physics=err_direct_physics,
+                   direct_vision=err_direct_vision, rollout=err_rollout,
+                   rollout_vision=err_rollout_vision, n=len(steps_d))
         rows.append(row)
         print(f"  {cond:>14}  direct(physics)={err_direct_physics:.4f}  "
               f"direct(vision)={err_direct_vision:.4f}  "
-              f"rollout={'--' if err_rollout is None else f'{err_rollout:.4f}'}  n={row['n']}")
+              f"rollout(physics)={'--' if err_rollout is None else f'{err_rollout:.4f}'}  "
+              f"rollout(vision)={'--' if err_rollout_vision is None else f'{err_rollout_vision:.4f}'}  n={row['n']}")
 
+    gr = np.array([r["goal_read_err"] for r in rows])
+    print(f"vision-driven picks graded against the TRUE goal: direct "
+          f"{np.mean([r['dv_vs_true'] for r in rows]):.4f}"
+          + (f"   rollout {np.mean([r['rv_vs_true'] for r in rows]):.4f}" if rollout_planner is not None else ""))
+    print(f"\ngoal read error |vision-read - physics|: {gr.mean():.4f}  (range {gr.min():.4f}-{gr.max():.4f})")
     dp = np.array([r["direct_physics"] for r in rows])
     dv = np.array([r["direct_vision"] for r in rows])
     print(f"\nmean across {len(rows)} conditions:")
@@ -133,6 +155,9 @@ def main():
         print(f"  rollout, physics goal: {rr.mean():.4f}  (range {rr.min():.4f}-{rr.max():.4f})")
         beat = int((dp < rr).sum())
         print(f"  direct beats rollout on {beat}/{len(rows)} conditions")
+        rv = np.array([r["rollout_vision"] for r in rows])
+        print(f"  rollout, vision goal:  {rv.mean():.4f}  (range {rv.min():.4f}-{rv.max():.4f})")
+        print(f"  direct(vision) beats rollout(vision) on {int((dv < rv).sum())}/{len(rows)} conditions")
 
 
 if __name__ == "__main__":

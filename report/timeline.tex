@@ -1,0 +1,98 @@
+% =========================================================================
+% Project timeline, September 2026 to May 2027.
+% Built as a plain colored-cell table rather than a drawing, so it sits in
+% the normal portrait text block and cannot overflow its frame.
+% =========================================================================
+
+% Category colors
+\definecolor{tlLit}{RGB}{100,116,139}
+\definecolor{tlModel}{RGB}{37,99,235}
+\definecolor{tlBase}{RGB}{147,51,234}
+\definecolor{tlSim}{RGB}{22,163,74}
+\definecolor{tlTo}{RGB}{234,88,12}
+\definecolor{tlDoc}{RGB}{190,18,60}
+
+% A filled month cell, and a centered fixed-width column type
+\newcommand{\tlCell}[1]{\cellcolor{#1}}
+\newcolumntype{M}{>{\centering\arraybackslash}p{0.85cm}}
+\newcolumntype{N}{>{\centering\arraybackslash}p{0.5cm}}
+
+% Legend swatch drawn with \fcolorbox, so no drawing package is needed
+\newcommand{\tlKey}[1]{\fcolorbox{black!55}{#1}{%
+  \rule{0pt}{5pt}\rule{7pt}{0pt}}}
+
+\begin{table}[H]
+\centering
+\captionsetup{width=15.2cm, justification=centering}
+\caption{Project timeline from September 2026 to May 2027}
+\label{tab:project-timeline}
+\vspace{0.2cm}
+\footnotesize
+\setlength{\tabcolsep}{1.5pt}
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{|N|p{6.2cm}|*{9}{M|}}
+\hline
+\rowcolor{black!8}
+ & & \multicolumn{4}{c|}{\textbf{2026}}
+ & \multicolumn{5}{c|}{\textbf{2027}} \\
+% \cline leaves the merged heading cells uncut. The \multirow entries are
+% written in the lower row with a negative span so the row color cannot
+% paint over their text.
+\cline{3-11}
+\rowcolor{black!8}
+\multirow{-2}{0.5cm}{\centering\textbf{No.}}
+ & \multirow{-2}{6.2cm}{\centering\textbf{Activity}}
+ & \textbf{Sep} & \textbf{Oct} & \textbf{Nov} & \textbf{Dec}
+ & \textbf{Jan} & \textbf{Feb} & \textbf{Mar} & \textbf{Apr} & \textbf{May} \\
+\hline
+
+1 & Literature review and study of the robot system
+ & \tlCell{tlLit} & \tlCell{tlLit} & & & & & & & \\
+\hline
+
+2 & Study and analysis of the robot dynamic model
+ & & \tlCell{tlModel} & \tlCell{tlModel} & & & & & & \\
+\hline
+
+3 & Baseline performance testing of the real robot
+ & \tlCell{tlBase} & \tlCell{tlBase} & \tlCell{tlBase} & \tlCell{tlBase}
+ & & & & & \\
+\hline
+
+4 & Simulation environment and robot model development
+ & & \tlCell{tlSim} & \tlCell{tlSim} & \tlCell{tlSim} & & & & & \\
+\hline
+
+5 & Trajectory optimization algorithm for the somersault
+ & & & \tlCell{tlTo} & \tlCell{tlTo} & & & & & \\
+\hline
+
+6 & Testing and refinement of the algorithm in simulation
+ & & & & \tlCell{tlTo} & \tlCell{tlTo} & \tlCell{tlTo} & & & \\
+\hline
+
+7 & Somersault trials in simulation and analysis
+ & & & & \tlCell{tlSim} & \tlCell{tlSim} & \tlCell{tlSim} & \tlCell{tlSim}
+ & & \\
+\hline
+
+8 & Conclusion and report preparation
+ & & & & & & & & \tlCell{tlDoc} & \tlCell{tlDoc} \\
+\hline
+\end{tabular}
+
+\vspace{0.45cm}
+
+% Legend
+\footnotesize
+\begin{tabular}{@{}l@{\hspace{0.4em}}l@{\hspace{1.6em}}l@{\hspace{0.4em}}%
+  l@{\hspace{1.6em}}l@{\hspace{0.4em}}l@{}}
+\tlKey{tlLit}   & Literature review          &
+\tlKey{tlModel} & Dynamic modeling          &
+\tlKey{tlBase}  & Baseline characterization  \\[2pt]
+\tlKey{tlSim}   & Simulation                 &
+\tlKey{tlTo}    & Trajectory optimization    &
+\tlKey{tlDoc}   & Reporting                  \\
+\end{tabular}
+
+\end{table}

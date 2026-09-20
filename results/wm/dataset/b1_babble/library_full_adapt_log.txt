@@ -1,0 +1,153 @@
+=== ADAPT b1_babble_v2_ego_flat ===
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 8619.67it/s]
+
+adapted on 9 clips of b1, 1000 updates, final loss 4.0858
+  horizon   before    after    moves
+        1     1.49     1.82     0.50
+        3     1.50     1.88     0.54
+        5     1.48     1.88     0.56
+       10     1.44     1.84     0.59
+
+Ratios are against holding the frame still; 1.0 means no better than predicting no
+motion. `moves` is predicted displacement over actual -- near 0 would be a model that
+learned to sit still, which scores 1.0 by construction.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/adapted_b1_babble_v2_ego_flat.pt
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 17119.03it/s]
+b1         36 clips, 693 of 3564 transitions held out
+epoch   50  train 4.2856
+epoch  100  train 3.8757
+epoch  150  train 3.6843
+epoch  200  train 3.5698
+epoch  250  train 3.4835
+epoch  300  train 3.4086
+
+embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
+b1              4.3217      0.658        0.1066      0.647
+
+Ratios are against predicting the mean z: below 1.0 is better than knowing nothing,
+and the rollout column is the one that decides whether planning can use this.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/proj_full_b1_babble_v2_ego_flat.pt
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 18148.87it/s]
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 17753.47it/s]
+also fitting on 1548 transitions from ['hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain']
+other robot: 24 clips, 195 of 1548 transitions held out (3 clips)
+36 clips, 495 of 3564 transitions held out (5 clips)
+held out: ['fwd_f1.5_s2.npz', 'fwd_f1.5_s3.npz', 'fwd_f2.0_s0.npz', 'yaw_p1.2_s1.npz', 'yaw_p1.5_s3.npz']
+
+fitting 8835 parameters, everything else frozen
+  before   b1       train     MSE 1.6133   mean 1.1663   ratio 1.383
+  before   b1       held out  MSE 1.0427   mean 0.6977   ratio 1.494
+  before   other    train     MSE 0.9983   mean 0.9858   ratio 1.013
+  before   other    held out  MSE 0.9323   mean 0.9000   ratio 1.036
+  epoch  100  train 1.7726
+  epoch  200  train 1.6498
+  epoch  300  train 1.5226
+  epoch  400  train 1.4198
+  after    b1       train     MSE 0.9217   mean 1.1663   ratio 0.790
+  after    b1       held out  MSE 0.7087   mean 0.6977   ratio 1.016
+  after    other    train     MSE 0.4972   mean 0.9858   ratio 0.504
+  after    other    held out  MSE 0.5730   mean 0.9000   ratio 0.637
+
+  ratio is against predicting the target's mean: **below 1.0 on the held-out clips is
+  the only line that means anything**, and a ratio near 1.0 there is a head that has
+  learned the dataset mean and nothing else -- which is what F120 measured this head
+  doing on the B1 before any fitting.
+
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/head_full_b1_babble_v2_ego_flat.pt
+=== LIBRARY_FULL b1_babble_v2_ego_flat ===
+library: data/egocentric/b1_babble_v2_ego_flat  (36 candidates)
+      speed_c5.8  selected 0.0743  oracle 0.0347  random 0.1181
+      speed_c7.1  selected 0.0821  oracle 0.0311  random 0.1346
+      turn_s0.05  selected 0.0675  oracle 0.0290  random 0.1127
+      turn_s0.15  selected 0.0770  oracle 0.0294  random 0.1126
+      turn_s0.29  selected 0.0975  oracle 0.0384  random 0.1186
+      turn_s0.56  selected 0.1304  oracle 0.0719  random 0.1467
+     speed_c8.15  selected 0.1140  oracle 0.0542  random 0.1659
+     side_L_lvl0  selected 0.0923  oracle 0.0425  random 0.1068
+     side_L_lvl1  selected 0.1136  oracle 0.0498  random 0.1199
+     side_R_lvl0  selected 0.0701  oracle 0.0322  random 0.0893
+     side_R_lvl1  selected 0.0888  oracle 0.0593  random 0.1338
+      speed_c8.8  selected 0.1065  oracle 0.0516  random 0.1674
+
+MEAN over 12 goals:  selected 0.0928   oracle 0.0437   random 0.1272
+scorer loss (selected - oracle) 0.0492;  share of the random-to-oracle gap recovered 41%
+=== ADAPT b1_babble_coppelia_spring_ego_flat ===
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 13327.20it/s]
+
+adapted on 9 clips of b1, 1000 updates, final loss 3.8265
+  horizon   before    after    moves
+        1     1.46     1.68     0.53
+        3     1.46     1.64     0.61
+        5     1.46     1.59     0.64
+       10     1.48     1.57     0.64
+
+Ratios are against holding the frame still; 1.0 means no better than predicting no
+motion. `moves` is predicted displacement over actual -- near 0 would be a model that
+learned to sit still, which scores 1.0 by construction.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/adapted_b1_babble_coppelia_spring_ego_flat.pt
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 16473.08it/s]
+b1         40 clips, 1272 of 6360 transitions held out
+epoch   50  train 4.3059
+epoch  100  train 4.0480
+epoch  150  train 3.9398
+epoch  200  train 3.8367
+epoch  250  train 3.7325
+epoch  300  train 3.6162
+
+embodiment       z MSE  vs mean-z   rollout gap  vs mean-z
+b1              4.3834      0.654        0.2084      0.605
+
+Ratios are against predicting the mean z: below 1.0 is better than knowing nothing,
+and the rollout column is the one that decides whether planning can use this.
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/proj_full_b1_babble_coppelia_spring_ego_flat.pt
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 17787.23it/s]
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 19604.99it/s]
+also fitting on 1548 transitions from ['hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain']
+other robot: 24 clips, 195 of 1548 transitions held out (3 clips)
+40 clips, 954 of 6360 transitions held out (6 clips)
+held out: ['b1_babble_s12.npz', 'b1_babble_s13.npz', 'b1_babble_s19.npz', 'b1_babble_s21.npz', 'b1_babble_s23.npz', 'b1_babble_s28.npz']
+
+fitting 8835 parameters, everything else frozen
+  before   b1       train     MSE 2.2731   mean 0.3043   ratio 7.471
+  before   b1       held out  MSE 2.5099   mean 0.3219   ratio 7.796
+  before   other    train     MSE 1.3346   mean 0.9858   ratio 1.354
+  before   other    held out  MSE 1.1510   mean 0.9000   ratio 1.279
+  epoch  100  train 1.1899
+  epoch  200  train 1.0465
+  epoch  300  train 0.9204
+  epoch  400  train 0.8310
+  after    b1       train     MSE 0.2728   mean 0.3043   ratio 0.897
+  after    b1       held out  MSE 0.2932   mean 0.3219   ratio 0.911
+  after    other    train     MSE 0.5574   mean 0.9858   ratio 0.565
+  after    other    held out  MSE 0.6490   mean 0.9000   ratio 0.721
+
+  ratio is against predicting the target's mean: **below 1.0 on the held-out clips is
+  the only line that means anything**, and a ratio near 1.0 there is a head that has
+  learned the dataset mean and nothing else -- which is what F120 measured this head
+  doing on the B1 before any fitting.
+
+-> wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/head_full_b1_babble_coppelia_spring_ego_flat.pt
+=== LIBRARY_FULL b1_babble_coppelia_spring_ego_flat ===
+library: data/egocentric/b1_babble_coppelia_spring_ego_flat  (40 candidates)
+      speed_c5.8  selected 0.0515  oracle 0.0311  random 0.0670
+      speed_c7.1  selected 0.0591  oracle 0.0368  random 0.0646
+      turn_s0.05  selected 0.0537  oracle 0.0304  random 0.0723
+      turn_s0.15  selected 0.0574  oracle 0.0357  random 0.0772
+      turn_s0.29  selected 0.0687  oracle 0.0467  random 0.0867
+      turn_s0.56  selected 0.1176  oracle 0.0892  random 0.1212
+     speed_c8.15  selected 0.0736  oracle 0.0508  random 0.0769
+     side_L_lvl0  selected 0.1332  oracle 0.1203  random 0.1677
+     side_L_lvl1  selected 0.1285  oracle 0.1168  random 0.1592
+     side_R_lvl0  selected 0.1329  oracle 0.1196  random 0.1666
+     side_R_lvl1  selected 0.1654  oracle 0.1569  random 0.1932
+      speed_c8.8  selected 0.0742  oracle 0.0529  random 0.0780
+
+MEAN over 12 goals:  selected 0.0930   oracle 0.0739   random 0.1109
+scorer loss (selected - oracle) 0.0191;  share of the random-to-oracle gap recovered 48%
+ALL DONE
