@@ -3316,3 +3316,45 @@ policy นี้เรียนรู้แค่ "เดินหน้า" ไ
   1. ดูความแกว่งของ seed ก่อนสรุป
   2. ออกแบบ test ที่สิ่งที่ทดสอบชนะได้จริง
   3. ตรวจภาพจริงก่อนเชื่อตัวเลขจาก sim
+
+## 28 ก.ย. 2026: เจอสาเหตุที่ z ไม่แชร์ข้ามร่าง และออกแบบใหม่ให้ถูกหลัก
+
+**สิ่งที่พบ**
+- **detach ถูก hard-code มาตลอด:** `z.detach()` ของ Froude head อยู่ในโค้ดตั้งแต่ 8 ก.ย. (commit c1e1bb9) โดยไม่มี config field ทุก run หลังจากนั้นจึงไม่มี Froude สอน z เลย
+  - F233 ที่บอกว่า "detach ไม่จำเป็น" เกิดจากอ่าน config ผิด (run นั้นก็ detach) แก้ใน FINDINGS แล้ว
+  - เพิ่ม flag `--detach_body_z` ค่าเริ่มต้นคือ True ให้ผลเหมือนเดิม
+- **ก่อน detach เคยแชร์:** ตอน Froude head อ่าน z อย่างเดียว ใช้หัวเดียวทุกร่าง pretrain ร่วม hexapod + B1 ได้ cross-body R² +0.54/+0.44 (F57) หลัง detach ได้ −0.40/−0.59 (F232) สอดคล้องกับหลักที่ว่า "ต้องการให้แชร์ ต้องใส่ใน objective"
+- **ภาพ ego บอกร่างได้ 99.8%** (hexapod vs B1, F275) หัวที่เห็นภาพจึงแยกทายตามร่างได้โดยไม่ต้องให้ z แชร์ (F57: หัวที่เห็นภาพได้ −10/−57)
+
+**แนวคิดใหม่ (สรุปจากการคุย)**
+- **มองโมเดลเป็น autoencoder:** ITM เข้ารหัสคู่ภาพเป็น z แล้วถอดรหัสสองทาง คือ FTM (ภาพถัดไป) และ motion decoder
+- **ตอนนี้ motion decoder ทายคำสั่งข้อต่อแยกต่อร่าง** ในบรรดาสามงาน (เรา, LAC-WM, Egocentric VSM) มีแต่ของเราที่ทำแบบนี้
+- **เปลี่ยน target เป็น Froude:** ให้ motion decoder ทาย Froude (ระดับสูง ใช้ร่วมทุกร่าง) เทียบได้กับ end-effector/camera motion ของ LAC-WM ซึ่ง camera motion ของเขาคือ body motion ของเราพอดี เพราะกล้องติดตัวหุ่น
+  - ยังทำหน้าที่กัน shortcut แบบ motion decoder ของ LAC-WM ไว้ได้
+  - หัวต้อง**อ่าน z อย่างเดียว** เพราะ Froude อยู่ใน body frame ไม่ขึ้นกับมุมกล้อง จึงไม่ต้องเห็นภาพ และปิดทางที่ภาพบอกร่าง
+- **อะไรแชร์ อะไรแยกต่อร่าง:**
+  - ระดับข้อต่ออยู่แค่ใน projector ต่อร่าง (คำสั่งข้อต่อ → z) เหมือน LAC-WM ที่ projector รับ action ดิบ
+  - loss ที่แยกต่อร่าง (`lambda_motion`, `lambda_readout`) อาจแค่ไม่ช่วยให้แชร์ หรืออาจดึง z ให้แยกกัน ต้องวัด เพราะ F57 มีทั้งสองอย่างก็ยังแชร์ได้
+- **target 3 มิติอาจอ่อนเกินไป** (LAC-WM ใช้ 9–138 มิติ) ทางเลือก:
+  - ทาย Froude ทั้ง chunk (15 ค่า)
+  - เพิ่ม 6-DoF ที่ normalize แล้ว (Δz/√(gh), roll/pitch × √(h/g))
+- **รูปแบบของการยึดกับ Froude:**
+  - (a) regression head บน z
+  - (b) similarity loss แบบ arXiv 2609.19846: cos(z_i, z_j) ต้องตรงกับความคล้ายของ Froude ของคู่นั้น **รวมคู่ข้ามร่าง** เปเปอร์นั้นได้ transfer 24 → 61.3% และดีกว่าการใส่หัวทาย action ยังไม่ได้สร้าง ใช้ชื่อ `lambda_sim`
+- **เมื่อ z แชร์แล้ว:** plan ใน z ได้ตรงๆ คือ z_goal = ITM(ภาพของอีกร่าง) เทียบกับ proj(a) หรือ z จาก rollout ไม่ต้องมีหัวอ่าน Froude ตอน plan
+- **prior work** (`doc/ref/notes_prior_work_cross_body.md`):
+  - ไม่เจอใครใช้ Froude เป็นสัญญาณร่วมของ latent action หรือ world model
+  - ไม่เจอ legged → legged ข้ามจำนวนขาจากกล้อง ego
+  - งานที่ใกล้ที่สุดคือ 2609.19846 (manipulation), QWM (quadruped, proprioception, ใช้ morphology descriptor) และ LAT (hexapod + quadruped แต่เทรนแยกกัน)
+  - scope: Froude จับคู่การเคลื่อนของลำตัว ไม่ใช่ท่าเดิน
+
+**แผนทดสอบ (ทีละคำถาม)**
+| ขั้น | คำถาม | สถานะ |
+|---|---|---|
+| 0 | ให้ Froude สอน z บนร่างเดียว (`dt0_beh24`) เทียบ A/A2 ทำให้ action sensitivity แย่ลงไหม | กำลังเทรนบน server (2 GPU) ประเมินที่เครื่องนี้ด้วย `detach_eval_local.sh` |
+| 1 | ยึดกับ Froude อย่างเดียว ปิด per-body decoder (`--lambda_motion 0 --lambda_readout 0 --lambda_body 0.5 --detach_body_z False`) | รอคิว |
+| 2 | pretrain ร่วม hexapod + B1 ด้วย babble เปรียบเทียบ: ไม่ยึด / (a) head / (b) similarity, และ per-body decoder เปิด vs ปิด, 2 seed | วัด cross-body retrieval, M10, M11, η² action |
+| 3 | ร่างหนึ่งทำตามการเคลื่อนของอีกร่างได้ไหม (closed loop ฟิสิกส์, รวมการให้คะแนนใน z) | |
+| 4 | gecko เป็นร่างที่ไม่เคยเห็น | |
+
+baseline ที่ต้องมี: visual odometry (ทาย Froude จากคู่ภาพตรงๆ ไม่ใช้ world model) และแบบ morphology-conditioning แบบ QWM

@@ -7039,3 +7039,186 @@ Per-condition values: `results/wm/closed_loop/physics/summary.txt`; figures
 - Phase matching helps direct slightly and makes rollout worse in every model; not explained.
 - What is established: selection in the world model's latent space (direct) is clearly better than
   random under real physics on both bodies (B1 0.070-0.078 vs 0.089; c08 0.059-0.078 vs 0.111-0.126).
+
+---
+
+### F275. A single egocentric frame identifies hexapod vs B1 almost perfectly (0.998) but not the two hexapod leg lengths (0.453): any head that reads the frame can solve a per-body target without a shared z
+
+Question: F57 found that a Froude head reading frame + z (LAC-WM's motion-decoder form) destroyed
+cross-body transfer (insect->b1 R2 -10.48, b1->insect -57.17, vs +0.544 / +0.435 for a z-only head),
+attributed to the frame revealing the robot. F57 used allocentric frames; does the egocentric view
+used since then still reveal the body?
+
+Probe: frozen V-JEPA2 embeddings of single egocentric frames (every 4th frame, 24 clips per body,
+mean over the 256 tokens), standardised, PCA 64, logistic regression, 5-fold CV grouped by clip.
+Caches: `anova_hex_beh24val.pt` (c10), `selection_eval_c08.pt` (c08), `selection_eval_cands.pt` (B1).
+
+| task | accuracy | chance |
+|---|---|---|
+| c10 vs B1 | 0.998 | 0.5 |
+| c10 vs c08 | 0.453 | 0.5 |
+| 3 bodies | 0.651 | 0.33 |
+
+**Reading.**
+- Egocentric frames separate the hexapod from the B1 as completely as allocentric ones could; the
+  frame-reveals-the-body mechanism behind F57 applies to the current setup. Any module that sees the
+  frame (motion decoder, frame-reading body head, FTM) can fit a per-body mapping without z being shared.
+- The two hexapods are indistinguishable from one frame, consistent with F272 (z shared c10 <-> c08).
+- Confound not separated: B1 clips are rendered by a different pipeline (camera height, room
+  generation), so the probe shows the frame identifies the body, not whether it does so from the body
+  itself or from rendering differences.
+- Same pattern as arXiv 2609.19846's wrist-camera ablation (body-specific views: transfer 61.3% -> 46.0%).
+
+Consequence for design: a cross-body grounding must act on z alone (z-only shared head, or a
+similarity loss on z), never through the frame. Notes: `doc/ref/notes_prior_work_cross_body.md`.
+
+---
+
+### F276. Pretraining on babble only: switching babble (drive held 15-25 frames) improves the read-out of the rollout on both seeds but not physics selection; rapid babble (drive every 5 frames) fails zero-shot c08 on both seeds
+
+`scripts/run/babble_only_arms.sh`. Stride-5 pretrains on 48 c10 clips each, differing only in the
+data, 2 seeds per arm, identical evaluation to F273/F274:
+- beh24: one behaviour per clip. Runs A, A2.
+- switch: babble only, new drive every 15-25 frames, ramp 4. Runs SW0, SW1.
+- rapid: babble only, new drive every 5 frames (= one model step), ramp 2. Runs RP0, RP1.
+  The rapid pilot showed the body's motion lagging the drive by about one segment (5-10 frames), and a
+  2-98% forward Froude range of -0.14..+0.13 against beh24's -0.21..+0.22.
+
+Kinematic selection, NS at w=11 (B1 oracle 0.031 / random 0.126; c08 0.020 / 0.121):
+
+| run | B1 direct | B1 rollout (current start) | c08 direct | c08 rollout (current start) | read of rollout r fwd/lat/yaw | top-1 retrieval |
+|---|---|---|---|---|---|---|
+| A | +0.82 | +0.40 | +0.61 | +0.39 | 0.10 / 0.23 / 0.21 | 0.233 |
+| A2 | +0.59 | +0.21 | +0.55 | +0.30 | 0.05 / 0.34 / 0.04 | 0.184 |
+| SW0 | +0.76 | +0.33 | +0.54 | +0.45 | 0.13 / 0.48 / 0.68 | 0.262 |
+| SW1 | +0.72 | +0.36 | +0.64 | +0.26 | 0.19 / 0.47 / 0.63 | 0.262 |
+| RP0 | +0.63 | +0.11 | -0.19 | +0.11 | -0.10 / 0.37 / 0.11 | 0.222 |
+| RP1 | +0.65 | +0.20 | -0.21 | -0.13 | -0.01 / 0.37 / -0.05 | 0.205 |
+
+(read of rollout = r across 24 actions of body(ITM(e_s, FTM(e_s, proj(a)))) vs true Froude, B1;
+top-1 retrieval = cosine match of the action-specific predicted change to the real one, chance 0.042.)
+
+eta^2 state / eta^2 action on the pretrained model, hexapod val (fwd/lat/yaw): A2 0.63/0.41/0.43 vs
+0.23/0.33/0.20; SW0 0.37/0.32/0.22 vs 0.31/0.49/0.47; SW1 0.51/0.41/0.32 vs 0.22/0.43/0.29; RP0
+0.55/0.36/0.38 vs 0.29/0.41/0.44; RP1 0.44/0.29/0.23 vs 0.37/0.50/0.57. Measured on beh24 val, which
+the babble runs never trained on.
+
+Physics closed loop (F274 protocol), mean L2 error over six goals; random 0.089 (B1), 0.126 (c08 plain),
+0.111 (c08 phase-matched):
+
+| run | B1 direct | B1 rollout | c08 plain direct | c08 plain rollout | c08 phase direct | c08 phase rollout |
+|---|---|---|---|---|---|---|
+| A (F274) | 0.070 | 0.083 | 0.072 | 0.077 | 0.065 | 0.100 |
+| A2 (F274) | 0.077 | 0.103 | 0.078 | 0.104 | 0.073 | 0.104 |
+| SW0 | 0.077 | 0.088 | 0.082 | 0.082 | 0.084 | 0.091 |
+| SW1 | 0.088 | 0.090 | 0.083 | 0.097 | 0.079 | 0.102 |
+| RP0 | 0.078 | 0.096 | 0.139 | 0.154 | 0.143 | 0.129 |
+| RP1 | 0.058 | 0.115 | 0.136 | 0.147 | 0.148 | 0.133 |
+
+No B1 run fell. c08 falls are not detected by the loop (not checked here).
+
+**Reading.**
+- Switching babble, both seeds: the rollout's read-out of its own prediction (lat 0.47-0.48, yaw
+  0.63-0.68) and top-1 retrieval (0.262 both) exceed both beh24 seeds. Kinematic direct stays in the
+  beh24 range. The physics loop does not follow: B1 rollout 0.088-0.090 is at the random level (0.089),
+  c08 errors sit at or slightly above beh24's. The mechanism gain is not reaching closed-loop selection.
+- Rapid babble, both seeds: zero-shot c08 fails, kinematically (NS -0.19, -0.21) and in physics (every
+  c08 cell 0.129-0.154, worse than random 0.111-0.126). Consistent with the pilot's drive-to-motion lag:
+  with a new drive every model step, the action chunk and the motion that follows it are misaligned.
+  RP1's B1 direct (0.058) is the lowest B1 direct error measured, on one seed, next to RP0's 0.078; not
+  interpreted.
+- Direct < rollout in 21 of 24 model x body x execution cells here and in F274 combined. Exceptions:
+  SW0 c08 plain (0.0819 vs 0.0815, a tie) and RP0 / RP1 c08 phase-matched, where both mechanisms are
+  worse than random. None is a rollout win over a direct that beats random.
+- Babble drive duration matters: held 15-25 frames is usable, every 5 frames is not, for this body's
+  response time. The detach experiment's babble cell uses switching babble for this reason.
+
+Scope: one c10 body pretrained; B1 via the four-stage pipeline; c08 zero-shot; 2 seeds per arm, 6 goals.
+
+---
+
+### F277. Letting the Froude head shape z (detach off) improves selection on every body, both seeds, direct and rollout; and a same-body test shows rollout < direct with no body change at all
+
+**Same-body test (new).** `scripts/run/c10_samebody_eval.sh`: goals = the six c10f10t10 held-out goal
+clips, candidates = c10f10t10's own beh24 val library (24 clips, never trained on; the hexapod projector
+from `c08_zeroshot/` was fit on beh24 cleantrain). No change of body or leg length. Library bounds:
+oracle 0.0135, random 0.1535. Caveat: the library is fixed-behaviour clips, in-distribution for beh24
+models and not for babble-only models (F276).
+
+**Detach off.** `dt0_beh24_s0/_s1`: identical to A / A2 (beh24 cleantrain, stride 5, same losses, 50
+epochs, seeds 0 / 1) except `--detach_body_z False`, so the shared z-only Froude head's gradient reaches
+the ITM (as before 2026-09-08). Trained on the lab server, evaluated here through
+`scripts/run/detach_eval_local.sh` (identical to every other arm's evaluation).
+
+NS at w=11:
+
+| test | A (detach on) | A2 (detach on) | dt0 s0 (off) | dt0 s1 (off) | SW0 | SW1 | RP0 | RP1 |
+|---|---|---|---|---|---|---|---|---|
+| c10 same body, direct | +0.80 | +0.73 | +0.91 | +0.90 | +0.60 | +0.68 | +0.01 | -0.09 |
+| c10, rollout (library start) | +0.60 | +0.42 | +0.72 | +0.73 | +0.42 | +0.31 | +0.16 | +0.07 |
+| c10, rollout (current start) | +0.49 | +0.52 | +0.64 | +0.59 | +0.42 | +0.14 | +0.14 | +0.01 |
+| c08 zero-shot, direct | +0.61 | +0.55 | +0.80 | +0.79 | | | | |
+| c08, rollout (library start) | +0.38 | +0.26 | +0.47 | +0.54 | | | | |
+| c08, rollout (current start) | +0.39 | +0.30 | +0.52 | +0.43 | | | | |
+| B1, direct | +0.82 | +0.59 | +0.82 | +0.82 | | | | |
+| B1, rollout (library start) | +0.45 | +0.00 | +0.62 | +0.44 | | | | |
+| B1, rollout (current start) | +0.40 | +0.21 | +0.46 | +0.28 | | | | |
+
+(c08 / B1 values for the babble runs: F276.) Mechanism, B1: read of the rollout's prediction r
+fwd/lat/yaw dt0 0.27/0.28/0.62 and 0.24/0.32/0.41 (A 0.10/0.23/0.21, A2 0.05/0.34/0.04); read of the
+real counterfactual 0.20/0.42/0.59 and 0.22/0.45/0.48; top-1 retrieval 0.247 / 0.273 (A 0.233, A2 0.184).
+eta^2 on the pretrained model, hexapod val, state / action: dt0 s0 0.61/0.40/0.43 vs 0.19/0.25/0.30,
+s1 0.58/0.51/0.53 vs 0.20/0.17/0.21 (A2 0.63/0.41/0.43 vs 0.23/0.33/0.20).
+
+**Reading.**
+- Same body, every model: rollout < direct. The rollout's deficit exists without any change of body,
+  so it is not caused by cross-embodiment transfer.
+- Detach off beats detach on in 32 of 36 seed-pair comparisons above (each dt0 seed vs each of A, A2,
+  9 rows): 2 ties (B1 direct, dt0 vs A, +0.82 each) and 2 losses (dt0 s1 vs A on B1 rollout library
+  start, +0.44 vs +0.45, and current start, +0.28 vs +0.40). The largest gains are on the bodies whose z is shared with the pretraining body
+  (c08 direct +0.55-0.61 -> +0.79-0.80; c10 rollout library start +0.42-0.60 -> +0.72-0.73), beyond the
+  seed spread measured in F273.
+- The gain is not an increase in the FTM's action share: eta^2 action is equal or slightly lower. It
+  comes with a z whose Froude read-out is better (read of prediction and top-1 up), i.e. z is more
+  organised by body motion.
+- Consequence: the hard-coded detach (2026-09-08, see F233 correction) cost selection quality on every
+  body tested. `detach_body_z False` is the better setting for single-body pretraining; the cross-body
+  question (does it make the B1 share z) needs joint pretraining.
+- On the same body, babble-only pretraining is below beh24 (library in-distribution for beh24 only).
+
+Physics closed loop for dt0: pending (`scripts/run/detach_physics.sh`).
+
+---
+
+### F278. Existing joint hexapod+B1 pretrains (egocentric, stride 1, Froude head NOT detached) do not share z with the B1 under the strict test either
+
+Search of `wm/runs/` (incl. archives) for runs pretrained on both bodies: all date from before the
+hard-coded detach (2026-09-08), so all trained with the Froude head's gradient reaching z:
+`beh12_hex-b1_body3` (08-30, allocentric), `beh12_ego` (09-02), `beh12_state` (09-04), `beh12_state_more`
+(09-05), all stride 1 (`beh12_lag3_*` stride 3, allocentric). None is clean-split; none has hinge or
+read-out loss (`beh12_ego`: lambda_hinge 0, lambda_readout 0).
+
+`scripts/figures/shared_latent_figure.py --model ...` (F272 protocol: pretrained ITM, recorded clips of
+c10 / c08 / B1, ridge Froude read-out fit on c10 only), `results/deck/shared_latent_joint_check/`:
+
+| model | body-ID acc (chance 0.33) | c10 -> c08 R2 fwd/lat/yaw | c10 -> B1 R2 fwd/lat/yaw | kNN mixing |
+|---|---|---|---|---|
+| joint beh12_ego (stride 1, not detached) | 0.73 | +0.45 / +0.09 / -0.33 | -0.91 / +0.07 / -0.18 | 0.39 |
+| joint beh12_state (stride 1, not detached) | 0.74 | +0.38 / +0.00 / -0.22 | -0.89 / +0.08 / -0.90 | 0.39 |
+| single A (stride 5, detached) | 0.67 | +0.63 / +0.09 / -0.35 | -1.01 / -0.34 / -0.09 | 0.48 |
+| single dt0 s0 (stride 5, not detached) | 0.69 | +0.78 / +0.36 / +0.18 | -1.30 / -0.02 / +0.26 | 0.44 |
+
+**Reading.**
+- Pretraining both bodies together with an undetached shared Froude head did not, in these egocentric
+  stride-1 runs, place the B1's z where a c10-fit read-out can read it (forward R2 -0.9), and body
+  identity is at least as decodable as in single-body models (0.73-0.74 vs 0.67-0.69).
+- F57's cross-body R2 (+0.544 / +0.435) was allocentric, stride 1, scored with the co-trained head
+  (fit on both bodies), which F232 already flagged as not a strict transfer test; the strict
+  fit-on-one-body test has now been applied to joint egocentric runs and fails.
+- Detach off in single-body stride 5 (dt0) organises z better by motion within the hexapod family
+  (c10 -> c08 R2 +0.78 / +0.36 / +0.18, the best measured), consistent with F277.
+- Not separated: stride 1 (action barely visible per step, F259), beh12 data, no hinge / read-out
+  terms, not clean-split, R2's sensitivity to a per-body offset in the read-out.
+- Consequence: joint pretraining plus a regression Froude head is not by itself sufficient evidence
+  for a shared z; the grounding may need a relational constraint on z across bodies (e.g. the
+  similarity loss of arXiv 2609.19846) and stride 5.
