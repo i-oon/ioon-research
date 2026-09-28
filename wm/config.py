@@ -41,6 +41,9 @@ LEGACY_DEFAULTS = {
     "lambda_cross": 0.0,
     "lambda_adv": 0.0,
     "lambda_body": 0.0,
+    # no field before 2026-09-28; every run since 2026-09-08 detached (runs before that did not,
+    # but they predate the field and are only loaded for evaluation, where it has no effect)
+    "detach_body_z": True,
     "lambda_hinge": 0.0,
     "lambda_readout": 0.0,
     "lambda_ldad": 0.0,
@@ -251,6 +254,12 @@ class Config:
     # across 18 and 12 dimensions, which is what leaves the trunk free to partition by robot
     # (F48). 0.0 reproduces every run recorded before 2026-08-17.
     lambda_body: float = 0.0
+    # **Whether L_body shapes z.** True: the body head reads `z.detach()`, so Froude supervision
+    # never reaches the ITM -- hard-coded, with no config field, in every run from 2026-09-08
+    # (commit c1e1bb9) until this flag existed, which is why F233 misread `beh12_hinge_cleansplit`'s
+    # config as "no detach". False: Froude's gradient reaches z, as in every run before 2026-09-08
+    # (Section 8's jointly pretrained hexapod+B1 runs). Default True reproduces every current run.
+    detach_body_z: bool = True
     # --- ActSWM (F137). Zero by default: every run before 2026-08-31 reproduces unchanged.
     lambda_ldad: float = 0.0      # Delta-JEPA's LDAD: decode the action from the PREDICTED
     # state difference `FTM(e_t, z) - e_t`. Their sweep puts the useful range at 10-50 and their

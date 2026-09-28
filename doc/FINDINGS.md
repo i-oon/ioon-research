@@ -5952,6 +5952,31 @@ Not settled: whether this conclusion holds on beh24 or on non-clean-split data â
 
 Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (`action_lever_gap()` added, additive). Checkpoint: `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt` (pre-existing).
 
+**Correction (2026-09-28): F233's premise is false -- `beh12_hinge_cleansplit` WAS trained with
+`z.detach()`.** The stop-gradient on the body loss had no config field: it was hard-coded in
+`wm/train.py` (`md.body(view, z.detach())`) from commit c1e1bb9 (2026-09-08) onward, and before that
+(commit 5ab9b19, 2026-08-18) the body loss read `z` undetached. F233 read "no detach flag" in the
+run's config and concluded the run was undetached; the run (config written 2026-09-18) postdates the
+hard-coded detach, so it is a detached run like `beh12_body_stopgrad`. F233 therefore compares two
+detached checkpoints and says nothing about whether the detach is necessary. It also compares a
+held-out MSE ratio (0.730 / 0.659) against F232's cross-body R2, which are different metrics.
+
+What the record supports instead:
+- Every run after 2026-09-08 (beh12_hinge, beh24, stride 1/5/10, A/A2/B/C, babble arms) trained with
+  the body loss unable to shape `z`.
+- Section 8's cross-body R2 (+0.544 / +0.435) came from runs before the detach, pretrained on hexapod
+  AND B1 together with one shared body head whose gradient reached `z`, read with a co-trained head.
+  After the detach, heads fit on one body do not transfer (F232: -0.397 / -0.594; F272: c10 -> B1
+  negative). Detach on vs off has never been compared with the same data, bodies and evaluation.
+- F177's argument for the detach (the undetached `z`-only head failed the action-lever test) was
+  measured at stride 1 on one-behaviour-per-clip data, both since found to hide the action (F259:
+  1-step action visibility r ~0.2; F252/F266: start-state shortcut, which persists with the detach on).
+
+Fix: `Config.detach_body_z` (default True, reproduces every run since 2026-09-08) makes the choice a
+recorded config field. The controlled comparison is `scripts/run/detach_2x2_step1.sh` (hexapod only,
+beh24 vs switch babble x detach on/off) and `scripts/run/detach_joint_step2.sh` (hexapod + B1 jointly
+pretrained, detach on/off, fit-on-one-body / test-on-the-other read-out).
+
 ---
 
 ### F234. beh12 vs beh24, same clean-split eval, both bodies: real accuracy cost confirmed on hexapod (~2x), smaller on B1, with a genuine per-channel gain on B1's forward

@@ -103,7 +103,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--out", default="results/deck/shared_latent")
+    ap.add_argument("--model", action="append", default=[], metavar="NAME=CKPT",
+                    help="checkpoints to measure instead of the default stride-1/5 pair (repeatable); "
+                         "a jointly pretrained hexapod+B1 best.pt works as is (only its ITM is used)")
     args = ap.parse_args()
+    models = [tuple(m.split("=", 1)) for m in args.model] or MODELS
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -116,7 +120,7 @@ def main():
     fams = ["forward", "backward", "turn +", "turn -", "side L", "side R"]
     fam_col = dict(zip(fams, ["#1b5e20", "#b71c1c", "#e65100", "#f9a825", "#0d47a1", "#6a1b9a"]))
     rows = []
-    for mname, mpath in MODELS:
+    for mname, mpath in models:
         Z, B, F, G, C = latents(mpath, args.device)
         acc, xfer, mix = numbers(Z, B, F, G, np.random.default_rng(0))
         rows.append((mname, acc, xfer, mix))

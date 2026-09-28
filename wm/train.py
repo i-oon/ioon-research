@@ -197,7 +197,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
 
     body_pred = body_target = None
     if models["md"].body_head is not None and "body_motion" in batch:
-        # `z.detach()`: L_body no longer shapes z. Isolated-frozen-z test (2026-09-08) found the
+        # `cfg.detach_body_z` (default True). `z.detach()`: L_body no longer shapes z. Isolated-frozen-z test (2026-09-08) found the
         # action->Froude signal IS in z (rho 0.69-0.94 per channel on the real absolute
         # body_motion target, action-lever gap 1.0-1.2 against a 0.11 bar) once a clean head reads
         # it WITHOUT competing against L_recon/L_motion for how z is shaped -- the jointly-trained
@@ -205,7 +205,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         # because its own gradient was one more voice pulling z toward appearance/motion instead
         # of just reading what is already there. Stop-gradient makes this the same experiment as
         # the isolated test that passed: z is shaped by L_recon/L_motion alone, L_body only reads.
-        body_pred = models["md"].body(views["view1_t"], z.detach())
+        body_pred = models["md"].body(views["view1_t"], z.detach() if cfg.detach_body_z else z)
         body_target = batch["body_motion"].to(device)
 
     # L_state / state_head retired (2026-09-08): F177 showed its delta ingredient actively hurts
