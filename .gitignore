@@ -12,7 +12,7 @@ data/
 # Model checkpoints and caches (large, regenerable)
 wm/runs/
 wm/cache/
-results/wm/cache/
+results/wm/cache*/
 results/wm/cache_zeroshot/
 results/dataset/**/emb.npz
 
