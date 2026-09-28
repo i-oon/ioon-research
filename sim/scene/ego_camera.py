@@ -48,6 +48,45 @@ REF_MOUNT_Z = 0.272
 # it stops the two cameras aiming at different parts of the room, and stabilises nothing else.
 WALK_PITCH = {"hexapod": 7.53, "b1": 1.02}
 
+# **The one field of view every egocentric camera in this project uses, on every body.** Every
+# training clip (`collect_ik.py --view egocentric`, `render_b1_replay.py --ego`) was shot at 90 deg.
+# It has been got wrong three separate ways, each producing frames that look plausible and pass every
+# downstream script: a 24-deg third-person default inherited by the B1 ego render (fixed in
+# `render_b1_replay.py`), the same 24 deg hard-coded in `close_loop_direct_froude.py`'s ego sensor
+# (F256 -- the planner read a telephoto view, a wall filling the frame), and a FOV set BEFORE
+# `startSimulation`, which restores the scene's authored 15 deg (`collect_ik.py`; also the babble
+# collector and the CPG controller, F256). Set it through `set_ego_fov`, which reads it back.
+EGO_FOV_DEG = 90.0
+
+
+def set_ego_fov(sim, cam, fov_deg=EGO_FOV_DEG):
+    """Set the egocentric field of view and **read it back**. Call it again after every
+    `startSimulation`: starting restores a scene sensor's authored value."""
+    sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle, float(np.deg2rad(fov_deg)))
+    got = float(np.degrees(sim.getObjectFloatParam(cam, sim.visionfloatparam_perspective_angle)))
+    if abs(got - fov_deg) > 0.5:
+        raise RuntimeError(f"ego camera FOV is {got:.1f} deg after setting {fov_deg:.1f}")
+    return got
+
+
+def ego_view_profile(frame):
+    """Mean luminance per image row -- where the ceiling, wall and floor fall in the frame."""
+    return np.asarray(frame, float).mean(2).mean(1)
+
+
+def check_ego_view(frame, reference_frames, min_corr=0.97, what="ego frame"):
+    """**Refuse to run on a view that does not look like the training clips.** Correlates the row
+    profile of `frame` with the mean profile of `reference_frames` (first frames of the clips the
+    model was trained or calibrated on). Measured (F256): correctly rendered B1 ego clips 0.980-0.995;
+    the 24-deg closed loop 0.67-0.70; babble ego sets 0.81-0.93; `beh12_b1_more_ego_flat` 0.43-0.55.
+    Returns the correlation; raises below `min_corr`."""
+    ref = np.mean([ego_view_profile(f) for f in reference_frames], axis=0)
+    r = float(np.corrcoef(ego_view_profile(frame), ref)[0, 1])
+    if r < min_corr:
+        raise RuntimeError(f"{what} does not match the training view (row-profile corr {r:.3f} < "
+                           f"{min_corr}): check the ego FOV ({EGO_FOV_DEG} deg), mount and room -- F256")
+    return r
+
 
 def room_for(mount_z, size=8.0, height=3.0, tile=6.0, ground_uv=0.5):
     """Every length scaled by body height, so the room **subtends the same angles from each eye**.
@@ -137,8 +176,9 @@ def attach_ego(sim, cam, parent, forward_world, offset=(0.0, 0.0, 0.0), up=(0.0,
                          float(x[1]), float(y[1]), float(z[1]), float(p[1]),
                          float(x[2]), float(y[2]), float(z[2]), float(p[2])])
     sim.setObjectParent(cam, parent, True)         # keepInPlace, so the world pose above survives
+    fov = set_ego_fov(sim, cam)                    # mounting an ego camera always sets its lens too
     return dict(forward=[round(float(v), 3) for v in z],
-                position=[round(float(v), 3) for v in p])
+                position=[round(float(v), 3) for v in p], fov=round(fov, 1))
 
 
 def insect_forward(sim):

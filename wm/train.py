@@ -263,6 +263,22 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         pred_next2 = models["ftm"](pred_next, z2, embodiment)
         rollout_loss = F.mse_loss(pred_next2, views["view2_next2"])
 
+    # --- counterfactual cycle (see `Config.lambda_cycle`). Off unless set, so every earlier run
+    # reproduces unchanged. z is shuffled across the batch (a batch is one embodiment, different
+    # clips and times), so the FTM sees a latent that disagrees with the frame it starts from -- the
+    # pairing selection creates -- and must move the prediction the way that latent says. The ITM's
+    # weights are detached for this term only: the gradient reaches the FTM through the ITM's
+    # function but cannot retrain the ITM to decode whatever the FTM happens to emit.
+    cycle_loss = None
+    if cfg.lambda_cycle > 0 and len(z) > 1:
+        z_cf = z.detach().roll(1, dims=0)
+        pred_cf = models["ftm"](views["view2_t"], z_cf, embodiment)
+        itm = models["itm"]
+        frozen = {k: v.detach() for k, v in itm.named_parameters()}
+        frozen.update(dict(itm.named_buffers()))
+        z_back = torch.func.functional_call(itm, frozen, (views["view2_t"], pred_cf))
+        cycle_loss = F.mse_loss(z_back.float(), z_cf.float())
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -293,6 +309,10 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     if rollout_loss is not None:
         loss = loss + cfg.lambda_rollout * rollout_loss
         parts["rollout"] = float(rollout_loss.detach())
+        parts["total"] = float(loss.detach())
+    if cycle_loss is not None:
+        loss = loss + cfg.lambda_cycle * cycle_loss
+        parts["cycle"] = float(cycle_loss.detach())
         parts["total"] = float(loss.detach())
     return loss, parts
 
@@ -594,7 +614,11 @@ def main():
         print(f"warm-started from {args.init_ckpt}; optimiser, schedule and epoch count are fresh")
     if "adv" in models:
         print(f"adversary on z: {n_bodies} bodies {train_set.morphs}, lambda_adv {cfg.lambda_adv}")
-    parameters = [p for model in models.values() for p in model.parameters()]
+    for name in cfg.freeze_modules:
+        for p in models[name].parameters():
+            p.requires_grad_(False)
+        print(f"frozen: {name}")
+    parameters = [p for model in models.values() for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(parameters, lr=cfg.lr, weight_decay=cfg.weight_decay)
     schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
     scaler = torch.amp.GradScaler("cuda")

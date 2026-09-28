@@ -69,8 +69,8 @@
   \node[goalbox] (recorded) at (80,30) {read recorded\\number};
   \node[scorebox, minimum width=27mm] (physGoal) at (123,30)
     {goal Froude\\$\mathbf v_t^g$};
-  \draw[flow] (sourceclipA) -- node[above,note] {record} (recorded);
-  \draw[flow] (recorded) -- node[above,note] {$\mathbf v_t^g$} (physGoal);
+  \draw[flow] (sourceclipA) -- (recorded);
+  \draw[flow] (recorded) -- (physGoal);
   \node[font=\scriptsize, text=targetgray] at (163,30)
     {privileged sanity ceiling};
 
@@ -78,13 +78,13 @@
   \node[goalbox] (sourceclipB) at (38,18) {source video};
   \node[encoder] (enc) at (80,18) {Encoder};
   \node[model] (itm) at (111,18) {ITM};
-  \node[bodyhead] (bodyheadG) at (142,18) {Body Head};
+  \node[bodyhead] (bodyheadG) at (142,18) {Cross Body Head};
   \node[scorebox, minimum width=27mm] (visGoal) at (183,18)
     {goal Froude\\$\mathbf v_t^g$};
-  \draw[flow] (sourceclipB) -- node[above,note] {$o_t,o_{t+1}$} (enc);
-  \draw[flow] (enc) -- node[above,note] {$(e_t,e_{t+1})$} (itm);
-  \draw[flow] (itm) -- node[above,note] {$z_t^g$} (bodyheadG);
-  \draw[flow] (bodyheadG) -- node[above,note] {$\mathbf v_t^g$} (visGoal);
+  \draw[flow] (sourceclipB) -- (enc);
+  \draw[flow] (enc) -- (itm);
+  \draw[flow] (itm) -- (bodyheadG);
+  \draw[flow] (bodyheadG) -- (visGoal);
 
   % -------------------------------------------------------------------
   % Axis 2: how a candidate is scored.
@@ -98,14 +98,14 @@
   \node[goalbox, minimum width=18mm] (act) at (40,-12) {$a_t$};
   \node[model] (proj) at (70,-12) {Projector};
   \node[latent] (z) at (99,-12) {$z_t$};
-  \node[bodyhead] (bodyheadD) at (132,-12) {Body Head};
+  \node[bodyhead] (bodyheadD) at (132,-12) {Cross Body Head};
   \node[scorebox, minimum width=31mm] (directF) at (175,-12)
     {candidate Froude\\$\hat{\mathbf v}_t$};
   % \draw[hotflow] (directTag) -- (act);
-  \draw[hotflow] (act) -- node[above,note] {$a_t$} (proj);
-  \draw[hotflow] (proj) -- node[above,note] {$z_t$} (z);
-  \draw[hotflow] (z) -- node[above,note] {$z_t$} (bodyheadD);
-  \draw[hotflow] (bodyheadD) -- node[above,note] {$\hat{\mathbf v}_t$} (directF);
+  \draw[hotflow] (act) -- (proj);
+  \draw[hotflow] (proj) -- (z);
+  \draw[hotflow] (z) -- (bodyheadD);
+  \draw[hotflow] (bodyheadD) -- (directF);
   \node[font=\scriptsize, text=targetgray] at (216,-12)
     {no world model};
 
@@ -114,18 +114,18 @@
   \node[model] (ftm) at (72,-32) {FTM};
   \node[goalbox, minimum width=25mm] (future) at (104,-32) {imagined\\future};
   \node[model] (itmR) at (135,-32) {ITM};
-  \node[bodyhead] (bodyheadR) at (166,-32) {Body Head};
+  \node[bodyhead] (bodyheadR) at (166,-32) {Cross Body Head};
   \node[scorebox, minimum width=31mm] (rollF) at (207,-32)
     {candidate Froude\\$\hat{\mathbf v}_t$};
   % \draw[hotflow] (rolloutTag) -- (ctx);
-  \draw[hotflow] (ctx) -- node[above,note] {$e_t,z_t$} (ftm);
-  \draw[hotflow] (ftm) -- node[above,note] {$\hat e_{t+1}$} (future);
-  \draw[hotflow] (future.north) -- ++(0,5) -- ($(ftm.north)+(0,5)$) -- (ftm.north);
+  \draw[hotflow] (ctx) -- (ftm);
+  \draw[hotflow] (ftm) -- (future);
+  \draw[target] (future.north) -- ++(0,5) -- ($(ftm.north)+(0,5)$) -- (ftm.north);
   \node[note, text=emphasisred] at (88,-20)
     {repeat rollout};
-  \draw[hotflow] (future) -- node[above,note] {$(e_t,\hat e_{t+1})$} (itmR);
-  \draw[hotflow] (itmR) -- node[above,note] {$\hat z_t$} (bodyheadR);
-  \draw[hotflow] (bodyheadR) -- node[above,note] {$\hat{\mathbf v}_t$} (rollF);
+  \draw[hotflow] (future) -- (itmR);
+  \draw[hotflow] (itmR) -- (bodyheadR);
+  \draw[hotflow] (bodyheadR) -- (rollF);
 
   % -------------------------------------------------------------------
   % Shared decision rule.

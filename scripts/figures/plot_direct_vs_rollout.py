@@ -37,8 +37,14 @@ def main():
     ap.add_argument("--candidates_dir", required=True)
     ap.add_argument("--goal_dir", required=True)
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--display_name", default="", help="name shown in the figure title (default: the tag)")
+    ap.add_argument("--cond_label", default="", help="condition name shown in the figure (default: the condition id)")
     ap.add_argument("--condition", required=True)
     ap.add_argument("--horizon", type=int, default=2)
+    ap.add_argument("--window", type=int, default=0,
+                    help="read-out window for scoring each candidate, independent of --horizon "
+                         "(decision cadence and grading stay --horizon). 0 = off, original "
+                         "scoring. ~20 matches body_motion's own 1 s stride smoothing.")
     ap.add_argument("--per_condition", type=int, default=999, help="999 = every clip is a candidate (as in the tracking plots)")
     ap.add_argument("--ylims", default="-0.12,0.33,-0.20,0.15,-0.07,0.14")
     ap.add_argument("--out_dir", default="results/deck/babble_selection")
@@ -53,6 +59,7 @@ def main():
     cdir = os.path.join(ROOT, args.candidates_dir)
     planner = build_planner(os.path.join(ROOT, args.ckpt), cdir, "b1", args.horizon, free_offset=False,
                             device=args.device, per_condition=args.per_condition)
+    planner.window = args.window
     spec = REGISTRY["b1"]
     gp = None
     for p in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
@@ -67,6 +74,7 @@ def main():
 
     rp = RolloutFroudePlanner.from_checkpoint(os.path.join(ROOT, args.ckpt), cdir, embodiment="b1",
                                               horizon=args.horizon, per_condition=args.per_condition, device=args.device)
+    rp.window = args.window
     raw = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     r_offset = offset_for(raw, "b1")
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
@@ -91,8 +99,8 @@ def main():
         ax.set_ylabel(LABELS[i]); ax.set_ylim(f[2 * i], f[2 * i + 1])
         if i == 0:
             ax.legend(loc="upper right", fontsize=8)
-    axes[0].set_title(f"2. Physics goal: direct vs rollout scoring  [{args.tag}]\n"
-                      f"goal={args.condition}  |  mean err: direct={err_d:.4f}  rollout={err_r:.4f}")
+    axes[0].set_title(f"Physics goal: direct vs rollout scoring  [{args.display_name or args.tag}]\n"
+                      f"goal: {args.cond_label or args.condition}  |  mean err: direct={err_d:.4f}  rollout={err_r:.4f}")
     axes[-1].set_xlabel(f"timestep (horizon={args.horizon}, goal read at every step)")
     plt.tight_layout()
     out = os.path.join(ROOT, args.out_dir, f"{args.tag}_direct_vs_rollout_{args.condition}.png")

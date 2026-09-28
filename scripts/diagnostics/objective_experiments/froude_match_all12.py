@@ -139,6 +139,9 @@ def main():
               f"direct(vision)={err_direct_vision:.4f}  "
               f"rollout(physics)={'--' if err_rollout is None else f'{err_rollout:.4f}'}  "
               f"rollout(vision)={'--' if err_rollout_vision is None else f'{err_rollout_vision:.4f}'}  n={row['n']}")
+        print(f"      RAW {cond} dp={err_direct_physics:.4f} dv={err_direct_vision:.4f} rp={'nan' if err_rollout is None else f'{err_rollout:.4f}'} "
+              f"rv={'nan' if err_rollout_vision is None else f'{err_rollout_vision:.4f}'} dv_true={dv_vs_true:.4f} "
+              f"rv_true={'nan' if rv_vs_true is None else f'{rv_vs_true:.4f}'} gre={goal_read_err:.4f} n={row['n']}")
 
     gr = np.array([r["goal_read_err"] for r in rows])
     print(f"vision-driven picks graded against the TRUE goal: direct "

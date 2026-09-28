@@ -48,7 +48,24 @@ from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
-FAMILY = lambda cond: cond.rsplit("_", 1)[0] if "_" in cond else cond
+import re
+
+
+def FAMILY(cond):
+    """Behaviour family a condition belongs to, independent of naming convention.
+
+    beh12 conditions carry one variable suffix (`speed_c5.8` -> `speed`), so a plain
+    rsplit worked. beh24 conditions can carry a SECOND, non-numeric suffix marking a mode
+    (`speed_c5.8_bwd`, `turn_s0.05_neg`) -- a plain rsplit strips only the numeric token and
+    leaves `speed_c5.8` / `turn_s0.05` as their own singleton "families", silently dropping
+    every _bwd/_neg condition (exactly the new, diversity-adding ones) from every ceiling
+    check. Strip the numeric magnitude/level token specifically and keep any mode suffix.
+    """
+    c = re.sub(r"_(c|s)[\d.]+", "", cond)   # speed_c5.8_bwd -> speed_bwd
+    c = re.sub(r"_lvl\d+", "", c)           # side_L_lvl0 -> side_L
+    if c == cond and "_" in cond:
+        c = cond.rsplit("_", 1)[0]          # fall back to old behaviour for beh12-style names
+    return c
 
 
 def main():

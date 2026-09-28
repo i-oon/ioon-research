@@ -88,7 +88,12 @@ def load_motion(path):
     dpos = np.einsum("nij,nj->ni", np.array([quat_wxyz_to_R(quat[t]).T for t in range(n)]),
                      pos[1:] - pos[:-1])
     dquat = np.array([quat_mul(quat_conj(quat[t]), quat[t + 1]) for t in range(n)])
-    return {"dpos": dpos, "dquat": dquat, "jpos": jpos, "height": float(np.median(pos[:, 2]))}
+    return {"dpos": dpos, "dquat": dquat, "jpos": jpos, "height": float(np.median(pos[:, 2])),
+            "pos": pos, "quat": quat, "psi": heading(quat, "b1")}
+
+
+def qz(angle):
+    return np.array([np.cos(angle / 2), 0.0, 0.0, np.sin(angle / 2)])
 
 
 def goal_froude(path, embodiment, channels):
@@ -173,6 +178,23 @@ def main():
                     "docstring. F80 measured this ~15pts more accurate and rejected it for the "
                     "discontinuous joint command it can cause; off by default so the original, "
                     "already-validated mechanism is the one you get unless you ask for this.")
+    ap.add_argument("--goal_timevarying", action="store_true",
+                    help="goal_source physics only: read the goal at EVERY step from the goal clip's "
+                         "own body_motion instead of its whole-clip mean -- the grading "
+                         "`selection_eval.py` uses. Each step's achieved Froude (the executed "
+                         "candidate's recorded body_motion at the index it was posed from) and the "
+                         "goal at that step are saved, and the mean L2 error is printed.")
+    ap.add_argument("--window", type=int, default=0,
+                    help="planner read-out window (F251); 0 is the original scoring")
+    ap.add_argument("--replan_every", type=int, default=1,
+                    help="decide every N steps and hold the chosen candidate in between; 1 is the "
+                         "original behaviour. `selection_eval.py` decides every --horizon steps.")
+    ap.add_argument("--level_body", action=argparse.BooleanOptionalAction, default=True,
+                    help="compose only planar position and heading across steps; take height, pitch "
+                         "and roll from the executed candidate's own recorded pose at that index. "
+                         "On by default since F256; --no-level_body composes full 3-D deltas, which accumulates pitch/roll/height "
+                         "every time the loop switches candidates at a different gait phase -- the "
+                         "ego view tilts and the horizon drifts away from the training clips' (F256).")
     ap.add_argument("--steps", type=int, default=66)
     ap.add_argument("--warm_start", type=int, default=10)
     ap.add_argument("--travel", type=float, default=2.0)
@@ -183,6 +205,11 @@ def main():
     ap.add_argument("--out", default="results/wm/closed_loop/direct_froude")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
+    if args.free_offset and args.replan_every > 1:
+        raise SystemExit("--free_offset with --replan_every > 1 is not supported (held steps would "
+                         "pose from t instead of the chosen tau)")
+    if args.embodiment != "b1":
+        raise SystemExit("this loop's pose composition and heading() calls assume the B1")
 
     device = torch.device(args.device)
     goal_embodiment = args.goal_embodiment or args.embodiment
@@ -216,6 +243,13 @@ def main():
     # vision goal it is the reference the read-from-video estimate is scored against -- without it
     # saved, nothing downstream can say how accurate the vision reading was.
     goal_reference = goal_froude(goal_path, goal_embodiment, planner.channels)
+    planner.window = args.window
+    goal_traj_raw = None
+    if args.goal_timevarying:
+        if (args.goal_source or ("physics" if args.mechanism == "direct" else "vision")) != "physics":
+            raise SystemExit("--goal_timevarying needs --goal_source physics")
+        goal_traj_raw = np.asarray(load(goal_path, REGISTRY[goal_embodiment])["body_motion"])[
+            :, planner.channels]
     if goal_source == "physics":
         goal_raw = goal_reference
         goal = torch.as_tensor(planner.standardize(goal_raw), dtype=torch.float32, device=device)
@@ -246,6 +280,8 @@ def main():
              f"(single-pair estimate was {np.round(goal_single.cpu().numpy(), 3)})")
 
     motion = [load_motion(c["path"]) for c in planner.candidates]
+    cand_bm = [np.asarray(load(c["path"], REGISTRY[args.embodiment])["body_motion"])[
+        :, planner.channels] for c in planner.candidates]
     demo_path = args.demo if os.path.isabs(args.demo) else os.path.join(ROOT, args.demo)
     want = condition_of(demo_path)
     demo_motion = load_motion(demo_path)
@@ -291,10 +327,15 @@ def main():
     cam_ego = None
     if True:
         sys.path.insert(0, os.path.join(ROOT, "sim", "scene"))
-        from ego_camera import attach_ego, build_texture_box, randomise_ground, room_for, WALK_PITCH
+        from ego_camera import (EGO_FOV_DEG, attach_ego, build_texture_box, check_ego_view,
+                                randomise_ground, room_for, WALK_PITCH)
+        # **90 deg, not 24.** Every egocentric training clip was rendered at 90 (`render_b1_replay.py
+        # --ego` forces it; 24 is the third-person framing default and gives a telephoto ego view).
+        # At 24 this loop's B1 saw a wall filling the frame from step 0 while the training clips show
+        # the floor over the lower half -- the planner read out-of-distribution frames (F256).
         cam_ego = sim.createVisionSensor(
             1 | 2 | 4, [256, 256, 0, 0],
-            [0.01, 20.0, np.deg2rad(24.0), 0.05, 0, 0, 0, 0, 0, 0, 0])
+            [0.01, 20.0, np.deg2rad(EGO_FOV_DEG), 0.05, 0, 0, 0, 0, 0, 0, 0])
         sim.setObjectAlias(cam_ego, "vjepa_cam_ego_loop")
         R = room_for(root0[2])
         build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"], seed=0,
@@ -344,11 +385,29 @@ def main():
     demo_index = next((i for i, c in enumerate(planner.candidates) if c["path"] == demo_path), None)
 
     frames, chosen, heads, quats, all_scores, ego_frames = [], [], [], [], [], []
+    achieved, goal_at, held = [], [], None
+    psi_acc = float(heading(quat[None], "b1")[0])   # --level_body: start facing where the loop does
     observation, ego_observation = pose(demo_motion["jpos"][0])
+    # **Refuse to run on a view the model was never trained on** (F256: a 24-deg lens here fed the
+    # planner a wall filling the frame, and nothing downstream noticed). Reference = the first frame
+    # of every candidate clip, i.e. the renders this library was recorded with.
+    with np.load(demo_path, allow_pickle=True) as _d:
+        _ref = [_d["frames"][0]] + [np.load(c["path"], allow_pickle=True)["frames"][0]
+                                    for c in planner.candidates[:12]]
+    print(f"  ego view check: row-profile corr "
+          f"{check_ego_view(ego_observation, _ref, what='closed-loop ego frame 0'):.3f} (min 0.97)")
     replan_t = replan_i = replan_tau0 = replan_sc = None
     for t in range(steps):
         motion_idx = t   # overridden below only for --mechanism direct with free_offset=True
-        if t < args.warm_start:
+        if goal_traj_raw is not None:
+            g_raw = goal_traj_raw[min(t, len(goal_traj_raw) - 1)]
+            goal = torch.as_tensor(planner.standardize(g_raw), dtype=torch.float32, device=device)
+        if t >= args.warm_start and held is not None and (t - args.warm_start) % args.replan_every:
+            i, sc = held
+            all_scores.append(np.asarray(sc, np.float32))
+            label = planner.candidates[i]["condition"]
+            src = motion[i]
+        elif t < args.warm_start:
             i, label = demo_index, f"warm:{want}"
             src = demo_motion
             all_scores.append(np.full(len(planner.candidates), np.nan, np.float32))
@@ -398,11 +457,28 @@ def main():
             all_scores.append(np.asarray(sc, np.float32))
             label = planner.candidates[i]["condition"]
             src = motion[i]
+            held = (i, sc)
         motion_idx = min(motion_idx, len(src["dpos"]) - 1, len(src["jpos"]) - 2)
+        if goal_traj_raw is not None and t >= args.warm_start:
+            bm = cand_bm[i]
+            achieved.append(bm[min(motion_idx, len(bm) - 1)])
+            goal_at.append(g_raw)
         chosen.append(label)
-        pos = pos + quat_wxyz_to_R(quat) @ src["dpos"][motion_idx]
-        quat = quat_mul(quat, src["dquat"][motion_idx])
-        quat = quat / np.linalg.norm(quat)
+        if args.level_body:
+            k = motion_idx
+            d_xy = src["pos"][k + 1, :2] - src["pos"][k, :2]
+            rot = psi_acc - float(src["psi"][k])          # candidate's heading frame -> the loop's
+            c_, s_ = np.cos(rot), np.sin(rot)
+            pos = np.array([pos[0] + c_ * d_xy[0] - s_ * d_xy[1], pos[1] + s_ * d_xy[0] + c_ * d_xy[1],
+                            float(src["pos"][k + 1, 2])])
+            dpsi = float(src["psi"][k + 1] - src["psi"][k])
+            psi_acc += float(np.arctan2(np.sin(dpsi), np.cos(dpsi)))
+            quat = quat_mul(qz(psi_acc - float(src["psi"][k + 1])), src["quat"][k + 1])
+            quat = quat / np.linalg.norm(quat)
+        else:
+            pos = pos + quat_wxyz_to_R(quat) @ src["dpos"][motion_idx]
+            quat = quat_mul(quat, src["dquat"][motion_idx])
+            quat = quat / np.linalg.norm(quat)
         observation, ego_observation = pose(src["jpos"][motion_idx + 1])
         frames.append(observation)
         if ego_observation is not None:
@@ -448,7 +524,13 @@ def main():
         mechanism=np.array(args.mechanism), goal_source=np.array(goal_source),
         horizon=np.int32(planner.horizon), warm_start=np.int32(args.warm_start),
         ckpt=os.path.relpath(args.ckpt, ROOT),
-        candidates=np.asarray([c["condition"] for c in planner.candidates]))
+        candidates=np.asarray([c["condition"] for c in planner.candidates]),
+        achieved_froude=np.asarray(achieved, np.float32), goal_froude_t=np.asarray(goal_at, np.float32),
+        window=np.int32(args.window), replan_every=np.int32(args.replan_every))
+    if achieved:
+        err = np.linalg.norm(np.asarray(achieved) - np.asarray(goal_at), axis=1)
+        print(f"time-varying goal: mean L2 error {err.mean():.4f} over {len(err)} steps "
+              f"(every step; at decision steps {err[::args.replan_every].mean():.4f})")
     planned = [c for c in chosen if not c.startswith("warm:")]
     print(f"\nchosen condition counts (planned steps only), mechanism={args.mechanism}:")
     for cond, n in Counter(planned).most_common():

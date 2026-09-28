@@ -37,13 +37,14 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.data.strided import action_chunks, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.action_projector import ActionProjector  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
-def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=()):
+def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=(), k=1):
     """Per clip: the frozen latent, the action that caused it, and the current embedding.
 
     **Embeddings come back on the CPU in half precision.** One clip is 65 x 256 x 1408 floats,
@@ -68,16 +69,17 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
         off = offset_for(checkpoint, name)
         if off is not None:
             e = e - off.to(device)
-        n = len(e) - 1
-        with torch.no_grad():
-            z = torch.cat([itm(e[t:min(t + 8, n)], e[t + 1:min(t + 8, n) + 1])
-                           for t in range(0, n, 8)])
-        actions = torch.as_tensor(clip["actions"], dtype=torch.float32, device=device)
-        # the command that caused frames[t] -> frames[t+1]; short clips are dropped rather than
+        # stride k (`wm/data/strided.py`): z = ITM(e_t, e_t+k), labelled with the k commands that
+        # caused it. At k = 1: the original one-step pairs and `actions[lag:lag + n]`, unchanged.
+        n = len(e) - k
+        # the commands that caused frames[t] -> frames[t+k]; short clips are dropped rather than
         # padded, since a padded action is a wrong label and F39 measured what wrong labels cost
-        if len(actions) < n + lag:
+        if n <= 0 or len(clip["actions"]) < n + lag + k - 1:
             continue
-        E.append(e[:n].cpu().half()); Z.append(z); A.append(actions[lag:lag + n])
+        z = pair_latents(itm, e, k, n)
+        actions = torch.as_tensor(action_chunks(clip["actions"], lag, k, n), dtype=torch.float32,
+                                  device=device)
+        E.append(e[:n].cpu().half()); Z.append(z); A.append(actions)
         C.append(torch.full((n,), len(C), dtype=torch.long))
         P.append(path)
         del e
@@ -124,13 +126,15 @@ def main():
     before = len(cache)
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     lag = max(1, cfg.action_lag)
+    k = stride_of(cfg)
+    print(f"stride {k}: z = ITM(e_t, e_t+{k}) from {k} command(s) per latent")
 
     data = {}
     for name, d in (("hexapod", args.hex_dir), ("b1", args.b1_dir)):
         if not d:
             continue
         data[name] = gather(name, os.path.join(ROOT, d), encoder, itm, checkpoint,
-                            cache, args.chunk, lag, device, tuple(args.exclude))
+                            cache, args.chunk, lag, device, tuple(args.exclude), k=k)
     if not data:
         raise SystemExit("no source directories given")
     if len(cache) > before:
@@ -141,9 +145,10 @@ def main():
     del encoder, cache
     torch.cuda.empty_cache()
 
-    proj = ActionProjector(cfg, {n: v[2].shape[1] for n, v in data.items()}).to(device)
+    proj = ActionProjector(cfg, {n: v[2].shape[-1] for n, v in data.items()}).to(device)
     for name, (_, _, a, _c, _p) in data.items():
-        proj.set_stats(name, a.mean(0).cpu(), a.std(0).cpu())
+        per_joint = a.reshape(-1, a.shape[-1])          # one command's statistics, any chunk size
+        proj.set_stats(name, per_joint.mean(0).cpu(), per_joint.std(0).cpu())
 
     # **Split by clip, not by frame.** Consecutive frames of one clip are near-duplicates, so a
     # frame-level split leaves the training data in the test set -- the leak that made yaw look
@@ -203,7 +208,8 @@ def main():
 
     out = args.out or os.path.join(os.path.dirname(os.path.join(ROOT, args.ckpt)), "projector.pt")
     torch.save({"projector": proj.state_dict(), "ckpt": args.ckpt,
-                "val_paths": val_paths, "action_dims": {n: v[2].shape[1] for n, v in data.items()}},
+                "val_paths": val_paths, "action_dims": {n: v[2].shape[-1] for n, v in data.items()},
+                "stride": k},
                out)
     print(f"-> {os.path.relpath(out, ROOT)}")
 

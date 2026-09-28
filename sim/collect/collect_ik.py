@@ -352,9 +352,15 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     # everywhere else. Offsetting it flattens the bottom of that path into something a stance can
     # push along -- measured kinematically, height variation across the lower half of the cycle
     # falls from 0.22 of the lift to 0.12 at `ft_phase` 0.25.
-    o = np.stack([np.sin(ph + 2 * np.pi * lead),
-                  np.sin(ph),
-                  np.sin(ph + 2 * np.pi * ft_phase)], axis=1)
+    # **`lead`, `ft_phase` and each of `amps` may be per-frame arrays** (`--plan`, babble with
+    # behaviour switches inside a clip). Scalars broadcast exactly as before, so every clip collected
+    # without a plan is unchanged.
+    lead = np.asarray(lead, dtype=float)
+    ft_phase = np.asarray(ft_phase, dtype=float)
+    amps = tuple(np.asarray(a, dtype=float) for a in amps)
+    o = np.stack(np.broadcast_arrays(np.sin(ph + 2 * np.pi * lead),
+                                     np.sin(ph),
+                                     np.sin(ph + 2 * np.pi * ft_phase)), axis=1)
 
     cmds = np.tile(bias, (frames, 1))
     # Kept so the collector can regenerate one frame with a different spin, which is what closing
@@ -992,6 +998,19 @@ def main():
                          "and no frame is the one where the turn begins. --gait cpg only, and not "
                          "combinable with the heading loop, which regenerates frames from a single "
                          "stored spin")
+    ap.add_argument("--centre_from", type=str, default="",
+                    help="--gait cpg only: take the pose the oscillator runs around from the mean "
+                         "command of an existing clip of the SAME body collected with the same pose "
+                         "settings (e.g. a --symmetric --ik_iters 8 sideways clip, whose integer number "
+                         "of cycles averages every sinusoid to zero), instead of IK on the expert "
+                         "recording. The CPG never uses the expert path for anything else, and this "
+                         "removes the dependency on expert_66k_aug3c_fcontact.csv.")
+    ap.add_argument("--plan", type=str, default="",
+                    help="JSON of per-frame CPG drives for one clip (babble with behaviour switches "
+                         "inside the clip): keys pace, spin, strafe, lead, a0, a1, a2, ft_phase, each "
+                         "a list of EP values. Supersedes --schedule/--spin_schedule/"
+                         "--strafe_schedule/--lead/--amps/--ft_phase. --gait cpg only. The plan is "
+                         "saved in every clip as `plan_*` arrays (the commanded drives per frame).")
     ap.add_argument("--schedule", type=str, default="",
                     help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
                          "walk, stand still for a fifth of the clip, then walk. Rate 0 is a stop. "
@@ -1041,6 +1060,22 @@ def main():
     # the same schedule string, expressed as the oscillator's per-frame pace
     pace_arg = piecewise(args.schedule, EP) if (args.schedule and args.gait == "cpg") else None
     strafe_arg = piecewise(args.strafe_schedule, EP) if args.strafe_schedule else args.strafe
+    lead_arg, amps_arg, ft_arg, plan = args.lead, tuple(args.amps), args.ft_phase, None
+    if args.plan:
+        import json
+        if args.gait != "cpg":
+            raise SystemExit("--plan needs --gait cpg")
+        if args.head_kp or args.head_ki:
+            raise SystemExit("--plan and the heading loop both write the turn rate (cpg_frame takes "
+                             "scalar drives only)")
+        with open(args.plan) as fh:
+            plan = {k: np.asarray(v, dtype=float) for k, v in json.load(fh).items()}
+        bad = [k for k, v in plan.items() if len(v) != EP]
+        if bad:
+            raise SystemExit(f"--plan arrays must have {EP} values: {bad}")
+        pace_arg, spin_arg, strafe_arg = plan["pace"], plan["spin"], plan["strafe"]
+        lead_arg, ft_arg = plan["lead"], plan["ft_phase"]
+        amps_arg = (plan["a0"], plan["a1"], plan["a2"])
     if args.strafe_schedule and args.gait != "cpg":
         raise SystemExit("--strafe_schedule needs --gait cpg")
     if args.spin_schedule and (args.head_kp or args.head_ki):
@@ -1070,7 +1105,15 @@ def main():
             SCENES.append((name, scene))
         print("bodies: " + ", ".join(f"{n} <- {s}" for n, s in SCENES))
     os.makedirs(args.out, exist_ok=True)
-    df = pd.read_csv(CSV)
+    centre_override = None
+    if args.centre_from:
+        if args.gait != "cpg" or args.stop:
+            raise SystemExit("--centre_from needs --gait cpg (and not --stop)")
+        with np.load(args.centre_from, allow_pickle=True) as _c:
+            centre_override = np.asarray(_c["actions"], dtype=np.float64).mean(0)
+        df = None
+    else:
+        df = pd.read_csv(CSV)
     c = RemoteAPIClient("localhost", port=args.port)
     sim = c.require("sim"); simIK = c.require("simIK")
     settle(sim)
@@ -1085,11 +1128,11 @@ def main():
                                               ik_iters=args.ik_iters)
             if args.gait == "cpg":
                 cmds, ikdiag = cpg_commands(sim, scene, EP, cmds.mean(0), cycles=args.cycles,
-                                            amps=tuple(args.amps), lead=args.lead,
+                                            amps=amps_arg, lead=lead_arg,
                                             mirror_joints=tuple(args.mirror),
                                             strafe=strafe_arg,
                                             spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
-                                            ft_phase=args.ft_phase,
+                                            ft_phase=ft_arg,
                                             symmetric=args.symmetric, legtune=legtune)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
                   f"shared-scale={ikdiag['scale']:.3f} "
@@ -1119,7 +1162,8 @@ def main():
     manifest = []
     for ep in episodes:
         rows = list(range(ep * EP, ep * EP + EP))
-        brel = body_rel_via_fk(sim, df, rows)  # shared Cartesian behavior, once per episode
+        # shared Cartesian behavior, once per episode (not needed when the CPG centre is given)
+        brel = body_rel_via_fk(sim, df, rows) if centre_override is None else None
         if args.dump_brel:
             print(f"\nrecorded foot path, episode {ep}, abdomen frame, metres")
             print(f"{'leg':<5}{'axis':>6}{'min':>10}{'mean':>10}{'max':>10}{'range':>10}")
@@ -1132,18 +1176,23 @@ def main():
             print("the one whose mean sits well below its max, since a foot spends most of a stride")
             print("on the ground and only briefly above it")
             return
-        brel = (schedule_path(brel, parse_schedule(args.schedule)) if args.schedule
-                else retime(brel, args.speed, args.speed_end))
+        if brel is not None:
+            brel = (schedule_path(brel, parse_schedule(args.schedule)) if args.schedule
+                    else retime(brel, args.speed, args.speed_end))
         for morph, scene in SCENES:
-            cmds, ikdiag = precompute_commands(sim, simIK, scene, brel, args.scale,
-                                              ik_iters=args.ik_iters)
+            if centre_override is None:
+                cmds, ikdiag = precompute_commands(sim, simIK, scene, brel, args.scale,
+                                                  ik_iters=args.ik_iters)
+                centre = cmds.mean(0)
+            else:
+                centre = centre_override
             if args.gait == "cpg":
-                cmds, ikdiag = cpg_commands(sim, scene, EP, cmds.mean(0), cycles=args.cycles,
-                                            amps=tuple(args.amps), lead=args.lead,
+                cmds, ikdiag = cpg_commands(sim, scene, EP, centre, cycles=args.cycles,
+                                            amps=amps_arg, lead=lead_arg,
                                             mirror_joints=tuple(args.mirror),
                                             strafe=strafe_arg,
                                             spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
-                                            ft_phase=args.ft_phase,
+                                            ft_phase=ft_arg,
                                             symmetric=args.symmetric, legtune=legtune)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
                   f"shared-scale={ikdiag['scale']:.3f} "
@@ -1175,7 +1224,8 @@ def main():
                                     foot_order=np.array(active_legs), step_idx=np.arange(len(f)),
                                     morph=morph, expert_episode=ep, repeat=rep, scale=args.scale,
                                     behavior=args.behavior, schedule=args.schedule,
-                                    gait=args.gait)
+                                    gait=args.gait,
+                                    **({f"plan_{k}": v for k, v in plan.items()} if plan else {}))
                 fwd, lat, verdict = walk_check(h)
                 hip = float(np.median(h[:, 2]))
                 # Froude beside the raw distance: the whole cross-robot comparison is

@@ -43,9 +43,23 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.data.strided import action_chunks, body_targets, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
+
+
+def window_mean(z, w):
+    """Centred moving average along time (dim 0) within one clip, truncated at the clip's ends
+    (each output averages only the steps that exist) so the edges are not shrunk toward zero."""
+    if w <= 1:
+        return z
+    zc = torch.cat([torch.zeros_like(z[:1]), z.cumsum(0)])
+    n = len(z)
+    idx = torch.arange(n)
+    lo = (idx - w // 2).clamp(min=0)
+    hi = (idx - w // 2 + w).clamp(max=n)
+    return (zc[hi] - zc[lo]) / (hi - lo).unsqueeze(1).to(z.dtype)
 
 
 def main():
@@ -82,12 +96,24 @@ def main():
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--cache", default="results/wm/cache/b1.pt")
     ap.add_argument("--out", default="")
+    ap.add_argument("--z_window", type=int, default=1,
+                    help="fit the head on z moving-averaged over this many steps (centred, "
+                         "within each clip), not single-step z. The target body_motion is itself a "
+                         "~20-step centred average; single-step z read against it is a timescale "
+                         "mismatch (timescale_probe.py: R2 0.44 single-step vs 0.68 at 21, same "
+                         "checkpoint and target). A head fit this way must be read the same way "
+                         "at planning time: planner.window_average='z'. 1 = original behaviour.")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ck = torch.load(os.path.join(ROOT, args.ckpt), map_location="cpu", weights_only=False)
     cfg = from_checkpoint(ck["config"])
     channels = [int(c) for c in cfg.body_channels]
+    # stride k (`wm/data/strided.py`): z = ITM(e_t, e_t+k), target = Froude averaged over [t, t+k).
+    # k = 1 reproduces the original one-step fit.
+    stride = stride_of(cfg)
+    lag = max(1, cfg.action_lag)
+    print(f"stride {stride}: z = ITM(e_t, e_t+{stride}), target = mean Froude over {stride} step(s)")
     mean = torch.tensor(np.asarray(ck["body_stats"][0]).ravel(), dtype=torch.float32)
     std = torch.tensor(np.asarray(ck["body_stats"][1]).ravel(), dtype=torch.float32)
 
@@ -118,17 +144,24 @@ def main():
                 cache[path] = encode_clip(encoder, clip["frames"], args.chunk).cpu().half()
             e = cache[path].float().to(device)
             motion = np.asarray(clip["body_motion"])[:, channels]
-            n = min(len(e) - 1, len(motion) - 1)
-            z_itm = (torch.cat([itm(e[t:t + 1], e[t + 1:t + 2]) for t in range(n)]).cpu()
+            n = min(len(e) - stride, len(motion) - stride)
+            if projector is not None:
+                n = min(n, len(clip["actions"]) - lag - stride + 1)
+            z_itm = (pair_latents(itm, e, stride, n, batch=1).cpu()
                      if args.latent in ("itm", "both") else None)
             z_proj = None
             if projector is not None:
-                acts = torch.tensor(np.asarray(clip["actions"])[:n], dtype=torch.float32).to(device)
+                # **The command that caused the transition, `actions[t + lag]`** -- the convention
+                # `wm.fit_projector` fits the projector on. This used `actions[:n]`, one step early,
+                # so the projector path of this head was fitted on mislabelled latents (F260).
+                acts = torch.tensor(action_chunks(clip["actions"], lag, stride, n),
+                                    dtype=torch.float32).to(device)
                 z_proj = projector(acts, args.embodiment).cpu()
-            z = torch.cat([x for x in (z_itm, z_proj) if x is not None])
+            z = torch.cat([window_mean(x, args.z_window) for x in (z_itm, z_proj)
+                           if x is not None])
             zs.append(z)
             reps = sum(x is not None for x in (z_itm, z_proj))
-            ys.append(torch.tensor(motion[:n], dtype=torch.float32).repeat(reps, 1))
+            ys.append(torch.tensor(body_targets(motion, stride, n), dtype=torch.float32).repeat(reps, 1))
             groups.append(torch.full((n * reps,), i))
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
@@ -151,13 +184,13 @@ def main():
                         cache2[path] = encode_clip(encoder, clip["frames"], args.chunk).cpu().half()
                     e = cache2[path].float().to(device)
                     motion = np.asarray(clip["body_motion"])[:, channels]
-                    n = min(len(e) - 1, len(motion) - 1)
+                    n = min(len(e) - stride, len(motion) - stride)
                     # **ITM latents only for the other robot.** A stage-3 projector carries a
                     # head for the robot it was adapted to and nothing else, and the goal side is
                     # read through the ITM at scoring time anyway.
-                    extra_z.append(torch.cat([itm(e[t:t + 1], e[t + 1:t + 2])
-                                              for t in range(n)]).cpu())
-                    extra_y.append(torch.tensor(motion[:n], dtype=torch.float32))
+                    extra_z.append(window_mean(pair_latents(itm, e, stride, n, batch=1).cpu(),
+                                               args.z_window))
+                    extra_y.append(torch.tensor(body_targets(motion, stride, n), dtype=torch.float32))
                     # one group id per clip, so the other robot gets a held-out split too. Without
                     # this its every transition was in training and the reported held-out ratio
                     # covered the adapted robot ONLY -- which is how a systematic goal-reading error
@@ -256,7 +289,8 @@ def main():
         saved["md"] = md_state
         saved["body_head_fit"] = {"data": args.data, "embodiment": args.embodiment,
                                   "val_paths": sorted(val_paths), "epochs": args.epochs,
-                                  "lr": args.lr, "source": args.ckpt}
+                                  "lr": args.lr, "source": args.ckpt, "z_window": args.z_window,
+                                  "stride": stride}
         torch.save(saved, out)
         print(f"\n-> {args.out}")
 

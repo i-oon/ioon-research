@@ -1,0 +1,39 @@
+w=0 OLD turn_s0.29 direct 0.0530  rollout 0.1490 
+w=0 OLD turn_s0.56 direct 0.0581  rollout 0.1593 
+w=0 OLD side_L_lvl0 direct 0.0842  rollout 0.1509 
+w=0 OLD side_R_lvl1 direct 0.0343  rollout 0.1785 
+w=0 OLD speed_c7.1 direct 0.0692  rollout 0.1194 
+w=0 OLD speed_c8.8 direct 0.0606  rollout 0.1363 
+w=0 NEW turn_s0.29 direct 0.0658  rollout 0.1333 
+w=0 NEW turn_s0.56 direct 0.0647  rollout 0.1447 
+w=0 NEW side_L_lvl0 direct 0.0980  rollout 0.1224 
+w=0 NEW side_R_lvl1 direct 0.0451  rollout 0.1530 
+w=0 NEW speed_c7.1 direct 0.0693  rollout 0.1531 
+w=0 NEW speed_c8.8 direct 0.0860  rollout 0.1896 
+w=11 OLD turn_s0.29 direct 0.0479  rollout 0.1100 
+w=11 OLD turn_s0.56 direct 0.0517  rollout 0.1389 
+w=11 OLD side_L_lvl0 direct 0.0983  rollout 0.0860 
+w=11 OLD side_R_lvl1 direct 0.0314  rollout 0.0772 
+w=11 OLD speed_c7.1 direct 0.0504  rollout 0.0884 
+w=11 OLD speed_c8.8 direct 0.0404  rollout 0.0831 
+w=11 NEW turn_s0.29 direct 0.0663  rollout 0.1305 
+w=11 NEW turn_s0.56 direct 0.0577  rollout 0.1467 
+w=11 NEW side_L_lvl0 direct 0.0615  rollout 0.1314 
+w=11 NEW side_R_lvl1 direct 0.0509  rollout 0.1637 
+w=11 NEW speed_c7.1 direct 0.0640  rollout 0.0860 
+w=11 NEW speed_c8.8 direct 0.0795  rollout 0.1211 
+w=21 OLD turn_s0.29 direct 0.0471  rollout 0.1409 
+w=21 OLD turn_s0.56 direct 0.0477  rollout 0.1548 
+w=21 OLD side_L_lvl0 direct 0.0980  rollout 0.0878 
+w=21 OLD side_R_lvl1 direct 0.0311  rollout 0.1080 
+w=21 OLD speed_c7.1 direct 0.0493  rollout 0.0923 
+w=21 OLD speed_c8.8 direct 0.0412  rollout 0.0948 
+w=21 NEW turn_s0.29 direct 0.0742  rollout 0.1326 
+w=21 NEW turn_s0.56 direct 0.0689  rollout 0.1530 
+w=21 NEW side_L_lvl0 direct 0.0619  rollout 0.1458 
+w=21 NEW side_R_lvl1 direct 0.0515  rollout 0.1673 
+w=21 NEW speed_c7.1 direct 0.0662  rollout 0.0862 
+w=21 NEW speed_c8.8 direct 0.0770  rollout 0.1309 
+SWEEP_DONE
+
+[exited with code 0]

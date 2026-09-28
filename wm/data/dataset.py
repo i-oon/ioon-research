@@ -221,7 +221,7 @@ class IKWalkPairs(Dataset):
         if "body_motion" in clip:
             # aligned to e_t, not to the lagged action: this describes the frame the latent was
             # inferred from, not the command that follows it
-            sample["body_motion"] = clip["body_motion"][t]
+            sample["body_motion"] = clip["body_motion"][t:t + self.frame_stride].mean(0)
 
         # a different body at the same episode and timestep: same intent, different geometry.
         # Its own augmentation, so the two frames share no nuisance factor the model could match
@@ -447,8 +447,11 @@ class MultiEmbodimentPairs(Dataset):
                                     mean, std),
             "embodiment": clip["embodiment"],
             "morph_id": self.morph_index[clip["embodiment"]],
-            **({"body_motion": ((clip["body_motion"][t, self.body_channels] - self.body_stats[0])
-                                / self.body_stats[1]).astype(np.float32)}
+            # the Froude over the interval z spans: `body_motion[t]` at stride 1 (unchanged), the
+            # mean over [t, t+stride) above it -- `wm/data/strided.py`, shared with Stages 1-4
+            **({"body_motion": ((clip["body_motion"][t:t + self.frame_stride,
+                                                     list(self.body_channels)].mean(0)
+                                 - self.body_stats[0]) / self.body_stats[1]).astype(np.float32)}
                if self.body_stats is not None else {}),
         }
         if self.rollout_k >= 2:

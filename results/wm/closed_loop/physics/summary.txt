@@ -1,0 +1,162 @@
+c08 A direct plain turn_s0.29 | physics closed loop: mean L2 error 0.0470 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep1202.npz
+c08 A direct --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0591 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 A direct policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0878 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep1202.npz
+c08 A rollout plain turn_s0.29 | physics closed loop: mean L2 error 0.0514 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep1202.npz
+c08 A rollout --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0766 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 A rollout policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.1001 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep1202.npz
+c08 A direct plain turn_s0.56 | physics closed loop: mean L2 error 0.0479 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep1303.npz
+c08 A direct --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0615 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 A direct policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.1003 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep1303.npz
+c08 A rollout plain turn_s0.56 | physics closed loop: mean L2 error 0.0718 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep1303.npz
+c08 A rollout --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.1031 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 A rollout policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0984 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep1303.npz
+c08 A direct plain side_L_lvl0 | physics closed loop: mean L2 error 0.0500 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep2000.npz
+c08 A direct --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0437 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 A direct policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0595 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep2000.npz
+c08 A rollout plain side_L_lvl0 | physics closed loop: mean L2 error 0.0417 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep2000.npz
+c08 A rollout --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0921 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 A rollout policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0792 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep2000.npz
+c08 A direct plain side_R_lvl1 | physics closed loop: mean L2 error 0.0399 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep2301.npz
+c08 A direct --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0432 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 A direct policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0522 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep2301.npz
+c08 A rollout plain side_R_lvl1 | physics closed loop: mean L2 error 0.0652 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep2301.npz
+c08 A rollout --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0837 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 A rollout policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0658 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep2301.npz
+c08 A direct plain speed_c7.1 | physics closed loop: mean L2 error 0.0906 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep103.npz
+c08 A direct --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.0895 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 A direct policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0406 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep103.npz
+c08 A rollout plain speed_c7.1 | physics closed loop: mean L2 error 0.1073 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep103.npz
+c08 A rollout --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.1380 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 A rollout policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0648 at 33 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep103.npz
+c08 A direct plain speed_c8.8 | physics closed loop: mean L2 error 0.1566 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11/c08f09t09_hexapod_ep302.npz
+c08 A direct --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.0922 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/direct_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 A direct policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.0814 at 32 decision steps -> results/wm/closed_loop/physics/A/b1/direct_w11/b1_hexapod_ep302.npz
+c08 A rollout plain speed_c8.8 | physics closed loop: mean L2 error 0.1232 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11/c08f09t09_hexapod_ep302.npz
+c08 A rollout --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.1063 at 29 decision steps -> results/wm/closed_loop/physics/A/c08/rollout_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 A rollout policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.0893 at 32 decision steps -> results/wm/closed_loop/physics/A/b1/rollout_w11/b1_hexapod_ep302.npz
+c08 B direct plain turn_s0.29 | physics closed loop: mean L2 error 0.0486 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep1202.npz
+c08 B direct --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0648 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 B direct policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0792 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep1202.npz
+c08 B rollout plain turn_s0.29 | physics closed loop: mean L2 error 0.0716 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep1202.npz
+c08 B rollout --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0778 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 B rollout policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0728 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep1202.npz
+c08 B direct plain turn_s0.56 | physics closed loop: mean L2 error 0.0354 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep1303.npz
+c08 B direct --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0484 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 B direct policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0995 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep1303.npz
+c08 B rollout plain turn_s0.56 | physics closed loop: mean L2 error 0.0661 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep1303.npz
+c08 B rollout --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0921 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 B rollout policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0819 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep1303.npz
+c08 B direct plain side_L_lvl0 | physics closed loop: mean L2 error 0.0527 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep2000.npz
+c08 B direct --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0564 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 B direct policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0544 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep2000.npz
+c08 B rollout plain side_L_lvl0 | physics closed loop: mean L2 error 0.0722 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep2000.npz
+c08 B rollout --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0847 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 B rollout policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.1043 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep2000.npz
+c08 B direct plain side_R_lvl1 | physics closed loop: mean L2 error 0.0514 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep2301.npz
+c08 B direct --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0329 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 B direct policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0625 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep2301.npz
+c08 B rollout plain side_R_lvl1 | physics closed loop: mean L2 error 0.0357 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep2301.npz
+c08 B rollout --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0818 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 B rollout policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0821 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep2301.npz
+c08 B direct plain speed_c7.1 | physics closed loop: mean L2 error 0.0632 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep103.npz
+c08 B direct --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.0637 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 B direct policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0577 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep103.npz
+c08 B rollout plain speed_c7.1 | physics closed loop: mean L2 error 0.0788 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep103.npz
+c08 B rollout --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.1080 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 B rollout policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0842 at 33 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep103.npz
+c08 B direct plain speed_c8.8 | physics closed loop: mean L2 error 0.1057 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11/c08f09t09_hexapod_ep302.npz
+c08 B direct --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.0960 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/direct_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 B direct policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.0967 at 32 decision steps -> results/wm/closed_loop/physics/B/b1/direct_w11/b1_hexapod_ep302.npz
+c08 B rollout plain speed_c8.8 | physics closed loop: mean L2 error 0.0878 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11/c08f09t09_hexapod_ep302.npz
+c08 B rollout --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.1126 at 29 decision steps -> results/wm/closed_loop/physics/B/c08/rollout_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 B rollout policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.1165 at 32 decision steps -> results/wm/closed_loop/physics/B/b1/rollout_w11/b1_hexapod_ep302.npz
+c08 C direct plain turn_s0.29 | physics closed loop: mean L2 error 0.0472 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep1202.npz
+c08 C direct --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0649 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 C direct policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0942 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep1202.npz
+c08 C rollout plain turn_s0.29 | physics closed loop: mean L2 error 0.0661 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep1202.npz
+c08 C rollout --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0973 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 C rollout policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0690 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep1202.npz
+c08 C direct plain turn_s0.56 | physics closed loop: mean L2 error 0.0697 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep1303.npz
+c08 C direct --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0662 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 C direct policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0972 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep1303.npz
+c08 C rollout plain turn_s0.56 | physics closed loop: mean L2 error 0.0841 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep1303.npz
+c08 C rollout --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0976 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 C rollout policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0930 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep1303.npz
+c08 C direct plain side_L_lvl0 | physics closed loop: mean L2 error 0.0373 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep2000.npz
+c08 C direct --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0296 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 C direct policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0579 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep2000.npz
+c08 C rollout plain side_L_lvl0 | physics closed loop: mean L2 error 0.0601 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep2000.npz
+c08 C rollout --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0570 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 C rollout policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0725 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep2000.npz
+c08 C direct plain side_R_lvl1 | physics closed loop: mean L2 error 0.0506 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep2301.npz
+c08 C direct --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0479 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 C direct policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0575 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep2301.npz
+c08 C rollout plain side_R_lvl1 | physics closed loop: mean L2 error 0.0656 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep2301.npz
+c08 C rollout --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0473 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 C rollout policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0505 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep2301.npz
+c08 C direct plain speed_c7.1 | physics closed loop: mean L2 error 0.0668 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep103.npz
+c08 C direct --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.0886 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 C direct policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0609 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep103.npz
+c08 C rollout plain speed_c7.1 | physics closed loop: mean L2 error 0.0889 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep103.npz
+c08 C rollout --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.1039 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 C rollout policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.1359 at 33 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep103.npz
+c08 C direct plain speed_c8.8 | physics closed loop: mean L2 error 0.1564 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11/c08f09t09_hexapod_ep302.npz
+c08 C direct --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.0902 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/direct_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 C direct policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.1010 at 32 decision steps -> results/wm/closed_loop/physics/C/b1/direct_w11/b1_hexapod_ep302.npz
+c08 C rollout plain speed_c8.8 | physics closed loop: mean L2 error 0.1159 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11/c08f09t09_hexapod_ep302.npz
+c08 C rollout --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.1189 at 29 decision steps -> results/wm/closed_loop/physics/C/c08/rollout_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 C rollout policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.0980 at 32 decision steps -> results/wm/closed_loop/physics/C/b1/rollout_w11/b1_hexapod_ep302.npz
+c08 A2 direct plain turn_s0.29 | physics closed loop: mean L2 error 0.0478 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep1202.npz
+c08 A2 direct --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0609 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 A2 direct policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0743 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep1202.npz
+c08 A2 rollout plain turn_s0.29 | physics closed loop: mean L2 error 0.0807 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep1202.npz
+c08 A2 rollout --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.1097 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep1202.npz
+b1 A2 rollout policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0743 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep1202.npz
+c08 A2 direct plain turn_s0.56 | physics closed loop: mean L2 error 0.0744 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep1303.npz
+c08 A2 direct --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.0573 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 A2 direct policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0762 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep1303.npz
+c08 A2 rollout plain turn_s0.56 | physics closed loop: mean L2 error 0.1081 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep1303.npz
+c08 A2 rollout --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.1209 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep1303.npz
+b1 A2 rollout policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.1279 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep1303.npz
+c08 A2 direct plain side_L_lvl0 | physics closed loop: mean L2 error 0.0162 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep2000.npz
+c08 A2 direct --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0355 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 A2 direct policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0712 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep2000.npz
+c08 A2 rollout plain side_L_lvl0 | physics closed loop: mean L2 error 0.1244 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep2000.npz
+c08 A2 rollout --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0869 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep2000.npz
+b1 A2 rollout policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0829 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep2000.npz
+c08 A2 direct plain side_R_lvl1 | physics closed loop: mean L2 error 0.0728 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep2301.npz
+c08 A2 direct --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0993 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 A2 direct policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0493 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep2301.npz
+c08 A2 rollout plain side_R_lvl1 | physics closed loop: mean L2 error 0.0728 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep2301.npz
+c08 A2 rollout --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0653 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep2301.npz
+b1 A2 rollout policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0495 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep2301.npz
+c08 A2 direct plain speed_c7.1 | physics closed loop: mean L2 error 0.1306 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep103.npz
+c08 A2 direct --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.0849 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 A2 direct policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0728 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep103.npz
+c08 A2 rollout plain speed_c7.1 | physics closed loop: mean L2 error 0.0803 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep103.npz
+c08 A2 rollout --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.0914 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep103.npz
+b1 A2 rollout policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.1393 at 33 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep103.npz
+c08 A2 direct plain speed_c8.8 | physics closed loop: mean L2 error 0.1259 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11/c08f09t09_hexapod_ep302.npz
+c08 A2 direct --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.0973 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/direct_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 A2 direct policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.1160 at 32 decision steps -> results/wm/closed_loop/physics/A2/b1/direct_w11/b1_hexapod_ep302.npz
+c08 A2 rollout plain speed_c8.8 | physics closed loop: mean L2 error 0.1593 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11/c08f09t09_hexapod_ep302.npz
+c08 A2 rollout --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.1480 at 29 decision steps -> results/wm/closed_loop/physics/A2/c08/rollout_w11_phase/c08f09t09_hexapod_ep302.npz
+b1 A2 rollout policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.1438 at 32 decision steps -> results/wm/closed_loop/physics/A2/b1/rollout_w11/b1_hexapod_ep302.npz
+c08 random random plain turn_s0.29 | physics closed loop: mean L2 error 0.0915 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep1202.npz
+c08 random random --phase_match turn_s0.29 | physics closed loop: mean L2 error 0.0884 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep1202.npz
+b1 random random policy turn_s0.29 | B1 physics closed loop: mean L2 error 0.0670 at 33 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep1202.npz
+c08 random random plain turn_s0.56 | physics closed loop: mean L2 error 0.1073 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep1303.npz
+c08 random random --phase_match turn_s0.56 | physics closed loop: mean L2 error 0.1176 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep1303.npz
+b1 random random policy turn_s0.56 | B1 physics closed loop: mean L2 error 0.0856 at 33 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep1303.npz
+c08 random random plain side_L_lvl0 | physics closed loop: mean L2 error 0.1386 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep2000.npz
+c08 random random --phase_match side_L_lvl0 | physics closed loop: mean L2 error 0.0900 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep2000.npz
+b1 random random policy side_L_lvl0 | B1 physics closed loop: mean L2 error 0.0898 at 33 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep2000.npz
+c08 random random plain side_R_lvl1 | physics closed loop: mean L2 error 0.1654 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep2301.npz
+c08 random random --phase_match side_R_lvl1 | physics closed loop: mean L2 error 0.0778 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep2301.npz
+b1 random random policy side_R_lvl1 | B1 physics closed loop: mean L2 error 0.0978 at 33 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep2301.npz
+c08 random random plain speed_c7.1 | physics closed loop: mean L2 error 0.1392 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep103.npz
+c08 random random --phase_match speed_c7.1 | physics closed loop: mean L2 error 0.1256 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep103.npz
+b1 random random policy speed_c7.1 | B1 physics closed loop: mean L2 error 0.0791 at 33 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep103.npz
+c08 random random plain speed_c8.8 | physics closed loop: mean L2 error 0.1134 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0/c08f09t09_hexapod_ep302.npz
+c08 random random --phase_match speed_c8.8 | physics closed loop: mean L2 error 0.1645 at 29 decision steps -> results/wm/closed_loop/physics/random/c08/random_w0_phase/c08f09t09_hexapod_ep302.npz
+b1 random random policy speed_c8.8 | B1 physics closed loop: mean L2 error 0.1154 at 32 decision steps -> results/wm/closed_loop/physics/random/b1/random_w0/b1_hexapod_ep302.npz

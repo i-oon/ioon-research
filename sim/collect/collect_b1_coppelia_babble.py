@@ -596,7 +596,7 @@ def main():
     if args.ego:
         sys.path.insert(0, os.path.join(ROOT, "sim", "scene"))
         from ego_camera import (WALK_PITCH, attach_ego, build_texture_box,  # noqa: E402
-                                randomise_ground, room_for)
+                                randomise_ground, room_for, set_ego_fov)
         camera_root = sim.getObject("/base_visual")
         root_position = sim.getObjectPosition(camera_root, sim.handle_world)
         ego_room = room_for(root_position[2])
@@ -672,6 +672,11 @@ def main():
 
     sim.setStepping(True)
     sim.startSimulation()
+    if args.ego:
+        # **After `startSimulation`**: starting restores the scene sensor's authored 15 deg, so a FOV
+        # set earlier (including by `attach_ego`) is silently reverted -- the babble ego sets were
+        # shot this way (F256). `set_ego_fov` reads the value back and raises if it did not stick.
+        print(f"    ego FOV after start: {set_ego_fov(sim, cam):.1f} deg")
     for _ in range(args.warmup):
         sim.step()
 

@@ -41,6 +41,7 @@ import torch
 
 from ..config import from_checkpoint
 from ..data.embodiment import REGISTRY, load
+from ..data.strided import stride_of
 from ..models.action_projector import ActionProjector, action_dims_from
 from ..models.ftm import ForwardTransitionModel
 from ..models.itm import InverseTransitionModel
@@ -73,6 +74,17 @@ def load_candidates(directory, embodiment, per_condition=1):
             out.append({"condition": cond, "path": path,
                         "actions": clip["actions"].astype(np.float32)})
     return out
+
+
+def action_chunk_at(actions, j, k):
+    """The k commands starting at `j`, padded by repeating the last one where a clip runs out --
+    what a stride-k projector reads for the latent starting at `j` (`wm/data/strided.py`)."""
+    a = np.asarray(actions)[max(0, j):max(0, j) + k]
+    if len(a) == 0:
+        a = np.asarray(actions)[-1:]
+    if len(a) < k:
+        a = np.concatenate([a, np.repeat(a[-1:], k - len(a), axis=0)])
+    return a
 
 
 class LatentPlanner:
@@ -180,6 +192,10 @@ class DirectFroudePlanner:
         self.horizon = int(horizon)
         self.device = torch.device(device)
         self.action_lag = 1
+        # **Frames per latent, read off the projector itself** (`ActionProjector.chunk`), so the
+        # planner cannot be built at a stride its projector was not fitted for -- whoever constructs
+        # it (`from_checkpoint`, `final_2x2x2_test.build_planner`, ...). 1 before stride existed.
+        self.stride = getattr(projector, "chunk", 1)
         # **Additive, default-off.** `free_offset=False` (the default) reproduces the exact
         # behaviour this class always had -- every candidate read at the SAME index `t` as the
         # live episode, one score per candidate. This was a deliberate choice (F80/module
@@ -220,6 +236,11 @@ class DirectFroudePlanner:
 
         planner = cls(proj, md, cands, embodiment, horizon, device, free_offset=free_offset)
         planner.action_lag = max(1, cfg.action_lag)
+        if stride_of(cfg) != planner.stride:
+            raise ValueError(f"checkpoint frame_stride {stride_of(cfg)} != projector chunk "
+                             f"{planner.stride}: the projector was fitted for a different stride")
+        if planner.stride > 1 and free_offset:
+            raise ValueError("free_offset is not implemented for stride > 1")
         planner.cfg = cfg
         planner.channels = [int(c) for c in cfg.body_channels]
         mean_s, std_s = checkpoint["body_stats"]
@@ -246,15 +267,79 @@ class DirectFroudePlanner:
         detail this collapses. `act` uses that detail to know which offset won, `score` alone
         cannot express it (kept this way so `score`'s return shape never changes)."""
         if self.free_offset:
+            if self.stride > 1:
+                raise ValueError("free_offset is not implemented for stride > 1")
             return np.asarray([np.min(row) for row in self.score_offsets(goal_std)])
         h = self.horizon_at(t)
         goal = torch.as_tensor(goal_std, dtype=torch.float32, device=self.device)
+        k = self.stride
+        if getattr(self, "window", 0) > max(h, k if k > 1 else 0):
+            return self._score_window(goal, t, h)
+        if k > 1:
+            # one latent for the k commands starting at t + lag: Froude over [t, t+k)
+            a = np.stack([action_chunk_at(c["actions"], t + self.action_lag, k) for c in self.candidates])
+            z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
+            pred = self.md.body(None, z)
+            return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         out = []
         for cand in self.candidates:
             a = torch.as_tensor(cand["actions"][t + self.action_lag:t + self.action_lag + h],
                                 device=self.device)
             z = self.proj(a, self.embodiment)
             pred = self.md.body(None, z).mean(0)
+            out.append(float(((pred - goal) ** 2).mean()))
+        return np.asarray(out)
+
+    @torch.no_grad()
+    def _score_window(self, goal, t, h):
+        """Read each candidate over a `self.window`-step window centred on the decision window,
+        instead of the `h` steps being decided. Only the read-out widens: the decision cadence and
+        the grading horizon stay `h`. The goal Froude is itself a ~1 s centred average
+        (`body_motion`), and a single step of `z` is dominated by within-stride motion, so reading
+        one or two steps against a stride-averaged goal is a timescale mismatch --
+        `timescale_probe.py` measured R2 0.44 single-step vs 0.68 at a 21-step window, same
+        checkpoint and target. Off (`window=0`) reproduces the original scoring exactly."""
+        w = int(self.window)
+        k = self.stride
+        if k > 1:
+            # every k-command chunk that fits inside the w-step window centred on the decision
+            out = []
+            for cand in self.candidates:
+                acts = cand["actions"]
+                n = len(acts)
+                if getattr(self, "window_align", "centre") == "forward":
+                    start = max(0, min(t + self.action_lag, n - w))
+                else:
+                    centre = t + self.action_lag + h // 2
+                    start = max(0, min(centre - w // 2, n - w))
+                a = np.stack([action_chunk_at(acts, j, k) for j in range(start, start + max(1, w - k + 1))])
+                z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
+                if getattr(self, "window_average", "pred") == "z":
+                    pred = self.md.body(None, z.mean(0, keepdim=True)).reshape(-1)
+                else:
+                    pred = self.md.body(None, z).mean(0)
+                out.append(float(((pred - goal) ** 2).mean()))
+            return np.asarray(out)
+        out = []
+        for cand in self.candidates:
+            acts = cand["actions"]
+            n = len(acts)
+            # "centre" (default, F251) reads a window centred on the decision; "forward" starts at
+            # t + lag like the rollout planner, which cannot look back past its start frame
+            if getattr(self, "window_align", "centre") == "forward":
+                start = max(0, min(t + self.action_lag, n - w))
+            else:
+                centre = t + self.action_lag + h // 2
+                start = max(0, min(centre - w // 2, n - w))
+            a = acts[start:start + w]
+            if len(a) == 0:
+                a = acts[-1:]
+            z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
+            if getattr(self, "window_average", "pred") == "z":
+                # for a body head fit on window-averaged z (`fit_body_head --z_window`)
+                pred = self.md.body(None, z.mean(0, keepdim=True)).reshape(-1)
+            else:
+                pred = self.md.body(None, z).mean(0)
             out.append(float(((pred - goal) ** 2).mean()))
         return np.asarray(out)
 
@@ -338,6 +423,8 @@ class RolloutFroudePlanner:
         self.horizon = int(horizon)
         self.device = torch.device(device)
         self.action_lag = 1
+        # frames per FTM step, read off the projector (see `DirectFroudePlanner.__init__`)
+        self.stride = getattr(projector, "chunk", 1)
 
     @classmethod
     def from_checkpoint(cls, ckpt_path, candidates_dir, embodiment="b1", projector_path="",
@@ -370,6 +457,9 @@ class RolloutFroudePlanner:
 
         planner = cls(itm, ftm, proj, md, cands, embodiment, horizon, device)
         planner.action_lag = max(1, cfg.action_lag)
+        if stride_of(cfg) != planner.stride:
+            raise ValueError(f"checkpoint frame_stride {stride_of(cfg)} != projector chunk "
+                             f"{planner.stride}: the projector was fitted for a different stride")
         planner.cfg = cfg
         planner.channels = [int(c) for c in cfg.body_channels]
         mean_s, std_s = checkpoint["body_stats"]
@@ -404,6 +494,20 @@ class RolloutFroudePlanner:
         if e_t.dim() == 2:
             e_t = e_t.unsqueeze(0)
         goal = goal.to(self.device).float()
+        k = self.stride
+        if getattr(self, "window", 0) > max(h, k if k > 1 else 0):
+            return self._score_window(e_t, goal, t)
+        if k > 1:
+            # ceil(h / k) FTM steps of k frames, each driven by its own k-command chunk
+            steps = max(1, -(-h // k))
+            n_c = len(self.candidates)
+            e = e_t.expand(n_c, -1, -1)
+            for i in range(steps):
+                a = np.stack([action_chunk_at(c["actions"], t + self.action_lag + i * k, k)
+                              for c in self.candidates])
+                e = self.ftm(e, self.proj(torch.as_tensor(a, device=self.device), self.embodiment))
+            pred = self.md.body(None, self.itm(e_t.expand(n_c, -1, -1), e))
+            return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         out = []
         for cand in self.candidates:
             a = torch.as_tensor(cand["actions"][t + self.action_lag:t + self.action_lag + h],
@@ -415,6 +519,58 @@ class RolloutFroudePlanner:
             pred = self.md.body(None, self.itm(e_t, e)).reshape(-1)
             out.append(float(((pred - goal) ** 2).mean()))
         return np.asarray(out)
+
+    @torch.no_grad()
+    def _score_window(self, e_t, goal, t):
+        """Roll every candidate `self.window` steps forward from `e_t` (all candidates batched),
+        read body motion from each imagined 1-step transition `ITM(e_k, e_k+1)` -- the only pair
+        spacing the ITM was trained on, unlike the default path's `ITM(e_t, e_final)` -- and average
+        along the imagined trajectory, the same stride-scale read-out `DirectFroudePlanner`'s
+        `_score_window` uses. A candidate with fewer than `window` actions left repeats its last."""
+        w = int(self.window)
+        k = self.stride
+        if k > 1:
+            # ceil(w / k) FTM steps; each imagined pair is read at the stride-k spacing the ITM was
+            # trained on, and the reads are averaged along the imagined trajectory
+            steps = max(1, -(-w // k))
+            n_cand = len(self.candidates)
+            e = e_t.expand(n_cand, -1, -1)
+            zs = []
+            for i in range(steps):
+                a = np.stack([action_chunk_at(c["actions"], t + self.action_lag + i * k, k)
+                              for c in self.candidates])
+                e_next = self.ftm(e, self.proj(torch.as_tensor(a, device=self.device), self.embodiment))
+                zs.append(self.itm(e, e_next))
+                e = e_next
+            zs = torch.stack(zs, dim=1)
+            if getattr(self, "window_average", "pred") == "z":
+                pred = self.md.body(None, zs.mean(1))
+            else:
+                pred = self.md.body(None, zs.reshape(n_cand * steps, -1)).reshape(n_cand, steps, -1).mean(1)
+            return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
+        windows = []
+        for cand in self.candidates:
+            a = cand["actions"][t + self.action_lag:t + self.action_lag + w]
+            if len(a) == 0:
+                a = cand["actions"][-1:]
+            if len(a) < w:
+                a = np.concatenate([a, np.repeat(a[-1:], w - len(a), axis=0)])
+            windows.append(a)
+        A = torch.as_tensor(np.stack(windows), device=self.device)       # (n_cand, w, a_dim)
+        n_cand = A.shape[0]
+        z = self.proj(A.reshape(n_cand * w, -1), self.embodiment).reshape(n_cand, w, -1)
+        e = e_t.expand(n_cand, -1, -1)
+        zs = []
+        for k in range(w):
+            e_next = self.ftm(e, z[:, k])
+            zs.append(self.itm(e, e_next))
+            e = e_next
+        zs = torch.stack(zs, dim=1)                                       # (n_cand, w, z_dim)
+        if getattr(self, "window_average", "pred") == "z":
+            pred = self.md.body(None, zs.mean(1))                        # (n_cand, body_dim)
+        else:
+            pred = self.md.body(None, zs.reshape(n_cand * w, -1)).reshape(n_cand, w, -1).mean(1)
+        return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
 
     @torch.no_grad()
     def act(self, e_t, goal, t):

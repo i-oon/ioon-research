@@ -1,0 +1,7 @@
+s5_stage124  w=0    direct 0.0556 (gap +0.74)  roll_fixed 0.1270 (gap -0.01)  roll_live 0.1143 (gap +0.13)
+s5_stage124  w=11   direct 0.0483 (gap +0.82)  roll_fixed 0.0839 (gap +0.45)  roll_live 0.0885 (gap +0.40)
+s5_s3_lz0    w=0    direct 0.0753 (gap +0.54)  roll_fixed 0.1278 (gap -0.02)  roll_live 0.1205 (gap +0.06)
+s5_s3_lz0    w=11   direct 0.0660 (gap +0.63)  roll_fixed 0.0814 (gap +0.47)  roll_live 0.0846 (gap +0.44)
+s5_s3_lz1    w=0    direct 0.0511 (gap +0.79)  roll_fixed 0.1348 (gap -0.09)  roll_live 0.1290 (gap -0.03)
+s5_s3_lz1    w=11   direct 0.0487 (gap +0.81)  roll_fixed 0.0859 (gap +0.42)  roll_live 0.0921 (gap +0.36)
+library bounds (mean over conditions): oracle 0.0310  random 0.1264

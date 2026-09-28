@@ -74,7 +74,8 @@ def build(ckpt, pretrained, device):
     return cfg, itm, ftm
 
 
-def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1):
+def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1,
+          stride=1):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
     One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
@@ -102,15 +103,18 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
     rng = np.random.default_rng(seed)
     params = list(itm.parameters()) + list(ftm.parameters())
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=1e-4)
-    spans = [(c, s, min(s + batch, len(c) - 1))
-             for c in clips for s in range(0, len(c) - 1, batch)]
+    # `stride` = the checkpoint's frame_stride (`wm/data/strided.py`): pairs e_t -> e_{t+stride}.
+    # 1 reproduces the original one-step spans exactly.
+    gap = max(1, int(stride))
+    spans = [(c, s, min(s + batch, len(c) - gap))
+             for c in clips for s in range(0, len(c) - gap, batch)]
     itm.train(); ftm.train()
     last = 0.0
     for step in range(steps):
         e_cpu, s, t = spans[rng.integers(len(spans))]
         opt.zero_grad()
         e_t = e_cpu[s:t].to(device)
-        e_next = e_cpu[s + 1:t + 1].to(device)
+        e_next = e_cpu[s + gap:t + gap].to(device)
         z = itm(e_t, e_next)
         pred = ftm(e_t, z)
         loss = torch.nn.functional.mse_loss(pred, e_next)
@@ -131,7 +135,7 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
 
 
 @torch.no_grad()
-def rollout(itm, ftm, clips, horizons, device):
+def rollout(itm, ftm, clips, horizons, device, stride=1):
     """Close the forward model on its own output; score against holding the frame still.
 
     Returns the ratio per horizon and, alongside it, **how far the model predicts the embedding
@@ -142,16 +146,19 @@ def rollout(itm, ftm, clips, horizons, device):
     """
     scores = {"model": {k: [] for k in horizons}, "hold": {k: [] for k in horizons},
               "moved": {k: [] for k in horizons}, "truth": {k: [] for k in horizons}}
+    # horizons count world-model steps; at stride k each step is k frames (1 = original behaviour)
+    gap = max(1, int(stride))
     for e_cpu in clips:
         e = e_cpu.to(device)
         n = len(e)
-        z = torch.cat([itm(e[i:i + 1], e[i + 1:i + 2]) for i in range(n - 1)])
-        for start in range(1, n - max(horizons) - 1):
+        z = torch.cat([itm(e[i:i + 1], e[i + gap:i + gap + 1]) for i in range(n - gap)])
+        for start in range(1, n - gap * max(horizons) - 1):
             predicted = e[start:start + 1]
             for step in range(1, max(horizons) + 1):
-                predicted = ftm(predicted, z[start + step - 1:start + step])
+                i = start + (step - 1) * gap
+                predicted = ftm(predicted, z[i:i + 1])
                 if step in scores["model"]:
-                    truth = e[start + step]
+                    truth = e[start + step * gap]
                     scores["model"][step].append(((predicted[0] - truth) ** 2).mean().item())
                     scores["hold"][step].append(((e[start] - truth) ** 2).mean().item())
                     # displacement from the frame the rollout started at, predicted and actual

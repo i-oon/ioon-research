@@ -37,6 +37,8 @@ def main():
     ap.add_argument("--candidates_dir", required=True)
     ap.add_argument("--goal_dir", required=True)
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--display_name", default="", help="name shown in the figure title (default: the tag)")
+    ap.add_argument("--cond_label", default="", help="condition name shown in the figure (default: the condition id)")
     ap.add_argument("--conditions", default="")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--ylims", default="", help="fwd_lo,fwd_hi,lat_lo,lat_hi,yaw_lo,yaw_hi: one fixed scale for "
@@ -86,8 +88,8 @@ def main():
             ax.set_ylabel(LABELS[i]); ax.set_ylim(*ylims[i])
             if i == 0:
                 ax.legend(loc="upper right", fontsize=8)
-        axes[0].set_title(f"1. Goal reading: physics vs vision, no planner involved\n[{args.tag}]  "
-                          f"goal={cond} (hex)  |  mean |vision-read - physics| = {err:.4f}")
+        axes[0].set_title(f"Goal reading: physics vs vision, no planner involved\n[{args.display_name or args.tag}]  "
+                          f"goal: {args.cond_label or cond}  |  mean |vision-read - physics| = {err:.4f}")
         axes[-1].set_xlabel(f"timestep (horizon={args.horizon}, goal read at every step)")
         plt.tight_layout()
         plt.savefig(os.path.join(out, f"{args.tag}_goal_reading_{cond}.png"), dpi=120)

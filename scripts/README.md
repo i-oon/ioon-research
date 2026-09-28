@@ -234,9 +234,16 @@ literal**, so a figure cannot drift away from the run it describes.
 
 ## finished/
 
-Answered, kept because the findings cite them. Not part of any current workflow.
+Answered, kept because the findings cite them, or because nothing in the project (script, `.sh`
+runner, or `doc/FINDINGS.md`) references them anymore and there is no reason to lose the diagnostic
+itself. Not part of any current workflow.
 `test_vjepa2_encoder.py`, `test_vjepa2_frame_isolation.py`, `step0_macro_f1.py`,
-`temporal_similarity.py`, `plot_sanity_check.py`, `plot_step_minus1.py`.
+`temporal_similarity.py`, `plot_sanity_check.py`, `plot_step_minus1.py`,
+`inspect_b1_coppelia_scene.py`, `state_head_ceiling.py`, `per_channel_goal_read.py`,
+`sweep_b1_coppelia_babble.py`, `clip_budget_curve.py`, `offset_fix_check.py`,
+`train_froude_head.py`, `refit_b1_babble_projector.py` (this second group moved from
+`diagnostics/objective_experiments/` on 2026-09-23: each was grep-checked against `doc/FINDINGS.md`,
+every other script, and every `run/*.sh` first, and matched nothing).
 
 ## amp/
 

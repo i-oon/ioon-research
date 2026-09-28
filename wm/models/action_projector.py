@@ -29,6 +29,8 @@ measured how cheap that is -- one B1 clip clears break-even.
 import torch
 import torch.nn as nn
 
+from ..config import chunk_of
+
 
 def action_dims_from(saved):
     """`{embodiment: action_dim}` for a saved projector, whether or not the file records it.
@@ -58,6 +60,12 @@ class ActionProjector(nn.Module):
         super().__init__()
         width = hidden or cfg.hidden
         self.z_dim = cfg.z_dim
+        # **A stride-k latent summarises k commands, so the projector reads all k** (`action_chunk`,
+        # `wm/data/strided.py`): input (..., k, dim), flattened after standardising each joint. The
+        # statistics stay per joint -- one command's worth -- so a chunk is standardised the same
+        # way its commands are one at a time. `chunk_of` is 1 for every checkpoint recorded before
+        # stride existed, which keeps their shapes and outputs exactly as they were.
+        self.chunk = chunk_of(cfg)
 
         def stack(dim):
             layers, d = [], dim
@@ -66,7 +74,7 @@ class ActionProjector(nn.Module):
                 d = width
             return nn.Sequential(*layers, nn.Linear(width, cfg.z_dim))
 
-        self.nets = nn.ModuleDict({name: stack(dim) for name, dim in action_dims.items()})
+        self.nets = nn.ModuleDict({name: stack(dim * self.chunk) for name, dim in action_dims.items()})
 
         # **Standardise the action per embodiment, and keep the statistics inside the module.**
         # Joint commands are radians in body-specific ranges; the latent is whatever the ITM made.
@@ -85,5 +93,11 @@ class ActionProjector(nn.Module):
                 torch.as_tensor(std, dtype=torch.float32).clamp_min(1e-6))
 
     def forward(self, action, embodiment):
+        """`(..., dim)` at chunk 1; `(..., chunk, dim)` above it -- a wrong shape raises."""
         a = (action - getattr(self, f"mean_{embodiment}")) / getattr(self, f"std_{embodiment}")
+        if self.chunk > 1:
+            if a.shape[-2] != self.chunk:
+                raise ValueError(f"projector expects {self.chunk} commands per latent, got shape "
+                                 f"{tuple(action.shape)}")
+            a = a.flatten(-2)
         return self.nets[embodiment](a)

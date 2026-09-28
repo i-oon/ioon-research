@@ -14,32 +14,31 @@ Stick insect (*Medauroidea extradentata*) and Unitree B1, simulated in CoppeliaS
 
 ## Contents
 
-| stage | # | jump to |
-|---|---|---|
-| Stage 1 | 1 | [Background — a locomotion controller is fitted to one body](#1-background-—-a-locomotion-controller-is-fitted-to-one-body) |
-| Stage 1 | 2 | [Background — idea forming from the literature](#2-background-—-idea-forming-from-the-literature) |
-| Stage 1 | 3 | [Methodology — pretraining pipeline](#3-methodology-—-pretraining-pipeline) |
-| Stage 1 | 4 | [Exp 1.1 — decoder reads the frame or recalls the nearest body?](#4-experiment-11-does-the-decoder-read-the-frame-or-recall-the-nearest-training-body) |
-| Stage 1 | 5 | [Exp 1.2 — transfer inside vs. outside the training geometry's span](#5-experiment-12-transfer-inside-vs-outside-the-training-geometrys-span) |
-| Stage 1 | 6 | [Exp 1.3 — how much of the command comes from the transition](#6-experiment-13-how-much-of-the-command-comes-from-the-transition-not-just-the-pose) |
-| Stage 2 | 7 | [What crossing embodiments with vision requires](#7-methodology-—-stage-2-what-crossing-embodiments-with-vision-requires) |
-| Stage 2 | 8 | [Exp 2.1a — does a shared-coordinate loss need to exist at all?](#8-experiment-21a-does-a-shared-coordinate-loss-need-to-exist-at-all) |
-| Stage 2 | 10 | [Exp 2.2 — zero-shot vs. staged adaptation to a genuinely different robot](#10-experiment-22-zero-shot-vs-staged-adaptation-to-a-genuinely-different-robot) |
-| Stage 2 | S11 | [Motivation for Exp 2.4 — pose determines the future](#slide-11-—-motivation-for-experiment-24-pose-determines-the-future-so-the-action-is-redundant) |
-| Stage 2 | S12 | [Motivation for Exp 2.4, cont. — the principle explains published results](#slide-12-—-motivation-for-experiment-24-continued-the-principle-explains-results-that-are-already-published) |
-| Stage 2 | S13 | [Exp 2.4 — move the camera onto the body](#slide-13-—-experiment-24-the-second-independent-fix-—-move-the-camera-onto-the-body) |
-| Stage 2 | S14 | [Exp 2.4, cont. — what egocentric fixed, and what it didn't](#slide-14-—-experiment-24-continued-what-egocentric-actually-fixed-and-what-it-didnt) |
-| Stage 2 | S15 | [Exp 2.3 — context collapse, a second independent fix](#slide-15-—-experiment-23-context-collapse-—-a-second-independent-fix-found-later) |
-| **Stage 3** | — | [Closed-loop control and real controllers (intro)](#stage-3-—-closed-loop-control-and-real-controllers) |
-| Stage 3 | S16 | [Exp 3.1 — imagination-RL: the wall is the rollout](#slide-16-—-experiment-31-imagination-rl-—-the-wall-is-the-rollout) |
-| Stage 3 | S18 | [Exp 3.3 — scoring in the shared coordinate vs. raw frame distance](#slide-18-—-experiment-33-scoring-in-the-shared-coordinate-vs-raw-frame-distance) |
-| Stage 3 | S19 | [Controller vs. what we test, and what Froude is](#slide-19-—-controller-vs-what-we-test-and-what-froude-is) |
-| Stage 3 | S21 | [Exp 3.4 — the 2×2: which half is broken](#slide-21-—-experiment-34-the-2×2-—-which-half-is-broken-goal-source-or-scoring-mechanism) |
-| Stage 3 | S22 | [Exp 3.5 — `z` is a lossy bottleneck](#slide-22-—-experiment-35-z-is-a-lossy-bottleneck-—-the-shared-coordinate-lives-downstream-of-it-not-in-it) |
-| Stage 3 | S23 | [Plan: main plan, continuing plan, plan B](#slide-23-—-plan-main-plan-continuing-plan-plan-b) |
-
-
----
+<table>
+<tr><th align="left" width="24%">Part</th><th width="8%">Slide</th><th align="left">Topic</th></tr>
+<tr><td rowspan="4" valign="top" bgcolor="#c4d0e0"><b>Background &amp; method</b></td><td align="center">1</td><td><a href="#1-background-—-a-locomotion-controller-is-fitted-to-one-body">Background — a locomotion controller is fitted to one body</a></td></tr>
+<tr><td align="center">2</td><td><a href="#2-background-—-idea-forming-from-the-literature">Background — idea forming from the literature</a></td></tr>
+<tr><td align="center">3</td><td><a href="#3-methodology-—-pretraining-pipeline">Methodology — pretraining pipeline</a></td></tr>
+<tr><td align="center">—</td><td><a href="#dataset-declaration-—-stage-1-stage-2-and-stage-3">Dataset declaration — Stage 1, 2 and 3</a></td></tr>
+<tr><td rowspan="3" valign="top" bgcolor="#d0c0f0"><b>Stage 1 — cross-morphology</b></td><td align="center">4</td><td><a href="#4-experiment-11-does-the-decoder-read-the-frame-or-recall-the-nearest-training-body">Exp 1.1 — decoder reads the frame or recalls the nearest body?</a></td></tr>
+<tr><td align="center">5</td><td><a href="#5-experiment-12-transfer-inside-vs-outside-the-training-geometrys-span">Exp 1.2 — transfer inside vs. outside the training geometry's span</a></td></tr>
+<tr><td align="center">6</td><td><a href="#6-experiment-13-how-much-of-the-command-comes-from-the-transition-not-just-the-pose">Exp 1.3 — how much of the command comes from the transition</a></td></tr>
+<tr><td rowspan="3" valign="top" bgcolor="#9ebef5"><b>Stage 2a — crossing embodiments</b></td><td align="center">7</td><td><a href="#7-methodology-—-stage-2-what-crossing-embodiments-with-vision-requires">What crossing embodiments with vision requires</a></td></tr>
+<tr><td align="center">8</td><td><a href="#8-experiment-21a-does-a-shared-coordinate-loss-need-to-exist-at-all">Exp 2.1a — does a shared-coordinate loss need to exist at all?</a></td></tr>
+<tr><td align="center">10</td><td><a href="#10-experiment-22-zero-shot-vs-staged-adaptation-to-a-genuinely-different-robot">Exp 2.2 — zero-shot vs. staged adaptation to a genuinely different robot</a></td></tr>
+<tr><td rowspan="5" valign="top" bgcolor="#a8deba"><b>Stage 2b — does the model use the action?</b></td><td align="center">S11</td><td><a href="#slide-11-—-motivation-for-experiment-24-pose-determines-the-future-so-the-action-is-redundant">Motivation for Exp 2.4 — pose determines the future</a></td></tr>
+<tr><td align="center">S12</td><td><a href="#slide-12-—-motivation-for-experiment-24-continued-the-principle-explains-results-that-are-already-published">Motivation for Exp 2.4, cont. — the principle explains published results</a></td></tr>
+<tr><td align="center">S13</td><td><a href="#slide-13-—-experiment-24-the-second-independent-fix-—-move-the-camera-onto-the-body">Exp 2.4 — move the camera onto the body</a></td></tr>
+<tr><td align="center">S14</td><td><a href="#slide-14-—-experiment-24-continued-what-egocentric-actually-fixed-and-what-it-didnt">Exp 2.4, cont. — what egocentric fixed, and what it didn't</a></td></tr>
+<tr><td align="center">S15</td><td><a href="#slide-15-—-experiment-23-context-collapse-—-a-second-independent-fix-found-later">Exp 2.3 — context collapse, a second independent fix</a></td></tr>
+<tr><td rowspan="6" valign="top" bgcolor="#fac8a0"><b>Stage 3 — closed loop and controllers</b></td><td align="center">—</td><td><a href="#stage-3-—-closed-loop-control-and-real-controllers">Closed-loop control and real controllers (intro)</a></td></tr>
+<tr><td align="center">S16</td><td><a href="#slide-16-—-experiment-31-imagination-rl-—-the-wall-is-the-rollout">Exp 3.1 — imagination-RL: the wall is the rollout</a></td></tr>
+<tr><td align="center">S18</td><td><a href="#slide-18-—-experiment-33-scoring-in-the-shared-coordinate-vs-raw-frame-distance">Exp 3.3 — scoring in the shared coordinate vs. raw frame distance</a></td></tr>
+<tr><td align="center">S19</td><td><a href="#slide-19-—-controller-vs-what-we-test-and-what-froude-is">Controller vs. what we test, and what Froude is</a></td></tr>
+<tr><td align="center">S21</td><td><a href="#slide-21-—-experiment-34-the-2×2-—-which-half-is-broken-goal-source-or-scoring-mechanism">Exp 3.4 — the 2×2: which half is broken</a></td></tr>
+<tr><td align="center">S22</td><td><a href="#slide-22-—-experiment-35-z-is-a-lossy-bottleneck-—-the-shared-coordinate-lives-downstream-of-it-not-in-it">Exp 3.5 — <code>z</code> is a lossy bottleneck</a></td></tr>
+<tr><td valign="top" bgcolor="#f2aabe"><b>Plan</b></td><td align="center">S23</td><td><a href="#slide-23-—-plan-main-plan-continuing-plan-plan-b">Plan: main plan, continuing plan, plan B</a></td></tr>
+</table>
 
 ## 1. Background — A locomotion controller is fitted to one body
 
@@ -90,13 +89,13 @@ retreat to the way manipulation does: eighteen and twelve joint targets share no
 
 ### Requirements
 
-| # | requirement | why |
-|---|---|---|
-| R1 | the shared quantity must mean the same physical thing on both bodies without a hand-built correspondence | otherwise it isn't cross-embodiment, it's relabelling |
-| R2 | no CAD/URDF, no kinematic tree, no per-robot adapter fitted from that robot's own proprioception | this is the exact thing every existing route (Section 2) supplies and this thesis withholds |
-| R3 | readable from **egocentric video alone** at deployment time | proprioception-free is the whole point — an animal or damaged robot has no other channel |
-| R4 | the visual encoder stays frozen | isolates the claim to what a frozen, off-the-shelf video model already carries |
-| R5 | the representation must be shown to be *used* by the forward model, not just decodable from it | Experiment 2.3/2.4 exist because R5 is not automatically satisfied by R1–R4 |
+| # | requirement | why | status |
+|---|---|---|---|
+| R1 | the shared quantity must mean the same physical thing on both bodies without a hand-built correspondence | otherwise it isn't cross-embodiment, it's relabelling | **met** |
+| R2 | no CAD/URDF, no kinematic tree, no per-robot adapter fitted from that robot's own proprioception | this is the exact thing every existing route (Section 2) supplies and this thesis withholds | **met** |
+| R3 | readable from **egocentric video alone** at deployment time | proprioception-free is the whole point — an animal or damaged robot has no other channel | **met** |
+| R4 | the visual encoder stays frozen | isolates the claim to what a frozen, off-the-shelf video model already carries | **met** |
+| R5 | ~~the representation must be shown to be *used* by the forward model, not just decodable from it~~ → **fixed via the camera (Exp 2.4) + objective (Exp 2.3) changes**, at the coarse level: `null/real` 1.03 → 1.06–1.16 (this is the only FTM-only evidence for R5 — the FTM's own prediction, real action vs. null action) | Experiment 2.3/2.4 exist because R5 is not automatically satisfied by R1–R4 | **coarse use: fixed** (`null/real`, FTM-based). Ranking is a separate capability, not R5 evidence either way: via FTM rollout (teacher test), different behaviours rank OK (52–55% vs. 33%) but near-identical ones don't (47% vs. 50%); the headline selection result (76–86%, Exp 3.3) instead skips the FTM entirely, and adding the FTM rollout back *hurts* it (→33–44%) |
 
 ### Scope and Assumptions
 
@@ -173,6 +172,53 @@ retreat to the way manipulation does: eighteen and twelve joint targets share no
 
 ---
 
+
+## Dataset declaration — Stage 1, Stage 2 and Stage 3
+
+<table>
+<tr>
+<th align="left" width="33%">Stage 1 — nine hexapod bodies</th>
+<th align="left" width="34%">Stage 2 — hexapod and Unitree B1</th>
+<th align="left" width="33%">Stage 3 — goal, candidates, babble</th>
+</tr>
+<tr>
+<td valign="top">
+<code>fwd_hex8body</code>: 9 six-legged walkers, coxa / femur / tibia scaled independently (the number in a name is the scale × 10), 30 clips each, 270 clips; 52 – 66 frames per clip, fixed third-person camera.
+<br><br>
+<b>Commands are retargeted.</b> Data used in training takes one foot trajectory in Cartesian space, solved separately for each body by inverse kinematics: same intended behaviour, genuinely different joint numbers.
+<br><br>
+<b>Behaviour:</b> forward walking, one speed.
+<br><br>
+<img src="../results/deck/dataset_stage1_hex_bodies.png" width="100%" alt="a few of the nine hexapod bodies, third-person view, one forward-walking clip each">
+</td>
+<td valign="top">
+<code>beh12</code>: 12 conditions per body (4 speeds, 4 turn levels, 4 sideways) × 4 clips = 48 clips per body; every clip 66 frames at 20 Hz (3.3 s), 256 × 256. Hexapod: the <code>c10f10t10</code> body in CoppeliaSim. B1: a trained walking policy in MuJoCo, replayed in CoppeliaSim with the same renderer and camera. Split per body: 24 train / 12 validation / 12 held-out clips.
+<br><br>
+<b>Third-person camera</b> (hexapod <code>turn_s0.29</code>, B1 <code>turn_w0.037</code>: the third turn level of each)
+<br>
+<img src="../results/deck/dataset_stage2_allocentric.png" width="100%" alt="hexapod and B1, third-person camera">
+<br><br>
+<b>Head camera</b>, textured room
+<br>
+<img src="../results/deck/dataset_stage2_egocentric.png" width="100%" alt="hexapod and B1, head camera">
+</td>
+<td valign="top">
+<b>Goal.</b> A hexapod clip, one per condition: the 12 held-out clips. Read at every timestep as a Froude vector (forward, lateral, yaw), from the recorded body motion (physics) or from the clip's video (vision).
+<br><br>
+<b>Candidates.</b> B1 clips only; the goal body is never a candidate. A candidate is scored as <code>body_head(proj(a))</code> against the goal at the same frame index and graded against its own recorded Froude.
+<ul>
+<li><b>expert</b> (ground-truth B1): 24 clips, trained walking policy in MuJoCo, 12 conditions × 2, 20 Hz, 66 frames.</li>
+<li><b>babble v2</b>: 36 clips, MuJoCo CPG with action noise 0.03 — 12 forward (1.0 / 1.5 / 2.0 Hz × 4 seeds), 12 sideways (0.8 / 1.0 / 1.2 Hz × 4), 12 turning (pivot 1.2 / 1.5 / 1.8 × 4); replayed in CoppeliaSim, one room; 50 Hz, 100 frames.</li>
+<li><b>babble spring</b>: 40 clips, CoppeliaSim spring-mode joint control, diagonal trot at 5.0 Hz, amplitude uniform 0.20 – 0.32, action noise 0.03, one seed and one room per clip; forward trot only (clip-mean forward Froude 0.124 – 0.216); 20 Hz, 160 frames.</li>
+</ul>
+<b>Babble.</b> Open-loop CPG with randomised parameters and noise: no trained policy, no expert B1 clip. Starting from the hexapod-only pretrain (<code>best.pt</code>), adaptation stages 1 and 2 are fitted on the babble library alone and stage 4 on the babble library plus the hexapod rehearsal clips.
+<br><br>
+The v2 clips are recorded at 50 Hz and the goals at 20 Hz; goal and candidate are matched by frame index, as in the expert library.
+</td>
+</tr>
+</table>
+
+---
 
 ## 4. Experiment 1.1: does the decoder read the frame, or recall the nearest training body?
 

@@ -1,0 +1,15 @@
+old          w=0    direct 0.0599 (gap +0.70)  roll_fixed 0.1482 (gap -0.23)  roll_live 0.1391 (gap -0.13)
+old          w=11   direct 0.0534 (gap +0.77)  roll_fixed 0.0976 (gap +0.30)  roll_live 0.1172 (gap +0.10)
+new          w=0    direct 0.0715 (gap +0.57)  roll_fixed 0.1493 (gap -0.24)  roll_live 0.1385 (gap -0.13)
+new          w=11   direct 0.0633 (gap +0.66)  roll_fixed 0.1299 (gap -0.04)  roll_live 0.1502 (gap -0.25)
+
+library bounds (mean over conditions): oracle 0.0310  random 0.1264
+gap = (random - selector) / (random - oracle): 0 = random, 1 = oracle, <0 worse than random
+
+per condition:
+  speed_c7.1   oracle 0.0206 random 0.1034 | old/w0/direct 0.0692  old/w0/roll_fixed 0.1150  old/w0/roll_live 0.1123  old/w11/direct 0.0504  old/w11/roll_fixed 0.0884  old/w11/roll_live 0.1259  new/w0/direct 0.0693  new/w0/roll_fixed 0.1531  new/w0/roll_live 0.1466  new/w11/direct 0.0640  new/w11/roll_fixed 0.0860  new/w11/roll_live 0.1648
+  turn_s0.29   oracle 0.0265 random 0.0982 | old/w0/direct 0.0530  old/w0/roll_fixed 0.1490  old/w0/roll_live 0.1335  old/w11/direct 0.0479  old/w11/roll_fixed 0.1100  old/w11/roll_live 0.1312  new/w0/direct 0.0658  new/w0/roll_fixed 0.1333  new/w0/roll_live 0.1217  new/w11/direct 0.0663  new/w11/roll_fixed 0.1305  new/w11/roll_live 0.1253
+  turn_s0.56   oracle 0.0374 random 0.1218 | old/w0/direct 0.0581  old/w0/roll_fixed 0.1593  old/w0/roll_live 0.1546  old/w11/direct 0.0517  old/w11/roll_fixed 0.1389  old/w11/roll_live 0.1438  new/w0/direct 0.0647  new/w0/roll_fixed 0.1447  new/w0/roll_live 0.1404  new/w11/direct 0.0577  new/w11/roll_fixed 0.1467  new/w11/roll_live 0.1449
+  side_L_lvl0  oracle 0.0465 random 0.1462 | old/w0/direct 0.0842  old/w0/roll_fixed 0.1509  old/w0/roll_live 0.1364  old/w11/direct 0.0983  old/w11/roll_fixed 0.0880  old/w11/roll_live 0.0978  new/w0/direct 0.0980  new/w0/roll_fixed 0.1224  new/w0/roll_live 0.1348  new/w11/direct 0.0615  new/w11/roll_fixed 0.1314  new/w11/roll_live 0.1366
+  side_R_lvl1  oracle 0.0194 random 0.1597 | old/w0/direct 0.0343  old/w0/roll_fixed 0.1785  old/w0/roll_live 0.1416  old/w11/direct 0.0314  old/w11/roll_fixed 0.0772  old/w11/roll_live 0.0802  new/w0/direct 0.0451  new/w0/roll_fixed 0.1530  new/w0/roll_live 0.1275  new/w11/direct 0.0509  new/w11/roll_fixed 0.1637  new/w11/roll_live 0.1363
+  speed_c8.8   oracle 0.0353 random 0.1288 | old/w0/direct 0.0606  old/w0/roll_fixed 0.1363  old/w0/roll_live 0.1560  old/w11/direct 0.0404  old/w11/roll_fixed 0.0831  old/w11/roll_live 0.1244  new/w0/direct 0.0860  new/w0/roll_fixed 0.1896  new/w0/roll_live 0.1597  new/w11/direct 0.0795  new/w11/roll_fixed 0.1211  new/w11/roll_live 0.1931

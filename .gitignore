@@ -3,33 +3,31 @@
 __pycache__/
 *.py[cod]
 
-# CoppeliaSim / sim run artifacts
-sim/env/experttemp.csv
-
 # Scratch outputs
 *.log
 
-# Large expert dataset (132 MB, exceeds GitHub's 100 MB limit) — keep on disk, not in git
-sim/env/expert_66k_aug3c_fcontact.csv
+# Data: all datasets stay on disk, not in git (regenerable via scripts/dataset/ and scripts/run/)
+data/
 
-results/wm/cache/
-
-# Data artifacts (regenerable: encoded embeddings, episode npz, rendered videos, frames)
-
-# *.npz
-
-airl-insect-walking/
-
-# *cache
-amp/
+# Model checkpoints and caches (large, regenerable)
 wm/runs/
-
 wm/cache/
+results/wm/cache/
 results/wm/cache_zeroshot/
-data/allocentric
-data/gecko
-
 results/dataset/**/emb.npz
-Egocentric_VSM/
-Demo-JEPA/
-Slalom-structure/
+
+# Reference repos / tools checked out locally
+doc/ref/Demo-JEPA/
+doc/ref/Egocentric_VSM/
+doc/ref/Slalom-structure/
+latex-document-skill/
+
+# Compiled report artifacts (regenerable via report/build_preview.sh or xelatex) — not the source
+report/thai_abstract_standalone.pdf
+report/*.aux
+report/*.toc
+report/*.out
+
+# Archived / invalidated results (moved, not deleted; see MANIFEST.txt inside each)
+*_archive*/
+_invalid_*/

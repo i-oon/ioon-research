@@ -103,12 +103,16 @@ def main():
     ap.add_argument("--candidates_dir", required=True)
     ap.add_argument("--goal_dir", required=True)
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--display_name", default="", help="name shown in the figure title (default: the tag)")
+    ap.add_argument("--cond_label", default="", help="condition name shown in the figure (default: the condition id)")
     ap.add_argument("--conditions", default="", help="comma list; empty = all")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--goal_allo_dir", default="data/allocentric/beh12_c10f10t10_flat")
     ap.add_argument("--cand_allo_dir", default="", help="unused since the stitched replay (kept for old calls)")
     ap.add_argument("--ylims", default="", help="fwd_lo,fwd_hi,lat_lo,lat_hi,yaw_lo,yaw_hi: one fixed scale "
                                                 "for every plot (match the goal-reading plots); empty = autoscale")
+    ap.add_argument("--library_label", default="babble library",
+                    help='legend text for the picks, e.g. "expert library" for the ground-truth B1 library')
     ap.add_argument("--plots_only", action="store_true", help="skip the videos (no CoppeliaSim needed)")
     ap.add_argument("--out_dir", default="results/deck")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -161,7 +165,7 @@ def main():
         fig, axes = plt.subplots(3, 1, figsize=(9, 8), sharex=True)
         for j, ax in enumerate(axes):
             ax.plot(steps, gs[:, j], color="black", lw=2, label="goal (hexapod, physics)")
-            ax.plot(steps, sel[:, j], color="#2a7a3b", lw=1.8, label="picked from babble library")
+            ax.plot(steps, sel[:, j], color="#2a7a3b", lw=1.8, label=f"picked from {args.library_label}")
             ax.plot(steps, orc[:, j], color="gray", ls=":", lw=1.8, label="best the library could have done")
             ax.set_ylabel(LABELS[j])
         if fixed:
@@ -170,8 +174,8 @@ def main():
         for arr in (gs, sel, orc):
             lo, hi = np.minimum(lo, arr.min(0)), np.maximum(hi, arr.max(0))
         axes[0].legend(loc="upper right", fontsize=8)
-        axes[0].set_title(f"{args.tag}: direct scoring over the B1 candidate library\n"
-                          f"goal={cond}  |  mean err: picked={e_sel:.4f}  library best={e_orc:.4f}")
+        axes[0].set_title(f"{args.display_name or args.tag}: direct scoring over the B1 candidate library\n"
+                          f"goal: {args.cond_label or cond}  |  mean err: picked={e_sel:.4f}  library best={e_orc:.4f}")
         axes[-1].set_xlabel(f"timestep (horizon={H}, goal read at every step)")
         plt.tight_layout()
         plt.savefig(os.path.join(out, f"{args.tag}_{cond}.png"), dpi=120)

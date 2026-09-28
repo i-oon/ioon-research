@@ -1,0 +1,2 @@
+s5_cfreadout w=0    direct 0.0556 (gap +0.74)  roll_fixed 0.1205 (gap +0.06)  roll_live 0.1106 (gap +0.17)
+s5_cfreadout w=11   direct 0.0483 (gap +0.82)  roll_fixed 0.0909 (gap +0.37)  roll_live 0.0945 (gap +0.33)

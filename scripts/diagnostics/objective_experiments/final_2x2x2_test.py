@@ -90,6 +90,11 @@ def build_planner(ckpt_path, candidates_dir, embodiment, horizon, free_offset, d
 def true_local_froude(cand, spec, offset, horizon):
     clip = load(cand["path"], spec)
     bm = np.asarray(clip["body_motion"])[:, :3]
+    # A candidate shorter than the caller's offset (variable clip lengths, a late goal timestep
+    # picking a short candidate) used to slice past the end and return NaN via mean-of-empty --
+    # never a valid result. Clamp to the candidate's own last valid index instead: the candidate's
+    # final state, not a crash.
+    offset = min(offset, len(bm) - 1)
     h = min(horizon, len(bm) - offset)
     return bm[offset:offset + max(h, 1)].mean(0)
 

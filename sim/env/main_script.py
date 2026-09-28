@@ -14,7 +14,9 @@ def sysCall_init():
     self.time_step = 0
     self.csv_row_count = 0
     # self.csv_file = "/home/yuchen/airl-insect-walking/env/Animal06_110919_00_31.csv"
-    self.csv_file = "/home/aria/ioon-research/sim/env/ds_loopsm.csv"
+    # next to the scene file, so the scene runs on any machine (was a hard-coded /home/aria/... path,
+    # which froze the simulation at t=0.15 s wherever that path does not exist)
+    self.csv_file = os.path.join(sim.getStringParam(sim.stringparam_scene_path), "ds_loopsm.csv")
     self.df = pd.read_csv(self.csv_file)
     self.df_final_line = len(self.df['LF_CTr'])
     print(self.df_final_line)
@@ -652,7 +654,7 @@ def sysCall_cleanup():
     # ------------normal mode ------------- #
     if self.logging:
         save_data = pd.DataFrame(self.data_list)
-        save_data.to_csv('/home/aria/ioon-research/sim/env/experttemp.csv', index=False)
+        save_data.to_csv(os.path.join(sim.getStringParam(sim.stringparam_scene_path), 'experttemp.csv'), index=False)
         
     # ------------write-in mode ------------- #
     # if self.logging and len(self.data_list) > 0:

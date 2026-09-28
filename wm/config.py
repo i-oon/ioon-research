@@ -268,6 +268,22 @@ class Config:
     # is a separate flag rather than folded into an existing one. 0.0 reproduces every run before
     # 2026-09-05.
     lambda_rollout: float = 0.0
+    # **Counterfactual cycle.** Every other term pairs e_t with the z of its OWN transition, so the
+    # FTM can predict e_{t+1} mostly from e_t and still score well; selection instead rolls every
+    # candidate's z from ONE shared frame, a pairing training never shows. Measured
+    # (`rollout_state_action_anova.py`): the rollout read-out is 50-87% state-driven and 2-17%
+    # action-driven even with the true z, and its ranking across actions from a fixed state is
+    # uncorrelated with their true Froude (r ~ 0). This term shuffles z across the batch and asks
+    # the ITM -- frozen for this term, so it cannot learn to read an FTM artefact -- to recover the
+    # shuffled z from ITM(e_t, FTM(e_t, z_shuffled)). 0.0 reproduces every run before 2026-09-25.
+    lambda_cycle: float = 0.0
+    # Modules held fixed during training (names from the model dict, e.g. `itm`). Measured need
+    # (F253): with the ITM trainable, `lambda_cycle` made the FTM use z but also reshaped z itself
+    # -- recon's gradient reaches z harder once the FTM depends on it -- and z's read-out as Froude
+    # fell (body(proj(a)) R2 forward 0.35 -> 0.12), so selection did not improve. Freezing the ITM
+    # keeps z's space (and so the projector and body head) fixed and lets only the FTM change.
+    # Empty reproduces every earlier run.
+    freeze_modules: tuple = ()
     hinge_margin: float = 0.1     # **0.1, not ActSWM's 0.3** -- at 0.3 the term collapses (F141)
     hinge_K: int = 3              # **3, not their 12** -- our rollout is reliable to about here
     readout_hidden: int = 512

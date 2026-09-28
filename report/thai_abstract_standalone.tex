@@ -1,0 +1,55 @@
+% Standalone Thai abstract, compiled separately from proposal.tex.
+% Font: TH Sarabun New (the actual SIPA-released face, in fonts_thsarabunnew/), the KMUTT/Thai-official
+% standard. Requires the font installed where fontspec/fc-list can see it (e.g. ~/.fonts/thsarabunnew/).
+% Margins match proposal.tex's KMUTT page geometry (top 30mm, left 40mm, right 20mm, bottom 20mm).
+% Compile with XeLaTeX (needed for the ICU-based Thai line-breaker, \XeTeXlinebreaklocale):
+%   xelatex thai_abstract_standalone.tex
+% This machine has no `xelatex` binary preinstalled; a local xetex-based one was built without sudo
+% into ~/.local/bin/xelatex (backed by a format file in ~/texmf-var/web2c/xetex/xelatex.fmt).
+\documentclass[11pt,a4paper]{article}
+\usepackage[a4paper,top=30mm,left=40mm,right=20mm,bottom=20mm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{thai}
+\setotherlanguage{english}
+\newfontfamily\thaifont{TH Sarabun New}
+\setmainfont{TH Sarabun New}
+\linespread{1.0}
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip=0pt plus 0.1em minus 0.05em
+\pagestyle{empty}
+\begin{document}
+\noindent
+\begin{tabular}{@{}p{4.8cm}p{9.7cm}@{}}
+หัวข้อโครงงานวิจัย & การถ่ายทอดการเคลื่อนที่ข้ามรูปแบบร่างกายจากแบบจำลองโลกเชิงภาพมุมมองบุคคลที่หนึ่งโดยไม่มีความรู้ล่วงหน้าเกี่ยวกับสัณฐานวิทยา\\[2mm]
+หน่วยกิต           & 6\\[2mm]
+ผู้ดำเนินโครงงาน   & นางสาวดิษย์ธร สุทธาเวศ\\[2mm]
+อาจารย์ที่ปรึกษา   & นายบวรศักดิ์ สกุลเกื้อกูลสุข\\[2mm]
+หลักสูตร           & วิศวกรรมศาสตรบัณฑิต\\[2mm]
+สาขาวิชา           & วิศวกรรมหุ่นยนต์และระบบอัตโนมัติ\\[2mm]
+ปีการศึกษา         & 2569\\
+\end{tabular}
+
+\vspace{3mm}
+\begin{center}บทคัดย่อ\end{center}
+\vspace{1mm}
+
+\noindent ตัวควบคุมการเคลื่อนที่ของหุ่นยนต์ขาที่ฝึกด้วยการเรียนรู้แบบเสริมกำลัง (Reinforcement Learning) จะผูกติดกับ
+ร่างกายที่ใช้ฝึกโดยตรง และวิธีการถ่ายทอดข้ามร่างกายที่มีอยู่ในปัจจุบันล้วนต้องได้รับข้อมูลของร่างกายใหม่ก่อนเสมอ ไม่ว่าจะเป็น
+ไฟล์ออกแบบ (CAD/URDF) โครงสร้างจลนศาสตร์ ตัวปรับเฉพาะหุ่นยนต์ หรือข้อมูลสาธิตของหุ่นยนต์เป้าหมาย งานวิจัยนี้จึงทดสอบว่า
+พฤติกรรมการเคลื่อนที่ที่บันทึกจากหุ่นยนต์ตัวหนึ่งจะขับเคลื่อนหุ่นยนต์อีกตัวที่มีโครงสร้างต่างกันโดยสิ้นเชิงได้หรือไม่ โดยใช้เพียง
+วิดีโอจากมุมมองบุคคลที่หนึ่ง (egocentric) ผ่าน \textbf{พิกัดการเคลื่อนที่ของลำตัวร่วม} (ความเร็วไปข้างหน้า ความเร็วด้านข้าง
+และอัตราการหมุน ปรับให้ไร้มิติด้วยเลขฟรูด) โดยไม่ใช้แบบจำลองจลนศาสตร์ ไม่ใช้ไฟล์ URDF และไม่ใช้ข้อมูลสาธิตของหุ่นยนต์
+เป้าหมาย หุ่นยนต์ที่ใช้คือแมลงกิ่งไม้จำลอง (\emph{Medauroidea extradentata}) ขนาด 18 องศาอิสระ ในโปรแกรม CoppeliaSim
+และหุ่นยนต์สี่ขา Unitree B1 ขนาด 12 องศาอิสระ ในโปรแกรม MuJoCo ซึ่งปริภูมิการกระทำของทั้งสองไม่มีมิติหรือความสอดคล้อง
+ร่วมกันเลย สถาปัตยกรรมประกอบด้วยตัวเข้ารหัสภาพ V-JEPA2 แบบตรึงค่า (frozen) ร่วมกับแบบจำลองการเปลี่ยนผ่านเชิงผกผัน
+(Inverse Transition Model) เชิงไปข้างหน้า (Forward Transition Model) และตัวถอดรหัสการเคลื่อนไหว (Motion Decoder)
+ผลการดำเนินงานจนถึงปัจจุบันแสดงว่าพิกัดการเคลื่อนที่ของลำตัวร่วมสามารถถ่ายทอดข้ามร่างกายได้โดยไม่ต้องจับคู่เฟรมหรือปรับ
+เป้าหมายระหว่างหุ่นยนต์ทั้งสอง เนื่องจากการเดินมีลักษณะเป็นคาบ มุมมองบุคคลที่สาม (allocentric) จึงทำให้ท่าทางของหุ่นยนต์
+บ่งบอกคำสั่งได้เอง แบบจำลองโลกจึงทำนายอนาคตได้โดยใช้การกระทำแฝงที่เรียนรู้มาน้อยมาก ขณะที่มุมมองบุคคลที่หนึ่งทำให้
+แบบจำลองกลับมาใช้การกระทำได้จริง ข้อจำกัดที่ยังเหลืออยู่คือแบบจำลองใช้การกระทำได้ในระดับหยาบเท่านั้น ยังไม่สามารถจัด
+อันดับความแตกต่างที่ละเอียดหรือทำนายต่อเนื่องในระยะยาวได้
+
+\vspace{2mm}
+\noindent คำสำคัญ: การเคลื่อนที่ข้ามรูปแบบร่างกาย / แบบจำลองโลกเชิงภาพ / มุมมองบุคคลที่หนึ่ง / พิกัดการเคลื่อนที่ของลำตัว / V-JEPA2
+\end{document}

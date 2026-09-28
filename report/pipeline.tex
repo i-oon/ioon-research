@@ -119,8 +119,8 @@
     {$(e_t^{A},e_{t+1}^{A})$};
   \node[align=center, labelbox] (featuresBLabel) at (80,-17)
     {$(e_t^{B},e_{t+1}^{B})$};
-  \draw[flow] (encA.east) -- (featuresA);
-  \draw[flow] (encB.east) -- (featuresB);
+  % \draw[flow] (encA.east) -- (featuresA);
+  % \draw[flow] (encB.east) -- (featuresB);
   \node[draw=ink!28, dashed, rounded corners=3pt,
     fit=(augA)(augB)(encA)(encB)(featuresALabel)(featuresBLabel), inner sep=4pt,
     label={[font=\scriptsize,text=ink!62]below:visual front-end; shared frozen encoder}]
@@ -141,7 +141,7 @@
   \draw[clearflow] (itm.south) -- (112,1) -- (z.west);
 
   \node[bodyhead] (bodyhead) at (180,21)
-    {Body-motion Head};
+    {Cross-body Head};
   \node[model] (ftm) at (180,1)
     {Forward Transition Model};
   \node[decoder] (md) at (180,-23)
@@ -156,7 +156,8 @@
   \coordinate (ctxToFtm) at (180,-9);
   \draw[clearline] (context) -- (ctxToFtm) -- (ftm.south);
   \coordinate (ctxToMd) at (128,-9);
-  \draw[clearline] (ctxToMd) -- (128,-25.8) -- ($(md.west)+(0,-2.8)$);
+  \draw[clearflow] (ctxToMd) -- (128,-25.8) -- ($(md.west)+(0,-2.8)$);
+  \node[junction] at (ctxToMd) {};
 
   % -----------------------------------------------------------------------
   % Compact scalar terminal objectives.
@@ -225,8 +226,8 @@
       {$(e_t^{A},e_{t+1}^{A})$};
     \node[align=center, labelbox] (ftFeaturesBLabel) at (80,-17)
       {$(e_t^{B},e_{t+1}^{B})$};
-    \draw[flow] (ftEncA.east) -- (ftFeaturesA);
-    \draw[flow] (ftEncB.east) -- (ftFeaturesB);
+    % \draw[flow] (ftEncA.east) -- (ftFeaturesA);
+    % \draw[flow] (ftEncB.east) -- (ftFeaturesB);
     \node[draw=ink!28, dashed, rounded corners=3pt,
       fit=(ftAugA)(ftAugB)(ftEncA)(ftEncB)(ftFeaturesALabel)(ftFeaturesBLabel),
       inner sep=4pt,
@@ -252,7 +253,7 @@
     \draw[clearflow] (projector.north) -- (112,-2) -- (131.3,-2);
 
     \node[hotbodyhead] (ftBodyHead) at (180,21)
-      {Body-motion Head};
+      {Cross-body Head};
     \node[hotmodel] (ftFtm) at (180,1)
       {Forward Transition Model};
     \node[decoder] (ftMd) at (180,-23)
@@ -262,13 +263,15 @@
     \draw[clearflow] (ftZ.north) -- (140,21) -- (ftBodyHead.west);
     \draw[clearflow] (ftZ.east) -- (ftFtm.west);
     \draw[clearflow] (ftZ.south) -- (140,-20.2) -- ($(ftMd.west)+(0,2.8)$);
+    
 
     \coordinate (ftContext) at (116,-9);
     \draw[line] (ftFeaturesB) -- node[above,labelbox] {$e_t^{B}$ context} (ftContext);
     \coordinate (ftCtxToFtm) at (180,-9);
     \draw[clearline] (ftContext) -- (ftCtxToFtm) -- (ftFtm.south);
     \coordinate (ftCtxToMd) at (128,-9);
-    \draw[clearline] (ftCtxToMd) -- (128,-25.8) -- ($(ftMd.west)+(0,-2.8)$);
+    \draw[clearflow] (ftCtxToMd) -- (128,-25.8) -- ($(ftMd.west)+(0,-2.8)$);
+    \node[junction] at (ftCtxToMd) {};
 
     \node[loss] (ftBodyLoss) at (223,21) {$\mathcal L_{\mathrm{body}}$};
     \node[loss] (ftReconLoss) at (223,1) {$\mathcal L_{\mathrm{recon}}$};

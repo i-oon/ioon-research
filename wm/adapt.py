@@ -36,6 +36,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 from diagnostics.cross_embodiment.finetune_ftm import adapt, embeddings_for, rollout  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
+from wm.data.strided import stride_of  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
@@ -88,10 +89,15 @@ def main():
     ap.add_argument("--ckpt", required=True)
     ap.add_argument("--data", required=True, help="clips of the robot to adapt to")
     ap.add_argument("--embodiment", default="b1")
-    ap.add_argument("--clips", type=int, default=9,
+    ap.add_argument("--clips", type=int, default=3,
                     help="how many clips of the new robot the adaptation may use. **This is the "
                          "few-shot budget and it is the claim**: slide 15 measures three clips "
-                         "clearing break-even where starting cold never does.")
+                         "clearing break-even where starting cold never does. Confirmed again "
+                         "under LoRA (the current default Stage 1 recipe): a clip-budget sweep "
+                         "(3/6/9/15, beh24_hinge_cleansplit -> B1) landed hexapod 0.764-0.788 and "
+                         "b1 0.302-0.315 at EVERY budget -- flat, no improvement past 3 clips, so "
+                         "3 is the default rather than 9 (this file's own prior default, never "
+                         "itself justified against fewer clips under this recipe).")
     ap.add_argument("--test_clips", type=int, default=10,
                     help="held out of adaptation, used only to report the rollout ratio")
     ap.add_argument("--train_clips", nargs="*", default=[],
@@ -117,7 +123,7 @@ def main():
     ap.add_argument("--lambda_hinge", type=float, default=0.0,
                     help="off by default. A single-step (K=1) real-vs-null separation term, "
                          "added because plain MSE adaptation measurably erodes a pretrain's "
-                         "hinge-built action-sensitivity (38-62% drop measured over this same "
+                         "hinge-built action-sensitivity (38-62%% drop measured over this same "
                          "1000-step budget, b1_adaptation_sep_check.py). Only turn on when "
                          "adapting a checkpoint that was itself pretrained with lambda_hinge>0 -- "
                          "there is nothing for this term to preserve otherwise.")
@@ -127,6 +133,21 @@ def main():
     ap.add_argument("--chunk", type=int, default=4)
     ap.add_argument("--out", required=True)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--no_lora", dest="lora", action="store_false",
+                    help="opt-out escape hatch, off by default -- LAC-WM's own recipe for this "
+                         "stage (rank 2, `doc/ref/notes_lac_wm.md` section 5.3: freeze every "
+                         "pretrained weight, train only a low-rank delta on each Mlp Linear -- "
+                         "NOT attention's out_proj or the fused QKV in_proj, see "
+                         "wm/models/lora.py's docstring for why) is now the DEFAULT for this "
+                         "stage, not opt-in. Measured on beh24_hinge_cleansplit -> B1: "
+                         "full-parameter adaptation left the ORIGINAL embodiment's rollout ratio "
+                         "at 0.918 (barely above predicting the mean) while gaining the new one "
+                         "(0.307) -- catastrophic forgetting, not a clean adaptation. LoRA "
+                         "recovered most of that (hexapod 0.786) while matching B1 (0.319), no "
+                         "rehearsal data needed. Pass --no_lora only to reproduce an old "
+                         "full-finetune run exactly.")
+    ap.set_defaults(lora=True)
+    ap.add_argument("--lora_rank", type=int, default=2)
     args = ap.parse_args()
 
     device = torch.device(args.device)
@@ -159,10 +180,32 @@ def main():
     itm.load_state_dict(checkpoint["itm"])
     ftm.load_state_dict(checkpoint["ftm"])
 
-    before, _ = rollout(itm, ftm, test_e, args.horizons, device)
+    if args.lora:
+        from wm.models.lora import apply_lora, merge_and_unwrap_lora
+        n_itm = apply_lora(itm, rank=args.lora_rank)
+        n_ftm = apply_lora(ftm, rank=args.lora_rank)
+        itm.to(device)  # apply_lora creates fresh lora_A/lora_B on CPU regardless of the
+        ftm.to(device)  # wrapped module's own device; move them back before anything runs.
+        print(f"LoRA rank {args.lora_rank}: wrapped {n_itm} ITM Linear layers, "
+             f"{n_ftm} FTM Linear layers (Mlp only; attention out_proj and the fused QKV "
+             "in_proj stay frozen, unwrapped -- see wm/models/lora.py's docstring for why)")
+        # `adapt()` optimises `list(itm.parameters()) + list(ftm.parameters())` unchanged --
+        # correct here too, since every non-LoRA param now has requires_grad=False and AdamW
+        # skips params with no gradient. No need to touch that function.
+
+    # adapt at the spacing the checkpoint was pretrained at (`wm/data/strided.py`)
+    k = stride_of(cfg)
+    print(f"stride {k}: pairs e_t -> e_t+{k}, horizons in world-model steps of {k} frames")
+    before, _ = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
     loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device,
-                lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin)
-    after, moved = rollout(itm, ftm, test_e, args.horizons, device)
+                lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin, stride=k)
+    after, moved = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
+
+    if args.lora:
+        n_itm = merge_and_unwrap_lora(itm)
+        n_ftm = merge_and_unwrap_lora(ftm)
+        print(f"merged LoRA deltas back into plain weights ({n_itm} ITM, {n_ftm} FTM layers) -- "
+             "the saved checkpoint is structurally identical to a full-finetune one")
 
     print(f"\nadapted on {len(train)} clips of {args.embodiment}, {args.steps} updates, "
           f"final loss {loss:.4f}")
@@ -180,7 +223,7 @@ def main():
     saved = {"config": checkpoint["config"], "epoch": -1,
              "itm": itm.state_dict(), "ftm": ftm.state_dict(), "md": checkpoint["md"],
              "adapted": {"embodiment": args.embodiment, "clips": len(train),
-                         "steps": args.steps, "source": args.ckpt,
+                         "steps": args.steps, "source": args.ckpt, "stride": k,
                          "train_paths": [os.path.basename(p) for p in train]}}
     for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets"):
         if key in checkpoint:

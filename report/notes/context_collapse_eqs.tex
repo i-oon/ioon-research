@@ -1,0 +1,78 @@
+% Standalone explainer: the 3 loss terms that fix context collapse.
+% Compile: PATH="$HOME/.local/bin:$PATH" xelatex context_collapse_eqs.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,margin=22mm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{thai}
+\setotherlanguage{english}
+\newfontfamily\thaifont{TH Sarabun New}
+\setmainfont{TH Sarabun New}
+\linespread{1.15}
+\XeTeXlinebreaklocale "th"
+\XeTeXlinebreakskip=0pt plus 0.1em minus 0.05em
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins}
+\pagestyle{empty}
+
+\newtcolorbox{eqbox}[1]{colback=blue!4,colframe=blue!35!black,fonttitle=\bfseries,
+  title=#1,boxrule=0.6pt,arc=2mm,left=4mm,right=4mm,top=2mm,bottom=2mm}
+
+\begin{document}
+{\Large\bfseries แก้ Context Collapse: 3 เทอมของ loss}
+
+\vspace{2mm}
+\noindent ทั้งหมดคำนวณจากเฟรมสองเฟรมติดกัน $e_t, e_{t+1}$ ผ่าน Inverse Transition Model (ITM) และ
+Forward Transition Model (FTM) เดียวกัน
+
+\vspace{4mm}
+\begin{eqbox}{(1) Hinge --- บังคับให้ real กับ null แยกกัน}
+\begin{align*}
+z &= \mathrm{ITM}(e_t,\, e_{t+1}) &\text{แอคชันแฝงจริง}\\
+z_{\varnothing} &= \mathrm{ITM}(e_t,\, e_t) &\text{แอคชันแฝง null (}\text{"ไม่มีอะไรเกิดขึ้น"}\text{)}\\[2mm]
+\hat e^{\,\mathrm{real}}_{t+k} &= \mathrm{FTM}\big(\hat e^{\,\mathrm{real}}_{t+k-1},\, z\big) &\text{ทำนาย }k\text{ ก้าว ด้วย }z\text{ จริง}\\
+\hat e^{\,\mathrm{null}}_{t+k} &= \mathrm{FTM}\big(\hat e^{\,\mathrm{null}}_{t+k-1},\, z_{\varnothing}\big) &\text{ทำนาย }k\text{ ก้าว ด้วย }z_\varnothing\\[2mm]
+\ell_k &= \max\!\Big(0,\; \cos\big(\hat e^{\,\mathrm{real}}_{t+k},\, \hat e^{\,\mathrm{null}}_{t+k}\big) - (1-m)\Big) &\text{ลงโทษถ้าคล้ายกันเกิน }1-m\\
+\mathcal{L}_{\text{hinge}} &= \frac{1}{K}\sum_{k=1}^{K} \ell_k &\text{เฉลี่ยตลอด }K\text{ ก้าว}
+\end{align*}
+$m=0.1$, $K=2$ --- ``สั่ง action จริงกับสั่ง action เปล่า ต้องพาไปคนละที่''
+\end{eqbox}
+
+\vspace{4mm}
+\begin{eqbox}{(2) Frozen Readout --- บังคับให้ยังอ่านคำสั่งออก}
+\begin{align*}
+\hat a_t &= R\big(\bar e_t,\; \bar{\hat e}^{\,\mathrm{real}}_{t+K}\big) &R = \text{MLP 2 ชั้น สุ่มค่า ไม่เทรน (frozen)}\\
+\mathcal{L}_{\text{readout}} &= \mathrm{MSE}\big(\hat a_t,\; a_t\big) &\text{เทียบกับคำสั่งจริง }a_t
+\end{align*}
+$R$ ถูกล็อกไว้ตั้งแต่ต้น: ทางเดียวที่จะลด loss ได้คือให้ $\hat e^{\,\mathrm{real}}_{t+K}$ เองพกข้อมูล
+action ติดไปมากขึ้น --- ``ต้องอ่านออกจริง ไม่ใช่แค่ต่างกันมั่ว ๆ''
+\end{eqbox}
+
+\vspace{4mm}
+\begin{eqbox}{(3) Rollout --- ตรึงไม่ให้ทำนายไกลแล้วเพี้ยน}
+\begin{align*}
+z_2 &= \mathrm{ITM}(e_{t+1},\, e_{t+2}) &\text{(จากเฟรมจริงเท่านั้น)}\\
+\hat e_{t+1} &= \mathrm{FTM}(e_t,\, z), \qquad
+\hat e_{t+2} = \mathrm{FTM}(\hat e_{t+1},\, z_2) &\text{ก้าว 2 ใช้ผลทำนายก้าว 1 เป็น input}\\
+\mathcal{L}_{\text{rollout}} &= \mathrm{MSE}\big(\hat e_{t+2},\; e_{t+2}\big) &\text{เทียบกับเฟรมจริงที่ }t+2
+\end{align*}
+``ทำนายไกลได้ แต่ห้ามมั่ว''
+\end{eqbox}
+
+\vspace{5mm}
+\noindent{\large\bfseries รวมเป็นสมการเดียว}
+\[
+\mathcal{L} = \mathcal{L}_{\text{base}} + \lambda_{\text{hinge}}\mathcal{L}_{\text{hinge}}
++ \lambda_{\text{readout}}\mathcal{L}_{\text{readout}} + \lambda_{\text{rollout}}\mathcal{L}_{\text{rollout}}
+\]
+\[
+\lambda_{\text{hinge}}=0.5, \quad \lambda_{\text{readout}}=1.0, \quad \lambda_{\text{rollout}}=1.0
+\]
+\noindent $\mathcal{L}_{\text{base}}$ = loss พื้นฐาน (ทำนายเฟรมถัดไป + decode คำสั่ง + Cross-Body Head)
+
+\vspace{4mm}
+\noindent {\bfseries ผล:} $\mathrm{null}/\mathrm{real}$ จาก $1.03$ (แทบไม่ใช้ action) เป็น $1.06$--$1.12$ ทุก lag (ใช้ action จริง แต่ยังไม่มากนัก)
+
+\end{document}

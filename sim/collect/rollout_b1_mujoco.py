@@ -109,6 +109,10 @@ def main():
                     help="piecewise pace as 'rate@fraction' segments, e.g. '1@0.4 0@0.2 1@0.4' to "
                          "walk, stand for a fifth of the clip, then walk. Rate multiplies "
                          "--vx/--vy/--wz. Same syntax as sim/collect/collect_ik.py.")
+    ap.add_argument("--cmd_plan", type=str, default="",
+                    help="JSON list of [vx, vy, wz] per recorded policy step (length --steps): babble "
+                         "with behaviour switches inside a clip. Supersedes --schedule/--vx/--vy/--wz "
+                         "after the policy warmup (the warmup holds the plan's first command).")
     ap.add_argument("--head_kp", type=float, default=HEAD_K,
                     help="proportional gain on heading error. Too low against --head_ki and the "
                          "response rings: at kp 0.5 / ki 5.0 the turn rate oscillates with a ~3 s "
@@ -203,6 +207,13 @@ def main():
 
     plan = command_plan(parse_schedule(args.schedule, args.vx, args.vy, args.wz), args.steps) \
         if args.schedule else None
+    if args.cmd_plan:
+        import json
+        with open(args.cmd_plan) as fh:
+            plan = np.asarray(json.load(fh), dtype=float)
+        if plan.shape != (args.steps, 3):
+            raise SystemExit(f"--cmd_plan must be {args.steps} x 3, got {plan.shape}")
+        args.vx, args.vy, args.wz = plan[0]        # the warmup holds the first command
     _noise = np.zeros(12, np.float64)
     _rng = np.random.default_rng(args.noise_seed)
     L = {k: [] for k in ("base_pos", "base_quat", "joint_pos", "joint_vel",
