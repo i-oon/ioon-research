@@ -75,7 +75,7 @@ def build(ckpt, pretrained, device):
 
 
 def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1,
-          stride=1):
+          stride=1, froude=None, anchor=None):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
     One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
@@ -106,12 +106,15 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
     # `stride` = the checkpoint's frame_stride (`wm/data/strided.py`): pairs e_t -> e_{t+stride}.
     # 1 reproduces the original one-step spans exactly.
     gap = max(1, int(stride))
-    spans = [(c, s, min(s + batch, len(c) - gap))
-             for c in clips for s in range(0, len(c) - gap, batch)]
+    # `froude` (optional): per clip, the standardised Froude of each transition (len(c) - gap rows);
+    # `anchor(z, f)` then adds a loss tying the new body's z to the pretrained space (wm/adapt.py).
+    spans = [(i, s, min(s + batch, len(c) - gap))
+             for i, c in enumerate(clips) for s in range(0, len(c) - gap, batch)]
     itm.train(); ftm.train()
     last = 0.0
     for step in range(steps):
-        e_cpu, s, t = spans[rng.integers(len(spans))]
+        ci, s, t = spans[rng.integers(len(spans))]
+        e_cpu = clips[ci]
         opt.zero_grad()
         e_t = e_cpu[s:t].to(device)
         e_next = e_cpu[s + gap:t + gap].to(device)
@@ -126,6 +129,8 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
             hinge = torch.nn.functional.relu(hinge_margin - sep)
             loss = loss + lambda_hinge * hinge
             del z_null, null, sep, hinge
+        if anchor is not None and froude is not None:
+            loss = loss + anchor(z, froude[ci][s:t].to(device))
         loss.backward()
         opt.step()
         last = loss.item()

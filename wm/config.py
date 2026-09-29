@@ -44,6 +44,7 @@ LEGACY_DEFAULTS = {
     # no field before 2026-09-28; every run since 2026-09-08 detached (runs before that did not,
     # but they predate the field and are only loaded for evaluation, where it has no effect)
     "detach_body_z": True,
+    "lambda_sim": 0.0,
     "lambda_hinge": 0.0,
     "lambda_readout": 0.0,
     "lambda_ldad": 0.0,
@@ -260,6 +261,20 @@ class Config:
     # config as "no detach". False: Froude's gradient reaches z, as in every run before 2026-09-08
     # (Section 8's jointly pretrained hexapod+B1 runs). Default True reproduces every current run.
     detach_body_z: bool = True
+    # **Froude-similarity supervision of z** (arXiv 2609.19846, Eqs. 4-7, with the standardised Froude
+    # target as the action-similarity signal). For every pair (i, j) of transitions the cosine of
+    # their z must match the similarity of their Froude: L = mean_{i != j} (cos(z_i, z_j) - S_ij)^2.
+    # A regression head constrains only the 3 numbers it reads out of z; this constrains z's whole
+    # geometry, and it never sees the frame (F275). Batches hold one embodiment (EmbodimentBatchSampler),
+    # so cross-body pairs come from a FIFO queue of recent (z, Froude) from every body, detached
+    # (MoCo-style): the current batch is pulled toward its correct place relative to the other
+    # body's recent latents. 0.0 reproduces every earlier run.
+    lambda_sim: float = 0.0
+    sim_queue: int = 256          # queued transitions (all bodies); small, so queued z stay current
+    sim_kind: str = "cos"         # S_ij: "cos" = cosine of standardised Froude (the paper's form);
+                                  # "rbf" = 2*exp(-|f_i-f_j|^2 / (2*sim_sigma^2)) - 1 (keeps speed magnitude)
+    sim_sigma: float = 1.0
+    sim_cross_only: bool = False  # True: queue pairs only from OTHER embodiments count
     # --- ActSWM (F137). Zero by default: every run before 2026-08-31 reproduces unchanged.
     lambda_ldad: float = 0.0      # Delta-JEPA's LDAD: decode the action from the PREDICTED
     # state difference `FTM(e_t, z) - e_t`. Their sweep puts the useful range at 10-50 and their

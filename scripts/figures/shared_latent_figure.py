@@ -96,7 +96,17 @@ def numbers(Z, B, F, G, rng):
     nn = NearestNeighbors(n_neighbors=11).fit(Zs[idx])
     nb = nn.kneighbors(Zs[idx], return_distance=False)[:, 1:]
     other = (B[idx][nb] != B[idx][:, None]).mean()
-    return float(np.mean(acc)), xfer, float(other / (2 / 3))
+    # cross-body retrieval: for each c10 point, its nearest neighbour (standardised z) among body b's
+    # points; score = 1 - L2(Froude, neighbour's Froude) / mean L2(Froude, random point of body b).
+    # 1 = the neighbour moves identically, 0 = no better than a random point of that body.
+    retr = {}
+    for b in (1, 2):
+        q, r = np.where(B == 0)[0], np.where(B == b)[0]
+        j = NearestNeighbors(n_neighbors=1).fit(Zs[r]).kneighbors(Zs[q], return_distance=False)[:, 0]
+        d_nn = np.linalg.norm(F[q] - F[r][j], axis=1).mean()
+        d_rand = np.linalg.norm(F[q][:, None] - F[r][rng.choice(len(r), 64)][None], axis=2).mean()
+        retr[b] = float(1 - d_nn / d_rand)
+    return float(np.mean(acc)), xfer, float(other / (2 / 3)), retr
 
 
 def main():
@@ -122,8 +132,8 @@ def main():
     rows = []
     for mname, mpath in models:
         Z, B, F, G, C = latents(mpath, args.device)
-        acc, xfer, mix = numbers(Z, B, F, G, np.random.default_rng(0))
-        rows.append((mname, acc, xfer, mix))
+        acc, xfer, mix, retr = numbers(Z, B, F, G, np.random.default_rng(0))
+        rows.append((mname, acc, xfer, mix, retr))
         Zs = StandardScaler().fit_transform(Z)
         embeds = [("PCA", PCA(2, random_state=0).fit_transform(Zs))] + \
                  [(f"UMAP seed {s}", umap.UMAP(random_state=s).fit_transform(Zs)) for s in (0, 1, 2)]
@@ -142,10 +152,10 @@ def main():
                      f"| kNN mixing {mix:.2f}", fontsize=11)
         fig.tight_layout(); fig.savefig(os.path.join(out, f"latent_{mname.replace(' ', '')}.png"), dpi=110)
         plt.close(fig)
-    print(f"{'model':<10}{'body-ID acc':>13}{'c08 xfer R2 (fwd/lat/yaw)':>30}{'B1 xfer R2 (fwd/lat/yaw)':>30}{'kNN mix':>10}")
-    for mname, acc, xfer, mix in rows:
+    print(f"{'model':<10}{'body-ID acc':>13}{'c08 xfer R2 (fwd/lat/yaw)':>30}{'B1 xfer R2 (fwd/lat/yaw)':>30}{'kNN mix':>10}{'retr c08':>10}{'retr B1':>9}")
+    for mname, acc, xfer, mix, retr in rows:
         f = lambda v: " / ".join(f"{x:+.2f}" for x in v)
-        print(f"{mname:<10}{acc:>13.2f}{f(xfer[1]):>30}{f(xfer[2]):>30}{mix:>10.2f}")
+        print(f"{mname:<10}{acc:>13.2f}{f(xfer[1]):>30}{f(xfer[2]):>30}{mix:>10.2f}{retr[1]:>10.2f}{retr[2]:>9.2f}")
     print("->", os.path.relpath(out, ROOT))
 
 

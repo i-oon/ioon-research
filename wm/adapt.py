@@ -84,6 +84,63 @@ def select_clips(paths, clips, test_clips, seed, stratify):
     return train, test
 
 
+def _froude_std(path, embodiment, k, n, stats):
+    from wm.data.embodiment import REGISTRY, load
+    from wm.data.strided import body_targets
+    bm = np.asarray(load(path, REGISTRY[embodiment])["body_motion"])[:, :3]
+    f = body_targets(bm, k, n)
+    return torch.as_tensor((f - stats[0]) / stats[1], dtype=torch.float32)
+
+
+@torch.no_grad()
+def bank_latents(itm, bank, k, checkpoint, device):
+    """(z, standardised Froude) of the pretrained body's transitions, from the unadapted ITM."""
+    embs, paths = bank
+    itm.eval()
+    Z, Fr = [], []
+    for e, p in zip(embs, paths):
+        n = len(e) - k
+        for s in range(0, n, 16):
+            t = min(s + 16, n)
+            Z.append(itm(e[s:t].to(device), e[s + k:t + k].to(device)).float().flatten(1).cpu())
+        Fr.append(_froude_std(p, "hexapod", k, n, checkpoint["body_stats"]))
+    print(f"anchor bank: {sum(len(z) for z in Z)} pretrained-body transitions from {len(paths)} clips")
+    return torch.cat(Z), torch.cat(Fr)
+
+
+def build_anchor(args, cfg, checkpoint, train, train_e, bank, k, device):
+    """Per-clip standardised Froude of the new body, and the anchor loss on its z."""
+    import torch.nn.functional as F
+    froude = [_froude_std(p, args.embodiment, k, len(e) - k, checkpoint["body_stats"])
+              for p, e in zip(train, train_e)]
+    head = None
+    if args.anchor_froude > 0:
+        from wm.models.motion_decoder import MotionDecoder
+        md = MotionDecoder(cfg, {}).to(device)
+        md.load_state_dict(checkpoint["md"], strict=False)
+        head = md.body_head.eval()
+        for p in head.parameters():
+            p.requires_grad_(False)
+    bz = bf = None
+    if args.anchor_sim > 0:
+        bz, bf = (x.to(device) for x in bank)
+        bzn = F.normalize(bz, dim=1)
+        bfn = F.normalize(bf, dim=1)
+
+    def anchor(z, f):
+        z = z.float().flatten(1)
+        loss = z.new_zeros(())
+        if head is not None:
+            loss = loss + args.anchor_froude * F.mse_loss(head(z), f)
+        if bz is not None:
+            s_z = F.normalize(z, dim=1) @ bzn.T
+            s_a = F.normalize(f, dim=1) @ bfn.T
+            loss = loss + args.anchor_sim * ((s_z - s_a) ** 2).mean()
+        return loss
+    print(f"anchors: froude-head {args.anchor_froude}, similarity {args.anchor_sim}")
+    return froude, anchor
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
@@ -148,6 +205,20 @@ def main():
                          "full-finetune run exactly.")
     ap.set_defaults(lora=True)
     ap.add_argument("--lora_rank", type=int, default=2)
+    # **Anchors: tie the new body's z to the pretrained space.** Plain Stage 1 only asks z to help
+    # predict the new body's next frame, so the new body settles wherever that works, and Stage 4
+    # then moves the Froude head to it: usable, not shared (F272). Both anchors use the new body's
+    # own Froude, standardised with the checkpoint's body statistics, and act on z only.
+    ap.add_argument("--anchor_froude", type=float, default=0.0,
+                    help="weight of MSE(frozen pretrained Froude head(z_new), Froude_new): the OLD head "
+                         "must read the new body's z correctly, so z moves into the head's coordinates")
+    ap.add_argument("--anchor_sim", type=float, default=0.0,
+                    help="weight of the Froude-similarity loss (Config.lambda_sim form) between the new "
+                         "body's z and a fixed bank of pretrained-body z: similar motion -> nearby z")
+    ap.add_argument("--anchor_bank_data", default="data/egocentric/beh24_c10f10t10_ego_flat_cleantrain",
+                    help="clips of the pretrained body for the --anchor_sim bank (encoded by the "
+                         "pretrained ITM before adaptation, then held fixed)")
+    ap.add_argument("--anchor_bank_clips", type=int, default=12)
     args = ap.parse_args()
 
     device = torch.device(args.device)
@@ -172,6 +243,8 @@ def main():
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     train_e = embeddings_for(encoder, train, args.chunk)
     test_e = embeddings_for(encoder, test, args.chunk)
+    bank_paths = sorted(glob.glob(os.path.join(ROOT, args.anchor_bank_data, "*.npz")))[:args.anchor_bank_clips]
+    bank_e = (embeddings_for(encoder, bank_paths, args.chunk), bank_paths) if args.anchor_sim > 0 else None
     del encoder
     torch.cuda.empty_cache()
 
@@ -179,6 +252,9 @@ def main():
     ftm = ForwardTransitionModel(cfg).to(device)
     itm.load_state_dict(checkpoint["itm"])
     ftm.load_state_dict(checkpoint["ftm"])
+    if bank_e is not None:
+        # the bank is the PRETRAINED space: encoded now, before any adaptation, then held fixed
+        bank_e = bank_latents(itm, bank_e, stride_of(cfg), checkpoint, device)
 
     if args.lora:
         from wm.models.lora import apply_lora, merge_and_unwrap_lora
@@ -196,9 +272,13 @@ def main():
     # adapt at the spacing the checkpoint was pretrained at (`wm/data/strided.py`)
     k = stride_of(cfg)
     print(f"stride {k}: pairs e_t -> e_t+{k}, horizons in world-model steps of {k} frames")
+    froude, anchor = None, None
+    if args.anchor_froude > 0 or args.anchor_sim > 0:
+        froude, anchor = build_anchor(args, cfg, checkpoint, train, train_e, bank_e, k, device)
     before, _ = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
     loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device,
-                lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin, stride=k)
+                lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin, stride=k,
+                froude=froude, anchor=anchor)
     after, moved = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
 
     if args.lora:
@@ -223,6 +303,7 @@ def main():
     saved = {"config": checkpoint["config"], "epoch": -1,
              "itm": itm.state_dict(), "ftm": ftm.state_dict(), "md": checkpoint["md"],
              "adapted": {"embodiment": args.embodiment, "clips": len(train),
+                         "anchor_froude": args.anchor_froude, "anchor_sim": args.anchor_sim,
                          "steps": args.steps, "source": args.ckpt, "stride": k,
                          "train_paths": [os.path.basename(p) for p in train]}}
     for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets"):

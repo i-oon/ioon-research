@@ -1,54 +1,41 @@
 # Architecture Comparison: Egocentric VSM, LAC-WM and Ours
 
-Updated 2026-09-28. Sources:
-- `doc/ref/notes_egocentric_vsm.md`, checked against the paper and its released code.
-- `doc/ref/notes_lac_wm.md`, checked against the paper PDF.
-- Our code (`wm/`) and run configs (`wm/runs/*/config.yaml`).
+Sources: the Egocentric VSM paper and its released code; the LAC-WM paper; our code and run configurations.
 
-## Side-by-side
+## Side by side
 
 Status legend: = same as LAC-WM · ≠ differs.
 
-| component | Egocentric VSM (Hu et al. 2025) | LAC-WM (ICLR 2026 submission) | Ours (current: stride 5) | status vs LAC-WM |
+| component | Egocentric VSM (Hu et al. 2025) | LAC-WM (ICLR 2026 submission) | Ours (current) | vs LAC-WM |
 |---|---|---|---|---|
 | Visual encoder | ResNet-50, trained end to end | V-JEPA2 1B, frozen | V-JEPA2, frozen | = |
 | Latent action | none; the action is an input | z = IDM(x_t, x_t+k), 64-d | z = ITM(e_t, e_t+k), 64-d | = |
 | Forward model | MLP fusion (image 256 + action 256 → 6) | FDM, 8 attention blocks, 512 / 16 heads | FTM, 8 attention blocks, 512 / 16 heads | = |
-| Temporal attention in forward model | none (single fused frame) | added for the last 20k of 80k iterations, horizon 8 | none; single step FTM(e_t, z) | ≠ |
-| Action chunk / step | 1 step (prev + next joint angles) | 5-step chunks | 5-step chunks (stride 5) | = |
+| Temporal attention in the forward model | none | last 20k of 80k iterations, horizon 8 | none (single step) | ≠ |
+| Action chunk per step | 1 step | 5 steps | 5 steps | = |
 | Cross-augmentation | n/a | yes | yes | = |
-| Motion decoder target | n/a | end-effector pose + camera motion, z split in half, one per target | joint commands, one head per body (18-d hexapod, 12-d B1), whole z | ≠ |
-| Body-level motion loss | predicts Δ body pose (6-d) directly | via end-effector / camera pose above | Froude head shared across bodies; reads `z.detach()` (no gradient to z) since 2026-09-08 | ≠ |
+| Motion target that shapes z | Δ body pose (6-d), predicted directly | end-effector pose + camera motion; z split in half, one half per target | **Froude body motion (3-d), one head shared by all bodies, reads z only** | ≠ (a task-space target, as in LAC-WM) |
+| Per-body action level | action is the model input | action projector at adaptation | action projector (joint commands → z) | = |
 | Extra losses | none | none | hinge (real vs null z), frozen read-out, 2-step rollout | ≠ |
-| Pretraining bodies | 1 robot | 3 (human hands, bimanual humanoid, Franka arm) | 1 (hexapod c10f10t10) | ≠ |
-| Pretraining data | motor babbling, sim + real | 150k trajectories (50k per dataset) | 48 clips of 66 frames, ≈2.7k transitions | ≠ |
-| Action variation within a trajectory | random (motor babbling) | teleoperation / human manipulation | one behaviour per clip (beh24) | ≠ |
-| Batch × iterations | not critical (small model) | 512 × 80k ≈ 41M samples | 8 × ≈16.7k ≈ 134k samples | ≠ |
-| Embodiment conditioning | n/a | not described | built (`ftm_embodiment_channel`), never enabled | ≠ |
-| Adaptation | retrain after damage | 3 stages: LoRA r2 IDM+FDM → projector → joint LoRA r2 | same 3 stages, plus Stage 4 (body head fit) | = (plus one stage) |
-| Adaptation data | n/a | one dataset for every stage (7,265 trajectories) | Stage 1: 3 clips; Stages 2 and 4: ≈38 clips | ≠ |
-| Goal given to the planner | body-pose target | **subgoal image** from a demonstration of the same body | **Froude** sequence from another body | ≠ |
-| Candidate scoring | predicted Δ pose vs target | **L2 in embedding space** between predicted frame and subgoal image | Froude read by ITM + body head from predicted frame (rollout), or body(proj(a)) (direct) | ≠ |
-| Re-grounding | every step (real frame) | every subgoal: 6-frame (Table 5) or 20-step (Table 2) rollout | every 2 steps, w = 11 | similar |
+| Pretraining bodies | 1 robot | 3 (human hands, bimanual humanoid, Franka arm) | 1 hexapod; hexapod + B1 jointly under test | ≠ |
+| Pretraining data | motor babbling | 150k trajectories | 48 clips of 66 frames per body | ≠ |
+| Batch × iterations | small model | 512 × 80k ≈ 41M samples | 8 × ≈16.7k ≈ 134k samples | ≠ |
+| Adaptation | retrain after damage | 3 stages: LoRA r2 IDM+FDM → projector → joint LoRA r2 | same 3 stages, plus a Froude-head fit | = (plus one stage) |
+| Goal given to the planner | body-pose target | subgoal image of the same body | Froude sequence of another body | ≠ |
+| Candidate scoring | predicted Δ pose vs target | L2 in embedding space, predicted frame vs subgoal image | Froude read from z (direct) or from the predicted frame (rollout) | ≠ |
+| Re-grounding | every step | every subgoal (6- or 20-step rollout) | every 2 steps, read-out window 11 | similar |
 
-## Differences with a measured consequence in our system
+## Differences with a measured consequence
 
-Metrics are as defined in `report/weekly_update.md`: M2 normalised score, M3 Pearson r, M5 η², M10 cross-body R².
+| difference | measurement (metric named in each cell) |
+|---|---|
+| Action chunk 1 → 5, as in LAC-WM | Normalised score on the B1 (0 = random, 1 = oracle): direct +0.66 → +0.82, rollout (current start) −0.25 → +0.40 |
+| Motion target: Froude head allowed to shape z, vs reading z only | Normalised score, c08: direct +0.55–0.61 → +0.79–0.80. Physics closed loop, c08 direct, mean L2 Froude error (random 0.126): 0.072–0.078 → 0.050–0.053 |
+| Motion target: Froude only, vs Froude + per-body joint commands | Normalised score, c08 rollout (library start): +0.47–0.54 → +0.56–0.63; B1 direct +0.82 → +0.85; other cells equal |
+| Rollout scores by reading Froude back out of a predicted frame (LAC-WM compares embeddings) | Pearson r across 24 actions, Froude read from the **real** future frame: 0.24 / 0.52 / 0.24 (fwd / lat / yaw), vs 0.83 / 0.91 / 0.84 for direct |
+| One behaviour per clip (LAC-WM: action varies within a trajectory) | Share of prediction variance explained by the start frame 0.26–0.66, by the action 0.15–0.23. Transitions matching another behaviour's pose: 4 / 765 |
+| Random actions held 15–25 frames (babble), vs one behaviour per clip | Pearson r of Froude read from the rollout's prediction, yaw: 0.63–0.68 vs 0.04–0.21. Normalised score not higher |
+| Single-body vs joint hexapod + B1 pretraining | Cross-body retrieval c10 → B1 (0 = random, 1 = identical motion): 0.04–0.05 single, 0.21 joint (stride 1); between hexapods 0.32–0.44 |
+| LoRA rank 2 vs full fine-tune in adaptation | Forgetting on the hexapod, relative MSE vs a mean-latent baseline (lower is better): 0.918 → 0.786 |
 
-| difference | measurement | source |
-|---|---|---|
-| Scoring reads Froude back out of the predicted frame (LAC-WM compares embeddings, no read-out) | Reading the **real** counterfactual outcome through ITM + body head: M3 r 0.24 / 0.52 / 0.24. Direct: 0.83 / 0.91 / 0.84 | F266 |
-| One behaviour per clip | M5 on the pretrained model, hexapod val: η² state 0.26–0.66, η² action 0.15–0.23. Pose-matched cross-behaviour pairs: 4 / 765 transitions | F252, FINDINGS_old note before F154 |
-| Action variation added (switch babble only, 1 seed, in progress) | η² state 0.37 / 0.32 / 0.22, η² action 0.31 / 0.49 / 0.47 (A2: 0.63 / 0.41 / 0.43 and 0.23 / 0.33 / 0.20) | babble arms, 2026-09-28 |
-| Action chunk 1 → 5 (now matches LAC-WM) | B1 NS (w=11): direct +0.66 → +0.82, rollout (current start) −0.25 → +0.40. Stride 5 over 4 pretrains: rollout +0.21 to +0.40 | F264, F273 |
-| Motion decoder on per-body joint commands; Froude head detached | z not shared with the B1: M10 c10 → B1 −0.91 / −0.29 / −0.18 (stride 5), body-ID probe 0.67 (chance 0.33) | F272 |
-| Before 2026-09-08: Froude head not detached, hexapod + B1 pretrained together | Cross-body R² +0.544 / +0.435 (co-trained head, allocentric data); after detach, per-body heads −0.397 / −0.594 | F232; the controlled detach on/off comparison is queued (`scripts/run/detach_*`) |
-| Adaptation, LoRA r2 vs full fine-tune | Forgetting on the hexapod, relative MSE vs mean-latent baseline: 0.918 → 0.786 | F248 |
-| Stage 3 (joint projector + FTM) | Prediction top-1 retrieval 0.233 → 0.276; B1 NS rollout +0.40 → +0.44 (within seed spread) | F265 |
-
-Not yet measured in our system:
-- temporal attention in the forward model;
-- batch size / iteration scale;
-- multi-body pretraining;
-- embodiment conditioning;
-- image-goal scoring in embedding space.
+Not yet measured in our system: temporal attention in the forward model; batch and iteration scale; embodiment conditioning; image-goal scoring in embedding space.

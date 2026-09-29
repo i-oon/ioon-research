@@ -7186,7 +7186,21 @@ s1 0.58/0.51/0.53 vs 0.20/0.17/0.21 (A2 0.63/0.41/0.43 vs 0.23/0.33/0.20).
   question (does it make the B1 share z) needs joint pretraining.
 - On the same body, babble-only pretraining is below beh24 (library in-distribution for beh24 only).
 
-Physics closed loop for dt0: pending (`scripts/run/detach_physics.sh`).
+Physics closed loop (`scripts/run/detach_physics.sh`, F274 protocol, six goals, mean L2 error; random
+B1 0.089, c08 plain 0.126, c08 phase-matched 0.111):
+
+| run | B1 direct | B1 rollout | c08 plain direct | c08 plain rollout | c08 phase direct | c08 phase rollout |
+|---|---|---|---|---|---|---|
+| A (detach on) | 0.070 | 0.083 | 0.072 | 0.077 | 0.065 | 0.100 |
+| A2 (detach on) | 0.077 | 0.103 | 0.078 | 0.104 | 0.073 | 0.104 |
+| dt0 s0 (off) | 0.072 | 0.073 | 0.053 | 0.071 | 0.057 | 0.077 |
+| dt0 s1 (off) | 0.073 | 0.098 | 0.050 | 0.078 | 0.059 | 0.089 |
+
+- The kinematic gain holds under physics on c08: direct 0.050-0.053 (detach on 0.072-0.078), the lowest
+  c08 error measured; rollout 0.071-0.078 (0.077-0.104); phase-matched direct 0.057-0.059 (0.065-0.073).
+- B1 direct unchanged (0.072-0.073 vs 0.070-0.077). B1 rollout: dt0 s0 0.073, equal to its direct
+  (0.072) -- the first model whose rollout matches direct on the B1 in physics; s1 0.098.
+- Direct <= rollout still holds in every cell.
 
 ---
 
@@ -7222,3 +7236,127 @@ c10 / c08 / B1, ridge Froude read-out fit on c10 only), `results/deck/shared_lat
 - Consequence: joint pretraining plus a regression Froude head is not by itself sufficient evidence
   for a shared z; the grounding may need a relational constraint on z across bodies (e.g. the
   similarity loss of arXiv 2609.19846) and stride 5.
+
+**Addendum: cross-body retrieval** (added to `shared_latent_figure.py`, offset-insensitive unlike R2):
+for each c10 point, its nearest neighbour in standardised z among body b's points; score = 1 -
+L2(Froude, neighbour's Froude) / mean L2(Froude, random point of b); 1 = neighbour moves identically,
+0 = no better than random.
+
+| model | retrieval c10 -> c08 | retrieval c10 -> B1 |
+|---|---|---|
+| joint beh12_ego (stride 1, not detached) | 0.32 | 0.21 |
+| single A (stride 5, detached) | 0.36 | 0.04 |
+| single dt0 s0 (stride 5, not detached) | 0.44 | 0.05 |
+
+Joint pretraining does give partial alignment with the B1 (0.21 vs ~0.05 without the B1 in
+pretraining), which the R2 test (offset-sensitive) did not show. It is well below within-hexapod
+alignment (0.32-0.44). This is the baseline the similarity loss has to improve on.
+
+**Implementation, 2026-09-29:** `Config.lambda_sim` (+ `sim_queue`, `sim_kind`, `sim_sigma`,
+`sim_cross_only`), `wm/train.py:froude_similarity_loss`. Batches are single-embodiment
+(`EmbodimentBatchSampler`), so cross-body pairs come from a FIFO queue of recent detached (z,
+standardised Froude) of every body. Body targets are standardised with pooled statistics across bodies
+(`MultiEmbodimentPairs.body_stats`), so Froude similarity is comparable across bodies. Checks: CPU toy
+(two bodies with offset z: nearest-other-body Froude cosine 0.90 after optimisation, from ~0); GPU
+smoke run, joint hexapod + B1, 2 epochs: sim 0.646 -> 0.368, ~1000 cross-body pairs per step,
+`lambda_sim` recorded in config.yaml.
+
+---
+
+### F279. Froude as the only motion target (joint-command motion decoder off) matches or slightly exceeds FS on every body; the per-body joint decoder is not needed
+
+`scripts/run/froude_md_server.sh`: `fmd_beh24_s0/_s1`, identical to FS (`dt0_beh24`, F277: beh24, stride 5,
+Froude head not detached, hinge / read-out / rollout) except `--lambda_motion 0`, so the per-body
+joint-command motion decoder gives no gradient and the shared z-only Froude head is the only motion
+target. Trained on the lab server; evaluated with `detach_eval_local.sh` and the c10 same-body test.
+Note: best.pt selection uses recon + lambda_motion * motion, i.e. recon only here.
+
+NS at w=11:
+
+| test | FS s0 | FS s1 | D s0 | D s1 |
+|---|---|---|---|---|
+| c10 same body, direct | +0.91 | +0.90 | +0.91 | +0.91 |
+| c10, rollout (library start) | +0.72 | +0.73 | +0.74 | +0.76 |
+| c10, rollout (current start) | +0.64 | +0.59 | +0.61 | +0.66 |
+| c08, direct | +0.80 | +0.79 | +0.78 | +0.79 |
+| c08, rollout (library start) | +0.47 | +0.54 | +0.56 | +0.63 |
+| c08, rollout (current start) | +0.52 | +0.43 | +0.53 | +0.54 |
+| B1, direct | +0.82 | +0.82 | +0.85 | +0.85 |
+| B1, rollout (library start) | +0.62 | +0.44 | +0.47 | +0.59 |
+| B1, rollout (current start) | +0.46 | +0.28 | +0.46 | +0.35 |
+
+Mechanism, B1: top-1 retrieval D 0.271 / 0.266 (FS 0.247 / 0.273); read of the rollout's prediction r
+D 0.34/0.02/0.57 and 0.12/0.24/0.61 (FS 0.27/0.28/0.62 and 0.24/0.32/0.41). eta^2 on the pretrained
+model, state / action: D s0 0.53/0.37/0.44 vs 0.24/0.25/0.28; s1 0.55/0.48/0.54 vs 0.23/0.23/0.26.
+
+**Reading.** Dropping the per-body joint-command decoder costs nothing measured and is equal or slightly
+better in most cells (c08 rollout library start +0.47-0.54 -> +0.56-0.63; B1 direct +0.82 -> +0.85),
+within seed spread. The shared Froude head alone is a sufficient motion target for pretraining; the
+per-body joint level can live in the projector only.
+
+Physics closed loop: the first attempt ran while the joint pretraining (`joint_sim_beh24_s0`) held the
+GPU; loading the V-JEPA2 encoder for rollout ran out of memory, and every later run returned nothing
+(3 valid cells, one goal: D s0 c08 direct 0.028, c08 phase-matched 0.067, B1 direct 0.068). The next
+re-run returned nothing because CoppeliaSim was left mid-simulation ("sim.loadScene: simulation is not
+stopped"); after `sim.stopSimulation()` the re-run completed (72 / 72).
+
+Physics closed loop, mean L2 error over six goals (random B1 0.089, c08 plain 0.126, c08 phase 0.111):
+
+| run | B1 direct | B1 rollout | c08 plain direct | c08 plain rollout | c08 phase direct | c08 phase rollout |
+|---|---|---|---|---|---|---|
+| FS s0 / s1 | 0.072 / 0.073 | 0.073 / 0.098 | 0.053 / 0.050 | 0.071 / 0.078 | 0.057 / 0.059 | 0.077 / 0.089 |
+| D s0 / s1 | 0.061 / 0.063 | 0.081 / 0.108 | 0.047 / 0.045 | 0.085 / 0.055 | 0.062 / 0.057 | 0.076 / 0.075 |
+
+D's direct is the lowest measured on both bodies (B1 0.061-0.063, c08 0.045-0.047); rollout is mixed
+across seeds (c08 plain 0.055-0.085, B1 0.081-0.108).
+
+---
+
+### F280. Joint hexapod + B1 pretraining with the Froude-similarity loss: the B1's video latents move toward the hexapod's (retrieval 0.05 -> 0.34) and B1 selection is the best measured
+
+`scripts/run/joint_sim_local.sh`: `joint_sim_beh24_s0`, beh24 clean-train for both bodies (48 + 48 clips,
+2673 / 2688 pairs, balanced batches, one body per batch), stride 5, Froude head shapes z, hinge /
+read-out / rollout as FS, joint-command motion decoder on, `--lambda_sim 0.05` (queue 256, both bodies'
+recent z). One seed. **No matched control** (same run with `lambda_sim 0`) yet: the comparison rows
+differ in more than the similarity loss.
+
+Shared latent (pretrained ITM; `results/deck/shared_latent_joint_sim/`):
+
+| model | body-ID probe | cross-body R2 c10 -> c08 | cross-body R2 c10 -> B1 | k-NN mixing | retrieval c10 -> c08 | retrieval c10 -> B1 |
+|---|---|---|---|---|---|---|
+| joint + similarity (stride 5) | 0.73 | +0.72 / +0.36 / +0.17 | +0.13 / +0.30 / -0.34 | 0.37 | 0.43 | 0.34 |
+| joint, beh12 (stride 1, no similarity, older losses) | 0.73 | +0.45 / +0.09 / -0.33 | -0.91 / +0.07 / -0.18 | 0.39 | 0.32 | 0.21 |
+| single hexapod, FS | 0.69 | +0.78 / +0.36 / +0.18 | -1.30 / -0.02 / +0.26 | 0.44 | 0.44 | 0.05 |
+
+Selection (standard evaluation: B1 through Stages 1, 2, 4 on top of the joint pretrain; NS w=11):
+B1 direct +0.95, rollout library start +0.71, current start +0.54 (FS: +0.82, +0.44-0.62, +0.28-0.46);
+c08 direct +0.79, rollouts +0.54 / +0.45; c10 same body direct +0.91, rollouts +0.76 / +0.53.
+Mechanism, B1: top-1 retrieval 0.370 (FS 0.247-0.273), read of the rollout's prediction r
+0.38 / 0.47 / 0.73. The in-training body probe (MorphProbe on z) stays at 0.999 throughout.
+
+**Reading.** First model with a positive cross-body R2 to the B1 on two channels and B1 retrieval near
+the within-hexapod level (0.34 vs 0.43); B1 selection and mechanism numbers are the best measured;
+hexapod-side numbers unchanged. z still encodes body identity (probe), alongside the shared motion
+structure. Which ingredient does it (similarity loss vs joint stride-5 pretraining itself) is not
+separated.
+
+---
+
+### F281. Anchoring Stage 1 adaptation (frozen pretrained Froude head, or similarity to a fixed bank of hexapod z) moves the B1's latents toward the hexapod's only a little at 3 clips / 1000 LoRA steps
+
+`scripts/run/anchor_stage1.sh`, `wm/adapt.py --anchor_froude / --anchor_sim` (new; the new body's
+standardised Froude, checkpoint body statistics; the similarity bank = 12 hexapod beh24 clips encoded by
+the unadapted ITM, held fixed). Base `fmd_beh24_s0`; Stage 1 as the standard recipe (LoRA rank 2 on the
+Mlp layers only, 3 stratified B1 clips, hinge 0.5, 1000 steps); measured on the adapted ITM.
+
+| Stage 1 anchor | retrieval c10 -> B1 | cross-body R2 c10 -> B1 | Stage 1 rollout ratio h=1 / h=10 (after) |
+|---|---|---|---|
+| none | 0.03 | -1.36 / +0.09 / +0.30 | 1.67 / 1.67 |
+| Froude head | 0.12 | -0.44 / +0.12 / +0.42 | 1.74 / 1.69 |
+| similarity | 0.11 | -0.45 / -0.01 / +0.33 | 1.74 / 1.70 |
+| both | 0.11 | -0.48 / +0.06 / +0.38 | 1.74 / 1.70 |
+
+c10 -> c08 retrieval unchanged (0.42-0.43). Each anchor moves the B1 toward the hexapod (0.03 -> 0.11-0.12,
+forward R2 -1.36 -> -0.45) at a small cost in B1 prediction (ratio 1.67 -> 1.74 at h=1), far short of
+joint pretraining (0.34, F280). Not separated: the adaptation budget (3 clips, 1000 steps, rank-2 LoRA on
+Mlp layers only), and whether Stages 2-4 (without Stage 4's head refit) preserve or use the alignment.

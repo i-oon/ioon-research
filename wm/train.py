@@ -170,6 +170,43 @@ def adv_scale(cfg, epoch):
     return min(1.0, epoch / cfg.adv_warmup_epochs)
 
 
+# FIFO of recent (z, standardised Froude, embodiment) for `lambda_sim`'s cross-body pairs. Module-
+# level (not in `models`, which run_epoch iterates as nn.Modules); filled only on training steps.
+SIM_QUEUE = {"z": None, "f": None, "emb": []}
+
+
+def froude_similarity_loss(z, f, embodiment, cfg, update_queue):
+    """`Config.lambda_sim`: mean over pairs of (cos(z_i, z_j) - S_ij)^2, the current batch against
+    itself and against the queue. Returns (loss, n_cross_body_pairs)."""
+    z = z.float().flatten(1)
+    f = f.float().flatten(1)
+
+    def target(a, b):
+        if cfg.sim_kind == "rbf":
+            return 2 * torch.exp(-torch.cdist(a, b) ** 2 / (2 * cfg.sim_sigma ** 2)) - 1
+        return F.normalize(a, dim=1) @ F.normalize(b, dim=1).T
+
+    zn = F.normalize(z, dim=1)
+    s_z, s_a = zn @ zn.T, target(f, f)
+    off = ~torch.eye(len(z), dtype=torch.bool, device=z.device)
+    errs = [((s_z - s_a)[off]) ** 2]
+    n_cross = 0
+    q = SIM_QUEUE
+    if q["z"] is not None and len(q["emb"]):
+        keep = torch.tensor([e != embodiment for e in q["emb"]] if cfg.sim_cross_only
+                            else [True] * len(q["emb"]))          # on the CPU, like the queue
+        if keep.any():
+            qz, qf = q["z"][keep].to(z.device), q["f"][keep].to(z.device)
+            errs.append(((zn @ F.normalize(qz, dim=1).T - target(f, qf)) ** 2).flatten())
+            n_cross = len(z) * sum(e != embodiment for e, k in zip(q["emb"], keep.tolist()) if k)
+    if update_queue:
+        nz, nf = z.detach().cpu(), f.detach().cpu()
+        q["z"] = nz if q["z"] is None else torch.cat([q["z"], nz])[-cfg.sim_queue:]
+        q["f"] = nf if q["f"] is None else torch.cat([q["f"], nf])[-cfg.sim_queue:]
+        q["emb"] = (q["emb"] + [embodiment] * len(nz))[-cfg.sim_queue:]
+    return torch.cat(errs).mean(), n_cross
+
+
 def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     # batches are single-embodiment by construction, so one head and one offset serve the batch
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
@@ -279,6 +316,12 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         z_back = torch.func.functional_call(itm, frozen, (views["view2_t"], pred_cf))
         cycle_loss = F.mse_loss(z_back.float(), z_cf.float())
 
+    # --- Froude-similarity supervision of z (see `Config.lambda_sim`). Off unless set.
+    sim_loss = None
+    if cfg.lambda_sim > 0 and "body_motion" in batch:
+        sim_loss, n_cross = froude_similarity_loss(z, batch["body_motion"].to(device), embodiment,
+                                                   cfg, update_queue=torch.is_grad_enabled())
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -313,6 +356,11 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     if cycle_loss is not None:
         loss = loss + cfg.lambda_cycle * cycle_loss
         parts["cycle"] = float(cycle_loss.detach())
+        parts["total"] = float(loss.detach())
+    if sim_loss is not None:
+        loss = loss + cfg.lambda_sim * sim_loss
+        parts["sim"] = float(sim_loss.detach())
+        parts["sim_xbody_pairs"] = float(n_cross)
         parts["total"] = float(loss.detach())
     return loss, parts
 
@@ -809,6 +857,8 @@ def main():
                if "state" in train_metrics else "")
             + (f" | rollout {train_metrics['rollout']:.4f}"
                if "rollout" in train_metrics else "")
+            + (f" | sim {train_metrics['sim']:.4f} (x-body pairs/step {train_metrics['sim_xbody_pairs']:.0f})"
+               if "sim" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"
