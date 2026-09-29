@@ -3360,3 +3360,9 @@ policy นี้เรียนรู้แค่ "เดินหน้า" ไ
 baseline ที่ต้องมี: visual odometry (ทาย Froude จากคู่ภาพตรงๆ ไม่ใช้ world model) และแบบ morphology-conditioning แบบ QWM
 
 **29 ก.ย. ข้อสังเกตเรื่องข้อมูล (ยังไม่ได้พิสูจน์ในการตั้งค่าปัจจุบัน):** "ครอบคลุมพฤติกรรมมากขึ้น" น่าจะเป็นตัวที่ช่วย ไม่ใช่การเปลี่ยนท่ากลาง clip โดยตรง เพราะ beh24 + steady babble (ท่าเดียวต่อ clip) ได้เท่ากับหรือดีกว่า beh24 + switch babble ส่วน counterfactual (สถานะเดียวกันแต่ผลต่างกัน) ถือเป็นความครอบคลุมอีกแบบ คือครอบคลุม "คู่สถานะกับ action" ยังไม่มีหลักฐานว่าช่วยเพิ่มจากความครอบคลุมของ action เฉยๆ **ข้อจำกัด:** ผลนี้มาจาก run แบบ detach, seed เดียว และ mix มีข้อมูล 96 clip เทียบกับ 48 ถ้าจะทดสอบจริง ให้เทียบ behaviour 48 / behaviour 48 + babble 48 / behaviour 96 บน pipeline ปัจจุบัน (pretrain ร่วม + shapes z + similarity)
+
+**29 ก.ย. หลักที่ได้ (F280–F282):** สองร่างจะแชร์ z ได้ก็ต่อเมื่อมี loss ที่เทียบสองร่างกันตรงๆ ในขั้นที่ทั้งสองร่างอยู่ด้วยกัน
+- **pretrain หลายร่าง:** ใช้ cosine similarity ข้ามร่างผ่าน queue
+- **ร่างใหม่ตอน adapt:** ใช้สมอ (หัว Froude ที่แช่แข็ง และ/หรือ cosine similarity เทียบกับ bank ของ z ร่างเดิม)
+- **ผล:** pretrain ร่วม + similarity ใช้แค่ projector ได้ B1 rollout ดีสุด (+0.76 / +0.65), retrieval 0.34 ส่วน adapt + สมอได้ 0.19 เพราะ LoRA ขยับ z ได้จำกัด
+- **รอ:** คู่เทียบ jointD_sim vs jointD_nosim บน server (ปิด motion decoder ทั้งคู่) เพื่อยืนยันว่า cosine similarity คือกลไกที่ทำให้แชร์

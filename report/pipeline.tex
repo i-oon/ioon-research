@@ -14,7 +14,6 @@
 \definecolor{targetgray}{HTML}{777B82}
 \definecolor{encoderfill}{HTML}{E8E1F0}
 \definecolor{modelfill}{HTML}{F3DCCF}
-\definecolor{decoderfill}{HTML}{F3E2A9}
 \definecolor{bodyfill}{HTML}{DDEED6}
 \definecolor{latentfill}{HTML}{E4F3FA}
 \definecolor{latentblue}{HTML}{5AA9CE}
@@ -41,7 +40,6 @@
   model/.style={draw=ink, fill=modelfill, line width=.8pt,
     rounded corners=2.5pt, align=center, minimum width=32mm,
     minimum height=10mm, inner sep=3pt},
-  decoder/.style={model, fill=decoderfill, minimum width=29mm, minimum height=10mm},
   bodyhead/.style={model, fill=bodyfill, minimum width=32mm, minimum height=10mm},
   latent/.style={draw=latentblue, fill=latentfill, line width=1.2pt,
     rounded corners=3pt, align=center, minimum width=17mm,
@@ -83,15 +81,13 @@
   \node[imageframe] (frameTp1) at (7.8,4.9)
     {\includegraphics[width=20mm,height=14mm]{2.png}};
   \node[anchor=south east, font=\scriptsize] at (frameT.north east) {$o_t$};
-  \node[anchor=south east, font=\scriptsize] at (frameTp1.north east) {$o_{t+1}$};
+  \node[anchor=south east, font=\scriptsize] at (frameTp1.north east) {$o_{t+5}$};
   \node[align=center, font=\scriptsize, text=ink!80] at (8,-7)
-    {Adjacent RGB\\observations};
+    {5 frames apart RGB\\observations};
 
-  % Synchronized action supervision is kept visually secondary.
+  % Body-motion supervision is kept visually secondary.
   \node[align=center, font=\scriptsize, text=ink!85] (label)
     at (14,35) {Body-motion label\\$\mathbf v_t$};
-  \node[align=center, font=\scriptsize, text=ink!85] (bodylabel)
-    at (14,-35) {Joint-command label\\$a_t$};
 
   % -----------------------------------------------------------------------
   % Two independently augmented views.
@@ -116,9 +112,9 @@
   \coordinate (featuresA) at (86,19);
   \coordinate (featuresB) at (86,-9);
   \node[align=center, labelbox] (featuresALabel) at (80,11.5)
-    {$(e_t^{A},e_{t+1}^{A})$};
+    {$(e_t^{A},e_{t+5}^{A})$};
   \node[align=center, labelbox] (featuresBLabel) at (80,-17)
-    {$(e_t^{B},e_{t+1}^{B})$};
+    {$(e_t^{B},e_{t+5}^{B})$};
   % \draw[flow] (encA.east) -- (featuresA);
   % \draw[flow] (encB.east) -- (featuresB);
   \node[draw=ink!28, dashed, rounded corners=3pt,
@@ -144,44 +140,34 @@
     {Cross-body Head};
   \node[model] (ftm) at (180,1)
     {Forward Transition Model};
-  \node[decoder] (md) at (180,-23)
-    {Motion Decoder};
   \draw[clearflow] (z.north) -- (140,21) -- (bodyhead.west);
   \draw[clearflow] (z.east) -- (ftm.west);
-  \draw[clearflow] (z.south) -- (140,-20.2) -- ($(md.west)+(0,2.8)$);
 
-  % Current-view contฟext from branch B conditions both predictors.
+  % Current-view context from branch B conditions the forward model.
   \coordinate (context) at (116,-9);
   \draw[line] (featuresB) -- node[above,labelbox] {$e_t^{B}$ context} (context);
   \coordinate (ctxToFtm) at (180,-9);
   \draw[clearline] (context) -- (ctxToFtm) -- (ftm.south);
-  \coordinate (ctxToMd) at (128,-9);
-  \draw[clearflow] (ctxToMd) -- (128,-25.8) -- ($(md.west)+(0,-2.8)$);
-  \node[junction] at (ctxToMd) {};
 
   % -----------------------------------------------------------------------
   % Compact scalar terminal objectives.
   \node[loss] (bodyloss) at (223,21) {$\mathcal L_{\mathrm{body}}$};
   \node[loss] (reconloss) at (223,1) {$\mathcal L_{\mathrm{recon}}$};
-  \node[loss] (motionloss) at (223,-23) {$\mathcal L_{\mathrm{motion}}$};
   \draw[flow] (bodyhead) -- node[above,labelbox] {$\hat{\mathbf v}_t$} (bodyloss);
-  \draw[flow] (ftm) -- node[above,labelbox] {$\hat e_{t+1}$} (reconloss);
-  \draw[flow] (md) -- node[above,labelbox] {$\hat a_t$} (motionloss);
+  \draw[flow] (ftm) -- node[above,labelbox] {$\hat e_{t+5}$} (reconloss);
 
   % Ground-truth targets use quiet dashed paths; backpropagation is implicit.
   \draw[target] (label.east) -- (223,35) --
     node[right,labelbox] {Froude $\mathbf v_t$} (bodyloss.north);
   \draw[target] (86,-13) -- (223,-13) --
-    node[pos=.65,right,labelbox] {$e_{t+1}^{B}$} (reconloss.south);
-  \draw[target] (bodylabel.east) -- (223,-35) --
-    node[right,labelbox] {$a_t$} (motionloss.south);
+    node[pos=.65,right,labelbox] {$e_{t+5}^{B}$} (reconloss.south);
 
   % A single unobtrusive annotation explains the non-solid target paths.
 \node[font=\scriptsize, text=targetgray, anchor=east] at (238,-41)
     {dashed: supervision target};
 
   % -----------------------------------------------------------------------
-  % Fine-tuning keeps the same prediction heads, but the real action label is
+  % Fine-tuning keeps the remaining prediction heads, but the real action label is
   % projected into the latent-action space.
   \begin{scope}[yshift=-100mm]
     \begin{scope}[on background layer]
@@ -195,9 +181,9 @@
     \node[hotimageframe] (ftFrameTp1) at (7.8,4.9)
       {\includegraphics[width=20mm,height=14mm]{2.png}};
     \node[anchor=south east, font=\scriptsize] at (ftFrameT.north east) {$o_t$};
-    \node[anchor=south east, font=\scriptsize] at (ftFrameTp1.north east) {$o_{t+1}$};
+    \node[anchor=south east, font=\scriptsize] at (ftFrameTp1.north east) {$o_{t+5}$};
     \node[align=center, font=\scriptsize, text=ink!80] at (8,-7)
-      {Real RGB\\observations \\ + unseen body};
+      {5 frames apart\\observations \\ from unseen body};
 
     \node[align=center, font=\scriptsize, text=ink!85] (ftBodyLabel)
       at (14,35) {Body-motion label\\$\mathbf v_t$};
@@ -223,9 +209,9 @@
     \coordinate (ftFeaturesA) at (86,19);
     \coordinate (ftFeaturesB) at (86,-9);
     \node[align=center, labelbox] (ftFeaturesALabel) at (80,11.5)
-      {$(e_t^{A},e_{t+1}^{A})$};
+      {$(e_t^{A},e_{t+5}^{A})$};
     \node[align=center, labelbox] (ftFeaturesBLabel) at (80,-17)
-      {$(e_t^{B},e_{t+1}^{B})$};
+      {$(e_t^{B},e_{t+5}^{B})$};
     % \draw[flow] (ftEncA.east) -- (ftFeaturesA);
     % \draw[flow] (ftEncB.east) -- (ftFeaturesB);
     \node[draw=ink!28, dashed, rounded corners=3pt,
@@ -239,9 +225,9 @@
     \draw[flow] (ftFeaturesA) -- (ftItm.west);
     \node[steptag, anchor=south west] at (ftItm.north west) {1};
 
-    \node[hotmodel, fill=latentfill, minimum width=25mm] (projector) at (112,-23)
+    \node[hotmodel, fill=latentfill, minimum width=25mm] (projector) at (140,-35)
       {Action Projector};
-    \draw[target] (ftActionLabel.east) -- (90,-35) -- (90,-23) -- (projector.west);
+    \draw[target] (ftActionLabel.east) -- (projector.west);
     \node[steptag, anchor=south west] at (projector.north west) {2};
 
     \node[latent] (ftZ) at (140,1)
@@ -250,44 +236,34 @@
       {latent action};
 
     \draw[clearflow] (ftItm.south) -- (112,1) -- (ftZ.west);
-    \draw[clearflow] (projector.north) -- (112,-2) -- (131.3,-2);
+    \draw[clearflow] (projector.north) -- (ftZ.south);
 
     \node[hotbodyhead] (ftBodyHead) at (180,21)
       {Cross-body Head};
     \node[hotmodel] (ftFtm) at (180,1)
       {Forward Transition Model};
-    \node[decoder] (ftMd) at (180,-23)
-      {Motion Decoder};
     \node[steptag, anchor=south west] at (ftFtm.north west) {1};
     \node[steptag, anchor=south west] at (ftBodyHead.north west) {3};
     \draw[clearflow] (ftZ.north) -- (140,21) -- (ftBodyHead.west);
     \draw[clearflow] (ftZ.east) -- (ftFtm.west);
-    \draw[clearflow] (ftZ.south) -- (140,-20.2) -- ($(ftMd.west)+(0,2.8)$);
     
 
     \coordinate (ftContext) at (116,-9);
     \draw[line] (ftFeaturesB) -- node[above,labelbox] {$e_t^{B}$ context} (ftContext);
     \coordinate (ftCtxToFtm) at (180,-9);
     \draw[clearline] (ftContext) -- (ftCtxToFtm) -- (ftFtm.south);
-    \coordinate (ftCtxToMd) at (128,-9);
-    \draw[clearflow] (ftCtxToMd) -- (128,-25.8) -- ($(ftMd.west)+(0,-2.8)$);
-    \node[junction] at (ftCtxToMd) {};
 
     \node[loss] (ftBodyLoss) at (223,21) {$\mathcal L_{\mathrm{body}}$};
     \node[loss] (ftReconLoss) at (223,1) {$\mathcal L_{\mathrm{recon}}$};
-    \node[loss] (ftMotionLoss) at (223,-23) {$\mathcal L_{\mathrm{motion}}$};
-    \node[hotloss] (ftProjLoss) at (140,-41) {$\mathcal L_{\mathrm{proj}}$};
+    \node[hotloss] (ftProjLoss) at (200,-35) {$\mathcal L_{\mathrm{proj}}$};
     \draw[flow] (ftBodyHead) -- node[above,labelbox] {$\hat{\mathbf v}_t$} (ftBodyLoss);
-    \draw[flow] (ftFtm) -- node[above,labelbox] {$\hat e_{t+1}$} (ftReconLoss);
-    \draw[flow] (ftMd) -- node[above,labelbox] {$\hat a_t$} (ftMotionLoss);
-    \draw[clearflow] (projector.south) -- (112,-41) -- node[above,labelbox] {$\hat z_t$} (ftProjLoss.west);
+    \draw[flow] (ftFtm) -- node[above,labelbox] {$\hat e_{t+5}$} (ftReconLoss);
+    \draw[clearflow] (projector.east) -- node[above,labelbox] {$\hat z_t$} (ftProjLoss.west);
 
     \draw[target] (ftBodyLabel.east) -- (223,35) --
       node[right,labelbox] {Froude $\mathbf v_t$} (ftBodyLoss.north);
     \draw[target] (86,-13) -- (223,-13) --
-      node[pos=.65,right,labelbox] {$e_{t+1}^{B}$} (ftReconLoss.south);
-    \draw[target] (ftActionLabel.east) -- (223,-35) --
-      node[right,labelbox] {$a_t$} (ftMotionLoss.south);
+      node[pos=.65,right,labelbox] {$e_{t+5}^{B}$} (ftReconLoss.south);
   \end{scope}
 \end{tikzpicture}%
 }

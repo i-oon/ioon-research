@@ -174,35 +174,38 @@ The last row is one seed, with the joint-command decoder on.
 
 ---
 
-## 6. Selection when the B1 is in pretraining
+## 6. Two ways to bring the B1 into the shared space
 
-Both columns adapt the B1 the same way (Stages 1, 2, 4) before testing; they differ only in whether the B1 was also in pretraining. c08 is zero-shot in both. Metric: normalised score (w=11), plus top-1 retrieval accuracy on the B1.
+- **Pretrain together:** the B1 is in pretraining with the hexapod (+ similarity loss); afterwards only the B1's action projector is fitted.
+- **Adapt afterwards:** pretrain on the hexapod only, then adapt to the B1. LoRA on ITM / FTM, then the projector, with an optional refit of the Froude head on the B1. The same 48 B1 clips are used at every stage.
+- **Anchor:** during adaptation, the hexapod's Froude head (frozen) must read the B1's z correctly, which pulls the B1 into the hexapod's space.
 
-| test | pretraining without the B1 (Froude only, S0 / S1) | pretraining with the B1 + similarity loss (1 seed) |
-|---|---|---|
-| B1 direct | +0.85 / +0.85 | **+0.95** |
-| B1 rollout (library start) | +0.47 / +0.59 | **+0.71** |
-| B1 rollout (current start) | +0.46 / +0.35 | **+0.54** |
-| B1 top-1 retrieval accuracy | 0.271 / 0.266 | **0.370** |
-| c08 direct | +0.78 / +0.79 | +0.79 |
-| c10 direct | +0.91 / +0.91 | +0.91 |
+Metrics: normalised score on the B1 (0 = random, 1 = oracle; w=11); cross-body retrieval c10 → B1 (0 = random, 1 = identical motion).
+
+| route | B1 direct | B1 rollout (library start) | B1 rollout (current start) | retrieval c10 → B1 |
+|---|---|---|---|---|
+| **pretrain together, projector only** | **+0.94** | **+0.76** | **+0.65** | **0.34** |
+| adapt, no anchor, Froude head refit | +0.84 | +0.57 | +0.44 | 0.04 |
+| adapt, no anchor, no refit | +0.71 | +0.20 | +0.08 | 0.04 |
+| adapt with anchor, LoRA rank 2, 1000 steps, no refit | +0.68 | +0.56 | +0.32 | 0.19 |
+| adapt with anchor, LoRA rank 8, 3000 steps, no refit | +0.87 | +0.66 | +0.41 | 0.19 |
+
+Hexapod side (pretrain together): c08 direct +0.79, c10 direct +0.91, unchanged from hexapod-only pretraining. Pretrain-together row: one seed, joint-command decoder on.
 
 ---
 
-## 7. Adapting a new body into the existing space
+## 7. What the anchored adaptation changes
 
-Adaptation Stage 1 (LoRA on ITM / FTM, 3 B1 clips) with an anchor that ties the new body's z to the hexapod's space. Metric: cross-body retrieval c10 → B1, measured on the adapted model.
-- **Froude-head anchor:** the pretrained Froude head, frozen, must read the B1's z correctly.
-- **Similarity anchor:** the Froude-similarity loss against a fixed bank of hexapod z.
+Cross-body R² of a Froude read-out fit on c10 only, applied to the B1 (fwd / lat / yaw), on the adapted model:
 
-| Stage 1 anchor | retrieval c10 → B1 | cross-body R² c10 → B1 (fwd / lat / yaw) |
-|---|---|---|
-| none | 0.03 | −1.36 / +0.09 / +0.30 |
-| Froude head | 0.12 | −0.44 / +0.12 / +0.42 |
-| similarity | 0.11 | −0.45 / −0.01 / +0.33 |
-| both | 0.11 | −0.48 / +0.06 / +0.38 |
+| adaptation | cross-body R² c10 → B1 |
+|---|---|
+| no anchor | −1.36 / +0.09 / +0.30 |
+| anchor, LoRA rank 2, 1000 steps | −0.72 / +0.16 / +0.42 |
+| anchor, LoRA rank 8, 3000 steps | +0.14 / +0.24 / +0.45 |
+| pretrain together (for reference) | +0.13 / +0.30 / −0.34 |
 
-For comparison: pretraining with the B1 + similarity loss reaches 0.34 (page 5). This test used 3 B1 clips and 1000 LoRA steps; a test with the same B1 data at every stage is next.
+With the rank-8 anchored adaptation, the hexapod's Froude head reads the B1 without a refit: the Froude refit adds nothing to direct (+0.88 with it vs +0.87 without). Rank and number of steps were changed together.
 
 ---
 
@@ -211,6 +214,6 @@ For comparison: pretraining with the B1 + similarity loss reaches 0.34 (page 5).
 | run | question |
 |---|---|
 | Hexapod + B1 together, Froude only; similarity loss on vs off (matched pair) | Is the similarity loss what places the B1 in the hexapod's z? |
-| Adaptation with an anchor and the same B1 data at every stage; with and without the Froude-head refit | Can a new body join the shared space by adaptation, and is the alignment usable for selection? |
+| Anchored adaptation: rank and number of steps separated; forgetting on the hexapod measured | What sets how far adaptation can move a new body into the shared space? |
 | Pretraining data: behaviour clips vs behaviour + varied-action clips vs the same amount of behaviour clips | Does broader behaviour coverage help, and does coverage of (state, action) combinations add to coverage of actions? |
 | Gecko held out | Does a body never seen land in the shared z, zero-shot and after a small adaptation? |

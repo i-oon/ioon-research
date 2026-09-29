@@ -7360,3 +7360,65 @@ c10 -> c08 retrieval unchanged (0.42-0.43). Each anchor moves the B1 toward the 
 forward R2 -1.36 -> -0.45) at a small cost in B1 prediction (ratio 1.67 -> 1.74 at h=1), far short of
 joint pretraining (0.34, F280). Not separated: the adaptation budget (3 clips, 1000 steps, rank-2 LoRA on
 Mlp layers only), and whether Stages 2-4 (without Stage 4's head refit) preserve or use the alignment.
+
+---
+
+### F282. The jointly pretrained model needs only a B1 projector (best B1 rollout measured); adaptation onto a hexapod-only pretrain, even with equal data and an anchor, stays below it
+
+`scripts/run/equal_data_anchor.sh`. B1 selection (library beh12 B1 clean-train, held-out hexapod goals, NS
+at w=11; oracle 0.031, random 0.126):
+- J: `joint_sim_beh24_s0` (F280) with Stage 2 only -- the B1 projector fit on beh24 B1 clean-train;
+  ITM, FTM and Froude head straight from pretraining (no Stage 1 re-adaptation, no Stage 4 head refit).
+- E*: `fmd_beh24_s0` (hexapod only, F279) adapted with the same B1 data at every stage (beh24 B1
+  clean-train: Stage 1 on 44 clips + 4 for its report, Stages 2 and 4 on all 48); Stage 1 with or
+  without the Froude-head anchor (`--anchor_froude 1.0`), with or without the Stage 4 head refit.
+
+| model | direct | rollout (library start) | rollout (current start) | retrieval c10 -> B1 |
+|---|---|---|---|---|
+| J: joint + similarity, Stage 2 only | **+0.94** | **+0.76** | **+0.65** | 0.34 (F280) |
+| J with the standard Stages 1, 2, 4 (F280) | +0.95 | +0.71 | +0.54 | -- |
+| E0: no anchor, no Stage 4 | +0.71 | +0.20 | +0.08 | 0.04 |
+| E1: no anchor, Stage 4 | +0.84 | +0.57 | +0.44 | 0.04 |
+| E2: anchor, no Stage 4 | +0.68 | +0.56 | +0.32 | 0.19 |
+| E3: anchor, Stage 4 | +0.85 | +0.59 | +0.36 | 0.19 |
+
+Stage 1 rollout ratio at h=10 (after): 1.80 without anchor, 1.79 with. Retrieval c10 -> c08 0.41-0.42
+for both adapted ITMs.
+
+**Reading.**
+- The joint model is usable as pretrained: a B1 projector alone gives the best B1 rollout measured
+  (+0.76 / +0.65); re-running Stages 1 and 4 on it lowers rollout (current start +0.65 -> +0.54).
+- On a hexapod-only pretrain, the anchor with equal data raises retrieval to 0.19 (3 clips: 0.12,
+  F281) and makes the unrefit pretrained head usable for rollout (library start +0.20 -> +0.56,
+  current start +0.08 -> +0.32), but direct is not better (+0.68 vs +0.71) and, with the head refit,
+  anchor and no anchor are equal (+0.84-0.85). No adapted variant reaches the joint model.
+- Current best route to a shared, usable B1 latent: pretrain the bodies together (with the similarity
+  loss); adapt only the projector. Single seed each; the matched similarity on/off pair is training.
+
+---
+
+### F283. A stronger anchored adaptation (LoRA rank 8, 3000 steps) makes the hexapod's own Froude head read the B1 without any head refit; retrieval stays at ~0.19
+
+`scripts/run/local_overnight.sh` part A. Base `fmd_beh24_s0`; Stage 1 with LoRA rank 8 (was 2), 3000 steps
+(was 1000), same B1 data at every stage (44 + 4 / 48 / 48 clips), anchor = frozen Froude head (A1) or
+Froude head + similarity bank (A2). NS at w=11; retrieval and cross-body R2 on the adapted ITM.
+
+| model | direct | rollout (library start) | rollout (current start) | retrieval c10 -> B1 | cross-body R2 c10 -> B1 |
+|---|---|---|---|---|---|
+| A1 Froude anchor, no Stage 4 | +0.87 | +0.66 | +0.41 | 0.19 | +0.14 / +0.24 / +0.45 |
+| A1 Froude anchor, Stage 4 | +0.88 | +0.59 | +0.41 | | |
+| A2 both anchors, no Stage 4 | +0.78 | +0.67 | +0.41 | 0.18 | +0.19 / +0.23 / +0.46 |
+| A2 both anchors, Stage 4 | +0.88 | +0.56 | +0.31 | | |
+| rank 2, 1000 steps, anchor, no Stage 4 (F282 E2) | +0.68 | +0.56 | +0.32 | 0.19 | -0.72 / +0.16 / +0.42 |
+| usual recipe, no anchor, Stage 4 (F282 E1) | +0.84 | +0.57 | +0.44 | 0.04 | |
+| joint + similarity, Stage 2 only (F282 J) | +0.94 | +0.76 | +0.65 | 0.34 | +0.13 / +0.30 / -0.34 |
+
+Stage 1 rollout ratio h=10: 1.72 (rank 2: 1.79-1.80), i.e. the B1 prediction also improved.
+
+**Reading.**
+- With more adaptation capacity the anchor places the B1 where the hexapod-trained Froude head reads it:
+  cross-body R2 to the B1 is positive on every channel (first time for an adapted model), and selection
+  without the head refit (+0.87 / +0.66 / +0.41) is as good as or better than the usual recipe with it.
+  The Stage 4 refit adds nothing (A1) or lowers rollout (A2).
+- Nearest-neighbour retrieval stays at 0.18-0.19: the Froude-relevant part of z is aligned, the rest is not.
+- Still below joint pretraining on every selection column.

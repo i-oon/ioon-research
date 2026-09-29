@@ -31,3 +31,4 @@ report/*.out
 # Archived / invalidated results (moved, not deleted; see MANIFEST.txt inside each)
 *_archive*/
 _invalid_*/
+.claude/
