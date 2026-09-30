@@ -7072,6 +7072,121 @@ Caches: `anova_hex_beh24val.pt` (c10), `selection_eval_c08.pt` (c08), `selection
 Consequence for design: a cross-body grounding must act on z alone (z-only shared head, or a
 similarity loss on z), never through the frame. Notes: `doc/ref/notes_prior_work_cross_body.md`.
 
+**Addendum 2026-09-30: the separation is a rendering difference, not the body.** Same clips, same
+grouped CV:
+- **Simple image features** barely separate c10 from B1:
+  - floor/wall edge row: 0.51 (median row 139 / 141, identical);
+  - mean RGB: 0.63;
+  - row-mean luminance profile: 0.76.
+- **The V-JEPA2 embedding separates them from any image region alone:**
+  - top rows, ceiling / upper wall: 0.990;
+  - wall: 0.984;
+  - floor/wall edge: 1.000;
+  - floor: 0.995.
+
+  So the cue is spread over the whole frame, not an object in view.
+- **Image statistics differ by render pipeline:**
+  - Laplacian variance (sharpness): B1 256 vs c10 178 / c08 163;
+  - high-frequency energy: 55.1 vs 49.9 / 48.6;
+  - ceiling texture std: 2.68 vs 3.71 / 3.43.
+
+  B1 clips are rendered by `render_b1_replay.py` (MuJoCo replay, room scaled by camera-mount height),
+  hexapod clips by `collect_ik.py`.
+
+The egocentric frames of the two pipelines therefore differ in sharpness / texture statistics, which
+V-JEPA2 detects everywhere in the image. This is a confound in the data, not evidence that a frame
+reveals the body. It can also carry into z: part of what separates the B1's z from the hexapod's may be
+render style. Before further cross-body claims, render both bodies through matched settings and require
+this probe to be near chance.
+
+**Sources found (2026-09-30).** Same sensor on both scenes (256x256, near 0.01, render mode 0), same
+capture code (no resize), same room code, same four scene lights.
+- **Lights: not the cause.** Scaling them with the room (x2.21 on the B1) changes no pixel (max
+  difference 0), so the scene lights do not affect these renders.
+- **Source 1: the B1 ego datasets predate the current room-texture recipe.** Re-rendering B1 clip
+  `b1_ep0` from its stored MuJoCo states with the current `render_b1_replay.py --ego` differs from the
+  dataset frame by up to 136 grey levels, and the ceiling texture std moves 2.58 -> 3.59, i.e. onto the
+  hexapod's 3.43-3.71.
+- **Source 2: remaining detail difference in the current renders.** Laplacian variance by region,
+  B1 re-render vs c10:
+
+  | region | B1 | c10 |
+  |---|---|---|
+  | ceiling | 59.4 | 53.9 |
+  | wall | 8.3 | 5.4 |
+  | floor | 129.4 | 95.7 |
+
+  The floor and walls carry finer detail on the B1, plausibly the height-scaled ground UV / wall
+  texture density.
+
+Fix path: re-render the B1 ego datasets from their stored states with the current code, match the
+floor / wall texture density to the hexapod's by these statistics, then require the frame-level
+body-identity probe to be near chance before re-measuring B1 sharing.
+
+**Re-render done (`scripts/dataset/rerender_b1_ego_matched.py` -> `data/egocentric_v2/`).**
+- **Floor.** The B1 floor was stretched by a fixed x3 (`render_b1_replay.py --floor_scale`); the
+  hexapod's grows with the room (`ego_camera.scale_floor`, x4.59 for the B1's 17.6 m room). With
+  `--match_floor`, the dashed line at the wall base disappears.
+- **Floor texture density.** Matched by `--ground_uv_mult 1.5`, chosen against c10 on Laplacian
+  variance:
+
+  | | whole frame | floor | wall base |
+  |---|---|---|---|
+  | c10 | 179 | 84 | 791 |
+  | B1, old renders | 294 | 129 | 1522 |
+  | B1, re-rendered | 187 | 93 | 918 |
+
+- **Determinism.** Kinematic replay: rendering a clip twice gives identical frames (max difference 0).
+- **Metadata.** Only `frames` is replaced; the other fields are copied from each original clip.
+
+Body-identity probe, c10 vs B1 (`scripts/diagnostics/egocentric_view/body_id_render_check.py`, V-JEPA2 on
+the CPU, float32):
+
+| B1 frames | whole frame | ceiling rows | wall | floor/wall edge | floor |
+|---|---|---|---|---|---|
+| old renders | 0.998 | 0.990 | 0.984 | 1.000 | 0.995 |
+| re-rendered | 0.904 | 0.877 | 0.932 | 0.907 | 0.943 |
+
+**What remains is largely body-caused.** The horizon (floor/wall edge) fitted per frame:
+
+| body | tilt, median abs | tilt, p90 | frame-to-frame tilt change | horizon row std |
+|---|---|---|---|---|
+| c10 | 4.33 deg | 9.45 deg | 3.40 deg | 5.6 |
+| c08 | 5.07 deg | 9.71 deg | 3.88 deg | 7.2 |
+| B1 (re-rendered) | 1.47 deg | 6.30 deg | 1.37 deg | 4.0 |
+
+- The hexapod camera rolls and sways with the tripod gait; the B1's stays level.
+- These two numbers alone (tilt, horizon row) separate c10 from B1 at 0.701.
+
+The re-rendered frames still identify the body mostly through how the body carries the camera. That is
+information the body genuinely causes, not rendering, and it is kept. Whether any rendering difference
+remains beyond it is not separated.
+
+**Correction (same day): the x1.5 floor setting was itself a rendering difference; pure scaling matches.**
+`scripts/diagnostics/egocentric_view/static_scene_render_check.py` isolates the scene from the body. It
+renders both scenes from the SAME camera poses:
+- 16 rooms x 12 poses, positions and headings in room-scaled units;
+- camera level at mount height x 1.551, 90 deg FOV;
+- no body in view, no walking;
+- each scene built as its collector builds it, same room seeds.
+
+V-JEPA2 frame probe, hexapod scene vs B1 scene:
+
+| B1 floor texture | whole frame | ceiling rows | wall | floor/wall edge | floor |
+|---|---|---|---|---|---|
+| `--ground_uv_mult 1.5` (v2) | 0.952 | 0.895 | 0.904 | 0.925 | 0.937 |
+| `--ground_uv_mult 1.0`, pure scaling | **0.552** | 0.477 | 0.680 | 0.627 | 0.581 |
+
+- **Pure scaling renders the two scenes alike.** Room, floor tiles (`--match_floor`) and floor texture
+  all scale with mount height.
+- **The x1.5 was tuned against walking data,** whose image-detail differences come from camera motion,
+  and so introduced a scene difference. The v2 re-render is superseded by v3
+  (`rerender_b1_ego_matched.py`, x1.0, `data/egocentric_v3/`).
+- **The earlier explanation of v2's residual 0.904 as gait sway was wrong.** The static test shows the
+  scene itself separated at 0.952.
+- **Method note.** Region-restricted probes on V-JEPA2 tokens do not localise a cue: every token attends
+  to the whole frame, which is why every region separated equally.
+
 ---
 
 ### F276. Pretraining on babble only: switching babble (drive held 15-25 frames) improves the read-out of the rollout on both seeds but not physics selection; rapid babble (drive every 5 frames) fails zero-shot c08 on both seeds
@@ -7422,3 +7537,69 @@ Stage 1 rollout ratio h=10: 1.72 (rank 2: 1.79-1.80), i.e. the B1 prediction als
   The Stage 4 refit adds nothing (A1) or lowers rollout (A2).
 - Nearest-neighbour retrieval stays at 0.18-0.19: the Froude-relevant part of z is aligned, the rest is not.
 - Still below joint pretraining on every selection column.
+
+---
+
+### F284. Matched pair: the similarity loss makes a c10-fit Froude read-out transfer to the B1 but does not change nearest-neighbour retrieval or selection; joint pretraining itself gives the retrieval
+
+Joint hexapod + B1 pretraining on the current pipeline (beh24 48 + 48 clips, stride 5, Froude head shapes z,
+joint-command decoder off). The only difference between S0 arms is `lambda_sim`. `scripts/run/jointD_server.sh`
+(S0 pair, lab server), `scripts/run/local_overnight.sh` part B (S1). Evaluated as joint models:
+`scripts/run/eval_joint_models.sh`, Stage 2 only (projectors fit on beh24 clean-train with the pretrained
+ITM), NS at w=11; shared latent on pretrained ITMs. **All on the old B1 renders** (F275 addendum).
+
+| model | B1 direct | B1 roll lib | B1 roll cur | c08 direct | c08 roll lib | c08 roll cur | c10 direct | c10 roll lib | c10 roll cur |
+|---|---|---|---|---|---|---|---|---|---|
+| similarity 0.05, S0 | +0.94 | +0.75 | +0.65 | +0.78 | +0.61 | +0.57 | +0.92 | +0.77 | +0.68 |
+| **no similarity, S0** | +0.94 | +0.74 | +0.65 | +0.79 | +0.56 | +0.48 | +0.91 | +0.68 | +0.69 |
+| similarity 0.05, S1 | +0.93 | +0.75 | +0.60 | +0.78 | +0.55 | +0.45 | +0.90 | +0.79 | +0.72 |
+| earlier: similarity + joint-command decoder (F280) | +0.94 | +0.76 | +0.65 | +0.78 | +0.53 | +0.51 | +0.91 | +0.75 | +0.57 |
+
+| model | body-ID probe | cross-body R2 c10 -> c08 | cross-body R2 c10 -> B1 | k-NN mixing | retrieval c10 -> c08 | retrieval c10 -> B1 |
+|---|---|---|---|---|---|---|
+| similarity, S0 | 0.73 | +0.72 / +0.36 / +0.37 | **+0.48 / +0.07 / +0.17** | 0.35 | 0.45 | 0.34 |
+| **no similarity, S0** | 0.74 | +0.70 / +0.36 / +0.23 | **-0.85 / +0.17 / -0.22** | 0.35 | 0.41 | 0.33 |
+| similarity, S1 | 0.74 | +0.75 / +0.35 / +0.32 | **+0.70 / +0.30 / -0.07** | 0.36 | 0.44 | 0.42 |
+| earlier, with decoder | 0.73 | +0.72 / +0.36 / +0.17 | +0.13 / +0.30 / -0.34 | 0.37 | 0.43 | 0.34 |
+
+**Reading.**
+- Joint stride-5 pretraining with the Froude head shaping z gives B1 retrieval about 0.33 without any
+  similarity loss (hexapod-only pretraining: 0.04-0.05). The retrieval gain in F280 came from joint
+  pretraining, not from the similarity loss.
+- The similarity loss changes the cross-body read-out: a Froude read-out fit on c10 predicts the B1's forward
+  motion (R2 +0.48 / +0.70 on two seeds vs -0.85 without it). It aligns the Froude-relevant direction of z
+  across bodies, not the nearest-neighbour mixing.
+- Selection on the B1 is identical with or without it (+0.94 / +0.74-0.75 / +0.65). The B1 projector is fit
+  in the pretrained space either way. On c08 the similarity arm's rollout is higher at S0 (+0.61 / +0.57 vs
+  +0.56 / +0.48) but not at S1 (+0.55 / +0.45): within seed spread.
+- Joint pretraining gives the best B1 rollout measured (+0.74-0.76 / +0.60-0.65) in every variant.
+- Pending: the same comparison on B1 data with matched rendering (v3).
+
+---
+
+### F285. The joint models' B1 representation depends on the old B1 rendering: fed matched-render (v3) frames, B1 selection and sharing collapse
+
+`scripts/run/eval_on_v3.sh`, no retraining. The F284 models (pretrained on the old B1 renders) get:
+- the B1 projector refit on v3 B1 clean-train frames (Stage 2);
+- B1 selection on the v3 library;
+- shared latent with the B1 on v3.
+
+v3 = `rerender_b1_ego_matched.py`, pure scaling. Its scene is shown to render like the hexapod's by the
+static test, 0.552.
+
+| model | B1 direct | B1 roll lib | B1 roll cur | retrieval c10 -> B1 | cross-body R2 c10 -> B1 | body-ID probe | k-NN mixing |
+|---|---|---|---|---|---|---|---|
+| similarity, S0: old B1 -> v3 | +0.94 -> **+0.24** | +0.75 -> +0.38 | +0.65 -> +0.40 | 0.34 -> 0.22 | +0.48 / +0.07 / +0.17 -> -0.71 / -0.27 / -1.20 | 0.73 -> 0.65 | 0.35 -> 0.45 |
+| no similarity, S0 | +0.94 -> **-0.08** | +0.74 -> +0.21 | +0.65 -> +0.27 | 0.33 -> 0.15 | -0.85 / +0.17 / -0.22 -> -1.66 / +0.09 / -1.27 | 0.74 -> 0.68 | 0.35 -> 0.45 |
+| similarity, S1 | +0.93 -> **+0.39** | +0.75 -> +0.31 | +0.60 -> +0.42 | 0.42 -> 0.20 | +0.70 / +0.30 / -0.07 -> -0.61 / -0.09 / -0.94 | 0.74 -> 0.65 | 0.36 -> 0.47 |
+
+**Reading.**
+- The models encode the B1 through features specific to its old rendering. On matched-render frames the
+  B1's z no longer lands where the pretrained Froude head reads it, even though:
+  - the frames look more like the hexapod's (body-ID down, k-NN mixing up);
+  - the projector is refit.
+- Direct selection collapses, so the effect is in the B1's z / read-out, not only in rollout.
+- The similarity arms degrade less than the control (direct +0.24 / +0.39 vs -0.08).
+- This is a train/test render shift, not a measurement of a model trained on v3. It shows the old-render
+  B1 results (F280-F284) rest partly on render-specific features, so they cannot be carried over.
+  Cross-body results must be retrained on v3 to be clean.

@@ -151,13 +151,6 @@ Same body (c10), current pipeline. Metric: normalised score.
 
 ## 5. Is z shared across bodies?
 
-**One egocentric frame identifies the body.** Metric: linear-probe accuracy for body identity from one frame's embedding.
-
-| task | accuracy | chance |
-|---|---|---|
-| c10 vs B1 | 0.998 | 0.5 |
-| c10 vs c08 | 0.453 | 0.5 |
-
 **z across bodies.**
 - **Metrics:** body-ID probe accuracy (lower = more shared); cross-body R² of a Froude read-out fit on c10 only; k-NN mixing ratio (1 = mixed); cross-body retrieval (0 = random, 1 = identical motion).
 - **Froude-similarity loss:** for every pair of transitions, the cosine of their z must match the similarity of their Froude. Cross-body pairs come from a queue of recent z, because each training batch holds one body. This is the form of arXiv 2609.19846, with Froude as the similarity signal.

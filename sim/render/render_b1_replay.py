@@ -97,6 +97,14 @@ def main():
     ap.add_argument("--ego_box", type=float, default=0.0,   # 0 = scaled from the insect's by height
                     help="build a textured room this many metres across; an untextured world "
                          "carries no optical flow and the egocentric view would see nothing")
+    ap.add_argument("--match_floor", action="store_true",
+                    help="--ego: stretch the floor with ego_camera.scale_floor(room size), the same rule "
+                         "the hexapod collector uses, instead of the fixed --floor_scale; makes the floor "
+                         "tiles scale with the room (F275 addendum). Off reproduces the older renders")
+    ap.add_argument("--ground_uv_mult", type=float, default=1.0,
+                    help="--ego: multiply the floor-texture tile size (room_for's ground_uv) -- a "
+                         "calibration knob to match the hexapod's image detail; 1.0 reproduces the "
+                         "current renders")
     ap.add_argument("--max_frames", type=int, default=0,
                     help="stop after this many frames, so every condition yields the same clip "
                          "length regardless of how fast the robot happens to walk")
@@ -230,7 +238,10 @@ def main():
         sim.setObjectPosition(cam, sim.handle_world,
                               [base_pos[0, 0] + off_xy[0] + args.cam_dx,
                                base_pos[0, 1] + off_xy[1] + args.cam_dy, cam_z])
-    if args.floor_scale > 0:
+    if args.ego and args.match_floor:
+        from ego_camera import scale_floor                  # noqa: E402
+        scale_floor(sim, R["size"])
+    elif args.floor_scale > 0:
         floors = [h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)
                   if sim.getObjectAlias(h, 1).startswith("/Floor")]
         if floors:
@@ -247,7 +258,7 @@ def main():
                 sim.setObjectPosition(h, sim.handle_world, [q[0], q[1], q[2] - drop])
             print(f"    floor x{args.floor_scale}: surface {before:+.3f} -> {surface():+.3f}")
     if args.ego:
-        randomise_ground(sim, seed=args.ego_seed, uv=R["ground_uv"])
+        randomise_ground(sim, seed=args.ego_seed, uv=R["ground_uv"] * args.ground_uv_mult)
     if args.cam_back != 1.0:
         # push the camera away along the line it already looks down, so the framing widens without
         # the lens changing -- the insect's shot, taken from further back
