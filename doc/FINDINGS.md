@@ -7603,3 +7603,214 @@ static test, 0.552.
 - This is a train/test render shift, not a measurement of a model trained on v3. It shows the old-render
   B1 results (F280-F284) rest partly on render-specific features, so they cannot be carried over.
   Cross-body results must be retrained on v3 to be clean.
+
+---
+
+### F286. Adapting the old-render joint models to v3 frames restores most of the B1 selection but not the cross-body sharing
+
+`scripts/run/finetune_v3.sh`: `jointD_sim_s0`, `jointD_nosim_s0` (pretrained on the old B1 renders) adapted
+to v3 B1 frames with the same v3 data at every stage (Stage 1 LoRA rank 2, 44 + 4 clips; Stages 2 and 4 on
+48). Two arms:
+- **A:** usual recipe, with the Froude-head refit.
+- **B:** frozen pretrained Froude head as the Stage 1 anchor, no refit.
+
+B1 selection on the v3 library, NS at w=11; shared latent with the B1 on v3.
+
+| model | direct | roll lib | roll cur | retrieval c10 -> B1 | cross-body R2 c10 -> B1 |
+|---|---|---|---|---|---|
+| similarity S0, no adaptation (F285) | +0.24 | +0.38 | +0.40 | 0.22 | -0.71 / -0.27 / -1.20 |
+| similarity S0, A | +0.82 | +0.72 | +0.54 | 0.19 | -0.68 / -0.24 / -1.35 |
+| similarity S0, B | +0.70 | +0.56 | +0.54 | 0.22 | -0.35 / -0.09 / -1.35 |
+| no similarity S0, no adaptation (F285) | -0.08 | +0.21 | +0.27 | 0.15 | -1.66 / +0.09 / -1.27 |
+| no similarity S0, A | +0.85 | +0.69 | +0.61 | 0.16 | -1.33 / +0.12 / -1.20 |
+| no similarity S0, B | +0.74 | +0.64 | +0.62 | 0.19 | -1.04 / +0.19 / -0.95 |
+| (old renders, F284: similarity / no similarity) | +0.94 / +0.94 | +0.75 / +0.74 | +0.65 / +0.65 | 0.34 / 0.33 | +0.48 / -0.85 (fwd) |
+
+**Reading.**
+- Adaptation on the new frames recovers usable B1 selection: A reaches +0.82-0.85 direct and +0.54-0.61
+  rollout, a little below the old-render values.
+- It does not recover cross-body sharing: retrieval 0.16-0.22 and negative forward R2. The alignment the
+  joint pretraining built was tied to the old B1 rendering.
+- Clean sharing numbers need pretraining on v3 (`scripts/run/jointD3_server.sh`).
+
+---
+
+### F287. With physical counterfactuals (no kinematic pose jump) the read-out still cannot read the real future: the rollout bottleneck is the read-out, not the kinematic rendering
+
+`scripts/diagnostics/objective_experiments/physics_counterfactual_check.py`.
+- **Branching.** From an exact MuJoCo state (mjSTATE_INTEGRATION + the policy's last action and gait
+  clock), the B1's own policy executes each of the 24 library candidates' recorded commands for 5 rendered
+  frames. Restoring is exact: the same command twice gives position difference 0.0.
+- **Truth:** the Froude the simulated body achieved.
+- **States:** 8 library clips x 3 times = 24 start states.
+- **Render:** `build_scene`, view check r = 0.994. This is the old B1 rendering, matching the models'
+  training data.
+- **Models:** D (Froude only, F279), S0 / S1, B1-adapted checkpoints.
+
+Pearson r across the 24 branches vs achieved Froude, fwd / lat / yaw:
+
+| reading | D S0 | D S1 | kinematic counterfactuals, D mean (F266-style, weekly update) |
+|---|---|---|---|
+| direct: Froude head(proj(executed chunk)) | 0.10 / 0.86 / 0.78 | 0.40 / 0.78 / 0.68 | 0.83 / 0.90 / 0.87 |
+| read of the real (physical) future | 0.19 / -0.43 / 0.54 | 0.12 / -0.10 / 0.45 | 0.26 / 0.41 / 0.52 |
+| read of the FTM prediction (rollout) | 0.28 / -0.29 / 0.44 | 0.03 / 0.05 / 0.11 | 0.23 / 0.13 / 0.59 |
+
+**Reading.**
+- Removing the kinematic pose jump does not help the read-out: reading the real physical future is as
+  poor as with kinematic renders, or worse (lateral negative). The ITM + Froude head cannot read an action
+  applied from a state it did not come from. That is a property of the read-out, not an artifact of how
+  the counterfactuals were rendered.
+- Caveat on the truth: 5 frames after a command change, the body's forward speed is still mostly its
+  previous momentum. Direct's forward r drops to 0.10 / 0.40 here (0.83 kinematic), while lateral and yaw
+  stay high. Part of the forward channel's low r is the physics lag, not the read-out.
+- Consequence for rollout: the read-out needs training on transitions where the start state and the
+  action do not come from the same clip, e.g. varied-action data in pretraining or physical counterfactual
+  branches like these.
+
+---
+
+### F288. The read-out collapse on counterfactual futures also happens on the hexapod c10 (in pretraining): it is not a cross-body effect
+
+`scripts/diagnostics/objective_experiments/counterfactual_readout_hex.py` (log `results/wm/logs/counterfactual_readout_hex_c10.log`,
+cache `results/wm/cache/counterfactual_readout_hex_c10.pt`). Kinematic counterfactuals in the hexapod scene, rendered exactly like
+the training data (per-clip room seed = the clip's `repeat`; view check pixel corr 0.994 mean, 0.989 min). Candidates and
+start states from `beh12_c10f10t10_ego_flat_cleantrain`: 8 clips x t in {10, 20, 30} = 24 states x 24 actions, K = 5.
+Poses derived from stored fields: abdomen quat = `body_quat`, abdomen position = head - R(body_quat) h_off, legs = recorded
+`actions`. Models: hexapod-only D pretrains S0 / S1 (`wm/runs/fmd_beh24_s{0,1}/c08_zeroshot/ckpt_lib_zeroshot.pt`).
+
+Pearson r across the 24 actions, fwd / lat / yaw, mean of S0 / S1 (B1 from F266 / F287 for comparison):
+
+| read | hexapod c10 | B1 |
+|---|---|---|
+| direct: Froude head(proj(a)) | 0.99 / 0.92 / 0.98 | 0.83 / 0.90 / 0.87 |
+| own recorded transition | 0.95 / 0.74 / 0.74 | 0.75 / 0.58 / 0.83 |
+| real counterfactual future | 0.18 / 0.40 / 0.28 | 0.26 / 0.41 / 0.52 |
+| FTM-predicted future | 0.25 / 0.36 / 0.60 | 0.23 / 0.13 / 0.59 |
+
+Per seed, real counterfactual: S0 0.21 / 0.41 / 0.32, S1 0.14 / 0.38 / 0.23.
+
+**Reading.** The body the model was pretrained on, with no adaptation and no render difference, shows the same drop from its
+own transition to a counterfactual future. The read-out failure comes from the training data (one command per clip), not from
+cross-body transfer. Caveat: kinematic, so the first step jumps to the candidate's posture; on the B1 the physics version
+(F287) ruled that out, not yet repeated on the hexapod.
+
+**Addendum, c08 (held out from pretraining).** Same script, `--scene medauroidea_c08f09t09.ttt`, candidates
+`beh12_c08f09t09_ego_flat` (48 clips, so 24 states x 48 actions), same checkpoints (hexapod projector), view check pixel
+corr 0.994 mean / 0.990 min. Log `results/wm/logs/counterfactual_readout_hex_c08.log`. Mean of S0 / S1:
+direct 0.98 / 0.80 / 0.95; own 0.91 / 0.55 / 0.38; real counterfactual 0.40 / 0.42 / 0.38 (S0 0.42 / 0.41 / 0.39,
+S1 0.38 / 0.43 / 0.36); FTM-predicted 0.35 / 0.31 / 0.62. Forward drops 0.91 -> 0.40 as on c10 and the B1; yaw's own-read
+is already low on c08 (0.38), so the yaw drop is not measurable there.
+
+---
+
+### F289. Hexapod-only pretrain + the current adaptation pipeline (LoRA rank 8, 3000 steps, Froude loss, no head refit) on the B1 v3 frames: B1 selection +0.81 / +0.69 direct, rollout +0.40 to +0.49; sharing stays low
+
+`scripts/run/hexonly_v3_new.sh fmd_beh24_s0 fmd_beh24_s1` (log `results/wm/logs/hexonly_v3_new.log`, checkpoints
+`wm/runs/fmd_beh24_s{0,1}/b1_v3_new/`). Stage 1 `wm.adapt --lora_rank 8 --steps 3000 --anchor_froude 1.0` on
+`data/egocentric_v3/beh24_b1_ego_flat_cleantrain` (44 + 4 clips, hinge 0.5), Stage 2 projector, no Stage 4. B1 selection on the
+v3 library (oracle 0.0310, random 0.1264), w=11, normalised score:
+
+| seed | direct | rollout (library start) | rollout (current start) |
+|---|---|---|---|
+| S0 | +0.81 | +0.49 | +0.46 |
+| S1 | +0.69 | +0.40 | +0.41 |
+| old recipe (rank 2, no Froude loss, Stage 4 refit), S0, `hexonly_v3.sh` | +0.73 | +0.29 | +0.14 |
+
+Shared latent on the adapted ITM (S0 / S1): body-ID 0.66 / 0.67; cross-body R2 c10 -> B1 -0.14 / +0.24 / -0.37 and
+-0.97 / -0.15 / -0.87; c10 -> c08 +0.69 / +0.32 / +0.21 and +0.74 / +0.35 / +0.19; kNN mixing 0.45 / 0.46; retrieval c08
+0.39 / 0.40, B1 0.18 / 0.11.
+
+**Reading.** On the current rendering the new pipeline beats the old recipe on every B1 selection column (S0 rollout from
+the current start +0.14 -> +0.46). The B1 selection works while the B1's z is still not shared with the hexapod's
+(retrieval 0.11-0.18, B1 R2 negative on two channels in both seeds): the per-body projector carries it. Seed spread is
+large on direct (0.12).
+
+**Addendum to F288, B1 with the current adaptation (F289 checkpoints) on the v3 rendering.**
+`scripts/diagnostics/objective_experiments/counterfactual_readout_b1.py` (log `results/wm/logs/counterfactual_readout_b1v3.log`,
+cache `results/wm/cache/counterfactual_readout_b1v3.pt`): same protocol as the hexapod (24 states x 24 actions, K = 5),
+kinematic counterfactuals rendered in the v3 matched scene (render_b1_replay --ego --match_floor --ground_uv_mult 1.0,
+per-clip room seed from `render_note`); view check pixel corr 1.000. Checkpoints `wm/runs/fmd_beh24_s{0,1}/b1_v3_new/ckpt.pt`.
+Mean of S0 / S1 (per seed): direct 0.88 / 0.79 / 0.78 (0.90 / 0.83 / 0.82, 0.86 / 0.75 / 0.73); own 0.47 / 0.74 / 0.22
+(0.48 / 0.65 / 0.09, 0.45 / 0.82 / 0.34); real counterfactual 0.15 / 0.46 / 0.41 (0.22 / 0.47 / 0.46, 0.08 / 0.45 / 0.36);
+FTM-predicted 0.32 / 0.24 / 0.45 (0.33 / 0.37 / 0.56, 0.31 / 0.10 / 0.33). The counterfactual read is as weak as on c10 / c08.
+Unlike the hexapods, the B1's own-transition read is also weak on forward and yaw (0.47, 0.22): after adaptation the
+pretrained head reads the B1's recorded transitions poorly, even though direct selection works through the projector.
+
+
+**Addendum 2 to F288: how much of the B1's weak own-transition read is the missing head refit.** Same cached v3
+counterfactual embeddings, same `b1_v3_new` adapted ITM / FTM / projector, plus only a Stage 4 refit of the Froude head
+(`wm.fit_body_head`, B1 v3 beh24 + hexapod beh24 rehearsal; `b1_v3_new/ckpt_s4.pt`). Mean of S0 / S1 (per seed):
+own 0.58 / 0.70 / 0.54 (0.59 / 0.69 / 0.37, 0.56 / 0.71 / 0.71) vs 0.47 / 0.74 / 0.22 without the refit; real
+counterfactual 0.19 / 0.40 / 0.38; FTM-predicted 0.21 / 0.09 / 0.39; direct 0.94 / 0.89 / 0.76. The refit recovers part
+of the own read (yaw 0.22 -> 0.54, forward 0.47 -> 0.58) but not to the old checkpoint's 0.75 / 0.58 / 0.83 (old rendering,
+older model), and does not help the counterfactual read or the FTM read (lateral 0.24 -> 0.09).
+
+---
+
+### F290. Joint hexapod + B1 pretraining on the matched (v3) B1 rendering: best B1 selection so far, but z is not shared with the B1, with or without the similarity loss
+
+`scripts/run/jointD3_server.sh` (server; resumed after a disk-full crash at epoch 42; best epoch sim 33, nosim 46),
+evaluated by `scripts/run/eval_joint_models_v3.sh jointD3_sim_s0 jointD3_nosim_s0` (log `results/wm/logs/eval_jointD3.log`):
+Stage 2 only (projectors from the pretrained ITM), B1 on the v3 library. NS w=11, direct / roll_fixed / roll_live:
+
+| model | B1 | c08 zero-shot | c10 same body |
+|---|---|---|---|
+| jointD3_nosim_s0 | +0.94 / +0.66 / +0.56 | +0.78 / +0.62 / +0.59 | +0.90 / +0.79 / +0.67 |
+| jointD3_sim_s0 | +0.94 / +0.50 / +0.53 | +0.77 / +0.66 / +0.54 | +0.91 / +0.79 / +0.67 |
+| hexapod only + current adaptation (F289, S0 / S1) | +0.81 / +0.49 / +0.46, +0.69 / +0.40 / +0.41 | | |
+
+Shared latent (pretrained ITM, B1 v3; `results/deck/shared_latent_jointD3`): body-ID 0.71 (nosim) / 0.72 (sim);
+c10 -> B1 R2 -1.16 / +0.02 / -1.58 and -1.40 / +0.03 / -2.02; c10 -> c08 +0.76 / +0.38 / +0.18 and +0.71 / +0.30 / +0.03;
+kNN mixing 0.35 / 0.36; retrieval c08 0.41 / 0.44, B1 0.17 / 0.16.
+
+**Reading.**
+- Joint pretraining gives the best B1 selection on every column (direct +0.94 vs +0.69-0.81 adapted).
+- The B1 z is not shared with the hexapod's: retrieval 0.16-0.17 (old-render joint + similarity: 0.34, F280), B1 R2
+  strongly negative. On matched rendering, the old run's B1 sharing does not reproduce; it likely rode on the render
+  difference (F275, F285). Selection works through each body's own projector and the shared head, not through a
+  shared z.
+- The similarity loss changes nothing measurable here (retrieval 0.16 vs 0.17, B1 selection equal, rollout from the
+  recorded frame lower, +0.50 vs +0.66). One seed each.
+
+---
+
+### F291. Reading the goal from vision (the model's own ITM + Froude head on the goal clip's frames) costs 0.03-0.10 normalised score on direct selection with the current models; F226's "vision goal costs nothing" does not hold for them
+
+`selection_eval.py --goal_source vision` (new): goal at t = mean of Froude head(ITM(e_j, e_{j+stride})) over a centred
+11-pair window of the goal clip (hexapod beh12 clean-heldout, goal-clip embeddings cached in
+`results/wm/cache/selection_eval_goals.pt`); grading unchanged (the picked candidate's true local Froude vs the goal
+clip's recorded Froude). w=11, NS direct / roll_fixed / roll_live:
+
+| model | B1, physics goal | B1, vision goal | c10 direct, physics / vision goal |
+|---|---|---|---|
+| hexapod-only D + current adaptation S0 | +0.81 / +0.49 / +0.46 | +0.72 / +0.35 / +0.25 | +0.91 / +0.82 |
+| same, S1 | +0.69 / +0.40 / +0.41 | +0.57 / +0.28 / +0.43 | +0.91 / +0.84 |
+| jointD3 nosim S0 | +0.94 / +0.66 / +0.56 | +0.84 / +0.67 / +0.58 | +0.90 / +0.87 |
+| jointD3 sim S0 | +0.94 / +0.50 / +0.53 | +0.84 / +0.41 / +0.57 | +0.91 / +0.85 |
+
+Goal-read quality (correlation over time with the recorded Froude, per goal clip, fwd / lat / yaw): lateral 0.7-0.9;
+forward 0.4-0.8; yaw poor on some goals (side_L_lvl0 -0.04 to 0.26, turn_s0.29 0.36-0.51); mean L2 0.02-0.09.
+Joint models read the goal slightly better (worst-goal L2 0.047-0.055 vs 0.057-0.089).
+
+**Reading.** Direct loses about 0.1 on the B1 and 0.03-0.09 on c10 when the goal is read from vision; rollout is
+mixed (joint models unchanged, hexapod-only S0 loses 0.21 from the current frame). F226 was measured on an older
+stride-1 checkpoint and does not carry over. Every other selection / physics number in this period uses the recorded
+(physics) goal.
+
+---
+
+### F292. With the current adaptation (F289 recipe) on the v3 rendering, the joint-command decoder and Froude-only pretrains adapt the B1 about equally; the decoder is ahead on rollout from the recorded frame
+
+`OUTTAG=dt0_v3_new bash scripts/run/hexonly_v3_new.sh dt0_beh24_s0 dt0_beh24_s1` (log `results/wm/logs/dt0_v3_new.log`,
+checkpoints `wm/runs/dt0_beh24_s{0,1}/b1_v3_new/`). B1 selection, v3 library, NS w=11, direct / roll_fixed / roll_live:
+
+| pretrain | S0 | S1 |
+|---|---|---|
+| with joint-command decoder (dt0) | +0.74 / +0.60 / +0.46 | +0.80 / +0.53 / +0.43 |
+| Froude only (fmd, F289) | +0.81 / +0.49 / +0.46 | +0.69 / +0.40 / +0.41 |
+
+Shared latent (adapted ITM), dt0 S0 / S1: body-ID 0.67 / 0.69; B1 R2 -0.58 / +0.08 / -0.53 and -0.50 / -0.06 / -0.40;
+retrieval B1 0.17 / 0.15, c08 0.37 / 0.38. Direct and roll_live equal within seed spread; roll_fixed higher with the
+decoder (+0.53 to +0.60 vs +0.40 to +0.49). The earlier "Froude only equal or slightly better on the B1" (F279) was on the
+old rendering with the old recipe.
+

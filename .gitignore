@@ -7,7 +7,7 @@ __pycache__/
 *.log
 
 # Data: all datasets stay on disk, not in git (regenerable via scripts/dataset/ and scripts/run/)
-data/
+/data/
 
 # Model checkpoints and caches (large, regenerable)
 wm/runs/

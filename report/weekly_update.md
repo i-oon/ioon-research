@@ -1,6 +1,6 @@
 # Weekly Update: A Froude-Grounded Latent Action World Model Across Bodies
 
-Period: 2026-09-20 to 2026-09-29
+Period: 2026-09-20 to 2026-09-30
 
 ## The problem this period set out to fix
 
@@ -60,12 +60,13 @@ Every table names the metric it uses.
 | part | design | shared or per body |
 |---|---|---|
 | encoder | frozen V-JEPA2, egocentric camera | shared |
+| rendering | every body's room, floor and floor texture scaled with its camera height; rendered from the same camera poses, the hexapod and B1 scenes are indistinguishable to a frame-level body-identity probe (0.552, chance 0.5) | — |
 | latent action | z = ITM(e_t, e_t+5): five frames per step, driven by a 5-command chunk, as in LAC-WM | shared |
 | forward model | FTM predicts e_t+5 from (e_t, z) | shared |
 | motion target that trains z | **Froude head: input z only (no frame), one head for all bodies, its gradient trains z**; the task-space counterpart of LAC-WM's end-effector / camera motion target | shared |
 | other training losses | reconstruction; separation between real-z and null-z predictions; frozen read-out; 2-step rollout consistency | shared |
 | action projector | the body's commands → z | **per body (the only per-body part)** |
-| adaptation to a new body | LoRA rank 2 on ITM / FTM, then the projector, then a Froude-head fit | — |
+| adaptation | Body in joint pretraining: fit its projector (Stage 2). Unseen body: LoRA on ITM/FTM (Stage 1) with the pretraining losses, then fit its projector. | shared head; per-body projector |
 
 **Two selection mechanisms**
 
@@ -74,40 +75,84 @@ Every table names the metric it uses.
 | direct | Froude head(proj(a)) | no |
 | rollout | Froude head(ITM(e_t, FTM(e_t, proj(a)))) | yes |
 
-Rollout start frame:
-- **library start:** the candidate's own recorded frame;
-- **current start:** the frame the controlled body is at.
+Rollout starting observation:
+- **candidate's recorded frame:** the frame saved with that candidate action in its original clip. This is an offline replay comparison.
+- **robot's actual current frame:** the observation at the decision point, shared by all candidate actions. This is the state a live selector must plan from.
 
 Read-out window: 11 steps.
 
 ---
 
-## 2. Motion target: Froude only, or Froude + per-body joint commands
+## 2. Adapting a body that was not in pretraining
+
+**Now**
+
+| stage | what is trained | data |
+|---|---|---|
+| 1 | LoRA on the ITM / FTM MLP layers, everything else frozen, with the pretraining losses (reconstruction, separation, Froude loss through the frozen Froude head) | a few clips of the new body |
+| 2 | the new body's action projector (commands → z) | the new body's clips |
+
+**Before**
+
+| stage | what is trained | data |
+|---|---|---|
+| 1 | all ITM / FTM weights, with reconstruction and separation losses | a few clips of the new body |
+| 2 | the new body's action projector (commands → z) | the new body's clips |
+| 4 | the shared Froude head, refit | the new body's clips + hexapod clips, so the hexapod is still read |
+
+**LoRA instead of updating all weights.** Updating all ITM / FTM weights makes the model forget the hexapod; LoRA adds a small low-rank change on top of the frozen weights. Metric: rollout error relative to always predicting the average z (lower is better, 1.0 = no better than the average).
+
+| Stage 1 | hexapod (already trained on) | B1 (new body) |
+|---|---|---|
+| all weights updated | 0.918 | 0.307 |
+| LoRA rank 2 | 0.786 | 0.319 |
+
+With LoRA, 3 clips of the new body are as good as 15 (rollout error: hexapod 0.764 vs 0.766, B1 0.315 vs 0.307).
+
+**LoRA capacity.** Metric: normalised score on B1 selection (w=11): direct / rollout from the candidate's recorded frame / rollout from the robot's current frame.
+
+| Stage 1 | B1 selection |
+|---|---|
+| LoRA rank 2, 1000 steps | +0.68 / +0.56 / +0.32 |
+| LoRA rank 8, 3000 steps | **+0.87 / +0.66 / +0.41** |
+| LoRA rank 8, 3000 steps, current B1 rendering, S0 / S1 | +0.81 / +0.49 / +0.46, +0.69 / +0.40 / +0.41 |
+
+First two rows: earlier B1 rendering, S0. The old pipeline on the current rendering (S0): +0.73 / +0.29 / +0.14.
+
+---
+
+## 3. Motion target: Froude only, or Froude + per-body joint commands
 
 The two versions are identical except for an extra motion decoder that predicts each body's joint commands (18-d hexapod, 12-d B1). Two seeds each. Metric: normalised score (0 = random, 1 = oracle).
 
 | test | with joint-command decoder, S0 | with, S1 | **Froude only, S0** | **Froude only, S1** |
 |---|---|---|---|---|
 | c10 same body, direct | +0.91 | +0.90 | +0.91 | +0.91 |
-| c10, rollout (library start) | +0.72 | +0.73 | +0.74 | +0.76 |
-| c10, rollout (current start) | +0.64 | +0.59 | +0.61 | +0.66 |
+| c10, rollout (candidate's recorded frame) | +0.72 | +0.73 | +0.74 | +0.76 |
+| c10, rollout (robot's actual current frame) | +0.64 | +0.59 | +0.61 | +0.66 |
 | c08 zero-shot, direct | +0.80 | +0.79 | +0.78 | +0.79 |
-| c08, rollout (library start) | +0.47 | +0.54 | +0.56 | +0.63 |
-| c08, rollout (current start) | +0.52 | +0.43 | +0.53 | +0.54 |
-| B1 adapted, direct | +0.82 | +0.82 | +0.85 | +0.85 |
-| B1, rollout (library start) | +0.62 | +0.44 | +0.47 | +0.59 |
-| B1, rollout (current start) | +0.46 | +0.28 | +0.46 | +0.35 |
+| c08, rollout (candidate's recorded frame) | +0.47 | +0.54 | +0.56 | +0.63 |
+| c08, rollout (robot's actual current frame) | +0.52 | +0.43 | +0.53 | +0.54 |
+| B1 adapted, direct | +0.74 | +0.80 | +0.81 | +0.69 |
+| B1, rollout (candidate's recorded frame) | +0.60 | +0.53 | +0.49 | +0.40 |
+| B1, rollout (robot's actual current frame) | +0.46 | +0.43 | +0.46 | +0.41 |
 
-The current pipeline uses Froude only.
+B1 rows: B1 adapted with the page 2 pipeline on the current rendering. c10 and c08 need no adaptation.
+
+- The hexapods: equal, Froude only slightly ahead on c08 rollout from the recorded frame.
+- The B1: equal on direct and on rollout from the current frame; the joint-command decoder is ahead on rollout from the recorded frame (+0.53 to +0.60 vs +0.40 to +0.49).
+- The current pipeline uses Froude only: one fewer per-body part, no loss measured.
 
 ---
 
-## 3. Physics closed loop
+## 4. Physics closed loop
 
 - **B1:** the chosen candidate's command is executed by the B1's own walking policy in MuJoCo.
 - **c08:** the candidate's joint commands drive the physics-simulated body in CoppeliaSim.
 
-Decision every 2 steps, six goals, no B1 run fell. Metric: error E, mean L2 between achieved and goal Froude (lower is better).
+Decision every 2 steps, six goals, no B1 run fell. Hexapod-only models; B1 on the earlier rendering. Metric: error E, mean L2 between achieved and goal Froude (lower is better).
+
+In physics, direct selection follows the goal; rollout is close to or worse than random on the B1 (0.081 / 0.108 vs random 0.089) and 3–4× direct's error on c08 for the same goals.
 
 ![Physics closed-loop error: direct and rollout, B1 and c08](../results/deck/weekly/physics_summary.png)
 
@@ -117,96 +162,166 @@ Decision every 2 steps, six goals, no B1 run fell. Metric: error E, mean L2 betw
 | **Froude only (current), S0 / S1** | **0.061 / 0.063** | 0.081 / 0.108 | **0.047 / 0.045** | 0.085 / 0.055 |
 | random candidate | 0.089 | 0.089 | 0.126 | 0.126 |
 
-![B1 walking under its own policy in physics, following a hexapod turn goal](../results/deck/weekly/b1_physics_turn.png)
+Same goals, direct vs rollout selection (S0; error = mean L2 between achieved and goal Froude, lower is better):
 
-B1 clips (goal hexapod | B1 in physics, third-person | B1's egocentric input, with Froude traces): [turn](../results/deck/weekly/b1_physics_turn.mp4), [forward](../results/deck/weekly/b1_physics_forward.mp4).
+| goal | c08 direct | c08 rollout | B1 direct | B1 rollout |
+|---|---|---|---|---|
+| turn | 0.024 | 0.106 | 0.078 | 0.086 |
+| forward | 0.041 | 0.141 | 0.068 | 0.081 |
 
-![c08 in physics following a hexapod turn goal](../results/deck/weekly/physics_turn.png)
+**B1** (goal hexapod | B1 in physics, third-person | B1's egocentric input, with Froude traces)
 
-c08 clips (goal hexapod third-person | its ego view | c08 in physics, with Froude traces): [turn](../results/deck/weekly/physics_turn.mp4), [forward](../results/deck/weekly/physics_forward.mp4).
+![B1 turn goal, direct selection](../results/deck/weekly/b1_physics_turn.png)
+![B1 turn goal, rollout selection](../results/deck/weekly/b1_physics_turn_rollout.png)
+
+Direct: [turn](../results/deck/weekly/b1_physics_turn.mp4), [forward](../results/deck/weekly/b1_physics_forward.mp4). Rollout: [turn](../results/deck/weekly/b1_physics_turn_rollout.mp4), [forward](../results/deck/weekly/b1_physics_forward_rollout.mp4).
+
+**c08** (goal hexapod third-person | its ego view | c08 in physics, with Froude traces)
+
+![c08 turn goal, direct selection](../results/deck/weekly/physics_turn.png)
+![c08 turn goal, rollout selection](../results/deck/weekly/physics_turn_rollout.png)
+
+Direct: [turn](../results/deck/weekly/physics_turn.mp4), [forward](../results/deck/weekly/physics_forward.mp4). Rollout: [turn](../results/deck/weekly/physics_turn_rollout.mp4), [forward](../results/deck/weekly/physics_forward_rollout.mp4).
 
 ---
 
-## 4. Where rollout still falls short of direct
+## 5. Trace the rollout failure: FTM → ITM → Froude head
 
-Same body (c10), current pipeline. Metric: normalised score.
+**Follow one candidate action through the blocks.** Solid arrows show rollout; dashed arrows show the real-future control and the direct shortcut.
 
-| | direct | rollout (library start) | rollout (current start) |
+```mermaid
+flowchart LR
+    A[Candidate action] --> P[Projector] --> Z[Action z]
+    E[Current frame] --> F[1. FTM]
+    Z --> F
+    F --> Q[Predicted future frame] --> I[2. ITM]
+    E --> I
+    A -. apply from the same state .-> S[Real future frame]
+    E -. same start state .-> S
+    S -. ground-truth control .-> I
+    I --> Z2[Recovered z′] --> H[3. Froude head] --> V[Predicted body motion]
+    Z -. direct scoring skips future .-> H
+    classDef ftm fill:#dbeafe,stroke:#2563eb,stroke-width:2px;
+    classDef itm fill:#fef3c7,stroke:#d97706,stroke-width:2px;
+    classDef head fill:#fee2e2,stroke:#dc2626,stroke-width:2px;
+    class F ftm;
+    class I itm;
+    class H head;
+```
+
+- **Selection gap on c10 (the pretraining body):** direct **+0.91**; rollout **+0.74–0.76** from each candidate's recorded frame, **+0.61–0.66** from the robot's actual current frame (normalised score, two seeds).
+- **Test:** from one start state, apply each of the 24 candidate actions, render the real future, and read Froude at each point of the chain (24 start states per body).
+
+
+| Froude reading (Pearson r, forward / lateral / yaw) | hexapod c10 (pretrained) | hexapod c08 (zero-shot) | B1 (adapted, page 2 pipeline) |
 |---|---|---|---|
-| S0 | +0.91 | +0.74 | +0.61 |
-| S1 | +0.91 | +0.76 | +0.66 |
+| direct from action | 0.99 / 0.92 / 0.98 | 0.98 / 0.80 / 0.95 | 0.88 / 0.79 / 0.78 |
+| candidate's own recorded transition | 0.95 / 0.74 / 0.74 | 0.91 / 0.55 / 0.38 | 0.47 / 0.74 / 0.22 |
+| **real** future from the same start state | 0.18 / 0.40 / 0.28 | 0.40 / 0.42 / 0.38 | 0.15 / 0.46 / 0.41 |
+| **FTM-predicted** future from that state | 0.25 / 0.36 / 0.60 | 0.35 / 0.31 / 0.62 | 0.32 / 0.24 / 0.45 |
 
-**Reading Froude back out of a future frame** (B1, current pipeline, mean of 2 seeds). The same start state is rendered under each of the 24 actions. Metric: Pearson r across actions between the read and the true Froude.
+Mean of S0 / S1; 24 start states × 24 actions (c08: × 48). Futures rendered kinematically in each body's training scene; on the B1, futures executed by its walking policy in physics from a saved state give the same drop (0.12–0.19 / −0.43 to −0.10 / 0.45–0.54, earlier checkpoint).
 
-![Pearson r of Froude read by each route](../results/deck/weekly/readout.png)
+- **Where the information is lost:** already at the real future. Even with a perfect FTM, the read of an alternative action from a shared start state is weak, on all three bodies, including the body the model was pretrained on.
 
-| reading | r fwd / lat / yaw |
+**Is the motion still in z′, or is it the read-out?** Earlier B1 checkpoint (stride 5). A linear probe fitted on same-start alternative transitions, tested on held-out start states:
+
+| read of z′ | real future | FTM-predicted future |
+|---|---|---|
+| model's Froude head (trained on one-action-per-clip pairs) | 0.24 / 0.52 / 0.24 | 0.10 / 0.23 / 0.21 |
+| linear probe fitted on alternative transitions (one probe per column) | **0.58 / 0.60 / 0.56** | **0.48 / 0.63 / 0.72** |
+
+| rollout selection, robot's current frame (w=11) | normalised score |
 |---|---|
-| direct: Froude head(proj(a)) | 0.83 / 0.90 / 0.87 |
-| ITM on the candidate's own recorded frames | 0.75 / 0.58 / 0.83 |
-| ITM on the **real** future from the shared start state (= a perfect FTM) | 0.26 / 0.41 / 0.52 |
-| rollout: ITM on the FTM prediction | 0.23 / 0.13 / 0.59 |
+| model's Froude head | +0.40 |
+| the probe (FTM-predicted fit) replacing the head | +0.33 |
+
+**Conclusion.**
+- z′ keeps decodable motion information (probe r ≈ 0.6 on held-out start states), but the Froude head, trained on one-action-per-clip transitions, does not generalise to same-start alternatives.
+- Refitting the read-out alone on a small set of alternative transitions (8 start states, one room) did not improve selection (+0.40 → +0.33).
+- The same failure occurs on the pretrained c10 body: a training-data problem, not specifically a cross-body one.
+- Fixing it needs diverse alternative transitions across states and rooms, including multi-step imagined rollouts, during joint training of the ITM, FTM and Froude head (page 8).
 
 ---
 
-## 5. Is z shared across bodies?
+## 6. Does z transfer across bodies?
 
-**z across bodies.**
-- **Metrics:** body-ID probe accuracy (lower = more shared); cross-body R² of a Froude read-out fit on c10 only; k-NN mixing ratio (1 = mixed); cross-body retrieval (0 = random, 1 = identical motion).
-- **Froude-similarity loss:** for every pair of transitions, the cosine of their z must match the similarity of their Froude. Cross-body pairs come from a queue of recent z, because each training batch holds one body. This is the form of arXiv 2609.19846, with Froude as the similarity signal.
+The Froude head reads the same motion from c10, c08 and B1 only if their latents carry compatible meanings. We test this with a readout fitted on c10 and applied to the other bodies **without refitting**. Body-ID, mixing and retrieval test whether the wider 64-D space is shared too. Rollout selection remains the practical test.
 
 | pretraining | body-ID probe | cross-body R² c10 → c08 | cross-body R² c10 → B1 | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
 |---|---|---|---|---|---|---|
-| hexapod only | 0.69 | +0.78 / +0.36 / +0.18 | −1.30 / −0.02 / +0.26 | 0.44 | 0.44 | 0.05 |
-| hexapod + B1 together (one frame per step, no similarity loss) | 0.73 | +0.45 / +0.09 / −0.33 | −0.91 / +0.07 / −0.18 | 0.39 | 0.32 | 0.21 |
-| **hexapod + B1 together + Froude-similarity loss** | 0.73 | +0.72 / +0.36 / +0.17 | **+0.13 / +0.30** / −0.34 | 0.37 | 0.43 | **0.34** |
+| hexapod only (B1 not adapted) | 0.67 | +0.71 / +0.30 / +0.24 | −1.41 / −0.01 / −0.52 | 0.45 | 0.43 | 0.10 |
+| hexapod only, B1 adapted (page 2 pipeline; mean S0 / S1) | 0.67 | +0.72 / +0.34 / +0.20 | −0.56 / +0.05 / −0.62 | 0.46 | 0.40 | 0.15 (0.18 / 0.11) |
+| joint, no similarity loss | 0.71 | +0.76 / +0.38 / +0.18 | −1.16 / +0.02 / −1.58 | 0.35 | 0.41 | 0.17 |
+| joint + Froude-similarity loss | 0.72 | +0.71 / +0.30 / +0.03 | −1.40 / +0.03 / −2.02 | 0.36 | 0.44 | 0.16 |
 
-The last row is one seed, with the joint-command decoder on.
+Joint pretraining uses c10 + B1 (48 clips each, B1 on the current rendering). The similarity loss encourages transitions with similar Froude motion to have similar z.
 
-![PCA and UMAP of z for three bodies, pretrained together with the similarity loss; coloured by body (top) and behaviour (bottom)](../results/deck/shared_latent_joint_sim/latent_joint_sim.png)
+![z of the three bodies, joint pretraining without similarity loss: PCA and UMAP, coloured by body (top) and behaviour (bottom)](../results/deck/shared_latent_jointD3/latent_jointD3_nosim_s0.png)
 
----
-
-## 6. Two ways to bring the B1 into the shared space
-
-- **Pretrain together:** the B1 is in pretraining with the hexapod (+ similarity loss); afterwards only the B1's action projector is fitted.
-- **Adapt afterwards:** pretrain on the hexapod only, then adapt to the B1. LoRA on ITM / FTM, then the projector, with an optional refit of the Froude head on the B1. The same 48 B1 clips are used at every stage.
-- **Anchor:** during adaptation, the hexapod's Froude head (frozen) must read the B1's z correctly, which pulls the B1 into the hexapod's space.
-
-Metrics: normalised score on the B1 (0 = random, 1 = oracle; w=11); cross-body retrieval c10 → B1 (0 = random, 1 = identical motion).
-
-| route | B1 direct | B1 rollout (library start) | B1 rollout (current start) | retrieval c10 → B1 |
-|---|---|---|---|---|
-| **pretrain together, projector only** | **+0.94** | **+0.76** | **+0.65** | **0.34** |
-| adapt, no anchor, Froude head refit | +0.84 | +0.57 | +0.44 | 0.04 |
-| adapt, no anchor, no refit | +0.71 | +0.20 | +0.08 | 0.04 |
-| adapt with anchor, LoRA rank 2, 1000 steps, no refit | +0.68 | +0.56 | +0.32 | 0.19 |
-| adapt with anchor, LoRA rank 8, 3000 steps, no refit | +0.87 | +0.66 | +0.41 | 0.19 |
-
-Hexapod side (pretrain together): c08 direct +0.79, c10 direct +0.91, unchanged from hexapod-only pretraining. Pretrain-together row: one seed, joint-command decoder on.
+- z is shared between the two hexapods (c10 → c08 forward R² +0.71 to +0.76, retrieval 0.40–0.44).
+- z is not shared with the B1 in any version: retrieval 0.10–0.17, forward R² negative. Joint pretraining and the similarity loss do not change this.
 
 ---
 
-## 7. What the anchored adaptation changes
+## 7. Selection when the B1 is in pretraining
 
-Cross-body R² of a Froude read-out fit on c10 only, applied to the B1 (fwd / lat / yaw), on the adapted model:
+Joint models are used as pretrained: only the B1's action projector is fitted. The first column adapts the B1 to a hexapod-only model with the adaptation pipeline of page 2. Metric: normalised score (0 = random, 1 = oracle), w=11.
 
-| adaptation | cross-body R² c10 → B1 |
-|---|---|
-| no anchor | −1.36 / +0.09 / +0.30 |
-| anchor, LoRA rank 2, 1000 steps | −0.72 / +0.16 / +0.42 |
-| anchor, LoRA rank 8, 3000 steps | +0.14 / +0.24 / +0.45 |
-| pretrain together (for reference) | +0.13 / +0.30 / −0.34 |
+| test | hexapod-only pretraining; B1 adapted (S0 / S1) | joint, no similarity loss (S0) | joint + similarity loss (S0) |
+|---|---|---|---|
+| B1 direct | +0.81 / +0.69 | +0.94 | +0.94 |
+| B1 rollout (candidate's recorded frame) | +0.49 / +0.40 | +0.66 | +0.50 |
+| B1 rollout (robot's actual current frame) | +0.46 / +0.41 | +0.56 | +0.53 |
+| B1 direct, goal read from vision | +0.72 / +0.57 | +0.84 | +0.84 |
+| B1 rollout (current frame), goal read from vision | +0.25 / +0.43 | +0.58 | +0.57 |
+| c08 direct (zero-shot) | +0.78 | +0.78 | +0.77 |
+| c10 direct (same body) | +0.91 | +0.90 | +0.91 |
+| c10 direct, goal read from vision | +0.82 / +0.84 | +0.87 | +0.85 |
 
-With the rank-8 anchored adaptation, the hexapod's Froude head reads the B1 without a refit: the Froude refit adds nothing to direct (+0.88 with it vs +0.87 without). Rank and number of steps were changed together.
+- Joint pretraining gives the best B1 selection (direct +0.94, rollout +0.53 to +0.66) without a shared z: each body's projector and the shared head carry it.
+- The similarity loss adds nothing measurable (one seed each).
+- Reading the goal from vision instead of the recorded Froude costs about 0.1 on B1 direct and 0.03–0.09 on c10 direct.
+
+Unless marked, the goal is the goal clip's recorded Froude. "Goal read from vision": the goal clip's frames read through the model's own ITM + Froude head (11-step window); the picked action is still graded by its real Froude.
 
 ---
 
-## 8. Next
+## 8. The training data: what it lacks, and the plan
+
+**1. Counterfactual transitions.** Each training clip holds one command for its whole length, so from any state the model only ever sees one action and its future. It never sees "same state, different action, different future". Because of this the Froude read-out cannot judge another action's future: on the hexapod c10, Pearson r between read and true Froude (fwd / lat / yaw) is 0.95 / 0.74 / 0.74 on the clip's own future, but 0.18 / 0.40 / 0.28 when another action is applied from the same start state. The same drop on c08 (forward 0.91 → 0.40) and the B1 (0.47 → 0.15).
+
+| | now | should be |
+|---|---|---|
+| actions seen from one state | 1 | many (all 24 commands from saved states) |
+| B1 | one command per clip | save the MuJoCo state, run each command from it, record each future |
+| hexapod | one command per clip | clips that switch command every ≥ 15 steps |
+| training on alternatives | none | ITM, FTM and Froude head trained together on them, including multi-step imagined rollouts |
+| rooms per start state | one | several |
+
+**2. Frame / view style.** Each body is rendered in one style with small image changes, so the model can recognise a body's scene instead of its motion. Changing only the B1 floor tiling and texture scale drops the B1 direct normalised score from +0.94 to +0.24 / −0.08. We follow Egocentric VSM's view randomisation.
+
+| | now | should be (Egocentric VSM) |
+|---|---|---|
+| crop | 85–100% | 10–100% |
+| brightness | ±20% | ×0.1–10 |
+| blur | none | kernel 3–41 |
+| colour, noise | none | yes |
+| ground textures | one per body | several, the same set for every body |
+| lighting | fixed | varied |
+
+**3. Amount.** 48 clips per body, ≈2.9k training pairs (frame t → t+5). LAC-WM uses 150k trajectories.
+
+| | now | should be |
+|---|---|---|
+| clips per body | 48 | test 48 vs 48 + switching vs 96, then scale up |
+
+☐ view augmentation: pilot ready (current, safe, Egocentric VSM strength; 25% of samples kept clean)  ☐ counterfactual branches: tool ready  ☐ randomised rendering, more data: planned
+
+**Next**
 
 | run | question |
 |---|---|
-| Hexapod + B1 together, Froude only; similarity loss on vs off (matched pair) | Is the similarity loss what places the B1 in the hexapod's z? |
-| Anchored adaptation: rank and number of steps separated; forgetting on the hexapod measured | What sets how far adaptation can move a new body into the shared space? |
-| Pretraining data: behaviour clips vs behaviour + varied-action clips vs the same amount of behaviour clips | Does broader behaviour coverage help, and does coverage of (state, action) combinations add to coverage of actions? |
-| Gecko held out | Does a body never seen land in the shared z, zero-shot and after a small adaptation? |
+| Pretraining with alternative transitions (physics branches on the B1, switching clips on the hexapod) | Does the read of an alternative action's future reach the own-transition level, and rollout reach direct? |
+| View augmentation pilot | Does B1 selection survive a rendering change without adaptation, with no loss on the training rendering? |
+| Gecko held out | Does a body never seen join, zero-shot and after a small adaptation? |

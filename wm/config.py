@@ -275,6 +275,19 @@ class Config:
                                   # "rbf" = 2*exp(-|f_i-f_j|^2 / (2*sim_sigma^2)) - 1 (keeps speed magnitude)
     sim_sigma: float = 1.0
     sim_cross_only: bool = False  # True: queue pairs only from OTHER embodiments count
+    # Training-view augmentation strength (wm/data/augment.py). Defaults = every run before 2026-09-30.
+    # Stronger settings follow the domain-randomisation idea of Egocentric VSM (crop 0.1-1, brightness
+    # x0.1-10, blur up to 41 px) without rotation / flip, which would contradict the Froude labels.
+    aug_min_scale: float = 0.85
+    aug_brightness: float = 0.2
+    aug_contrast: float = 0.2
+    aug_blur: float = 0.0
+    aug_saturation: float = 0.0
+    aug_hue: float = 0.0
+    aug_noise: float = 0.0
+    aug_prob: float = 1.0         # per-type application probability (1.0 = always, as before)
+    aug_bright_mult: float = 0.0  # >0: multiplicative brightness, log-uniform in [1/m, m]
+    aug_clean: float = 0.0        # fraction of samples left completely un-augmented
     # --- ActSWM (F137). Zero by default: every run before 2026-08-31 reproduces unchanged.
     lambda_ldad: float = 0.0      # Delta-JEPA's LDAD: decode the action from the PREDICTED
     # state difference `FTM(e_t, z) - e_t`. Their sweep puts the useful range at 10-50 and their

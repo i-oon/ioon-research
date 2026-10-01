@@ -51,6 +51,12 @@ def main():
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--modes", nargs="+", default=["direct", "roll_fixed", "roll_live"])
     ap.add_argument("--cache", default="results/wm/cache/selection_eval_cands.pt")
+    ap.add_argument("--goal_source", choices=("physics", "vision"), default="physics",
+                    help="physics: the goal clip's recorded body_motion (privileged). vision: the goal read "
+                         "from the goal clip's frames through each model's own ITM + Froude head, pairs "
+                         "(t, t+stride) averaged over a centred --goal_window; grading stays physical")
+    ap.add_argument("--goal_window", type=int, default=11)
+    ap.add_argument("--goal_cache", default="results/wm/cache/selection_eval_goals.pt")
     ap.add_argument("--rollout_readout", default="",
                     help="npz (coef, intercept; raw Froude) from counterfactual_readout_fit.py --save: "
                          "replaces the body head in the ROLLOUT planner's read-out only (F267)")
@@ -88,7 +94,26 @@ def main():
         d = np.array([[np.linalg.norm(local(i, t) - g[t]) for i in range(len(cands))] for t in steps])
         bounds[c] = (d.min(1).mean(), d.mean())
 
-    need_frames = any(m.startswith("roll") for m in args.modes)
+    need_frames = any(m.startswith("roll") for m in args.modes) or args.goal_source == "vision"
+    goal_paths = {}
+    for p in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
+        with np.load(p, allow_pickle=True) as d:
+            c = str(d["condition"])
+        if c in goals and c not in goal_paths:
+            goal_paths[c] = p
+    gemb = {}
+    if args.goal_source == "vision":
+        gc = os.path.join(ROOT, args.goal_cache)
+        gemb = torch.load(gc, map_location="cpu") if os.path.exists(gc) else {}
+        miss = [p for p in goal_paths.values() if p not in gemb]
+        if miss:
+            from vjepa2_encoder import VJEPA2FrameEncoder
+            encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+            for p in miss:
+                gemb[p] = encode_clip(encoder, load(p, REGISTRY["hexapod"])["frames"], 2).cpu().half()
+            del encoder
+            torch.cuda.empty_cache()
+            torch.save(gemb, gc)
     emb = {}
     if need_frames:
         cache_path = os.path.join(ROOT, args.cache)
@@ -131,6 +156,30 @@ def main():
             assert [c["path"] for c in rp.candidates] == [c["path"] for c in cands]
             off = offset_for(torch.load(ckpt, map_location="cpu", weights_only=False), args.embodiment)
 
+        vgoal = {}
+        if args.goal_source == "vision":
+            ck_ = torch.load(ckpt, map_location="cpu", weights_only=False)
+            goff = offset_for(ck_, "hexapod")
+            k = rp.stride
+            for c, p in goal_paths.items():
+                e = gemb[p].float()
+                if goff is not None:
+                    e = e - goff.float().reshape(1, *e.shape[1:])
+                e = e.to(args.device)
+                with torch.no_grad():
+                    z = rp.itm(e[:-k], e[k:])
+                    f = rp.md.body(None, z).float().cpu().numpy() * rp.std_s + rp.mean_s   # (T-k, 3) Froude
+                half = args.goal_window // 2
+                n = len(goals[c])
+                vg = np.stack([f[max(0, t - half):min(len(f), t + half + 1)].mean(0) for t in range(min(n, len(f)))])
+                if len(vg) < n:
+                    vg = np.concatenate([vg, np.repeat(vg[-1:], n - len(vg), 0)])
+                vgoal[c] = vg
+                g = goals[c]
+                r = [np.corrcoef(vg[:, j], g[:, j])[0, 1] for j in range(3)]
+                print(f"  goal read {name} {c:<12} L2 {np.linalg.norm(vg - g, axis=1).mean():.4f}  "
+                      f"r {r[0]:+.2f} / {r[1]:+.2f} / {r[2]:+.2f}", flush=True)
+
         def frame(i, t):
             e = emb[cands[i]["path"]]
             e = e[min(t, len(e) - 1)].float()
@@ -143,7 +192,7 @@ def main():
             if rp is not None:
                 rp.window = w
             for c, g in goals.items():
-                g_std = np.stack([planner.standardize(x) for x in g])
+                g_std = np.stack([planner.standardize(x) for x in (vgoal[c] if vgoal else g)])
                 steps = list(range(0, len(g) - h, h))
                 for mode in args.modes:
                     errs, prev = [], 0

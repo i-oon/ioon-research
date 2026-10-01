@@ -594,6 +594,8 @@ def main():
 
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
+    from wm.data import augment as _augment          # training-view augmentation strength (cfg.aug_*)
+    _augment.configure(cfg)
     device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
 
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
