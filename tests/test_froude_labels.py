@@ -30,11 +30,12 @@ def _need(ok, what):
     msg = f"MISSING DATA: {what} (set FROUDE_TESTS_ALLOW_SKIP=1 to skip instead of failing)"
     if not ALLOW_SKIP:
         raise AssertionError(msg)
-    try:
+    # pytest's skip is a BaseException that the plain-script runner below does not catch: use it only
+    # when pytest is actually running this file (it sets PYTEST_CURRENT_TEST)
+    if "PYTEST_CURRENT_TEST" in os.environ:
         import pytest
         pytest.skip(msg)
-    except ImportError:
-        raise Skipped(msg)
+    raise Skipped(msg)
 
 
 class _D(dict):
