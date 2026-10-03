@@ -10,6 +10,7 @@
 #   bash scripts/run/round1_counterfactual.sh A        # e.g. on the server (needs only the clips dirs)
 #   bash scripts/run/round1_counterfactual.sh B        # locally (needs the branch dirs too)
 #   GPU: CUDA_VISIBLE_DEVICES=0 bash ...
+#   a longer arm B is a NEW run (new --name, fresh cosine schedule); --resume only continues an unfinished run
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 ARM=${1:?usage: round1_counterfactual.sh A|B}
@@ -33,6 +34,6 @@ case $ARM in
            b1=$CW/b1_branches_train --epochs 3 --checkpoint_every 1" ;;
   *) echo "arm must be A or B"; exit 1 ;;
 esac
-setsid nohup $PY -m wm.train $COMMON $ARGS --name $NAME > results/wm/logs/$NAME.log 2>&1 &
+setsid nohup $PY -m wm.train $COMMON $ARGS --name $NAME >> results/wm/logs/$NAME.log 2>&1 &
 echo "started $NAME (pid $!); log results/wm/logs/$NAME.log"
 echo "check after a few minutes: grep -E '^train|^epoch' results/wm/logs/$NAME.log | tail -3"

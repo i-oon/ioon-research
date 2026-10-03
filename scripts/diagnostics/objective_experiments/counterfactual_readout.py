@@ -11,7 +11,7 @@ channel fwd / lat / yaw, then the mean over groups:
 
 Truth = mean label over [b, b+K) (the training target for the pair starting at b). With --pairs P > 1 every read
 is averaged over the P consecutive pairs b .. b+P-1 and the truth over [b, b+P-1+K) (a windowed read; P <= 11
-fits the 20 frames after the branch). Embeddings are cached per file.
+fits the 20 frames after the branch). Processed one group at a time (bounded RAM); no embedding cache.
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/counterfactual_readout.py --embodiment b1 \\
         --cf_dir data/counterfactual_walks/b1_branches_heldout --ckpt NAME=results/eval/NAME/ckpt/b1.pt --pairs 1 11
@@ -31,7 +31,6 @@ for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
 
 from rollout_state_action_anova import Models, corr  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.data.emb_cache import load_cache, note, save_cache  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.policy.planner import action_chunk_at  # noqa: E402
 
@@ -53,7 +52,7 @@ def main():
     ap.add_argument("--cf_dir", required=True)
     ap.add_argument("--ckpt", action="append", required=True, help="name=path")
     ap.add_argument("--pairs", type=int, nargs="+", default=[1, 11])
-    ap.add_argument("--cache", default="")
+    ap.add_argument("--cache", default="", help="ignored (kept so old command lines still parse)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     dev, emb_name = args.device, args.embodiment
@@ -63,46 +62,40 @@ def main():
     sizes = collections.Counter(len(v) for v in G.values())
     print(f"{len(G)} groups; branches per group: {dict(sizes)}")
 
-    files = sorted(p for v in G.values() for p in v)
-    clips = {p: load(p, REGISTRY[emb_name]) for p in files}
-    b = {p: int(clips[p]["first_pair"]) for p in files}
-    K = None
-    cache = os.path.join(ROOT, args.cache or f"results/wm/cache/cf_readout_v4_{emb_name}_"
-                         f"{os.path.basename(os.path.normpath(args.cf_dir))}.pt")
-    E = load_cache(cache)
-    todo = [p for p in files if p not in E]
-    if todo:
-        from vjepa2_encoder import VJEPA2FrameEncoder
-        enc = VJEPA2FrameEncoder(dtype=torch.float32, device=dev)
-        for i, p in enumerate(todo):
-            fr = clips[p]["frames"][b[p]:]                 # from the branch frame to the end
-            E[p] = encode_clip(enc, fr, 8).cpu().half()
-            note(E, p)
-            if (i + 1) % 200 == 0:
-                print(f"  encoded {i + 1}/{len(todo)}", flush=True)
-                save_cache(E, cache)
-        save_cache(E, cache)
-        del enc
-        torch.cuda.empty_cache()
-
+    # **One group at a time, nothing kept.** Holding every branch's frames and patch-token embeddings
+    # (1,728 files: ~10 GB frames + ~26 GB fp16 tokens) exhausted the 31 GB machine on 2026-10-03 and the OS
+    # killed VS Code with it. Frames are read lazily, each group's 24 branches are encoded, read by every
+    # checkpoint at every P, and dropped. No embedding cache (it would be ~20 GB per body); encoding is redone.
+    P_max = max(args.pairs)
+    from vjepa2_encoder import VJEPA2FrameEncoder
+    enc = VJEPA2FrameEncoder(dtype=torch.float32, device=dev)
+    runs = []
     for spec in args.ckpt:
         name, path = spec.split("=", 1)
         m = Models(os.path.join(ROOT, path), emb_name, 18 if emb_name == "hexapod" else 12, dev)
-        K = m.stride
         ck = torch.load(os.path.join(ROOT, path), map_location="cpu", weights_only=False)
         mean, std = [np.asarray(x).ravel()[:3] for x in ck["body_stats"]]
-        rd = lambda z: m.md.body(None, z).float().cpu().numpy() * std + mean  # noqa: E731
+        del ck
         off = None if m.offset is None else m.offset.float().to(dev)
-        fix = (lambda e: e) if off is None else (lambda e: e - off.reshape(e.shape[1:]))  # noqa: E731
-        for P in args.pairs:
-            R = {k: [] for k in ("real cf", "FTM cf", "direct")}
-            for key, paths in sorted(G.items()):
-                truth, reads = [], {k: [] for k in R}
-                for p in paths:
-                    c, e = clips[p], E[p].float().to(dev)
-                    if P - 1 + K >= len(e):
-                        raise SystemExit(f"--pairs {P} does not fit {len(e)} frames after the branch")
-                    bp = b[p]
+        runs.append(dict(name=name, m=m, mean=mean, std=std, off=off,
+                         R={P: {k: [] for k in ("real cf", "FTM cf", "direct")} for P in args.pairs}))
+    K_max = max(r["m"].stride for r in runs)
+
+    for gi, (key, paths) in enumerate(sorted(G.items())):
+        clips = [load(p, REGISTRY[emb_name], lazy_frames=True) for p in paths]
+        bs = [int(c["first_pair"]) for c in clips]
+        # only the frames any read uses: b .. b + P_max - 1 + K_max
+        E = [encode_clip(enc, np.asarray(c["frames"][bp:bp + P_max + K_max]), 8).half() for c, bp in zip(clips, bs)]
+        for r in runs:
+            m, K = r["m"], r["m"].stride
+            rd = lambda z, r=r: r["m"].md.body(None, z).float().cpu().numpy() * r["std"] + r["mean"]  # noqa: E731
+            fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - o.reshape(e.shape[1:]))  # noqa: E731
+            for P in args.pairs:
+                truth, reads = [], {k: [] for k in r["R"][P]}
+                for c, bp, e in zip(clips, bs, E):
+                    e = e.float().to(dev)
+                    if P - 1 + K >= len(e) or bp + P - 1 + K > len(c["body_motion"]):
+                        raise SystemExit(f"--pairs {P} does not fit the frames after the branch")
                     truth.append(np.asarray(c["body_motion"])[bp:bp + P - 1 + K, :3].mean(0))
                     e0, e1 = fix(e[:P]), fix(e[K:K + P])
                     chunk = np.stack([action_chunk_at(c["actions"], bp + j + m.action_lag, K) for j in range(P)])
@@ -111,14 +104,22 @@ def main():
                     reads["FTM cf"].append(rd(m.itm(e0, m.ftm_step(e0, z))).mean(0))
                     reads["direct"].append(rd(z).mean(0))
                 truth = np.stack(truth)
-                for k in R:
+                for k in reads:
                     f = np.stack(reads[k])
-                    R[k].append([corr(f[:, j], truth[:, j]) for j in range(3)])
-            print(f"\n=== {name}: {len(G)} groups, pairs averaged {P} (truth over {P - 1 + K} frames); "
-                  f"r fwd / lat / yaw", flush=True)
-            for k, v in R.items():
-                print(f"  {k:<8}" + " / ".join(f"{x:.2f}" for x in np.nanmean(np.asarray(v), 0)), flush=True)
+                    r["R"][P][k].append([corr(f[:, j], truth[:, j]) for j in range(3)])
+        del clips, E
+        if (gi + 1) % 12 == 0:
+            print(f"  {gi + 1}/{len(G)} groups", flush=True)
+    del enc
+    torch.cuda.empty_cache()
 
+    for r in runs:
+        for P in args.pairs:
+            K = r["m"].stride
+            print(f"\n=== {r['name']}: {len(G)} groups, pairs averaged {P} (truth over {P - 1 + K} frames); "
+                  f"r fwd / lat / yaw", flush=True)
+            for k, v in r["R"][P].items():
+                print(f"  {k:<8}" + " / ".join(f"{x:.2f}" for x in np.nanmean(np.asarray(v), 0)), flush=True)
 
 if __name__ == "__main__":
     main()

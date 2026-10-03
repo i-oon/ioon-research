@@ -8703,3 +8703,29 @@ No data content changed. Directories moved (`mv`); in every current npz (15 792 
 | `add_cam_pose.py verify_camfix` | `verify_remount` |
 
 Result / check video names (`results/check/hex_det_*.mp4`, `c08_det_samples.mp4`) and cache names are unchanged.
+
+### F307. One still egocentric frame shows the motion mostly through the room: Froude R2 0.25-0.69 in seen rooms, 0.02-0.13 in unseen rooms
+
+Question: a Froude head that also reads the current frame (LAC-WM's `MD(x_t, z)`) keeps z grounded only if the frame alone
+cannot give the motion away (F57: frozen-encoder R2 0.676 on speed7, no room split). `scripts/diagnostics/egocentric_view/single_frame_speed_probe.py`:
+frozen V-JEPA2 on ONE frame (duplicated into its 2-frame tubelet, no motion across time), patch tokens mean-pooled (1408-d) or
+2x2 quadrants (5632-d), ridge -> 1 s CoM Froude, alpha chosen on the val rooms. Seen rooms = alternate frames of the 48 train
+clips (each clip its own room); unseen rooms = fit on train, test on the 24 heldout clips (rooms 200-223, never seen).
+Data `data/counterfactual_walks/{c10,b1}_clips_*` (3168 / 1584 / 1584 frames per body).
+
+| body | features | seen rooms fwd / lat / yaw (mean) | unseen rooms fwd / lat / yaw (mean) |
+|---|---|---|---|
+| c10 | mean 1408-d | +0.30 / +0.29 / +0.16 (+0.25) | +0.20 / -0.05 / +0.05 (+0.07) |
+| c10 | 2x2 5632-d | +0.49 / +0.50 / +0.27 (+0.42) | +0.27 / -0.06 / +0.08 (+0.09) |
+| B1 | mean 1408-d | +0.75 / +0.69 / +0.62 (+0.69) | +0.14 / +0.20 / -0.27 (+0.02) |
+| B1 | 2x2 5632-d | +0.61 / +0.58 / +0.50 (+0.57) | +0.17 / +0.35 / -0.14 (+0.13) |
+
+Reading:
+- In rooms it has seen, one frame gives the motion (B1 up to 0.69, as F57's 0.676): each train room holds one behaviour
+  (behaviour i -> rooms 2i, 2i+1), so the room is a label. In unseen rooms almost nothing is left (mean 0.02-0.13); the
+  rest is small and channel-specific (c10 forward +0.20-0.27, B1 lateral +0.20-0.35 with quadrants).
+- So a frame-conditioned head trained on main clips can learn "room -> speed" and bypass z (the F57 failure). Counterfactual
+  branches remove this (24 commands in every branch room). A frame-conditioned Froude head is therefore only worth testing
+  with branches in training, never on clips alone.
+- Caveats: a linear probe on pooled tokens; a nonlinear head could read more. c10 alpha at the top of the grid (1e5).
+- Not tested: the probe on branch frames (room fixed, 24 commands), the cleanest version; only needed if this becomes decisive.
