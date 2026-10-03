@@ -17,7 +17,8 @@
 | `c08_clips_heldout` | hexapod c08f09t09 | test only | 24 | main clips (never trained on) | `scripts/dataset/collect_c08_test_set.py` |
 | `c08_walks` | c08 | — | 24 walks | source walks | same |
 | `c08_branches_heldout` | c08 | test only | 1728 | branches for the read-out | same |
-| `branch_points.json` | all | — | — | branch points (frame, gait phase) per main clip | `build_branches.py` |
+| `branch_points_current.json` | all | — | 216 | branch points (frame, gait phase) per current main clip (c08 = its c10 heldout counterpart's) | `build_branches.py rekey` (from `branch_points.json`) |
+| `branch_points.json` | hex, B1 | — | 192 | same points keyed by the superseded stage-1/2 clip paths (kept; read only by `rekey`) | `build_branches.py points` (2026-10-01) |
 
 **Rooms** (seed per clip, identical for every body): train 0-47 (behaviour i, copy k -> 2i+k), val 100-123, heldout 200-223.
 Branches use their source clip's room. **Training pairs per body** (stride 5, rollout 2): main 2688 / 1344 / 1344, branches

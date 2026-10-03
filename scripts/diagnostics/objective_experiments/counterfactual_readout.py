@@ -31,6 +31,7 @@ for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
 
 from rollout_state_action_anova import Models, corr  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.data.emb_cache import load_cache, note, save_cache  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.policy.planner import action_chunk_at  # noqa: E402
 
@@ -68,7 +69,7 @@ def main():
     K = None
     cache = os.path.join(ROOT, args.cache or f"results/wm/cache/cf_readout_v4_{emb_name}_"
                          f"{os.path.basename(os.path.normpath(args.cf_dir))}.pt")
-    E = torch.load(cache, map_location="cpu") if os.path.exists(cache) else {}
+    E = load_cache(cache)
     todo = [p for p in files if p not in E]
     if todo:
         from vjepa2_encoder import VJEPA2FrameEncoder
@@ -76,10 +77,11 @@ def main():
         for i, p in enumerate(todo):
             fr = clips[p]["frames"][b[p]:]                 # from the branch frame to the end
             E[p] = encode_clip(enc, fr, 8).cpu().half()
+            note(E, p)
             if (i + 1) % 200 == 0:
                 print(f"  encoded {i + 1}/{len(todo)}", flush=True)
-                torch.save(E, cache)
-        torch.save(E, cache)
+                save_cache(E, cache)
+        save_cache(E, cache)
         del enc
         torch.cuda.empty_cache()
 

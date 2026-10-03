@@ -6,8 +6,10 @@ BEHAVIOUR across bodies (body identification near chance, the hexapod-fit read-o
 the indirect evidence for this.
 
 Latents: z = ITM(e_t, e_{t+k}) with each model's B1-adapted ITM (`ckpt_lib_s4.pt`, the ITM the B1 test
-uses), on three bodies' cached egocentric clips: hexapod c10f10t10 (beh24 val, 24 clips), hexapod
-c08f09t09 (beh12, 48), B1 (beh12 library, 24).
+uses), on three bodies' cached egocentric clips. The built-in defaults (beh24 / beh12 dirs, now in
+data/_archive_old_datasets) reproduce the 2026-09-26 figure only; every current number comes from
+scripts/run/eval_suite.sh, which passes --c10 / --c08 / --b1 = the heldout clips of data/counterfactual_walks
+with the embedding caches that selection_eval.py built for them (stale or missing entries -> refuse to run).
 
 Numbers (decide the question; the picture only illustrates them):
   body-ID acc   logistic regression z -> body, grouped CV by clip, bodies subsampled to equal size
@@ -31,6 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
     sys.path.insert(0, os.path.join(ROOT, p))
 from rollout_state_action_anova import Models  # noqa: E402
+from wm.data.emb_cache import load_cache  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.policy.planner import condition_of, load_candidates  # noqa: E402
 
@@ -63,8 +66,13 @@ def latents(model_path, dev):
     for bi, (name, emb, d, cache) in enumerate(BODIES):
         m = Models(os.path.join(ROOT, model_path), emb, 18 if emb == "hexapod" else 12, dev)
         k = m.stride
-        E = torch.load(os.path.join(ROOT, cache), map_location="cpu")
-        for ci, c in enumerate(load_candidates(os.path.join(ROOT, d), emb, per_condition=999)):
+        E = load_cache(os.path.join(ROOT, cache))
+        cands = load_candidates(os.path.join(ROOT, d), emb, per_condition=999)
+        miss = [c["path"] for c in cands if c["path"] not in E]
+        if not cands or miss:
+            raise SystemExit(f"{name}: {len(miss)} of {len(cands)} clips in {d} have no current embedding in "
+                             f"{cache}; build it first (selection_eval.py with the same dir and --cache)")
+        for ci, c in enumerate(cands):
             e = E[c["path"]].float()
             if m.offset is not None:
                 e = e - m.offset.float().reshape(e.shape[1:])
@@ -118,6 +126,8 @@ def main():
                          "a jointly pretrained hexapod+B1 best.pt works as is (only its ITM is used)")
     ap.add_argument("--c10", default="", metavar="DIR=CACHE",
                     help="c10 clips and their embedding cache (use the heldout split for test numbers)")
+    ap.add_argument("--c08", default="", metavar="DIR=CACHE",
+                    help="c08 clips and their embedding cache (use c08_clips_heldout for test numbers)")
     ap.add_argument("--b1", default="", metavar="DIR=CACHE",
                     help="B1 clips and their embedding cache to use instead of the default (e.g. re-rendered data)")
     args = ap.parse_args()
@@ -128,6 +138,9 @@ def main():
     if args.c10:
         d, c = args.c10.split("=", 1)
         BODIES[0] = ("c10 (pretrain)", "hexapod", d, c)
+    if args.c08:
+        d, c = args.c08.split("=", 1)
+        BODIES[1] = ("c08 (held-out)", "hexapod", d, c)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt

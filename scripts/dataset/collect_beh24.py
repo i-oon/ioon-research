@@ -17,9 +17,12 @@ were never logged, and an earlier version of this table did not match them. Conv
 body's hip, so the same numbers give different Froude on another leg geometry (F96, F108). For another body,
 re-tune (`--lvl0_strafe`, `--spin_sign`) and check with `--separability` / `--turn_sign` rather than assuming.
 
-`--verify` re-collects on c10f10t10 and compares the achieved Froude against `REFERENCE`, which covers only
-the 12 original beh12 conditions (from `data/allocentric/beh12_c10f10t10_flat`, older label code) -- it does
-not yet check the 12 newer ones or the beh24 egocentric clips;
+`--verify` no longer re-collects: the reference set it compared against (`data/allocentric/beh12_c10f10t10_flat`,
+12 conditions, older label code) is archived (`data/_archive_old_datasets/`), and the current hexapod data
+(`data/counterfactual_walks/c10_*`) are made by `collect_c10_walks_and_branches.py` from the plan table
+(`collect_switch_hex.COND`), not by this file. It prints the checks of the current data instead:
+`scripts/dataset/check_branches.py` (+ `--c08`), `scripts/diagnostics/dataset/check_splits.py`,
+`tests/test_froude_labels.py`, `collect_c10_walks_and_branches.py targets` (doc/DATA.md);
 `--separability` checks that the conditions are further apart than their own spread across clips.
 
   .venv/bin/python3 scripts/dataset/collect_beh24.py --dry_run
@@ -123,7 +126,7 @@ SIDE_EXTRA = [(f"side_{d}_lvl{i}", SIDE_BASE + ["--strafe", f"{SIDE_STRAFE[d][i]
 
 CONDITIONS = SPEED + SPEED_BWD + TURN + TURN_NEG + SIDE + SIDE_EXTRA
 
-# What `data/allocentric/beh12_c10f10t10_flat` achieved, measured from the clips. `--verify` reproduces these.
+# What `data/allocentric/beh12_c10f10t10_flat` (now archived) achieved, measured from the clips (the old `--verify` target).
 REFERENCE = {"speed_c5.8": (0.126, 0.007, 0.002), "speed_c7.1": (0.151, -0.025, -0.003),
              "speed_c8.15": (0.174, 0.010, 0.003), "speed_c8.8": (0.205, -0.047, 0.001),
              "turn_s0.05": (0.137, -0.003, 0.003), "turn_s0.15": (0.135, 0.001, 0.014),
@@ -285,10 +288,8 @@ def main():
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--dry_run", action="store_true", help="print the commands and collect nothing")
     ap.add_argument("--verify", action="store_true",
-                    help="re-collect on c10f10t10 and compare against data/allocentric/beh12_c10f10t10_flat. **Run "
-                         "this first**: two of the twelve recipes are reconstructed, and a wrong "
-                         "one produces a dataset that differs from the original without saying so.")
-    ap.add_argument("--verify_out", default="data/allocentric/beh12_verify_raw")
+                    help="print the checks of the current hexapod data (data/counterfactual_walks c10_*, made by "
+                         "collect_c10_walks_and_branches.py) and exit; collects nothing")
     ap.add_argument("--spin_sign", type=float, default=1.0,
                     help="multiply every turn level's --spin by this. Default 1 = the canonical c10f10t10 "
                          "commands (turn_sX runs --spin -X, F298). **The same positive spin "
@@ -330,16 +331,17 @@ def main():
         return
 
     if args.verify:
-        morph, scene = "c10f10t10", "medauroidea_c10f10t10.ttt"
-        out_root = os.path.join(ROOT, args.verify_out)
-        # --verify only makes sense against a recorded reference. The 12 new conditions have no
-        # historical clips to check against yet (they've never been collected before this file) --
-        # restrict --verify to the original 12 rather than crashing on a missing REFERENCE key.
-        if not args.only:
-            args.only = list(REFERENCE)
-    else:
-        morph, scene = args.morph.split("=", 1)
-        out_root = os.path.join(ROOT, args.out)
+        print("The current hexapod data (data/counterfactual_walks/c10_*) are made by "
+              "scripts/dataset/collect_c10_walks_and_branches.py, not by this file; check them with:\n"
+              "  .venv/bin/python3 scripts/dataset/check_branches.py [--c08]\n"
+              "  .venv/bin/python3 scripts/diagnostics/dataset/check_splits.py\n"
+              "  .venv/bin/python3 tests/test_froude_labels.py\n"
+              "  .venv/bin/python3 scripts/dataset/collect_c10_walks_and_branches.py targets\n"
+              "(doc/DATA.md). The old re-collection check against data/allocentric/beh12_c10f10t10_flat "
+              "(REFERENCE) was removed with that dataset's archiving.")
+        return
+    morph, scene = args.morph.split("=", 1)
+    out_root = os.path.join(ROOT, args.out)
     os.makedirs(out_root, exist_ok=True)
 
     todo = [c for c in CONDITIONS if not args.only or c[0] in args.only]
@@ -351,33 +353,9 @@ def main():
 
     if args.dry_run:
         return
-    if not args.verify:
-        print(f"\nnow flatten:\n  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py "
-              f"--src {os.path.relpath(out_root, ROOT)} --out data/allocentric/beh12_{morph}_flat "
-              f"--embodiment hexapod")
-        return
-
-    print(f"\n{'condition':<14}{'channel':>9}{'recorded':>10}{'re-run':>10}{'agree':>8}")
-    bad = []
-    for name, _ in todo:
-        got = achieved(os.path.join(out_root, name))
-        if got is None:
-            bad.append((name, "no clips")); continue
-        want = REFERENCE[name]
-        k = int(np.argmax(np.abs(want)))
-        label = ("forward", "lateral", "yaw")[k]
-        rel = abs(got[k] - want[k]) / max(abs(want[k]), 1e-6)
-        ok = rel < args.tolerance
-        print(f"{name:<14}{label:>9}{want[k]:>10.3f}{got[k]:>10.3f}{rel:>7.1%}{'' if ok else '  X'}")
-        if not ok:
-            bad.append((name, f"{rel:.1%} off"))
-    if bad:
-        print("\nrecipe does NOT reproduce the recorded set:")
-        for name, why in bad:
-            print(f"  {name:<14}{why}")
-        raise SystemExit(1)
-    print("\nevery condition reproduces within tolerance; the recipe in this file is the one used.")
-
+    print(f"\nnow flatten:\n  .venv/bin/python3 scripts/dataset/merge_behaviour_dirs.py "
+          f"--src {os.path.relpath(out_root, ROOT)} --out data/allocentric/beh12_{morph}_flat "
+          f"--embodiment hexapod")
 
 if __name__ == "__main__":
     main()

@@ -32,73 +32,62 @@ What the world model supplies is knowledge of **how to drive joints so that the 
 locomotion** — the expensive part of bringing up a new robot, and the part that otherwise costs a
 training run per body.
 
-## The contribution, and the result
+## The approach
 
-The action target is **joint space**, not task space. LAC-WM's targets — end-effector poses,
-fingertip positions — live in one physical frame shared by every embodiment, so a fingertip at
-`(x,y,z)` already means the same thing for a human hand and a gripper. **An 18-DOF hexapod and a
-12-DOF quadruped share no such frame**: no dimension of one corresponds to any dimension of the
-other. Decoding into the shared space would hand us the correspondence instead of making the model
-learn it.
+The action latent is grounded in a **task-space target that every body shares: body motion in Froude
+units**, forward and lateral speed divided by √(g·h) and yaw rate times √(h/g), with h the height of
+the centre of mass. LAC-WM grounds its latent in end-effector and camera poses, which live in one
+physical frame for every embodiment. An 18-DOF hexapod and a 12-DOF quadruped share no joint
+correspondence, but Froude-scaled body motion means the same thing for both.
 
-That poses the question the experiments answer — *can a joint-space action target work at all when
-no shared action space exists?*
+A frozen Froude head reads z alone, one head for all bodies. The only per-body part is the action
+projector, which maps a body's own commands to z. To choose an action, the model either reads the
+command's motion directly (projector → head) or imagines the future frame with the forward model and
+reads the motion back out of it (rollout).
 
-| | within-robot joint error | cross-robot transfer |
-|---|---|---|
-| joint target, no body term | 0.3517 | **−28.9 / −43.1** |
-| joint target + shared body term | **0.2183** | **+0.610 / +0.573** |
+**Where it stands (2026-10).** Direct selection follows a goal on all three bodies. Rollout does not:
+the model trained on one command per clip cannot read the future of a different action from the same
+state. Round 1 trains on **counterfactual branches**, the same state under all 24 commands, built
+identically for both bodies, and measures whether rollout recovers. Every number from before
+2026-10-01 was measured on data later found faulty and is being re-measured (`doc/STATUS.md`).
 
-**A joint-space target works within a robot on its own; it crosses robots only with a shared
-body-motion term** — which also improves the within-robot decoding by 38%. The term supervises one
-dimensionless number both robots share, and transfer appears **channel by channel**: yaw sits at
-−5.2 when it is not supervised and +0.37 when it is, on identical data and architecture.
+## Bodies
 
-## The two stages
-
-| | question | bodies |
-|---|---|---|
-| **Stage 1** | cross-**morphology** — does a latent transfer to an unseen leg geometry? | stick-insect hexapods, scaled coxa/femur/tibia |
-| **Stage 2** | cross-**embodiment** — does it transfer to a different *kind* of robot? | the hexapod against a Unitree B1 quadruped |
-
-Stage 1 is finished. Stage 2's transfer and few-shot goals are met; the open question is whether a
-**shared body-motion target** gives the two robots a common language rather than a switch.
+| | role |
+|---|---|
+| hexapod c10f10t10 (stick-insect, 18 DOF) | pretraining |
+| hexapod c08f09t09 (shorter legs) | test only, zero-shot |
+| Unitree B1 quadruped (12 DOF) | joint pretraining, or adapted to a hexapod-only model |
 
 ## Architecture
 
 ```
 frozen V-JEPA2  ─→  e_t
-                     ├── ITM (e_t, e_t+1) ──→  z    the latent action
-                     ├── FTM (e_t, z)     ──→  ê_t+1   the world model
-                     └── MotionDecoder (e_t, z) ──→ joint commands
-                                                     per-embodiment heads
-                                                     + one shared body head
+                     ├── ITM (e_t, e_t+5)  ──→  z         latent action, 5 frames (0.25 s) per step
+                     ├── FTM (e_t, z)      ──→  ê_t+5     the world model
+                     └── Froude head (z)   ──→  body motion (fwd, lat, yaw), shared by all bodies
+action projector (per body): commands ──→ z
 ```
 
-`L = λ_recon·L_recon + λ_motion·L_motion + λ_body·L_body`, where **`L_body` is the only term that
-asks the same `z` to decode the same way on both robots**. As trained: `1.0 / 1.0 / 0.5`, with the
-body head supervising forward, lateral and yaw. Full breakdown, sizes and every hyperparameter in
-[doc/MODEL_CONFIG.md](doc/MODEL_CONFIG.md).
+Losses: reconstruction, real-vs-null hinge, Froude head on z, frozen read-out, 2-step rollout
+consistency. Side-by-side with LAC-WM and Egocentric VSM in [ARCHITECTURE.md](ARCHITECTURE.md);
+every default in `wm/config.py`, every run's values in `wm/runs/<name>/config.yaml`.
 
 ## Documentation
 
-Each document has one role and does not repeat another.
-
 | | |
 |---|---|
-| [doc/direction_plan.md](doc/direction_plan.md) | **the plan as it stands today.** Edited in place, never stacked — read this first |
-| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered `F1`…`F169`, with the trap each one avoids. Cited from everywhere else. **Not append-only** — a finding is corrected or withdrawn when a later one refutes it |
-| [doc/OPEN_QUESTION.md](doc/OPEN_QUESTION.md) | only what is still undecided. A settled question moves to FINDINGS and leaves one line here |
-| [doc/PROGRESS.md](doc/PROGRESS.md) | the dated engineering log, including what was tried and failed. Thai and English |
-| [doc/SIM_GUIDE.md](doc/SIM_GUIDE.md) | how to actually run anything described above |
-| [doc/MODEL_CONFIG.md](doc/MODEL_CONFIG.md) | one-page reference: architecture, loss terms and λ weights, hyperparameters, with `file:line` for each |
-| [wm/README.md](wm/README.md) | the world model: lifecycle, modules, and how to read a training log |
-| [scripts/README.md](scripts/README.md) | every diagnostic, the question it answers, the trap it avoids |
-| [sim/README.md](sim/README.md) | building scenes, recording data, rendering |
+| [doc/STATUS.md](doc/STATUS.md) | **start here**: what is done, what runs now, what is next, open decisions |
+| [doc/DATA.md](doc/DATA.md) | which data is current, its splits, and the script that made it |
+| [doc/DATA_PLAN.md](doc/DATA_PLAN.md) | how the counterfactual data was designed and checked |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | the model against LAC-WM and Egocentric VSM |
+| [doc/FINDINGS.md](doc/FINDINGS.md) | every measurement, numbered, with the trap each one avoids. Corrected or withdrawn when refuted |
+| [doc/PROGRESS.md](doc/PROGRESS.md) | dated engineering log, Thai and English |
+| [doc/SIM_GUIDE.md](doc/SIM_GUIDE.md) | installing and running the simulators |
+| [wm/README.md](wm/README.md), [scripts/README.md](scripts/README.md), [sim/README.md](sim/README.md) | per-directory guides |
+| [doc/_archive/](doc/_archive/) | plans and guides for earlier pipelines (kept for the record, not current) |
 
-**Papers this builds on** are in [doc/ref/](doc/ref/) — LAC-WM (the source architecture), V-JEPA 2,
-DreamerV3, and the latent-action locomotion line. `F60` reads LAC-WM against our own design and
-`F72` explains why its action projector is not optional.
+**Papers this builds on** are in [doc/ref/](doc/ref/), with notes on LAC-WM and Egocentric VSM.
 
 ## Layout
 
@@ -127,8 +116,9 @@ calibration utilities that answer no research question.
 .venv/bin/python3 -m wm.train --help
 ```
 
-Always `.venv/bin/python3` from the repository root. Heavy training goes to a remote GPU box, not a
-local card — see [doc/SIM_GUIDE.md](doc/SIM_GUIDE.md).
+Always `.venv/bin/python3` from the repository root. Training: `scripts/run/round1_counterfactual.sh`;
+every reported number: `scripts/run/eval_suite.sh`. Frames are read lazily from a memory-mapped cache
+(`data/_frame_cache/`), so training needs a few GB of RAM, not the size of the data.
 
 ## A note on the record
 

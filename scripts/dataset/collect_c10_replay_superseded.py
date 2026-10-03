@@ -1,4 +1,6 @@
-"""SUPERSEDED (2026-10-02): its output moved to data/counterfactual_walks/_superseded/c10_replay_noise/; the official hexapod set is
+"""SUPERSEDED (2026-10-02), not a current data script: it writes into data/counterfactual_walks/_superseded/ BY DESIGN.
+Shared constants / rules (ORDER, ROLES, schedule, ...) now live in beh24_conditions.py (imported here).
+Its output moved to data/counterfactual_walks/_superseded/c10_replay_noise/; the official hexapod set is
 made by scripts/dataset/collect_c10_walks_and_branches.py (deterministic scene reuse, F305). Kept for the record.
 
 DATA_PLAN v2 stage 1: hexapod (c10f10t10) main clips -> data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_{train,val,heldout}.
@@ -41,50 +43,11 @@ sys.path.insert(0, os.path.join(ROOT, "scripts", "dataset"))
 sys.path.insert(0, os.path.join(ROOT, "sim", "render"))
 from collect_switch_hex import COND, KEYS, centre_pose, COMMON, CENTRE  # noqa: E402
 
-EP = 66
-W0 = 10
-GAPS = range(8, 31)
-BASE_CYC = 8.8
-OUT = "data/counterfactual_walks/_superseded/c10_replay_noise"   # moved there 2026-10-02 (F305)
+from beh24_conditions import (EP, W0, GAPS, BASE_CYC, ROLES, LIVE_ROOM, ORDER, FAMILY, seed_of, split_of,  # noqa: E402,F401
+                              cycles_per_frame, schedule, tilt_deg)
+OUT = "data/counterfactual_walks/_superseded/c10_replay_noise"   # moved there 2026-10-02 (F305); writes there by design
 WALKS = os.path.join(OUT, "hex_main_walks")
-ROLES = ("train0", "train1", "val", "heldout")
 OLD = "data/egocentric/beh24_c10f10t10_ego_flat"
-LIVE_ROOM = 40.0     # physics walks: walls 20 m away so they can never be touched (no frames are taken)
-
-ORDER = ([f"speed_c{c:g}" for c in (5.8, 7.1, 8.15, 8.8)]
-         + [f"speed_c{c:g}_bwd" for c in (5.8, 7.1, 8.15, 8.8)]
-         + [f"turn_s{v}" for v in ("0.05", "0.15", "0.29", "0.56")]
-         + [f"turn_s{v}_neg" for v in ("0.05", "0.15", "0.29", "0.56")]
-         + [f"side_L_lvl{i}" for i in range(4)] + [f"side_R_lvl{i}" for i in range(4)])
-FAMILY = ["fwd"] * 4 + ["bwd"] * 4 + ["turn_left"] * 4 + ["turn_right"] * 4 + ["side_L"] * 4 + ["side_R"] * 4
-assert sorted(ORDER) == sorted(COND) and len(ORDER) == 24
-
-
-def seed_of(i, role):
-    return {"train0": 2 * i, "train1": 2 * i + 1, "val": 100 + i, "heldout": 200 + i}[role]
-
-
-def split_of(role):
-    return "train" if role.startswith("train") else role
-
-
-def cycles_per_frame(c):
-    return COND[c][1]["pace"] * BASE_CYC / EP
-
-
-def schedule(c):
-    """(gap, starts, start phases, total frames) for condition c."""
-    cpf = cycles_per_frame(c)
-    best = None
-    for g in GAPS:
-        st = [W0 + w * (EP + g) for w in range(4)]
-        ph = np.mod(np.array(st) * cpf, 1.0)
-        d = np.abs(ph[:, None] - ph[None, :]); d = np.minimum(d, 1 - d)
-        score = d[np.triu_indices(4, 1)].min()
-        if best is None or score > best[0] + 1e-9:
-            best = (score, g, st, ph)
-    _, g, st, ph = best
-    return g, st, ph, st[-1] + EP
 
 
 def walk_path(c):
@@ -117,15 +80,6 @@ def do_walks(args):
                    window_starts=np.array(st), centre_from=CENTRE)
         np.savez_compressed(dst, **rec)
         print(f"walk {i:2d} {c:<16} N={N} gap={g} phases={np.round(ph, 2)} {time.time() - t0:.0f}s", flush=True)
-
-
-def tilt_deg(q):
-    """Angle of the body's own axes from their first-frame orientation, about a horizontal axis
-    (yaw removed): angle between the body-frame image of world z now and at frame 0."""
-    from scipy.spatial.transform import Rotation as Rt
-    R = Rt.from_quat(q)                       # (x, y, z, w)
-    up = R.inv().apply([0, 0, 1.0])           # world up in body coordinates
-    return np.degrees(np.arccos(np.clip(up @ up[0], -1, 1)))
 
 
 def walk_health(rec):

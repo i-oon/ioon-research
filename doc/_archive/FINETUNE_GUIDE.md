@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Describes an earlier pipeline or plan; not current. Current state: `doc/STATUS.md`, `ARCHITECTURE.md`, `doc/DATA.md`.
+
 # FINETUNE_GUIDE
 
 How to ground a body absent from pretrain into the shared coordinate. This is the manual for

@@ -13,7 +13,7 @@ policy produces different motion here than in its own MuJoCo recording, that IS 
 the real, meaningful comparison, not a stand-in.
 
 **Uses the convex-decomposed scene** (`sim/env/b1_flat_convex.ttt`) so Bullet doesn't hang on
-non-convex collision meshes (see `doc/OPEN_QUESTION.md` Q22 for the full diagnosis). Engine is
+non-convex collision meshes (see `doc/_archive/OPEN_QUESTION.md` Q22 for the full diagnosis). Engine is
 left at Bullet (0), matching hexapod's own pretraining scenes -- never switch to Newton here, that
 was already tried and correctly reverted (reconfounds the comparison Q22 needs isolated).
 

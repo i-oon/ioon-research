@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Describes an earlier pipeline or plan; not current. Current state: `doc/STATUS.md`, `ARCHITECTURE.md`, `doc/DATA.md`.
+
 # Cross-embodiment plan — status & open questions
 
 > **Role**: What still has to be decided.

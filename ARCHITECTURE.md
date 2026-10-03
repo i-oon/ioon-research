@@ -21,7 +21,7 @@ Status legend: = same as LAC-WM · ≠ differs.
 | Extra losses | none | none | hinge (real vs null z), frozen read-out, 2-step rollout | ≠ |
 | Pretraining bodies | 1 robot | 3 (human hands, bimanual humanoid, Franka arm) | 1 hexapod, or hexapod + B1 jointly | ≠ |
 | Pretraining data | motor babbling | 150k trajectories | per body 48 clips of 66 frames (24 behaviours, windows of one long walk each, one room per clip shared by both bodies) + counterfactual branches 3,456 (3 branch points x 24 commands per clip; B1 exact MuJoCo restore, hexapod deterministic replay); Froude at the centre of mass | ≠ |
-| Batch × iterations | small model | 512 × 80k ≈ 41M samples | 8 × ≈16.7k ≈ 134k samples | ≠ |
+| Batch × iterations | batch 16, early stop after 20 epochs without validation gain | 512 × 80k ≈ 41M samples | 8 × ≈30k ≈ 244k samples (round 1, both arms; augmentation on the fly) | ≠ |
 | Adaptation | retrain after damage | 3 stages: LoRA r2 IDM+FDM → projector → joint LoRA r2 | body in pretraining: projector only. New body: LoRA r8 on ITM / FTM (3000 steps) with the pretraining losses incl. the Froude loss through the frozen head → projector. No head refit, no joint stage | ≠ (rank 8, no stage 3) |
 | Goal given to the planner | body-pose target | subgoal image of the same body | Froude sequence of another body: recorded, or read from the goal clip's frames through ITM + Froude head | ≠ |
 | Candidate scoring | predicted Δ pose vs target | L2 in embedding space, predicted frame vs subgoal image | Froude read from z (direct) or from the predicted frame (rollout) | ≠ |

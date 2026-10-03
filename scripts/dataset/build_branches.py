@@ -1,8 +1,14 @@
 """DATA_PLAN v2 stage 3: counterfactual branches of the main clips, both bodies
--> data/counterfactual_walks/b1_branches_{train,val,heldout} (current B1 branches) and, for the hexapod,
-data/counterfactual_walks/_superseded/c10_replay_noise/hex_cf_* (superseded by collect_c10_walks_and_branches.py, F305).
-Branch points (step `points`) -> data/counterfactual_walks/branch_points.json, keyed by the stage-1/2 source clips
-(SRC_DIR below, now under _superseded/; the current c10 / b1 clips share their episode numbers).
+-> data/counterfactual_walks/b1_branches_{train,val,heldout} (current B1 branches). The hexapod branches here were made by
+replay (start noise, F304); the current hexapod branches c10_branches_* / c08_branches_* are made by
+collect_c10_walks_and_branches.py / collect_c08_test_set.py (deterministic, F305) -- step `hex` refuses to run.
+Every source is a CURRENT main clip (SRC_DIR: c10_clips_*, b1_clips_*).
+
+Branch points: data/counterfactual_walks/branch_points_current.json (POINTS), keyed by the current main clip paths
+(c10_clips_*, b1_clips_*, c08_clips_heldout; c08 uses its c10 heldout counterpart's points). It was made (step `rekey`)
+from branch_points.json (POINTS_LEGACY, kept unchanged), which step `points` wrote 2026-10-01 keyed by the stage-1/2
+clips that are now superseded; each entry keeps that key as `legacy_key`. `points --check` recomputes the points
+from the current clips and compares them to POINTS without writing.
 
 Per main clip: 3 branch points t (window frame, 10 <= t <= 45), chosen so the gait phase at t is spread
 (targets u + k/3, k = 0, 1, 2, with a per-clip offset u = frac(0.618 * clip) / 3 so the phases fill the cycle
@@ -11,7 +17,7 @@ over the split; best triple with >= 6 frames between points). Hexapod phase = th
 `collect_b1_walks.contact_phase`, at the policy step of frame t).
 
 At every point, all 24 commands of the body (its own 24 matched conditions, command index = condition index
-of collect_c10_replay_superseded.ORDER; the clip's own index = no-switch control). Output = 31 frames: window frames
+of beh24_conditions.ORDER; the clip's own index = no-switch control). Output = 31 frames: window frames
 t-10 .. t (prefix, branch frame at index 10) + 20 frames of the new command; `segment` 0/1 (1 from index 10;
 the new command acts from the step after frame t), `first_pair` = 10, `froude_height` = source clip median
 CoM z.
@@ -29,8 +35,9 @@ exact restored state. Poses translated by the source window's offset (orientatio
 rendered with render_b1_replay.ego_setup / pose_and_capture in the source room; prefix + branch frame = the
 source's frames.
 
-    .venv/bin/python3 scripts/dataset/build_branches.py points
-    .venv/bin/python3 scripts/dataset/build_branches.py hex --ports 23110 23120 ...
+    .venv/bin/python3 scripts/dataset/build_branches.py points --check    (recompute, compare; writes nothing)
+    .venv/bin/python3 scripts/dataset/build_branches.py rekey [--dry_run] (legacy keys -> current, checked 1:1)
+    .venv/bin/python3 scripts/dataset/build_branches.py sources           (list every source file read; no sim)
     .venv/bin/python3 scripts/dataset/build_branches.py b1 --ports 23110 ...
     .venv/bin/python3 scripts/dataset/build_branches.py check
     .venv/bin/python3 scripts/dataset/build_branches.py video
@@ -51,7 +58,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for p in ("", "scripts/dataset", "sim/collect", "sim/render", "sim/scene"):
     sys.path.insert(0, os.path.join(ROOT, p))
-from collect_c10_replay_superseded import ORDER, FAMILY, COMMON, LIVE_ROOM, KEYS  # noqa: E402
+from beh24_conditions import ORDER, FAMILY, COMMON, LIVE_ROOM, KEYS  # noqa: E402
 from collect_switch_hex import COND  # noqa: E402
 
 CW = os.path.join(ROOT, "data/counterfactual_walks")
@@ -59,16 +66,16 @@ PREFIX, BRANCH, FADE = 10, 20, 4
 TMIN, TMAX = PREFIX, 65 - BRANCH
 NB = PREFIX + 1 + BRANCH
 SPLITS = ("train", "val", "heldout")
-POINTS = os.path.join(CW, "branch_points.json")
+POINTS = os.path.join(CW, "branch_points_current.json")    # keyed by current main clips (step rekey)
+POINTS_LEGACY = os.path.join(CW, "branch_points.json")     # 2026-10-01 keys (superseded stage-1/2 clips); kept, read by rekey only
 PY = os.path.join(ROOT, ".venv/bin/python3")
-CENTRE_NPZ = os.path.join(CW, "c10_walks/_work/centre_pose.npz")   # fitted c10 centre pose (hex_main_walks moved to _superseded/c10_replay_noise)
+CENTRE_NPZ = os.path.join(CW, "c10_walks/_work/centre_pose.npz")   # fitted c10 centre pose
 PER = 165
 KEEP = np.unique(np.round(np.arange(0, PER, 2.5)).astype(int))
 
 
-SRC_DIR = {"hex": "_superseded/c10_replay_noise/hex_main",     # stage-1 replay clips (branch-point keys)
-           "b1": "_superseded/b1_camera_yawed/b1_main"}         # stage-2 cut, legacy camera mount (re-rendered -> b1_clips_*)
-OUT_DIR = {"hex": "_superseded/c10_replay_noise/hex_cf", "b1": "b1_branches"}
+SRC_DIR = {"hex": "c10_clips", "b1": "b1_clips", "c08": "c08_clips"}          # current main clips
+OUT_DIR = {"hex": "c10_branches", "b1": "b1_branches", "c08": "c08_branches"}  # current branches
 
 
 def main_files(body, split):
@@ -117,6 +124,11 @@ def b1_phase(d):
 
 
 def do_points(a):
+    """Branch points of the current hexapod / B1 main clips. Written 2026-10-01 (then keyed by the stage-1/2 clips,
+    POINTS_LEGACY); the current points file is POINTS (step rekey). Only `--check` is allowed now: recompute from the
+    current clips and compare with POINTS, nothing written (a re-choice would orphan every existing branch file)."""
+    if not a.check:
+        raise SystemExit("points: the branch points are fixed (branches exist for them); use `points --check`")
     out = {}
     for body in ("hex", "b1"):
         for split in SPLITS:
@@ -130,12 +142,106 @@ def do_points(a):
                 out[os.path.relpath(p, ROOT)] = dict(body=body, split=split, ep=ep, cond_index=cond_i,
                                                      t=ts, phase=[float(ph[t]) for t in ts], target=tg,
                                                      period=P)
-    json.dump(out, open(POINTS, "w"), indent=1)
+    cur = load_points()
+    nt = sum(cur[k]["t"] != v["t"] for k, v in out.items() if k in cur)
+    dph = max(float(np.abs(np.array(cur[k]["phase"]) - np.array(v["phase"])).max()) for k, v in out.items() if k in cur)
+    print(f"points --check: {len(out)} clips recomputed, {sum(k in cur for k in out)} in {os.path.relpath(POINTS, ROOT)}; "
+          f"t differs on {nt}; max |phase diff| {dph:.2e}")
     for body in ("hex", "b1"):
         ph = np.array([x for v in out.values() if v["body"] == body for x in v["phase"]])
         err = np.array([circ(np.array(v["phase"]), np.array(v["target"])).max() for v in out.values() if v["body"] == body])
         print(f"{body}: {len(ph)} points; phase histogram (10 bins) {np.histogram(ph, 10, (0, 1))[0].tolist()}; "
               f"max |phase - target| {err.max():.3f}")
+
+
+MATCH = ("expert_episode", "cond_index", "split", "copy", "room_seed", "window_start")
+
+
+def _fields(p):
+    with np.load(p, allow_pickle=True) as d:          # non-frame keys only (lazy npz)
+        return tuple(str(d[k]) if k in ("split", "copy") else int(d[k]) for k in MATCH)
+
+
+def do_rekey(a):
+    """POINTS_LEGACY (keys = 2026-10-01 stage-1/2 clips, now superseded) -> POINTS keyed by the current main clips.
+    Match by (body, episode, condition, split, copy, room seed, window start); the legacy key's own path is NOT read:
+    its episode / split come from the legacy entry and the key's file name, the rest from the current clip, which must
+    agree with the legacy entry (cond_index, ep) and be unique. c08: each c08 clip takes the points of its c10 heldout
+    counterpart (`c10_counterpart` field). Checks: 1:1, complete (hex / b1 48 / 24 / 24, c08 24), every current branch
+    file's t (from its name) is one of its clip's points and every point has all 24 branches. Atomic write."""
+    L = json.load(open(POINTS_LEGACY))
+    cur = {}
+    for body in ("hex", "b1", "c08"):
+        for split in SPLITS:
+            for p in main_files(body, split):
+                f = _fields(p)
+                assert f not in cur, ("duplicate current clip", p)
+                cur[f] = (body, os.path.relpath(p, ROOT))
+    out, used = {}, set()
+    for lk, v in sorted(L.items()):
+        ep, split = int(v["ep"]), v["split"]
+        assert os.path.basename(lk).endswith(f"_ep{ep}.npz") and f"_{split}/" in lk, lk
+        hits = [(f, bp) for f, bp in cur.items() if bp[0] == v["body"] and f[0] == ep and f[2] == split]
+        assert len(hits) == 1, (lk, hits)
+        f, (body, cp) = hits[0]
+        assert f[1] == v["cond_index"], (lk, cp)
+        assert cp not in used, cp
+        used.add(cp)
+        out[cp] = dict(v, legacy_key=lk, copy=f[3], room_seed=f[4], window_start=f[5])
+    for f, (body, cp) in sorted(cur.items(), key=lambda x: x[1][1]):
+        if body != "c08":
+            continue
+        with np.load(os.path.join(ROOT, cp), allow_pickle=True) as d:
+            cc = str(d["c10_counterpart"])
+        v = out[cc]
+        assert v["cond_index"] == f[1] and v["window_start"] == f[5] and f[2] == "heldout", (cp, cc)
+        out[cp] = dict(body="c08", split="heldout", ep=f[0], cond_index=f[1], t=v["t"], phase=v["phase"],
+                       target=v["target"], period=None, c10_counterpart=cc, legacy_key=v["legacy_key"],
+                       copy=f[3], room_seed=f[4], window_start=f[5])
+    cnt = {(b, s): sum(v["body"] == b and v["split"] == s for v in out.values()) for b in ("hex", "b1", "c08") for s in SPLITS}
+    want = {(b, s): n for b in ("hex", "b1") for s, n in zip(SPLITS, (48, 24, 24))}
+    want.update({("c08", "train"): 0, ("c08", "val"): 0, ("c08", "heldout"): 24})
+    print("counts", {f"{b}/{s}": n for (b, s), n in cnt.items()})
+    print(f"legacy keys {len(L)} -> {len([v for v in out.values() if v['body'] != 'c08'])} current (1:1), "
+          f"current clips {len(cur)}, unmatched current {len(cur) - len(out)}")
+    assert cnt == want and len(out) == len(cur) and len(used) == len(L), "mapping not complete / not 1:1"
+    nb = 0
+    for cp, v in out.items():
+        ep = v["ep"]
+        bdir = os.path.join(CW, f"{OUT_DIR[v['body']]}_{v['split']}")
+        pre = "b1" if v["body"] == "b1" else "hexapod"
+        got = {int(os.path.basename(q)[len(pre) + 3:-4]) for q in glob.glob(os.path.join(bdir, f"{pre}_ep{ep}????.npz"))}
+        exp = {code_of(ep, t, ci) for t in v["t"] for ci in range(24)}
+        assert got == exp, (cp, sorted(got ^ exp)[:5])
+        nb += len(got)
+    print(f"branch files: every clip's branch t (from file names) == its points, 72 per clip: {nb} files")
+    if a.dry_run:
+        print("dry run: nothing written")
+        return
+    tmp = POINTS + f".tmp{os.getpid()}"
+    json.dump(out, open(tmp, "w"), indent=1)
+    os.replace(tmp, POINTS)
+    print("->", os.path.relpath(POINTS, ROOT))
+
+
+def do_sources(a):
+    """Every file the build steps read (no simulator): points file, main clips, their walks, centre pose, tuning."""
+    P = load_points()
+    need = {POINTS, CENTRE_NPZ, os.path.join(CW, "b1_walks/tuning.json")}
+    for cp, v in P.items():
+        need.add(os.path.join(ROOT, cp))
+        with np.load(os.path.join(ROOT, cp), allow_pickle=True) as d:
+            need.add(os.path.join(ROOT, str(d["source_walk"])))
+    rel = sorted(os.path.relpath(p, ROOT) for p in need)
+    miss = [p for p in rel if not os.path.exists(os.path.join(ROOT, p))]
+    sup = [p for p in rel if "_superseded" in p]
+    by = {}
+    for p in rel:
+        by[os.path.dirname(p)] = by.get(os.path.dirname(p), 0) + 1
+    for k, n in sorted(by.items()):
+        print(f"  {k:<48} {n}")
+    print(f"{len(rel)} source files; missing {len(miss)}; under _superseded {len(sup)}")
+    assert not miss and not sup, (miss[:5], sup[:5])
 
 
 def load_points():
@@ -372,6 +478,8 @@ def hex_one(a):
 
 
 def do_hex(a):
+    raise SystemExit("hex: replay branches are superseded (start noise, F304); the current hexapod branches "
+                     "(c10_branches_*) come from collect_c10_walks_and_branches.py")
     """Each branch runs in a child process with a timeout; a child that hangs (a CoppeliaSim instance stopped
     answering: 4 of 6 instances hung on 2026-10-02 03:10-03:45 with the in-process version) is killed, its
     instance restarted on the same port, and the job retried."""
@@ -452,7 +560,6 @@ def b1_job(job, port, sim, work, only_cmds=None):
     from collect_b1_walks import B1_NAME
     from wm.data.com import b1_com
     srcp, split, ts, _, phases = job
-    srcp = remount_path(srcp)          # corrected-mount re-render of the v4 main clip (same state, new frames)
     d = dict(np.load(os.path.join(ROOT, srcp), allow_pickle=True))
     ep, st, i = int(d["expert_episode"]), int(d["window_start"]), int(d["cond_index"])
     cis = only_cmds if only_cmds is not None else list(range(24))
@@ -550,50 +657,33 @@ def b1_job(job, port, sim, work, only_cmds=None):
     return f"{os.path.basename(srcp)} rep {rep_err:.1e} {' '.join(msgs)} {time.time() - t0:.0f}s"
 
 
-def remount_path(srcp):
-    """B1 sources: the camera-mount-corrected re-render of the v4 main clip (see do_b1_remount)."""
-    return srcp.replace(SRC_DIR["b1"] + "_", "b1_clips_")
-
-
 def b1_remount_job(job, port, sim, work):
-    """Re-render one v4 B1 main clip with the corrected camera mount (render_b1_replay default rule: camera on
-    the base's own forward axis) -> data/counterfactual_walks/b1_clips_<split>/ (same file name, every other
-    field unchanged; frames + cam_pose new; legacy-mount frames NOT kept, they are in _superseded/b1_camera_yawed/b1_main_<split>)."""
-    from render_b1_replay import ego_setup, pose_and_capture, CAM_POSE_CONVENTION
+    """Re-render one current B1 main clip (b1_clips_<split>) from its own recorded state with the corrected camera
+    mount (render_b1_replay default rule: camera on the base's own forward axis) into results/check/b1_remount_<split>/ and
+    compare with the stored frames + cam_pose (reproduction check; the clip is never overwritten). History: b1_clips_*
+    were made 2026-10-02 this way from the legacy-mount cut (field `remount_from`)."""
+    from render_b1_replay import ego_setup, pose_and_capture
     srcp = job[0]
-    dst = os.path.join(ROOT, remount_path(srcp))
-    if os.path.exists(dst):
-        return "skip"
     d = dict(np.load(os.path.join(ROOT, srcp), allow_pickle=True))
-    msg = ""
-    if job[4]:          # first clips: the in-process legacy setup reproduces the stored frames + cam_pose
-        r, j, c = ego_setup(sim, os.path.join(ROOT, "sim/env/b1_flat.ttt"), d["base_pos"][0], d["base_quat"][0],
-                            int(d["room_seed"]), legacy_mount=True)
-        fl, cl = zip(*[pose_and_capture(sim, r, j, c, d["base_pos"][t], d["base_quat"][t], d["joint_pos"][t])
-                       for t in range(len(d["frames"]))])
-        msg = (f"legacy in-process vs stored: pixel MAE {np.abs(np.asarray(fl, int) - d['frames'].astype(int)).mean():.3f}"
-               f" cam_pose max|d| {np.abs(np.asarray(cl)[:, :3] - d['cam_pose'][:, :3]).max():.1e}; ")
     r, j, c = ego_setup(sim, os.path.join(ROOT, "sim/env/b1_flat.ttt"), d["base_pos"][0], d["base_quat"][0],
                         int(d["room_seed"]))
     fr, cp = zip(*[pose_and_capture(sim, r, j, c, d["base_pos"][t], d["base_quat"][t], d["joint_pos"][t])
                    for t in range(len(d["frames"]))])
-    d.update(frames=np.asarray(fr, np.uint8), cam_pose=np.asarray(cp, np.float64),
-             cam_pose_convention=np.array(CAM_POSE_CONVENTION), cam_pose_parent=np.array("base_visual"),
-             remount_from=np.array(srcp),
-             render=np.array(str(d["render"]) + " | RE-RENDERED 2026-10-02 with the corrected ego mount "
-                             "(render_b1_replay default: camera on the base's own forward axis; the original used "
-                             "the clip's start heading -> camera yawed by that heading relative to the body)"))
-    d.pop("cam_pose_local", None)
+    fr, cp = np.asarray(fr, np.uint8), np.asarray(cp, np.float64)
+    dst = os.path.join(ROOT, "results/check", f"b1_remount_{d['split']}", os.path.basename(srcp))
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     tmp = dst[:-4] + ".tmp.npz"
-    np.savez_compressed(tmp, **d)
+    np.savez_compressed(tmp, frames=fr, cam_pose=cp, source=np.array(srcp))
     os.replace(tmp, dst)
-    return msg + "ok"
+    return (f"pixel MAE vs stored {np.abs(fr.astype(int) - d['frames'].astype(int)).mean():.3f} "
+            f"cam_pose max|d| {np.abs(cp[:, :3] - d['cam_pose'][:, :3]).max():.1e}")
 
 
 def do_b1_remount(a):
-    jobs = [(srcp, None, None, None, k < 2) for k, srcp in enumerate(
-        sorted(os.path.relpath(p, ROOT) for s in a.splits for p in main_files("b1", s)))]
+    jobs = [(srcp, None, None, None, None) for srcp in
+            sorted(os.path.relpath(p, ROOT) for s in a.splits for p in main_files("b1", s))]
+    if a.sources:
+        jobs = [j for j in jobs if os.path.basename(j[0]) in a.sources]
     run_pool(jobs, a.ports, b1_remount_job, "b1remount")
 
 
@@ -706,7 +796,9 @@ def do_b1(a):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=("points", "hex", "hex_one", "b1", "b1_remount", "video"))
+    ap.add_argument("step", choices=("points", "rekey", "sources", "hex", "hex_one", "b1", "b1_remount", "video"))
+    ap.add_argument("--check", action="store_true", help="points: recompute and compare, write nothing")
+    ap.add_argument("--dry_run", action="store_true", help="rekey: check the mapping, write nothing")
     ap.add_argument("--ports", type=int, nargs="+", default=[23110])
     ap.add_argument("--splits", nargs="+", default=list(SPLITS))
     ap.add_argument("--sources", nargs="*", default=None)
@@ -717,7 +809,7 @@ def main():
     ap.add_argument("--nshards", type=int, default=1)
     a = ap.parse_args()
     os.chdir(ROOT)
-    {"points": do_points, "hex": do_hex, "b1": do_b1, "b1_remount": do_b1_remount, "video": do_video, "hex_one": hex_one}[a.step](a)
+    {"points": do_points, "rekey": do_rekey, "sources": do_sources, "hex": do_hex, "b1": do_b1, "b1_remount": do_b1_remount, "video": do_video, "hex_one": hex_one}[a.step](a)
 
 
 if __name__ == "__main__":

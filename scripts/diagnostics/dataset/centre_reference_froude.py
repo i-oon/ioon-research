@@ -1,6 +1,7 @@
-"""Froude labels of the v4 walks measured at different body reference points (diagnostic only).
+"""Froude labels of the walks measured at different body reference points (diagnostic only; made for F301 on the
+stage-1 replay walks, re-pointed 2026-10-03 to the current deterministic walks, same fields and window rule).
 
-Hexapod (data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_walks, 4 windows x 66 frames per condition):
+Hexapod (data/counterfactual_walks/c10_walks, 4 windows x 66 frames per condition):
   head  -- the `head` field (current loader reference)
   com   -- mass-weighted mean of the 24 dynamic shapes' frame origins (state_link_pose); every
            shape's CoM sits at its frame origin (getShapeInertia transform = identity), masses from
@@ -41,7 +42,9 @@ def labels(refs, quat, dt, emb, h):
 masses = {r["name"]: r["mass"] for r in json.load(open(os.path.join(OUT, "hex_masses.json"))) if r["static"] == 0}
 HIP_LOCAL = np.array([0, 0, -(0.47105 + 0.31555 + 0.18005) / 3])
 hex_rows = {}; offs = []
-for f in sorted(glob.glob(os.path.join(ROOT, "data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_walks/*.npz"))):
+HEX_WALKS = sorted(glob.glob(os.path.join(ROOT, "data/counterfactual_walks/c10_walks/*.npz")))
+assert len(HEX_WALKS) == 24, f"expected 24 hexapod walks in data/counterfactual_walks/c10_walks, found {len(HEX_WALKS)}"
+for f in HEX_WALKS:
     d = np.load(f); names = list(d["state_link_names"]); lp = d["state_link_pose"]
     idx = [names.index(n) for n in masses]; m = np.array([masses[n] for n in masses])
     com = (lp[:, idx, :3] * m[None, :, None]).sum(1) / m.sum()
@@ -63,12 +66,13 @@ o = np.array([x[1:] for x in offs if x[0] == "com"]); oh = np.array([x[1:] for x
 print(f"hexapod dynamic mass {m.sum():.3f} kg over {len(m)} shapes")
 print("mean offset from head in walking frame (fwd,left,up) m: com", o.mean(0).round(3), " hip", oh.mean(0).round(3))
 
-# sanity: loader label on a train clip equals the head reference of its walk window
-tc = sorted(glob.glob(os.path.join(ROOT, "data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_train/*.npz")))[0]
+# sanity: loader label on a train clip vs the references of its walk window (the loader is CoM-referenced since F301,
+# with the CoM-z height; this script uses the head height for every reference, so expect com close, not equal)
+tc = sorted(glob.glob(os.path.join(ROOT, "data/counterfactual_walks/c10_clips_train/*.npz")))[0]
 dd = np.load(tc); mot = E._hexapod(dd)["body_motion"]
 src = os.path.basename(str(dd["source_walk"])).replace(".npz", ""); wi = int(dd["window_index"])
-w = hex_rows[src][wi]["head"]["mean"]
-print("sanity", os.path.basename(tc), src, wi, "loader", mot.mean(0).round(4), "head-ref", np.round(w, 4))
+print("sanity", os.path.basename(tc), src, wi, "loader", mot.mean(0).round(4),
+      "com-ref", np.round(hex_rows[src][wi]["com"]["mean"], 4), "head-ref", np.round(hex_rows[src][wi]["head"]["mean"], 4))
 
 def table(rows, refs, title):
     print(f"\n{title}: clip-mean over 4 windows (fwd, lat, yaw) | within-clip std of 1 s label (fwd, lat) | raw per-frame std (fwd, lat)")

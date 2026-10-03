@@ -45,7 +45,7 @@ PYEOF
 echo "=== $NAME ($MODE) $PT $(date)" | tee $OUT/summary.txt
 
 # 1. checkpoints
-$PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir "" --out $CK/projector_hex.pt 2>&1 | quiet | tail -1
+$PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir "" --cache results/wm/cache/fitproj_v4.pt --out $CK/projector_hex.pt 2>&1 | quiet | tail -1
 merge $PT $CK/projector_hex.pt $CK/hex.pt
 if [ "$MODE" = joint ]; then
   $PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir $B1 --cache results/wm/cache/fitproj_v4.pt \
@@ -68,7 +68,7 @@ $PY $SEL --conditions all --candidates_dir $LIB --goal_dir $GOALS --cache $LIBC 
     --ckpt $NAME=$CK/b1.pt 2>&1 | grep -E "w=|bounds"
 echo "--- selection B1, vision-read goal"
 $PY $SEL --conditions all --candidates_dir $LIB --goal_dir $GOALS --cache $LIBC --windows 21 --goal_source vision \
-    --ckpt $NAME=$CK/b1.pt 2>&1 | grep -E "w=|bounds"
+    --goal_cache results/wm/cache/test_v4_goals_c10_heldout.pt --ckpt $NAME=$CK/b1.pt 2>&1 | grep -E "w=|bounds"
 echo "--- selection c08 zero-shot"
 $PY $SEL --conditions all --embodiment hexapod --candidates_dir $C08 --goal_dir $GOALS \
     --cache results/wm/cache/test_v4_c08_heldout.pt --windows 21 --ckpt $NAME=$CK/hex.pt 2>&1 | grep -E "w=|bounds"
@@ -80,6 +80,7 @@ $PY $SEL --conditions all --embodiment hexapod --candidates_dir $HEXT --goal_dir
 # 3. shared latent
 echo "--- shared latent" | tee -a $OUT/summary.txt
 $PY scripts/figures/shared_latent_figure.py --device cuda --b1 "$LIB=$LIBC" --c10 "$HEXT=results/wm/cache/test_v4_hex_heldout.pt" \
+    --c08 "$C08=results/wm/cache/test_v4_c08_heldout.pt" \
     --model "$NAME=$ITM_B1" --out $OUT/shared_latent 2>&1 | quiet | tail -3 | tee $OUT/shared_latent.txt | tee -a $OUT/summary.txt
 
 # 4. counterfactual read-out on the v4 physics branches (heldout), no simulator

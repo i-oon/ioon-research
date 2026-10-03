@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Describes an earlier pipeline or plan; not current. Current state: `doc/STATUS.md`, `ARCHITECTURE.md`, `doc/DATA.md`.
+
 # Research Direction — Cross-Morphology Locomotion via Latent Action World Models
 
 > **Role**: The plan as it stands today.

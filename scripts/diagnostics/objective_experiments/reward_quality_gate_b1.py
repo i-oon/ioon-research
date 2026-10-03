@@ -33,7 +33,7 @@ action as the "known good" baseline to perturb -- that quietly reintroduces "is 
 test that is supposed to be about the reward function's own local discriminative power, independent
 of any candidate source. The baseline action here is a recorded EXPERT clip's own action (B1's own
 `data/egocentric/beh12_b1_ego_flat`), executed to reach a real branch state, precisely to keep this
-test uncontaminated by babble's separately-open status (`doc/OPEN_QUESTION.md` Q21).
+test uncontaminated by babble's separately-open status (`doc/_archive/OPEN_QUESTION.md` Q21).
 """
 import argparse
 import glob

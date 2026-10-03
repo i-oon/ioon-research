@@ -1,11 +1,12 @@
 """DATA_PLAN v2 stage 2: B1 main clips matched to the hexapod v4 clips -> data/counterfactual_walks/b1_clips_{train,val,heldout}
-(cut into _superseded/b1_camera_yawed/b1_main_*, re-rendered with the corrected camera mount by build_branches.py b1_remount).
+(`cut` renders with the corrected camera mount straight into b1_clips_*; the clips there were made 2026-10-02 by a
+legacy-mount cut + corrected-mount re-render, field `remount_from`, same state and same frames rule).
 
 Reference point (2026-10-01, FINDINGS F301): every label here is CoM-based -- hexapod clips and B1 rollouts
 carry `com_pos` and the loader measures velocity and Froude height at it. The head-referenced version of
-this stage is in data/counterfactual_walks/_superseded/b1_head_reference_targets/.
+this stage is kept with the superseded data (doc/DATA.md, b1_head_reference_targets).
 
-Targets: for each hexapod condition c (collect_c10_replay_superseded.ORDER, index i), the mean clip-mean Froude
+Targets: for each hexapod condition c (beh24_conditions.ORDER, index i), the mean clip-mean Froude
 (fwd, lat, yaw) of its 4 v4 windows (loader labels, wm.data.embodiment). The B1 condition paired with c is
 the same family and level index (DATA_PLAN section 0 item 3).
 
@@ -26,11 +27,13 @@ kp 2.5 / ki 1.0, F69; every other family: kp 0.5 / ki 0).
 
 Walks (`walks`): one long rollout per condition with the tuned command; 4 non-overlapping 165-step windows
 (66 frames) cut after STEADY steps, gap chosen from 20..75 steps to spread the start gait phase (phase from
-the FR/RL foot-contact touchdowns). Split / room rule as stage 1 (collect_c10_replay_superseded: window w of
+the FR/RL foot-contact touchdowns). Split / room rule as stage 1 (beh24_conditions: window w of
 condition i -> ROLES[(w + i) % 4], seeds train 2i+k, val 100+i, heldout 200+i).
 
 Cut (`cut`): each window face-forwarded, re-centred at the room centre (render_b1_replay --spawn 0 0), rendered
-with render_b1_replay --ego --match_floor --ground_uv_mult 1.0 --fps 20 --ego_seed <seed>.
+with render_b1_replay --ego --match_floor --ground_uv_mult 1.0 --fps 20 --ego_seed <seed> (default = corrected mount,
+camera on the base's forward axis) -> b1_clips_<split>/b1_ep<ep>.npz; existing files are skipped. `cut --dry_run`
+lists every walk read and every target clip with its (split, seed, window start) checked against the existing clip.
 
     .venv/bin/python3 scripts/dataset/collect_b1_walks.py targets|tune|walks|cut|check|video
 """
@@ -50,15 +53,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "scripts", "dataset"))
 import wm.data.embodiment as E  # noqa: E402
-from collect_c10_replay_superseded import ORDER as HEX_ORDER, FAMILY, ROLES, seed_of, split_of  # noqa: E402
+from beh24_conditions import ORDER as HEX_ORDER, FAMILY, ROLES, seed_of, split_of  # noqa: E402
 from recollect_b1_more import _face_forward  # noqa: E402
 from wm.data.com import b1_com  # noqa: E402
 
 OUT = "data/counterfactual_walks"
 WALKS = os.path.join(OUT, "b1_walks")
-# `cut` output: legacy camera mount, re-rendered by build_branches.py b1_remount into b1_clips_* (the live clips);
-# the original cut is kept under _superseded/b1_camera_yawed (build_branches.SRC_DIR, branch-point keys)
-CUT = "_superseded/b1_camera_yawed/b1_main_{}"
+CUT = "b1_clips_{}"            # `cut` output = the current B1 main clips (corrected camera mount)
 TUNE_JSON = os.path.join(OUT, "b1_walks", "tuning.json")
 PY = os.path.join(ROOT, ".venv/bin/python3")
 ROLL = os.path.join(ROOT, "sim/collect/rollout_b1_mujoco.py")
@@ -276,6 +277,8 @@ SEND = ("joint_pos", "joint_vel", "action", "command", "foot_contact", "base_pos
 
 
 def do_cut(a):
+    if a.dry_run:
+        return cut_dry_run()
     for s in ("train", "val", "heldout"):
         os.makedirs(os.path.join(ROOT, OUT, CUT.format(s)), exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="b1cut_")
@@ -325,15 +328,42 @@ def do_cut(a):
                        tune_cmd=T["tune_cmd"], tune_target=T["tune_target"],
                        render=np.array("render_b1_replay --ego --match_floor --ground_uv_mult 1.0 --fps 20 "
                                        "--spawn 0 0, re-centred (translation only), fov 90; " + (room[0].strip() if room else "")))
-            np.savez_compressed(dst, **out)
+            tmpd = dst[:-4] + ".tmp.npz"
+            np.savez_compressed(tmpd, **out)
+            os.replace(tmpd, dst)
             print(f"{HEX_ORDER[i]:<16} w{w} start {st:3d} -> {split:<7} seed {seed:3d} ep{ep}  {time.time() - t0:.0f}s",
                   flush=True)
 
 
+def cut_dry_run():
+    """`cut` without rendering: the walks it reads and the clips it would write; each existing clip must carry the
+    window's (episode, condition, split, copy, seed, window start, source walk)."""
+    n = bad = 0
+    for i in range(24):
+        wp = walk_path(i)
+        with np.load(wp, allow_pickle=True) as T:
+            starts = [int(x) for x in T["window_starts"]]
+        print(f"read {os.path.relpath(wp, ROOT)}")
+        for w, st in enumerate(starts):
+            role = ROLES[(w + i) % 4]
+            split, seed, ep = split_of(role), seed_of(i, role), 50000 + 10 * i + w
+            dst = os.path.join(ROOT, OUT, CUT.format(split), f"b1_ep{ep}.npz")
+            n += 1
+            if not os.path.exists(dst):
+                print(f"  would render {os.path.relpath(dst, ROOT)}")
+                continue
+            with np.load(dst, allow_pickle=True) as d:
+                got = (int(d["expert_episode"]), int(d["cond_index"]), str(d["split"]), str(d["copy"]),
+                       int(d["room_seed"]), int(d["window_start"]), str(d["source_walk"]))
+            want = (ep, i, split, role, seed, st, os.path.relpath(wp, ROOT))
+            bad += got != want
+            if got != want:
+                print(f"  MISMATCH {os.path.relpath(dst, ROOT)}: {got} != {want}")
+    print(f"cut --dry_run: {n} windows, existing {sum(len(v) for v in b1_files().values())}, mismatches {bad}")
+
+
 def b1_files():
-    # the live B1 main clips are the camera-mount-corrected re-renders (build_branches b1_remount);
-    # the original cut (CUT) is in _superseded/b1_camera_yawed
-    return {s: sorted(glob.glob(os.path.join(ROOT, OUT, f"b1_clips_{s}", "*.npz"))) for s in ("train", "val", "heldout")}
+    return {s: sorted(glob.glob(os.path.join(ROOT, OUT, CUT.format(s), "*.npz"))) for s in ("train", "val", "heldout")}
 
 
 def do_check(a):
@@ -461,6 +491,7 @@ def main():
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--only", type=int, nargs="*", default=[])
     ap.add_argument("--port", type=int, default=23000)
+    ap.add_argument("--dry_run", action="store_true", help="cut: list reads / writes, check existing clips, no render")
     ap.add_argument("--video_conds", nargs=8, default=["speed_c5.8_bwd", "val", "turn_s0.56_neg", "heldout",
                                                        "side_L_lvl3", "train0", "speed_c8.15", "train1"])
     a = ap.parse_args()

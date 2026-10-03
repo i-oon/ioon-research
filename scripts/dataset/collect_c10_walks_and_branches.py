@@ -9,8 +9,8 @@ runs since the load (measured: at runs 1, 8, 85, 261, 361, and a class can come 
 its long walk AND all 288 branches -- runs on ONE instance session, and every branch is assigned to a class.
 
 Per condition (24), one worker process per CoppeliaSim instance:
-  1. commands of the walk (stored plan of data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_walks/<c>.npz, same length N) and of all
-     4 windows x 3 branch points x 24 commands (branch_points.json, same causal 4-frame cross-fade as
+  1. commands of the walk (stored plan of PLANS/<c>.npz = c10_walks/_work/plans, byte-identical copies of the stage-1 walks, same length N) and of all
+     4 windows x 3 branch points x 24 commands (branch_points_current.json, same causal 4-frame cross-fade as
      build_branches.hex_plan), computed before the scene is loaded;
   2. load once; 90 short warm-up runs (past the switch at run 85), then full walk runs until 3 consecutive
      ones agree bit for bit (the first class reference);
@@ -18,7 +18,7 @@ Per condition (24), one worker process per CoppeliaSim instance:
      equals bit for bit on frames T-10 .. T (a prefix matching no known walk -> one walk run, which identifies the
      current class or adds a new one); results are kept per class until one class has all 288 branches, and
      that class's walk run is saved as the walk; the own-command branch must equal that walk on all 31 frames;
-  4. render (render_hex_replay links mode): 4 main windows (rooms / seeds / re-centring as collect_c10_replay_superseded)
+  4. render (render_hex_replay links mode): 4 main windows (rooms / seeds / re-centring as beh24_conditions)
      and the 288 branches (source room, source window offset).
 
     .venv/bin/python3 scripts/dataset/collect_c10_walks_and_branches.py drive --ports 24600 24610 ...   (launch + supervise)
@@ -41,15 +41,16 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for p in ("", "scripts/dataset", "sim/collect", "sim/render", "sim/scene"):
     sys.path.insert(0, os.path.join(ROOT, p))
-from collect_c10_replay_superseded import ORDER, FAMILY, ROLES, EP, seed_of, split_of, schedule  # noqa: E402
+from beh24_conditions import ORDER, FAMILY, ROLES, EP, seed_of, split_of, schedule  # noqa: E402
 from collect_switch_hex import COND, KEYS, BASE, CENTRE  # noqa: E402
 from build_branches import hex_plan, code_of, PREFIX, BRANCH, NB, FADE, POINTS, CENTRE_NPZ, \
     PER_FRAME_HEX  # noqa: E402
 
 CW = os.path.join(ROOT, "data/counterfactual_walks")
-OLD = "_superseded/c10_replay_noise"   # stage-1 replay walks / clips (plans + branch-point keys)
-OLD_WALKS = os.path.join(CW, OLD, "hex_main_walks")
 WALKS = os.path.join(CW, "c10_walks")
+# the stage-1 replay walks (plans, window starts, lengths) this collection drives; copied byte-identical (sha256
+# checked 2026-10-03) from the superseded stage-1 tree, which may be deleted
+PLANS = os.path.join(WALKS, "_work", "plans")
 PHYS = os.path.join(WALKS, "_physics")
 SCENE = "medauroidea_c10f10t10.ttt"
 SPLITS = ("train", "val", "heldout")
@@ -85,13 +86,13 @@ def save_atomic(dst, **kw):
 
 
 def windows(i, c, W):
-    """[(w, start, role, split, seed, ep, old main path, points t, phases)] -- same rule as collect_c10_replay_superseded."""
+    """[(w, start, role, split, seed, ep, old main path, points t, phases)] -- same rule as beh24_conditions."""
     P = json.load(open(POINTS))
     out = []
     for w, st in enumerate(W["window_starts"]):
         role = ROLES[(w + i) % 4]
         split, seed, ep = split_of(role), seed_of(i, role), 40000 + 10 * i + w
-        old = f"data/counterfactual_walks/{OLD}/hex_main_{split}/hexapod_ep{ep}.npz"
+        old = f"data/counterfactual_walks/c10_clips_{split}/hexapod_ep{ep}.npz"   # points key (branch_points_current)
         v = P[old]
         assert v["ep"] == ep and v["cond_index"] == i
         out.append((w, int(st), role, split, seed, ep, old, list(v["t"]), list(v["phase"])))
@@ -112,7 +113,7 @@ def physics(sim, port, i, c, log):
     class until one class has all 288 branches; that class's walk is saved. A prefix matching no known class
     triggers a walk run (a new class appears) and the branch is classified again."""
     from scene_reuse import SceneReuse, state_hash
-    W = dict(np.load(os.path.join(OLD_WALKS, f"{c}.npz"), allow_pickle=True))
+    W = dict(np.load(os.path.join(PLANS, f"{c}.npz"), allow_pickle=True))
     N = len(W["actions"])
     g, st_, ph_, N2 = schedule(c)
     assert N2 == N and list(st_) == [int(x) for x in W["window_starts"]]
@@ -301,7 +302,7 @@ def render_condition(sim, i, c, log):
     log(f"{c}: 4 main clips rendered ({time.time() - t0:.0f} s)")
     beh = {}
     for s in SPLITS:
-        for p in glob.glob(os.path.join(CW, OLD, f"hex_main_{s}", "*.npz")):
+        for p in glob.glob(os.path.join(CW, f"c10_clips_{s}", "*.npz")):
             with np.load(p, allow_pickle=True) as f:
                 beh[int(f["cond_index"])] = str(f["behaviour"])
     winfo = {w: (st, split, seed, ep) for (w, st, role, split, seed, ep, *_r) in wins}
@@ -370,7 +371,7 @@ def render_condition(sim, i, c, log):
 def condition_done(i, c):
     if not os.path.exists(os.path.join(PHYS, f"{c}.npz")):
         return False
-    W = np.load(os.path.join(OLD_WALKS, f"{c}.npz"), allow_pickle=True)
+    W = np.load(os.path.join(PLANS, f"{c}.npz"), allow_pickle=True)
     wins = windows(i, c, W)
     return all(os.path.exists(main_path(s, ep)) and all(os.path.exists(cf_path(s, ep, t, ci)) for t in ts for ci in range(24))
                for (w, st, role, s, seed, ep, oldp, ts, phs) in wins)
@@ -423,7 +424,7 @@ def do_drive(a):
     log_dir = os.path.join(WALKS, "_logs")
     os.makedirs(log_dir, exist_ok=True)
     conds = a.conds or ORDER
-    lens = {c: len(np.load(os.path.join(OLD_WALKS, f"{c}.npz"))["actions"]) for c in conds}
+    lens = {c: len(np.load(os.path.join(PLANS, f"{c}.npz"))["actions"]) for c in conds}
     shares = [[] for _ in a.ports]
     for k, c in enumerate(sorted(conds, key=lambda c: -lens[c])):
         r = k % (2 * len(a.ports))
@@ -471,7 +472,7 @@ def do_drive(a):
 # ------------------------------------------------------------------------------------------------ B1 targets
 def do_targets(a):
     """Per-condition hexapod targets (mean of the 4 clip-mean CoM Froude labels) from c10_clips vs the targets
-    the B1 was tuned to (_superseded/c10_replay_noise/hex_main, b1_walks/targets.npy), and the B1 main clips (b1_clips) checked against the
+    the B1 was tuned to (b1_walks/targets.npy = the stage-1 replay clips' targets, historical), and the B1 main clips (b1_clips) checked against the
     new targets with the stage-2 tolerance max(10 %, 0.005) per channel (collect_b1_walks.ok)."""
     import wm.data.embodiment as E
     from collect_b1_walks import ok
@@ -488,12 +489,10 @@ def do_targets(a):
         assert sorted(T) == list(range(24)) and all(len(v) == 4 for v in T.values()), {k: len(v) for k, v in T.items()}
         return np.array([np.mean(T[i], 0) for i in range(24)]), np.array([np.std(T[i], 0) for i in range(24)])
     new, new_sd = means("c10_clips_{}", E.HEXAPOD)
-    old, _ = means(OLD + "/hex_main_{}", E.HEXAPOD)
-    tuned = np.load(os.path.join(CW, "b1_walks", "targets.npy"))
+    old = np.load(os.path.join(CW, "b1_walks", "targets.npy"))   # "old" = the targets the B1 was tuned to
     b1, _ = means("b1_clips_{}", E.B1)
     np.save(os.path.join(WALKS, "targets.npy"), new)
     f = lambda v: " ".join(f"{x:+.3f}" for x in v)  # noqa: E731
-    print(f"old hex targets == b1_walks/targets.npy: max |d| {np.abs(old - tuned).max():.2e}")
     print("cond | new hex target (fwd lat yaw) | old target | new - old | B1 clips mean | B1 - new | tol | within")
     nbad = 0
     for i, c in enumerate(ORDER):

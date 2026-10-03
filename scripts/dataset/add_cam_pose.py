@@ -1,4 +1,8 @@
-"""Back-fill `cam_pose` (per-frame world pose of the ego camera) into the v4 main clips (DATA_PLAN stage 3 A).
+"""Back-fill `cam_pose` (per-frame world pose of the ego camera) into the main clips (DATA_PLAN stage 3 A).
+
+Current sources (FILL_DIR): c10_clips_* (hexapod) and b1_clips_* (B1, corrected mount). Every current clip already has
+`cam_pose` from its renderer; `fill` recomputes it in place (frames untouched) and is only needed for a clip rendered
+without it. History: `fill` was first run 2026-10-01 on the stage-1/2 clips (since superseded, doc/DATA.md).
 
 The camera is rigidly parented to one body at render time, so its world pose is
     cam(t) = parent(t) * L,
@@ -7,13 +11,14 @@ frame, fixed by the mount rule (`ego_camera.attach_ego` at render time):
 - hexapod (`render_hex_replay.setup`): parent = the `/head` shape, whose recorded world pose is in
   `state_link_pose` (links mode, re-centred); L is the same for every clip (authored scene pose, room 8 m).
 - B1 (`render_b1_replay --ego --match_floor`): parent = the base (`base_visual`) at (`base_pos`, `base_quat`
-  w,x,y,z); L depends on the clip (the camera is aimed along the clip's frame-0 heading while the base is still
-  at its authored pose -- the pre-2026-10-02 rule, now `render_b1_replay --legacy_mount`), so it is read per
-  clip from the same setup (`render_b1_replay.ego_setup(legacy_mount=True)`). NOTE: with that rule the camera
-  yaw relative to the body = the clip's start heading; v4 B1 main clips look 0-168 deg off the body axis.
+  w,x,y,z); L is read per clip from the same setup (`render_b1_replay.ego_setup`, legacy_mount=B1_LEGACY = False:
+  b1_clips_* use the corrected mount, camera on the base's forward axis). The pre-2026-10-02 rule
+  (`--legacy_mount`, camera aimed along the clip's frame-0 heading, 0-168 deg off the body axis) applied to the
+  superseded stage-2 cut only.
 L is read from CoppeliaSim (`getObjectPose(cam, parent)`), the composition is done here in float64.
 Convention: render_b1_replay.CAM_POSE_CONVENTION (stored as `cam_pose_convention`).
 
+    .venv/bin/python3 scripts/dataset/add_cam_pose.py list              (files fill / verify read; no simulator)
     .venv/bin/python3 scripts/dataset/add_cam_pose.py fill  [--port P]
     .venv/bin/python3 scripts/dataset/add_cam_pose.py verify [--port P]   (re-render 2 clips per body, compare)
 """
@@ -33,6 +38,8 @@ from render_b1_replay import CAM_POSE_CONVENTION  # noqa: E402
 
 CW = os.path.join(ROOT, "data/counterfactual_walks")
 B1_SCENE = os.path.join(ROOT, "sim/env/b1_flat.ttt")
+FILL_DIR = {"hex": "c10_clips", "b1": "b1_clips"}       # current main clips
+B1_LEGACY = False                                       # b1_clips_* are rendered with the corrected mount
 
 
 def compose(parent, local):
@@ -51,9 +58,8 @@ def hex_local(sim):
     return np.asarray(sim.getObjectPose(cam, head), np.float64)
 
 
-def b1_local(sim, pos0, quat0, legacy=True):
+def b1_local(sim, pos0, quat0, legacy=B1_LEGACY):
     from render_b1_replay import ego_setup
-    # the v4 main clips were rendered with the pre-2026-10-02 mount rule (render_b1_replay --legacy_mount)
     root, joints, cam = ego_setup(sim, B1_SCENE, pos0, quat0, seed=0, legacy_mount=legacy)
     return np.asarray(sim.getObjectPose(cam, root), np.float64)
 
@@ -72,10 +78,6 @@ def b1_cam(d, L):
 
 def files_of(prefix):
     return sorted(p for s in ("train", "val", "heldout") for p in glob.glob(os.path.join(CW, f"{prefix}_{s}", "*.npz")))
-
-
-# `fill` was run on the stage-1/2 clips (2026-10-01), now under _superseded/
-FILL_DIR = {"hex": "_superseded/c10_replay_noise/hex_main", "b1": "_superseded/b1_camera_yawed/b1_main"}
 
 
 def files(body):
@@ -109,7 +111,7 @@ def do_fill(sim):
     print(f"B1: {len(files('b1'))} files")
 
 
-def do_verify(sim, port, b1_dirs=(FILL_DIR["b1"],), legacy=True):
+def do_verify(sim, port, b1_dirs=(FILL_DIR["b1"],), legacy=B1_LEGACY):
     """Re-render 2 clips per body with the renderers (which now report cam_pose) and compare."""
     import subprocess
     import tempfile
@@ -152,9 +154,15 @@ def do_verify(sim, port, b1_dirs=(FILL_DIR["b1"],), legacy=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("step", choices=("fill", "verify", "verify_remount"))
+    ap.add_argument("step", choices=("list", "fill", "verify", "verify_remount"))
     ap.add_argument("--port", type=int, default=23110)
     a = ap.parse_args()
+    if a.step == "list":
+        for b in ("hex", "b1"):
+            fs = files(b)
+            dirs = sorted({os.path.relpath(os.path.dirname(p), ROOT) for p in fs})
+            print(f"{b}: {len(fs)} files in {dirs}; all exist {all(os.path.exists(p) for p in fs)}")
+        return
     from coppeliasim_zmqremoteapi_client import RemoteAPIClient
     sim = RemoteAPIClient("localhost", port=a.port).require("sim")
     {"fill": lambda: do_fill(sim), "verify": lambda: do_verify(sim, a.port),

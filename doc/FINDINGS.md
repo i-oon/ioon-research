@@ -3760,7 +3760,7 @@ Conclusion: the coordinate objective was a small positive contributor to action-
 
 Morphology probe result: body identity decodable from `z` at 0.974 with the body term, 0.732 without (chance=0.5) — `z` is substantially body-identifiable. Validation motion also slightly worse without the term (0.6134 vs 0.5360).
 
-**Scoping correction (applied 2026-08-31, not a retraction):** `z` is not body-blind — every document claiming "morphology-agnostic z" was wrong and has been corrected. The agnosticism lives in the shared body-motion coordinate (forward/lateral/yaw, F127), not in `z` itself; wording is now "`z` maps to a shared body-motion coordinate." Changed in `doc/direction_plan.md` (3 places), `doc/START_HERE.md`, `report/presentation_proposal.md` (3 places). `report/update_slide.md` needed no change. F97's related claim is superseded by this section; earlier findings left as-written.
+**Scoping correction (applied 2026-08-31, not a retraction):** `z` is not body-blind — every document claiming "morphology-agnostic z" was wrong and has been corrected. The agnosticism lives in the shared body-motion coordinate (forward/lateral/yaw, F127), not in `z` itself; wording is now "`z` maps to a shared body-motion coordinate." Changed in `doc/_archive/direction_plan.md` (3 places), `doc/START_HERE.md`, `report/presentation_proposal.md` (3 places). `report/update_slide.md` needed no change. F97's related claim is superseded by this section; earlier findings left as-written.
 
 Note: `probe` = `MorphProbe(z)` classifying which body (not the 3-channel body-motion coordinate). The lambda_body=0 control has no trained body head, so no body-motion coordinate number exists for it.
 
@@ -4972,13 +4972,13 @@ Warm-starting `wm.train` (`--init_ckpt`) with a new body as a source looks like 
 
 The scale confound found and fixed is a real fact about this mechanism but is not a finding about claim (3): the right adaptation pipeline already existed (`wm/adapt.py`, `wm/fit_projector.py`, `wm/adapt3.py`, `wm/fit_body_head.py`, validated at F122/F123) and was not used here. See F183, where B1 grounds decisively via the correct pipeline, including on the forward channel that looked broken here.
 
-Checkpoints/flags from this dead end were removed; use `wm.finetune_new_body` (`doc/FINETUNE_GUIDE.md`) for any future body.
+Checkpoints/flags from this dead end were removed; use `wm.finetune_new_body` (`doc/_archive/FINETUNE_GUIDE.md`) for any future body.
 
 ---
 
 ### F183. LAC-WM's actual staged adaptation recovers B1 decisively (forward included), correcting F182's mechanism
 
-F182's `wm.train --init_ckpt` "fine-tune" was never LAC-WM's adaptation procedure. The correct one, merged into `wm.finetune_new_body` and documented in `doc/FINETUNE_GUIDE.md`:
+F182's `wm.train --init_ckpt` "fine-tune" was never LAC-WM's adaptation procedure. The correct one, merged into `wm.finetune_new_body` and documented in `doc/_archive/FINETUNE_GUIDE.md`:
 
     stage 1  wm.adapt          fine-tune ONLY ITM+FTM on new body's clips, else frozen
     stage 2  (new, generic)    fit action projector against the adapted ITM's z
@@ -5001,7 +5001,7 @@ Note (from F189): the stage-1 rollout ratio quoted here (1.55x down to 1.23-1.47
 Selection/control on this checkpoint: see F184-F188 (mode A/D clear, rollout does not). Gecko's version of this pipeline: see F189 (fails at stage 4, 1.010x).
 
 Scripts: `wm.finetune_new_body`, `wm.adapt`, `wm.fit_projector`, `wm.assemble_teacher`, `wm.fit_body_head`.
-Checkpoints: `wm/runs/b1_adapt/adapted_b1.pt` (stage 1), `wm/runs/b1_adapt/projector_b1.pt` (stage 2), `wm/runs/b1_adapt/teacher_b1.pt` (merged), `wm/runs/b1_adapt/body_head_b1.pt` (stage 4). Manual: `doc/FINETUNE_GUIDE.md`.
+Checkpoints: `wm/runs/b1_adapt/adapted_b1.pt` (stage 1), `wm/runs/b1_adapt/projector_b1.pt` (stage 2), `wm/runs/b1_adapt/teacher_b1.pt` (merged), `wm/runs/b1_adapt/body_head_b1.pt` (stage 4). Manual: `doc/_archive/FINETUNE_GUIDE.md`.
 
 **F293 note.** Affected: the B1 rho and held-out ratio (1.330x -> 0.751x) are fit and scored against
 `data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
@@ -5169,7 +5169,7 @@ Supersedes this entry's own first version ("babble narrowness" diagnosis) — bo
 | B1 | 3.627 | 3.698 | worse | succeeds (0.751) |
 | gecko | 3.994 | 3.878 | better | fails (1.010) |
 
-Stage-1 rollout quality is anti-correlated with downstream success across the only two cases tested — not a valid gate. Also: frozen, never-adapted model already beats holding-frame-still on both robots (1.55x, 1.57x), contradicting `doc/FINETUNE_GUIDE.md`'s stated stage-1 premise.
+Stage-1 rollout quality is anti-correlated with downstream success across the only two cases tested — not a valid gate. Also: frozen, never-adapted model already beats holding-frame-still on both robots (1.55x, 1.57x), contradicting `doc/_archive/FINETUNE_GUIDE.md`'s stated stage-1 premise.
 
 **Correction 2 — gecko's body frame used the wrong axis.** `forward_axis`/`heading` read gecko's forward from body x-axis, whose horizontal projection has mean length 0.065 (reaches 0.000) across all 36 babble clips — 99.9% of frames have meaningless `arctan2`. Heading jumped up to 358 deg between consecutive 50Hz frames (16.8% of steps >90 deg; B1's worst step: 2 deg), scrambling forward/lateral (not just yaw) and the reported Froude calibration (gecko never actually walked at the believed 0.133-0.138). Correct axis is -(body y): horizontal length 0.998, 0% unstable frames, zero per-step jumps over 2,340 steps. Effect on frozen-embedding ridge ceilings: forward +0.244→+0.303, lateral +0.606(inflated)→+0.285, yaw -0.042(dead)→+0.362-0.501 (now the strongest channel).
 
@@ -5279,7 +5279,7 @@ Scripts: `wm/policy/planner.py` (`DirectFroudePlanner.free_offset`, `score_offse
 
 ### F194. Q21's clean 2x2x2: babble substitutes for the teacher library on family accuracy, but not on the more trustworthy continuous distance metric — genuinely open
 
-Pre-registered (`doc/OPEN_QUESTION.md` Q21): babble substitutes if it clears its own chance AND `capture_ratio = lift_babble/lift_expert >= 0.5`. One script/run/log: `scripts/run/b1_babble_clean_redo.sh`, `results/wm/dataset/b1_babble/clean_redo_log.txt`. Checkpoints: `wm/runs/b1_babble_clean/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt`. Data: `data/egocentric/b1_babble_ego_flat/`.
+Pre-registered (`doc/_archive/OPEN_QUESTION.md` Q21): babble substitutes if it clears its own chance AND `capture_ratio = lift_babble/lift_expert >= 0.5`. One script/run/log: `scripts/run/b1_babble_clean_redo.sh`, `results/wm/dataset/b1_babble/clean_redo_log.txt`. Checkpoints: `wm/runs/b1_babble_clean/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt`. Data: `data/egocentric/b1_babble_ego_flat/`.
 
 Headline cell (goal=A physics, free_offset=False — untouched by F193's bugs):
 
@@ -5288,7 +5288,7 @@ Headline cell (goal=A physics, free_offset=False — untouched by F193's bugs):
 | family accuracy | 69% (chance 45%, lift +24) | 96% (chance 56%, lift +40) | 0.60 | clears 0.5 |
 | Froude distance (lower better) | 0.1133 (chance 0.1518, lift 0.0385) | 0.0735 (chance 0.1584, lift 0.0849) | 0.45 | fails 0.5 |
 
-Verdict flips by metric; Froude distance is the more trustworthy one since family accuracy is a coarse same-family-counts-as-correct proxy. Per-family: fwd 78% (50/64), lat 50% (16/32) — lateral weaker, consistent with F192. Step 1 (does babble substitute for the teacher library) remains genuinely open (`doc/OPEN_QUESTION.md` Q21).
+Verdict flips by metric; Froude distance is the more trustworthy one since family accuracy is a coarse same-family-counts-as-correct proxy. Per-family: fwd 78% (50/64), lat 50% (16/32) — lateral weaker, consistent with F192. Step 1 (does babble substitute for the teacher library) remains genuinely open (`doc/_archive/OPEN_QUESTION.md` Q21).
 
 Mechanism behind babble's weaker D-mode robustness: expert candidates have 0% chance their nearest neighbor (predicted-Froude space) is a different family (perfectly separated); babble has 19% of candidates at a zero-margin family boundary. A v2 fix attempt (bigger lateral strafe amplitude) failed — margin checked in TRUE Froude space doesn't transfer to PREDICTED Froude space (F110: direction right, extent wrong); cross-family risk stayed 19%. Corrected rule (memory `babble-generation-rule-target-pretrain-range.md`): margin must be checked through a fitted checkpoint's prediction, never raw motion.
 

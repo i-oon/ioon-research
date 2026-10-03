@@ -37,6 +37,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.data.emb_cache import load_cache, n_entries, note, save_cache  # noqa: E402
 from wm.data.strided import action_chunks, first_pair_of, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.action_projector import ActionProjector  # noqa: E402
@@ -65,6 +66,7 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
         clip = load(path, REGISTRY[name])
         if path not in cache:
             cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu().half()
+            note(cache, path)
         e = cache[path].float().to(device)
         off = offset_for(checkpoint, name)
         if off is not None:
@@ -125,8 +127,8 @@ def main():
         p.requires_grad_(False)
 
     cache_path = os.path.join(ROOT, args.cache)
-    cache = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
-    before = len(cache)
+    cache = load_cache(cache_path)
+    before = n_entries(cache)
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     lag = max(1, cfg.action_lag)
     k = stride_of(cfg)
@@ -140,9 +142,8 @@ def main():
                             cache, args.chunk, lag, device, tuple(args.exclude), k=k)
     if not data:
         raise SystemExit("no source directories given")
-    if len(cache) > before:
-        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        torch.save(cache, cache_path)
+    if n_entries(cache) > before:
+        save_cache(cache, cache_path)
     # 300M frozen parameters that nothing below uses; on an 11 GB card that is the difference
     # between the rollout batching fitting and not
     del encoder, cache

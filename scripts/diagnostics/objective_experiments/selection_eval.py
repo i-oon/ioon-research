@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "control"))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "diagnostics", "objective_experiments"))
 
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.data.emb_cache import load_cache, note, save_cache  # noqa: E402
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.policy.planner import RolloutFroudePlanner, load_candidates  # noqa: E402
 from final_2x2x2_test import build_planner  # noqa: E402
@@ -115,30 +116,31 @@ def main():
     gemb = {}
     if args.goal_source == "vision":
         gc = os.path.join(ROOT, args.goal_cache)
-        gemb = torch.load(gc, map_location="cpu") if os.path.exists(gc) else {}
+        gemb = load_cache(gc)
         miss = [p for p in goal_paths.values() if p not in gemb]
         if miss:
             from vjepa2_encoder import VJEPA2FrameEncoder
             encoder = VJEPA2FrameEncoder(dtype=torch.float32)
             for p in miss:
                 gemb[p] = encode_clip(encoder, load(p, REGISTRY["hexapod"])["frames"], 2).cpu().half()
+                note(gemb, p)
             del encoder
             torch.cuda.empty_cache()
-            torch.save(gemb, gc)
+            save_cache(gemb, gc)
     emb = {}
     if need_frames:
         cache_path = os.path.join(ROOT, args.cache)
-        emb = torch.load(cache_path, map_location="cpu") if os.path.exists(cache_path) else {}
+        emb = load_cache(cache_path)
         missing = [c["path"] for c in cands if c["path"] not in emb]
         if missing:
             from vjepa2_encoder import VJEPA2FrameEncoder
             encoder = VJEPA2FrameEncoder(dtype=torch.float32)
             for p in missing:
                 emb[p] = encode_clip(encoder, load(p, spec_b1)["frames"], 2).cpu().half()
+                note(emb, p)
             del encoder
             torch.cuda.empty_cache()
-            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-            torch.save(emb, cache_path)
+            save_cache(emb, cache_path)
 
     results = {}
     for spec_str in args.ckpt:

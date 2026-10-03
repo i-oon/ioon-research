@@ -4,7 +4,7 @@
   B1 (base_pos / base_quat / joint_pos): wm.data.com.b1_com (MuJoCo subtree CoM of the trunk)
 
 Clips without the needed state are skipped (and listed). Collectors write `com_pos` themselves since
-2026-10-01 (collect_ik --record_state, collect_c10_replay_superseded cut, rollout_b1_mujoco, render_b1_replay,
+2026-10-01 (collect_ik --record_state, stage-1 replay cut, rollout_b1_mujoco, render_b1_replay,
 build_b1_cf_branches).
 
     .venv/bin/python3 scripts/dataset/add_com_pos.py DIR [DIR ...]

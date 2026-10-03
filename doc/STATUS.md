@@ -44,20 +44,28 @@ Every file: `com_pos` (Froude at the centre of mass), `cam_pose`; branches also 
 | `eval_suite.sh` on v4 data; read-out on the heldout physics branches (`counterfactual_readout.py`) | |
 | Label tests `tests/test_froude_labels.py` 9/9 (missing data fails) | |
 | Camera vs body motion checked against LAC-WM / Egocentric VSM; `cam_pose` recorded | open items |
+| Lazy frame loading (`wm/data/frame_store.py`, memory-mapped cache in `data/_frame_cache/`, RAM guard 8 GB); arm B 0 GB frames in RAM, 0.8 s/step, bit-identical to the eager loader | |
+| Eval embedding caches stamped with file size + mtime (`wm/data/emb_cache.py`); stale entries re-encoded; shared latent reads c08 heldout (`--c08`), not the archived beh12 dir | |
 
 ## Next, in order
 
 1. **Commit** (user runs it) + rsync `data/counterfactual_walks/` (current dirs only, see `doc/DATA.md`) to the server.
-2. **Round 1 (server, 2 GPUs):** new script on v4 data — joint c10 + B1 pretraining on main clips only vs + both bodies' branches (equal step budget); evaluate both with `scripts/run/eval_suite.sh`.
+2. **Round 1 (running 2026-10-03):** `scripts/run/round1_counterfactual.sh` — arm A `round1_clips_s0` (clips only, server GPU 0) vs arm B `round1_branches_s0` (clips + both bodies' branches, local); joint c10 + B1, ~30k steps each, seed 0. Evaluate both with `scripts/run/eval_suite.sh NAME joint wm/runs/NAME/best.pt`. **Decision rule, written before the results:**
+   - *Training long enough:* if arm B's best validation is at its last epoch (3), continue it with `--resume` 3 more epochs before judging; arm A (45 epochs, best of 15 checks) is judged at its best.
+   - *Primary (does the model see another action's future):* counterfactual read-out on the heldout branches, Pearson r mean over fwd / lat / yaw, real future and FTM-predicted future. Branches help if arm B beats arm A by ≥ 0.10 on the FTM-predicted future on both c10 and B1.
+   - *Secondary (does it reach selection):* rollout from the robot's current frame, normalised score, B1 and c10; improves by ≥ 0.10 with direct not worse by > 0.05.
+   - *Noise:* one seed per arm; seed-to-seed differences seen before were up to ~0.1 normalised score, so a difference < 0.10 is "no difference" until a second seed.
+   - c08 (zero-shot) is reported, not used to decide.
 3. **Render-shift test set** + **augmentation pilot** (update `aug_pilot*.sh` to v4 paths first).
-4. **Round 2:** camera vs body options (frame-conditioned decoder / camera target), randomised or multi-version rendering, second seed, longer branches if post-switch rollout is weak.
+4. **Round 2:** camera vs body options (frame-conditioned Froude head / camera target), randomised or multi-version rendering, second seed, longer branches if post-switch rollout is weak.
 5. **Physics closed loop** with heldout goals; then **slides once**.
-6. Housekeeping: `build_branches.py` / `collect_b1_walks.py cut` / `add_cam_pose.py fill` still read their sources from `_superseded/` (branch points were keyed on those clip paths) -- re-key to the current clips before regenerating anything; `collect_beh24.py --verify` rewrite; delete `data/counterfactual_walks/_superseded/` (~24 GB) once round 1 passes.
+6. Housekeeping: data scripts re-keyed to the current clips (2026-10-03: `branch_points_current.json`, walk plans copied to `c10_walks/_work/plans/`, shared constants in `scripts/dataset/beh24_conditions.py`); no current script reads `_superseded/`. Delete `data/counterfactual_walks/_superseded/` (~24 GB), `data/_archive_old_datasets/` and old runs only after round 1 is evaluated and the user agrees.
 
 ## Open decisions / known issues
 
 - Sideways hexapod heading drift (up to ±28°): accepted; revisit if side goals are worst in the baseline eval.
-- **Camera vs body motion:** LAC-WM splits z into end-effector + camera targets and conditions its motion decoder on the current frame; Egocentric VSM supervises base motion only. Round 2 tries (1) frame-conditioned decoder, (2) extra camera target (fwd/lat only, CoM-height scaling), vs the z-only Froude head. Decide by measurement.
+- **Camera vs body motion:** LAC-WM splits z into end-effector + camera targets and conditions its motion decoder on the current frame; Egocentric VSM supervises base motion only. Round 2 tries (1) frame-conditioned Froude head (the same 3-d Froude target, one head for all bodies, reads the current frame + z; NOT the removed per-body joint-command decoder), (2) extra camera target (fwd/lat only, CoM-height scaling), vs the z-only Froude head. Decide by measurement.
+- **Bounce / roll / pitch (2026-10-03, not added):** not targets of the shared Froude head — they are gait-specific (tripod vs trot), not the same behaviour across bodies; near zero when averaged over a step; the FTM's reconstruction already has to model the camera sway. Measure first after round 1: (a) single-frame frozen-encoder probe -> Froude, fit on train rooms, tested on heldout rooms (speed visible without the room?); (b) share of camera motion (`cam_pose`) left unexplained by fwd / lat / yaw. Only if both show a real gap: per-body auxiliary sway head (not shared), or the frame-conditioned option.
 - **Multi-version rendering** (each clip in K rooms, one version per training sample) proposed for randomised rendering; lighting is fixed for both bodies today.
 - **Branch length 20 frames (1 s) kept** (user). In 1 s the post-switch motion is still in transition (median fraction of steady target in the last 10 frames: hexapod fwd/lat/yaw 0.95 / 0.72 / 0.84, B1 0.90 / 0.91 / 0.54; direction and ordering correct, r 0.95-1.0). States 1-2 s after a switch are in no data set. Measure: multi-step rollout after the branch on heldout (up to 4 steps) and the physics closed loop for longer horizons; if weak, add 40-frame branches or multi-switch clips.
 - Ego view of the bigger body changes ~2x slower at equal Froude (room scaled by height): a real cross-body difference.

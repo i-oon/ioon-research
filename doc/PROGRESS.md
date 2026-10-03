@@ -1123,7 +1123,7 @@ cross-attention ที่มี `z` เป็น query จึงดึงมา�
 | **coverage ไม่พอ** | **ยืนยัน — ทางเดียวที่ได้ผล (F14, F15)** |
 | **decoder เข้าถึงภาพผ่านช่องทางที่ผิด** | **เหลืออันนี้ → Q6** |
 
-ผลทั้งหมดพร้อมตัวเลขอยู่ใน [FINDINGS.md](FINDINGS.md) F17–F18 และ [OPEN_QUESTION.md](OPEN_QUESTION.md) Q5 (ปิดแล้ว) / Q6 (เปิดใหม่)
+ผลทั้งหมดพร้อมตัวเลขอยู่ใน [FINDINGS.md](FINDINGS.md) F17–F18 และ [OPEN_QUESTION.md](_archive/OPEN_QUESTION.md) Q5 (ปิดแล้ว) / Q6 (เปิดใหม่)
 
 ### 18.11 Q6 — ให้ decoder เข้าถึงภาพโดยตรง (2026-08-09)
 
@@ -2761,7 +2761,7 @@ fit projector ใหม่ → (ถ้าจำเป็น) fine-tune ร่ว
 FINDINGS.md เหลือแค่บทเรียนสั้นๆ ชี้ไปที่ F183 แทน
 
 **สร้าง pipeline ที่ถูกต้องรวมเป็นคำสั่งเดียว** — `wm/finetune_new_body.py` (stage 1 adapt → stage 2
-fit projector generic → stage 3 optional → stage 4 fit_body_head) พร้อมคู่มือ `doc/FINETUNE_GUIDE.md`
+fit projector generic → stage 3 optional → stage 4 fit_body_head) พร้อมคู่มือ `doc/_archive/FINETUNE_GUIDE.md`
 รันจริงกับ B1 (warm-start จาก `beh12_hexonly_stopgrad`, ไม่ rehearse hexapod เลยตามที่ผู้ใช้ชี้ว่า
 claim (3) ไม่ต้องการรักษา hexapod ไว้ — ต้องการแค่ทำให้ตัวใหม่ดี):
 
@@ -2943,7 +2943,7 @@ not the closest"* **ขัดกับตารางบรรทัดถัด
 ไม่ใช่ full pretrain — **ยังไม่มีใครรู้ว่าเทรนเต็มที่จะข้ามเกณฑ์ได้ไหม**
 
 **เอกสารที่แก้**: `feedbacks/feedback_ajan_go.md` (จัดฟอร์แมต Week 15 + เพิ่ม W13-1/2, W15-1..5 ใน
-ตาราง action items), `doc/OPEN_QUESTION.md` (Q21), `doc/direction_plan.md` (§1.3), `doc/FINDINGS.md`
+ตาราง action items), `doc/_archive/OPEN_QUESTION.md` (Q21), `doc/_archive/direction_plan.md` (§1.3), `doc/FINDINGS.md`
 (แก้ประโยคที่อ่านตัวเลขกลับด้าน)
 
 ---
@@ -3047,7 +3047,7 @@ episode ตอนล้ม, correlated noise, command curriculum, feet air-time)
 กว่า F202 (ไม่เกี่ยวกับคุณภาพ babble เลย) **ตอนนี้ไม่คิดว่าการไล่แก้ทีละกลไกจะคุ้มค่าต่อไปแล้ว** ทางที่
 เหลือจริงๆ มีแค่ (ก) เพิ่ม compute อีกมาก (ไม่มีหลักฐานว่าจะช่วย และช่องว่างกับ reference ยังใหญ่มาก)
 หรือ (ข) กลับไปที่สาย candidate-scoring (F201/F202) ซึ่งใช้ได้แล้วกับ B1 เอง (20.8%) แต่ติดที่คุณภาพ
-babble บนหุ่นที่ไม่เคยเห็นจริงๆ. อัปเดต F204/F205 และ Q21 ใน `doc/FINDINGS.md`/`doc/OPEN_QUESTION.md`
+babble บนหุ่นที่ไม่เคยเห็นจริงๆ. อัปเดต F204/F205 และ Q21 ใน `doc/FINDINGS.md`/`doc/_archive/OPEN_QUESTION.md`
 แล้ว (แก้ในที่เดิม ไม่ stack)
 
 ---
@@ -3081,7 +3081,7 @@ tracking_reward เฉลี่ย 0.336 — **สูงกว่าเพดา
 สรุปได้ว่า 2 บั๊กนี้ (ไม่ใช่กลไก RL ไหนเลยที่ลองมา 6 ทาง) น่าจะเป็นคำตอบจริงว่าทำไม tracking ไม่เคยขยับ
 เลยตลอดทั้ง arc — **environment เดิมไม่มีทางให้ reward กับการเดินจริงได้เลย ต่อให้ policy บังเอิญเดินถูก
 ก็ตาม** กำลังเทรนใหม่ทั้งหมดบน environment ที่แก้แล้ว (พี่ให้สิทธิ์รันเองระหว่างพักผ่อน) อัปเดต F206 +
-Q21 ใน `doc/FINDINGS.md`/`doc/OPEN_QUESTION.md` แล้ว
+Q21 ใน `doc/FINDINGS.md`/`doc/_archive/OPEN_QUESTION.md` แล้ว
 
 ---
 

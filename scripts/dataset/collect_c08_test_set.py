@@ -2,7 +2,7 @@
 deterministic heldout data (collect_c10_walks_and_branches.py, FINDINGS F305)
 -> data/counterfactual_walks/c08_walks (24 walks), c08_clips_heldout (24 clips), c08_branches_heldout (1728 branches).
 
-Same as c10, per condition i (collect_c10_replay_superseded.ORDER):
+Same as c10, per condition i (beh24_conditions.ORDER):
   - commands: the c10 walk's plan (c10_walks/<c>.npz plan_*, same length N, same CPG parameters:
     cycles 8.8 * N / 66, spin_amp 0.25, mirror (0, 1, 2)); the CPG centre pose is c08's OWN, fitted (bias +
     sinusoids, residual 1.2e-7 rad) from the c08 speed_c7.1 raw-pose clip data/egocentric/beh12_c08f09t09_ego_flat/
@@ -40,7 +40,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for p in ("", "scripts/dataset", "sim/collect", "sim/render", "sim/scene"):
     sys.path.insert(0, os.path.join(ROOT, p))
-from collect_c10_replay_superseded import ORDER, FAMILY, ROLES, EP  # noqa: E402
+from beh24_conditions import ORDER, FAMILY, ROLES, EP  # noqa: E402
 from collect_switch_hex import COND, KEYS, BASE  # noqa: E402
 from build_branches import hex_plan, code_of, PREFIX, BRANCH, NB, FADE, POINTS  # noqa: E402
 from collect_c10_walks_and_branches import (DRIVE_KW, CMP, SHORT_WARM, WARM_MIN, save_atomic, cpg_phase, _instance_pid,  # noqa: E402
@@ -83,7 +83,7 @@ def heldout_window(i, c):
     w = [k for k in range(4) if ROLES[(k + i) % 4] == "heldout"][0]
     st = int(W["window_starts"][w])
     ep10 = 40000 + 10 * i + w
-    v = json.load(open(POINTS))[f"data/counterfactual_walks/_superseded/c10_replay_noise/hex_main_heldout/hexapod_ep{ep10}.npz"]
+    v = json.load(open(POINTS))[f"data/counterfactual_walks/c10_clips_heldout/hexapod_ep{ep10}.npz"]
     assert v["ep"] == ep10 and v["cond_index"] == i
     return w, st, ep10, EP0 + 10 * i + w, 200 + i, [int(x) for x in v["t"]], [float(x) for x in v["phase"]]
 
@@ -423,7 +423,7 @@ def do_check(a):
     achieved CoM Froude per condition vs c10 (same window of the c10 det walk, and the c10 4-window mean)."""
     import wm.data.embodiment as E
     from wm.data.com import hex_com
-    from collect_c10_replay_superseded import tilt_deg
+    from beh24_conditions import tilt_deg
     sign_ch = {"fwd": (0, 1), "bwd": (0, -1), "turn_left": (2, 1), "turn_right": (2, -1), "side_L": (1, 1), "side_R": (1, -1)}
     fails = []
     files = sorted(glob.glob(os.path.join(MAIN, "*.npz")))

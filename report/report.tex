@@ -1,10 +1,8 @@
 % ============================================================================
 %  KMUTT GRADUATE THESIS PROPOSAL  (ENGLISH)
-%  Cross-Embodiment Locomotion Transfer from Egocentric Visual World Model
+%  CELT-VWM: Cross-Embodiment Locomotion Transfer with a Latent-Action Visual World Model
 %  Content migrated from report/report_proposal.md (2026).
-%  Compile with pdfLaTeX (run twice for Contents / cross-refs).
-%  NOTE: the Thai abstract renders only under XeLaTeX/LuaLaTeX (a Thai font is
-%  loaded conditionally below); under pdfLaTeX it prints a one-line placeholder.
+%  Compile with XeLaTeX (Overleaf: Menu -> Compiler -> XeLaTeX).
 % ============================================================================
 \documentclass[12pt,a4paper,oneside]{report}
 
@@ -34,7 +32,13 @@
   \usepackage[utf8]{inputenc}
 \fi
 \usepackage{amsmath}
-\usepackage{newtxtext,newtxmath}   % Times New Roman-compatible text + math (all engines)
+\ifThai
+  \setmainfont{TeX Gyre Termes}
+  \usepackage{unicode-math}
+  \setmathfont{TeX Gyre Termes Math}
+\else
+  \usepackage{mathptmx}
+\fi
 % newtx's own typewriter shape (t1xtt, from txfonts) is not installed in this TeX distribution,
 % which makes any \texttt fatal under pdfLaTeX. Latin Modern's typewriter shape is a standard
 % part of every TeX install (no extra package, so no further missing-dependency risk) and is
@@ -182,7 +186,7 @@
     {\includegraphics[width=32mm]{image/kmutt.jpg}}%
     {\framebox[32mm]{\rule{0pt}{18mm}\small KMUTT logo}}\par
   \vspace{5mm}
-  \MakeUppercase{Cross-Embodiment Locomotion Transfer from Egocentric Visual World Model}\par
+  \MakeUppercase{CELT-VWM: Cross-Embodiment Locomotion Transfer with a Latent-Action Visual World Model}\par
   \vfill
   \MakeUppercase{Miss Disthorn Suttawet}\par
   \vfill
@@ -201,7 +205,7 @@
 \thispagestyle{empty}
 \begin{center}
   {\fontsize{12}{20}\selectfont
-   Cross-Embodiment Locomotion Transfer from Egocentric Visual World Model\par}
+   CELT-VWM: Cross-Embodiment Locomotion Transfer with a Latent-Action Visual World Model\par}
   \vspace{8mm}
   {\fontsize{12}{20}\selectfont Miss Disthorn Suttawet\par}
   \vspace{10mm}
@@ -280,7 +284,7 @@
 \addcontentsline{toc}{frontmatter}{ABSTRACT}
 \noindent
 \begin{tabular}{@{}p{4.8cm}p{9.7cm}@{}}
-Research Project Title    & Cross-Embodiment Locomotion Transfer from Egocentric Visual World Model\\[2mm]
+Research Project Title    & CELT-VWM: Cross-Embodiment Locomotion Transfer with a Latent-Action Visual World Model\\[2mm]
 Research Project Credits  & 6\\[2mm]
 Candidate                 & Miss Disthorn Suttawet\\[2mm]
 Research Project Advisors & Mr. Bawornsak Sakulkueakulsuk\\[2mm]
@@ -2698,7 +2702,7 @@ match is selected. The candidates are recorded actions, so nothing here invents 
 
 \noindent The test crosses 2 ways of producing the goal (from the recorded number, physics, or from the source video, vision) with 2 ways of scoring a candidate (directly from its action, or through a rollout of the Forward Transition Model). They are separated on purpose, since bundling them confounded an earlier version of this test.
 
-\subsection{Experiment 3.4: Goal Source and Scoring Mechanism (2$\times$2 Comparison)}
+\subsection{Experiment 3.4: Goal Source and Scoring Mechanism (2\texorpdfstring{$\times$}{×}2 Comparison)}
 
 
 \textbf{Assumption:} candidate scoring can fail on either axis independently, the goal's source (vision versus privileged) or the scoring mechanism (direct versus rollout), and the 2 must be crossed, not bundled, or a failure cannot be attributed.

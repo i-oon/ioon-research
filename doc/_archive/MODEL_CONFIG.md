@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Describes an earlier pipeline or plan; not current. Current state: `doc/STATUS.md`, `ARCHITECTURE.md`, `doc/DATA.md`.
+
 # Model & Training Config
 
 Quick reference. Two columns throughout where they differ: the **default** in `wm/config.py`, and

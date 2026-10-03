@@ -1,3 +1,5 @@
+> **Archived 2026-10-03.** Describes an earlier pipeline or plan; not current. Current state: `doc/STATUS.md`, `ARCHITECTURE.md`, `doc/DATA.md`.
+
 # RL stage: ตัวควบคุมที่รับเป้าหมายเป็นค่า Froude
 
 ทุกตัวเลขอ่านจากรันจริง 2026-09-13

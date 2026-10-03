@@ -51,7 +51,7 @@ Every table names the metric it uses.
 | Cross-body retrieval | For each c10 transition, the nearest neighbour in standardised z among another body's transitions: 1 − L2(Froude, neighbour's Froude) / mean L2(Froude, random transition of that body) | 0 = random, 1 = identical motion / higher |
 
 - **Froude:** with hip height h and gravity g, forward and lateral speed in the body frame are divided by √(g·h), and yaw rate is multiplied by √(h/g).
-- **Normalised-score bounds (oracle / random error):** B1 0.031 / 0.126; c08 0.020 / 0.121; c10 0.0135 / 0.1535.
+- **Normalised-score bounds (oracle / random error):** B1 0.034 / 0.127 (library of 23 clips); c08 0.020 / 0.121; c10 0.0135 / 0.1535.
 
 ---
 
@@ -115,9 +115,9 @@ With LoRA, 3 clips of the new body are as good as 15 (rollout error: hexapod 0.7
 |---|---|
 | LoRA rank 2, 1000 steps | +0.68 / +0.56 / +0.32 |
 | LoRA rank 8, 3000 steps | **+0.87 / +0.66 / +0.41** |
-| LoRA rank 8, 3000 steps, current B1 rendering, S0 / S1 | +0.81 / +0.49 / +0.46, +0.69 / +0.40 / +0.41 |
+| LoRA rank 8, 3000 steps, current B1 data, S0 / S1 | +0.83 / +0.39 / +0.39, +0.74 / +0.29 / +0.29 |
 
-First two rows: earlier B1 rendering, S0. The old pipeline on the current rendering (S0): +0.73 / +0.29 / +0.14.
+First two rows: earlier B1 data, S0. The old pipeline on the current data (S0): (re-measuring).
 
 ---
 
@@ -133,15 +133,15 @@ The two versions are identical except for an extra motion decoder that predicts 
 | c08 zero-shot, direct | +0.80 | +0.79 | +0.78 | +0.79 |
 | c08, rollout (candidate's recorded frame) | +0.47 | +0.54 | +0.56 | +0.63 |
 | c08, rollout (robot's actual current frame) | +0.52 | +0.43 | +0.53 | +0.54 |
-| B1 adapted, direct | +0.74 | +0.80 | +0.81 | +0.69 |
-| B1, rollout (candidate's recorded frame) | +0.60 | +0.53 | +0.49 | +0.40 |
-| B1, rollout (robot's actual current frame) | +0.46 | +0.43 | +0.46 | +0.41 |
+| B1 adapted, direct | +0.80 | +0.85 | +0.83 | +0.74 |
+| B1, rollout (candidate's recorded frame) | +0.54 | +0.34 | +0.39 | +0.29 |
+| B1, rollout (robot's actual current frame) | +0.46 | +0.38 | +0.39 | +0.29 |
 
 B1 rows: B1 adapted with the page 2 pipeline on the current rendering. c10 and c08 need no adaptation.
 
 - The hexapods: equal, Froude only slightly ahead on c08 rollout from the recorded frame.
-- The B1: equal on direct and on rollout from the current frame; the joint-command decoder is ahead on rollout from the recorded frame (+0.53 to +0.60 vs +0.40 to +0.49).
-- The current pipeline uses Froude only: one fewer per-body part, no loss measured.
+- The B1: equal on direct; the joint-command decoder is ahead on rollout by about 0.1 (recorded frame +0.34 to +0.54 vs +0.29 to +0.39; current frame +0.38 to +0.46 vs +0.29 to +0.39).
+- The current pipeline uses Froude only (one fewer per-body part); on the B1's rollout it costs about 0.1.
 
 ---
 
@@ -250,38 +250,38 @@ The Froude head reads the same motion from c10, c08 and B1 only if their latents
 
 | pretraining | body-ID probe | cross-body R² c10 → c08 | cross-body R² c10 → B1 | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
 |---|---|---|---|---|---|---|
-| hexapod only (B1 not adapted) | 0.67 | +0.71 / +0.30 / +0.24 | −1.41 / −0.01 / −0.52 | 0.45 | 0.43 | 0.10 |
-| hexapod only, B1 adapted (page 2 pipeline; mean S0 / S1) | 0.67 | +0.72 / +0.34 / +0.20 | −0.56 / +0.05 / −0.62 | 0.46 | 0.40 | 0.15 (0.18 / 0.11) |
-| joint, no similarity loss | 0.71 | +0.76 / +0.38 / +0.18 | −1.16 / +0.02 / −1.58 | 0.35 | 0.41 | 0.17 |
-| joint + Froude-similarity loss | 0.72 | +0.71 / +0.30 / +0.03 | −1.40 / +0.03 / −2.02 | 0.36 | 0.44 | 0.16 |
+| hexapod only (B1 not adapted) | (re-measuring) | | | | | |
+| hexapod only, B1 adapted (page 2 pipeline; mean S0 / S1) | 0.68 | +0.70 / +0.34 / +0.17 | −0.73 / +0.11 / −0.04 | 0.47 | 0.38 | 0.25 (0.25 / 0.24) |
+| joint, no similarity loss | 0.73 | +0.76 / +0.38 / +0.18 | −1.40 / −0.07 / −0.87 | 0.35 | 0.40 | 0.22 |
+| joint + Froude-similarity loss | 0.73 | +0.71 / +0.30 / +0.04 | −1.59 / −0.09 / −1.06 | 0.36 | 0.44 | 0.24 |
 
 Joint pretraining uses c10 + B1 (48 clips each, B1 on the current rendering). The similarity loss encourages transitions with similar Froude motion to have similar z.
 
 ![z of the three bodies, joint pretraining without similarity loss: PCA and UMAP, coloured by body (top) and behaviour (bottom)](../results/deck/shared_latent_jointD3/latent_jointD3_nosim_s0.png)
 
 - z is shared between the two hexapods (c10 → c08 forward R² +0.71 to +0.76, retrieval 0.40–0.44).
-- z is not shared with the B1 in any version: retrieval 0.10–0.17, forward R² negative. Joint pretraining and the similarity loss do not change this.
+- z is not shared with the B1 in any version: retrieval 0.22–0.25 (hexapods 0.38–0.44), forward R² negative. Joint pretraining and the similarity loss do not change this.
 
 ---
 
 ## 7. Selection when the B1 is in pretraining
 
-Joint models are used as pretrained: only the B1's action projector is fitted. The first column adapts the B1 to a hexapod-only model with the adaptation pipeline of page 2. Metric: normalised score (0 = random, 1 = oracle), w=11.
+Joint models are used as pretrained: only the B1's action projector is fitted. The joint models were pretrained before a B1 label correction (hard-turn clips); their projectors and all evaluation use the corrected data, and retraining is planned. The first column adapts the B1 to a hexapod-only model with the adaptation pipeline of page 2. Metric: normalised score (0 = random, 1 = oracle), w=11.
 
 | test | hexapod-only pretraining; B1 adapted (S0 / S1) | joint, no similarity loss (S0) | joint + similarity loss (S0) |
 |---|---|---|---|
-| B1 direct | +0.81 / +0.69 | +0.94 | +0.94 |
-| B1 rollout (candidate's recorded frame) | +0.49 / +0.40 | +0.66 | +0.50 |
-| B1 rollout (robot's actual current frame) | +0.46 / +0.41 | +0.56 | +0.53 |
-| B1 direct, goal read from vision | +0.72 / +0.57 | +0.84 | +0.84 |
-| B1 rollout (current frame), goal read from vision | +0.25 / +0.43 | +0.58 | +0.57 |
-| c08 direct (zero-shot) | +0.78 | +0.78 | +0.77 |
+| B1 direct | +0.83 / +0.74 | +0.92 | +0.94 |
+| B1 rollout (candidate's recorded frame) | +0.39 / +0.29 | +0.61 | +0.45 |
+| B1 rollout (robot's actual current frame) | +0.39 / +0.29 | +0.55 | +0.57 |
+| B1 direct, goal read from vision | +0.60 / +0.46 | +0.84 | +0.84 |
+| B1 rollout (current frame), goal read from vision | +0.25 / +0.35 | +0.56 | +0.57 |
+| c08 direct (zero-shot) | +0.78 | +0.78 | +0.79 |
 | c10 direct (same body) | +0.91 | +0.90 | +0.91 |
 | c10 direct, goal read from vision | +0.82 / +0.84 | +0.87 | +0.85 |
 
-- Joint pretraining gives the best B1 selection (direct +0.94, rollout +0.53 to +0.66) without a shared z: each body's projector and the shared head carry it.
+- Joint pretraining gives the best B1 selection (direct +0.92 to +0.94, rollout +0.45 to +0.61) without a shared z: each body's projector and the shared head carry it.
 - The similarity loss adds nothing measurable (one seed each).
-- Reading the goal from vision instead of the recorded Froude costs about 0.1 on B1 direct and 0.03–0.09 on c10 direct.
+- Reading the goal from vision instead of the recorded Froude costs 0.08–0.28 on B1 direct (least for the joint models) and 0.03–0.09 on c10 direct.
 
 Unless marked, the goal is the goal clip's recorded Froude. "Goal read from vision": the goal clip's frames read through the model's own ITM + Froude head (11-step window); the picked action is still graded by its real Froude.
 

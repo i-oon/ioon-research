@@ -8,9 +8,9 @@ Related documents:
 | Document | Contents |
 |---|---|
 | [PROGRESS.md](PROGRESS.md) | Full chronological research log, findings, dated sections |
-| [direction_plan.md](direction_plan.md) | Current research direction, roadmap, experiment design |
+| [STATUS.md](STATUS.md) | Current state, what runs now, what is next |
+| [DATA.md](DATA.md) | Current data, splits, and the scripts that made them |
 | [sim/SOURCES.md](sim/SOURCES.md) | File origins and attribution for migrated simulator assets |
-| [OPEN_QUESTION.md](OPEN_QUESTION.md) | Unresolved questions |
 
 Throughout this guide `$REPO` means the repository root and `$SIM` means the CoppeliaSim
 install directory. Set them once per shell:
