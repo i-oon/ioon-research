@@ -38,6 +38,24 @@ _TOUCH_SDK_TO_IL_LEG = [1, 0, 3, 2]
 HEAD_K = 0.5
 
 
+RESUME_KEYS = ("rollout_head_kp", "rollout_head_ki", "rollout_head_ki_clip", "rollout_checkpoint",
+               "rollout_gait_freq", "rollout_model", "rollout_cmd_noise", "rollout_noise_tau")
+
+
+def rollout_settings(args):
+    """The loop's settings as `rollout_*` npz fields (paths relative to the repo root)."""
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    rel = lambda x: os.path.relpath(os.path.abspath(x), root)  # noqa: E731
+    return {"rollout_head_kp": np.float64(args.head_kp), "rollout_head_ki": np.float64(args.head_ki),
+            "rollout_head_ki_clip": np.float64(args.head_ki_clip), "rollout_checkpoint": np.array(rel(args.checkpoint)),
+            "rollout_gait_freq": np.float64(args.gait_freq), "rollout_model": np.array(rel(args.model)),
+            "rollout_warmup": np.int64(args.warmup), "rollout_policy_warmup": np.int64(args.policy_warmup),
+            "rollout_cmd_noise": np.float64(args.cmd_noise), "rollout_noise_tau": np.float64(args.noise_tau),
+            "rollout_noise_seed": np.int64(args.noise_seed), "rollout_yaw0": np.float64(args.yaw0),
+            "rollout_load_state": np.array(rel(args.load_state) if args.load_state else "")}
+
+
 def parse_schedule(spec, vx, vy, wz):
     """`"1@0.4 0@0.2 1@0.4"` -> [(1.0, 0.4), (0.0, 0.2), (1.0, 0.4)], scaling the base command.
 
@@ -157,6 +175,11 @@ def main():
                          "command than whatever produced the snapshot -- this is the counterfactual "
                          "branch: same exact state, different action from this point.")
     args = ap.parse_args()
+    # **Every setting that shapes the rollout is recorded** (in --out and in a --state_out snapshot) as
+    # `rollout_*` fields: before 2026-10-01 none were, and code continuing a recording (the B1
+    # counterfactual branches) silently ran it under default heading gains (kp 0.5 / ki 0) where the
+    # recording had used kp 2.5 / ki 1 -- a controller switch at the branch point.
+    settings = rollout_settings(args)
 
     actor = load_actor(args.checkpoint)
     use_clock = actor[0].in_features == 60
@@ -170,6 +193,15 @@ def main():
         # needs its own last action, gait-clock step, and heading integrator restored, or it is
         # not actually the same state even though qpos/qvel match
         snap = np.load(args.load_state, allow_pickle=True)
+        # resuming under other settings than the snapshot's run is NOT a counterfactual on the command
+        # only; refuse (warmup / policy_warmup / yaw0 do not act after the resume and are not compared)
+        if "rollout_head_kp" not in snap.files:
+            raise SystemExit(f"{args.load_state}: snapshot carries no rollout settings (pre-2026-10-01); "
+                             "cannot verify the resume runs under the saving run's controller/policy/model")
+        for k in RESUME_KEYS:
+            if str(snap[k]) != str(settings[k]):
+                raise SystemExit(f"--load_state: {k} = {settings[k]} here but {snap[k]} in the snapshot; pass "
+                                 "the saving run's settings (only the command may differ)")
         # mj_setState with mjSTATE_INTEGRATION restores everything mj_step actually needs to
         # continue bit-exactly, including the contact solver's warm-start cache (qacc_warmstart)
         # and simulation time -- hand-picking qpos/qvel/ctrl looked complete but silently missed
@@ -178,6 +210,9 @@ def main():
         spec = mujoco.mjtState.mjSTATE_INTEGRATION
         mujoco.mj_setState(m, d, snap["mjstate"], spec)
         mujoco.mj_forward(m, d)
+        # sensordata as the saving run left it: after mj_step the sensors hold the PRE-step values the
+        # policy reads next; mj_forward recomputes them for the post-step state (~1e-3 rad off in 20 frames)
+        d.sensordata[:] = snap["sensordata"]
         last = snap["last"].astype(np.float32)
         step_i = int(snap["step_i"])
         heading_target = float(snap["heading_target"])
@@ -278,9 +313,9 @@ def main():
             spec = mujoco.mjtState.mjSTATE_INTEGRATION
             state = np.empty(mujoco.mj_stateSize(m, spec), np.float64)
             mujoco.mj_getState(m, d, state, spec)
-            np.savez(args.state_out, mjstate=state,
+            np.savez(args.state_out, mjstate=state, sensordata=d.sensordata.copy(),
                      last=last.copy(), step_i=step_i, heading_target=heading_target,
-                     yaw_int=yaw_int)
+                     yaw_int=yaw_int, **settings)
             print(f"  state saved at post-warmup step {args.save_state_at} -> {args.state_out}")
             return
 
@@ -295,6 +330,17 @@ def main():
         L["foot_contact"].append(foot.copy())
 
     out = {k: np.asarray(v, np.float32) for k, v in L.items()}
+    # centre of mass per recorded step (world, m; FINDINGS F301): MuJoCo subtree CoM of the trunk from the
+    # recorded qpos (float64, a separate MjData so the rollout itself is untouched) -- the loader's
+    # Froude reference point
+    if len(L["base_pos"]):
+        _md = mujoco.MjData(m)
+        com = np.zeros((len(L["base_pos"]), 3))
+        for _t, (_p, _q, _j) in enumerate(zip(L["base_pos"], L["base_quat"], L["joint_pos"])):
+            _md.qpos[0:3] = _p; _md.qpos[3:7] = _q; _md.qpos[7:19] = _j
+            mujoco.mj_fwdPosition(m, _md)
+            com[_t] = _md.subtree_com[1]
+        out["com_pos"] = com
     bp = out["base_pos"]
     print(f"steps={len(bp)}  x_travel={bp[-1,0]-bp[0,0]:+.2f}m  y_drift={bp[-1,1]-bp[0,1]:+.2f}m  "
           f"z: start {bp[0,2]:.3f} min {bp[:,2].min():.3f} end {bp[-1,2]:.3f}  "
@@ -304,7 +350,7 @@ def main():
         os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
         np.savez_compressed(args.out, joint_order_sdk=np.array(
             [f"{l}_{s}_joint" for l in ("FR", "FL", "RR", "RL") for s in ("hip", "thigh", "calf")]),
-            dt=DECIMATION * m.opt.timestep, **out)
+            dt=DECIMATION * m.opt.timestep, **out, **settings)
         print("saved ->", args.out)
 
 

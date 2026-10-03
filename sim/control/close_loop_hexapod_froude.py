@@ -15,7 +15,7 @@ Egocentric camera exactly as the collector's (`--view egocentric`, 90 deg set af
 `startSimulation`, room around the spawn, `ego_seed`); the first frame must pass
 `ego_camera.check_ego_view` against the candidate library's frames (F256).
 
-    .venv/bin/python3 sim/control/close_loop_hexapod_froude.py --mechanism rollout --window 11 \\
+    .venv/bin/python3 sim/control/close_loop_hexapod_froude.py --mechanism rollout --window 21 \\
         --ckpt wm/runs/beh24_stride5_cleansplit/c08_zeroshot/ckpt_lib_zeroshot.pt \\
         --goal data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_ep302.npz \\
         --candidates_dir data/egocentric/beh12_c08f09t09_ego_flat --morph c08f09t09=medauroidea_c08f09t09.ttt
@@ -51,7 +51,7 @@ def main():
     ap.add_argument("--morph", required=True, help="NAME=SCENE of the controlled body")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--replan_every", type=int, default=2)
-    ap.add_argument("--window", type=int, default=0)
+    ap.add_argument("--window", type=int, default=21)
     ap.add_argument("--phase_match", action="store_true",
                     help="execution only: on a switch, continue the new candidate from the frame whose "
                          "joint command is nearest the last one sent (its gait phase), not from index t. "

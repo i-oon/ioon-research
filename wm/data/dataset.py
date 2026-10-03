@@ -16,6 +16,8 @@ from ..bodies import (CONTACT_THRESHOLD, EXCLUDED_BODIES, body_of,  # noqa: F401
 from .augment import apply, identity_params, sample_params
 from .embodiment import BODY_CHANNELS, HEXAPOD_DT, REGISTRY, body_motion
 from .embodiment import load as load_embodiment
+from .frame_store import (LazyFrames, check_frame_budget, eager_frame_bytes,
+                          resident_frame_bytes)
 
 # Re-exported above so existing `from wm.data.dataset import ...` keeps working. They are defined
 # in wm/bodies.py, which has no torch dependency, so the collector and the diagnostics can share
@@ -44,10 +46,10 @@ def available_episodes(data_dir, morphs):
     return sorted(episodes)
 
 
-def load_clip(path):
+def load_clip(path, lazy_frames=False):
     with np.load(path, allow_pickle=True) as data:
         return {
-            "frames": data["frames"],
+            "frames": LazyFrames(path) if lazy_frames else data["frames"],
             "actions": data["actions"].astype(np.float32),
             "forces": data["forces"].astype(np.float32),
             "morph": str(data["morph"]),
@@ -75,6 +77,11 @@ def action_window(actions, t, lag, chunk, mean, std):
     return (window[0] if chunk == 1 else window).astype(np.float32)
 
 
+def _from_first_pair(clip, key):
+    """`clip[key]` from the first frame a training pair can use (`first_pair`, 0 if absent)."""
+    return clip[key][int(clip.get("first_pair", 0) or 0):]
+
+
 def action_stats(clips, within_body=True):
     """Per-joint mean and scale used to standardise the motion target.
 
@@ -92,12 +99,13 @@ def action_stats(clips, within_body=True):
     weighted by how much it actually moves. The mean stays pooled: an unseen body's mean
     posture is not knowable at test time.
     """
-    actions = np.concatenate([clip["actions"] for clip in clips], axis=0)
+    # from `first_pair` on, like MultiEmbodimentPairs (no-op for clips without the field)
+    actions = np.concatenate([_from_first_pair(clip, "actions") for clip in clips], axis=0)
     mean = actions.mean(axis=0)
     if within_body:
         groups = {}
         for clip in clips:
-            groups.setdefault(clip["morph"], []).append(clip["actions"])
+            groups.setdefault(clip["morph"], []).append(_from_first_pair(clip, "actions"))
         variances = [np.concatenate(v, axis=0).var(axis=0) for v in groups.values()]
         std = np.sqrt(np.mean(variances, axis=0))
     else:
@@ -111,8 +119,11 @@ class IKWalkPairs(Dataset):
 
     def __init__(self, data_dir, morphs, episodes=None, mean=None, std=None, seed=0,
                  frame_range=None, within_body_std=True, cross_augment=True, action_lag=1,
-                 frame_stride=1, action_chunk=1):
-        self.clips = [load_clip(p) for p in clip_paths(data_dir, morphs)]
+                 frame_stride=1, action_chunk=1, lazy_frames=True, max_frame_ram_gb=8.0):
+        paths = clip_paths(data_dir, morphs)
+        if not lazy_frames:
+            check_frame_budget(eager_frame_bytes(paths), max_frame_ram_gb, "IKWalkPairs")
+        self.clips = [load_clip(p, lazy_frames) for p in paths]
         if episodes is not None:
             keep = set(episodes)
             self.clips = [c for c in self.clips if c["episode"] in keep]
@@ -179,7 +190,7 @@ class IKWalkPairs(Dataset):
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(start, (stop or len(clip["frames"])) - reach)
+            for t in range(max(start, clip.get("first_pair", 0)), (stop or len(clip["frames"])) - reach)
         ]
         self.seed = seed
         self.epoch = 0
@@ -330,17 +341,28 @@ class MultiEmbodimentPairs(Dataset):
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
                  body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1, action_chunk=1,
-                 rollout_k=1):
+                 rollout_k=1, lazy_frames=True, max_frame_ram_gb=8.0):
+        # **RAM guard.** Frames are read on demand by default (wm/data/frame_store.py); eager
+        # loading is refused up front, from the .npz headers, if it would exceed the limit --
+        # round-1 arm B's branches are ~42 GB of frames on a 31 GB machine.
+        if not lazy_frames:
+            check_frame_budget(eager_frame_bytes([p for paths, _ in sources for p in paths]),
+                               max_frame_ram_gb, "MultiEmbodimentPairs")
         self.clips, self.stats = [], {}
         for paths, name in sources:
             spec = REGISTRY[name]
-            clips = [load_embodiment(p, spec) for p in paths]
+            clips = [load_embodiment(p, spec, lazy_frames=lazy_frames) for p in paths]
             if not clips:
                 raise ValueError(f"no clips given for embodiment {name}")
             if stats and name in stats:
                 self.stats[name] = stats[name]
             else:
-                actions = np.concatenate([c["actions"] for c in clips])
+                # **only frames a training pair can use**: a counterfactual branch carries its
+                # source clip's prefix up to `first_pair`, and every pair starts at or after it
+                # (its commands at t + lag >= first_pair), so the prefix -- a duplicate of the
+                # source clip -- must not re-weight the statistics. `[0:]` for every clip without
+                # the field, so their statistics are bit-identical to before.
+                actions = np.concatenate([_from_first_pair(c, "actions") for c in clips])
                 self.stats[name] = (actions.mean(0), np.maximum(actions.std(0), 1e-6))
             self.clips.extend(clips)
 
@@ -358,7 +380,10 @@ class MultiEmbodimentPairs(Dataset):
         # lines above.
         if self.clips and "body_motion" in self.clips[0]:
             self.body_channels = tuple(body_channels)
-            pooled = np.concatenate([c["body_motion"][:, self.body_channels] for c in self.clips])
+            # same rule as the action statistics above: from `first_pair` on (the body target of a
+            # pair at t averages body_motion[t:t + stride], t >= first_pair)
+            pooled = np.concatenate([_from_first_pair(c, "body_motion")[:, self.body_channels]
+                                     for c in self.clips])
             self.body_stats = (pooled.mean(0),
                                np.maximum(pooled.std(0), 1e-6)) if body_stats is None else body_stats
         elif not self.clips:
@@ -394,7 +419,7 @@ class MultiEmbodimentPairs(Dataset):
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(len(clip["frames"]) - reach)
+            for t in range(clip.get("first_pair", 0), len(clip["frames"]) - reach)
         ]
         self.seed = seed
         self.epoch = 0
@@ -405,6 +430,9 @@ class MultiEmbodimentPairs(Dataset):
 
     def set_epoch(self, epoch):
         self.epoch = epoch
+
+    def resident_frame_bytes(self):
+        return resident_frame_bytes(self.clips)
 
     def embodiment_indices(self):
         groups = {}
@@ -541,7 +569,7 @@ class IKWalkFrames(Dataset):
         self.index = [
             (i, t)
             for i, clip in enumerate(self.clips)
-            for t in range(len(clip["frames"]) - reach)
+            for t in range(clip.get("first_pair", 0), len(clip["frames"]) - reach)
         ]
 
     def __len__(self):

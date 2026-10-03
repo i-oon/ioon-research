@@ -5,12 +5,68 @@ checkpoint. `wm/runs/` is gitignored and checkpoints are ~370 MB each, so they g
 deleted when the disk fills -- and a run's config exists nowhere else. Regenerate
 this **before** deleting anything.
 
+## _archive_2026-09-26
+
+- **cross-embodiment**, reached epoch -1
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: body_head_babble.pt, ckpt_s124.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## babrp_stride5_s0
+
+- **cross-embodiment**, reached epoch 24
+- data: `hexapod=data/egocentric/babble_c10f10t10_rapid_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## babrp_stride5_s1
+
+- **cross-embodiment**, reached epoch 36
+- data: `hexapod=data/egocentric/babble_c10f10t10_rapid_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## babsw_stride5_s0
+
+- **cross-embodiment**, reached epoch 31
+- data: `hexapod=data/egocentric/babble_c10f10t10_switch_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## babsw_stride5_s1
+
+- **cross-embodiment**, reached epoch 33
+- data: `hexapod=data/egocentric/babble_c10f10t10_switch_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## beh12_actswm
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/beh12_c10f10t10_flat, b1=data/beh12_b1_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_body_stopgrad
+
+- **cross-embodiment**, reached epoch 45
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat, b1=data/egocentric/beh12_b1_ego_flat`
+- held out: none
+- checkpoints on disk: best.pt, head_b1only.pt, head_hexonly.pt, head_joint.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
 ## beh12_ego
 
 - **cross-embodiment**, reached epoch 37
 - data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat, b1=data/egocentric/beh12_b1_ego_flat`
 - held out: none
-- checkpoints on disk: teacher_ego.pt
+- checkpoints on disk: best.pt, best_motion.pt, md_refit.pt, projector_ego.pt, teacher_ego.pt
 - settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
 ## beh12_hex-b1_body3
@@ -18,7 +74,7 @@ this **before** deleting anything.
 - **cross-embodiment**, reached epoch 50
 - data: `hexapod=data/beh12_c10f10t10_flat, b1=data/beh12_b1_flat`
 - held out: none
-- checkpoints on disk: adapted_b1.pt, best.pt, projector_b1_adapted.pt, stage3_b1_nce_s0.pt, stage3_b1_nce_s0_bodyfit_proj.pt, stage3_hex_nce_s0.pt, teacher_hexapod.pt
+- checkpoints on disk: adapted_b1.pt, best.pt, best_motion.pt, projector_b1_adapted.pt, stage3_b1_nce_s0.pt, stage3_hex_nce_s0.pt
 - settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
 ## beh12_hexonly
@@ -26,108 +82,198 @@ this **before** deleting anything.
 - **cross-embodiment**, reached epoch 48
 - data: `hexapod=data/beh12_hex_flat`
 - held out: none
-- checkpoints on disk: best.pt, best_motion.pt, stage3_b1_mse_s0.pt, stage3_b1_mse_s0_bodyfit_proj.pt, stage3_b1_nce_s0.pt, stage3_b1_nce_s0_bodyfit.pt, stage3_b1_nce_s0_bodyfit_both.pt, stage3_b1_nce_s0_bodyfit_proj.pt, stage3_b1_nce_s0_bodyfit_proj_split1.pt
+- checkpoints on disk: adapted_b1.pt, best.pt, projector_b1_adapted.pt, stage3_b1_mse_s0.pt, stage3_b1_mse_s1.pt, stage3_b1_mse_s2.pt, stage3_b1_nce_s0.pt, stage3_b1_nce_s1.pt, stage3_b1_nce_s2.pt
 - settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
-## s1_fwd_bracket_cross
-
-- **single-morphology**, reached epoch 10
-- data: `data/ik_walk_cov_wide`
-- train: c10f10t10 c06f10t10 c10f06t06 c08f09t09 c10f09t07 c10f08t06 | held out: c10f10t08 (ratio 1.04, dead zone 12 mm)
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.5`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=10`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s1_fwd_m3d_body0.5
+## beh12_hinge_cleansplit
 
 - **cross-embodiment**, reached epoch 50
-- data: `hexapod=data/ik_walk_m3d_clean`
-- held out: ['c08f09t09'] | capped: ['hexapod=12']
-- checkpoints on disk: best.pt, best_motion.pt
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
 - settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
-## s1_fwd_m3d_bracketed
+## beh12_lag3_nobody
 
-- **single-morphology**, reached epoch 50
-- data: `data/ik_walk_m3d_clean`
-- train: c10f10t10 c06f10t10 c10f06t06 c06f06t06 | held out: c08f09t09 (ratio 0.83, dead zone 64 mm)
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s1_fwd_m3d_cross
-
-- **single-morphology**, reached epoch 49
-- data: `data/ik_walk_m3d_clean`
-- train: c10f10t10 c06f10t10 c10f06t06 c06f06t06 | held out: c08f09t09 (ratio 0.83, dead zone 64 mm)
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.5`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s1_fwd_tib_cross
-
-- **single-morphology**, reached epoch 10
-- data: `data/ik_walk_cov_narrow`
-- train: c10f10t10 c06f10t10 c10f06t06 c08f09t09 | held out: c10f10t08 (ratio 1.04, dead zone 12 mm)
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.5`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=10`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s1_fwd_tib_ctrl
-
-- **single-morphology**, reached epoch 10
-- data: `data/ik_walk_cov_narrow`
-- train: c10f10t10 c06f10t10 c10f06t06 c08f09t09 | held out: c10f10t08 (ratio 1.04, dead zone 12 mm)
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=10`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s2_fwd_hex7-b1_body0.5
-
-- **cross-embodiment**, reached epoch 28
-- data: `hexapod=data/ik_walk_speed7, b1=data/b1_framed`
-- held out: ['c08f09t09'] | capped: ['hexapod=7']
-- checkpoints on disk: best.pt, best_motion.pt, last.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s2_fwd_hex7-b1_body0.5_seed1
-
-- **cross-embodiment**, reached epoch 60
-- data: `hexapod=data/ik_walk_speed7, b1=data/b1_framed`
-- held out: ['c08f09t09'] | capped: ['hexapod=7']
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=1`
-
-## s2_fwd_hex7-b1_bodyframe0.5
-
-- **cross-embodiment**, reached epoch 59
-- data: `hexapod=data/ik_walk_speed7, b1=data/b1_framed`
-- held out: ['c08f09t09'] | capped: ['hexapod=7']
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s2_fwd_hex7-b1_ctrl
-
-- **cross-embodiment**, reached epoch 59
-- data: `hexapod=data/ik_walk_speed7, b1=data/b1_framed`
-- held out: ['c08f09t09'] | capped: ['hexapod=7']
-- checkpoints on disk: best.pt, last.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## s2_fwd_hex8-b1_ctrl
-
-- **cross-embodiment**, reached epoch 60
-- data: `hexapod=data/ik_walk_8body, b1=data/b1_framed`
-- held out: ['c08f09t09'] | capped: ['hexapod=5']
-- checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=60`, `batch_size=8`, `lr=0.0001`, `seed=0`
-
-## smoke_lag3
-
-- **cross-embodiment**, reached epoch 1
+- **cross-embodiment**, reached epoch 10
 - data: `hexapod=data/beh12_c10f10t10_flat, b1=data/beh12_b1_flat`
 - held out: none
 - checkpoints on disk: best.pt, best_motion.pt
-- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=1`, `batch_size=8`, `lr=0.0001`, `seed=0`
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=10`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_lag3_nohinge
+
+- **cross-embodiment**, reached epoch 10
+- data: `hexapod=data/beh12_c10f10t10_flat, b1=data/beh12_b1_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=10`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_lambdabody2_cleansplit
+
+- **cross-embodiment**, reached epoch 44
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat/beh12_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_margin_itm
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_margin_itm_earlystop
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_state
+
+- **cross-embodiment**, reached epoch 34
+- data: `hexapod=data/egocentric/beh12_c10f10t10_ego_flat, b1=data/egocentric/beh12_b1_ego_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt, best_state.pt, seq_t0_killgate.pt, teacher_state.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh12_state_more
+
+- **cross-embodiment**, reached epoch 49
+- data: `hexapod=data/egocentric/beh12_c10f10t10_more_ego_flat, b1=data/egocentric/beh12_b1_ego_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt, best_state.pt, projector_more.pt, teacher_more.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh24_hinge_cleansplit
+
+- **cross-embodiment**, reached epoch 46
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt, ckpt_lib_noadapt_b1.pt, full_c08f09t09.pt, projector_c08f09t09.pt, projector_noadapt_b1.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh24_stride5_A2
+
+- **cross-embodiment**, reached epoch 48
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## beh24_stride5_cleansplit
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh24st_stride5_C
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, hexapod=data/egocentric/babble_c10f10t10_steady_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## beh24sw_stride5_B
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, hexapod=data/egocentric/babble_c10f10t10_switch_flat`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## dt0_beh24_s0
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## dt0_beh24_s1
+
+- **cross-embodiment**, reached epoch 48
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## fmd_beh24_s0
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## fmd_beh24_s1
+
+- **cross-embodiment**, reached epoch 48
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## jointD3_nosim_s0
+
+- **cross-embodiment**, reached epoch 46
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric_v3/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## jointD3_sim_s0
+
+- **cross-embodiment**, reached epoch 33
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric_v3/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## jointD_nosim_s0
+
+- **cross-embodiment**, reached epoch 47
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## jointD_sim_s0
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
+
+## jointD_sim_s1
+
+- **cross-embodiment**, reached epoch 50
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=1`
+
+## joint_sim_beh24_s0
+
+- **cross-embodiment**, reached epoch 48
+- data: `hexapod=data/egocentric/beh24_c10f10t10_ego_flat_cleantrain, b1=data/egocentric/beh24_b1_ego_flat_cleantrain`
+- held out: none
+- checkpoints on disk: best.pt, best_motion.pt
+- settings: `action_lag=1`, `lambda_cross=0.0`, `lambda_adv=0.0`, `cross_augment=True`, `within_body_std=True`, `md_head=mlp`, `balance_embodiments=True`, `ftm_embodiment_channel=False`, `center_embeddings=False`, `epochs=50`, `batch_size=8`, `lr=0.0001`, `seed=0`
 
 ## Deleted — config lost
 
 These directories exist with no checkpoint, so nothing records what they were.
 Numbers from them appear in FINDINGS.md and cannot be reproduced or re-scored.
 
-- `smoke_actswm2`
+- `_archive`
+- `beh12_hinge_multistep_anchor_v2`
+- `lambda_body_probe_test`

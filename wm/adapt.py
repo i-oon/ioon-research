@@ -86,9 +86,12 @@ def select_clips(paths, clips, test_clips, seed, stratify):
 
 def _froude_std(path, embodiment, k, n, stats):
     from wm.data.embodiment import REGISTRY, load
-    from wm.data.strided import body_targets
-    bm = np.asarray(load(path, REGISTRY[embodiment])["body_motion"])[:, :3]
-    f = body_targets(bm, k, n)
+    from wm.data.strided import body_targets, first_pair_of
+    clip = load(path, REGISTRY[embodiment])
+    bm = np.asarray(clip["body_motion"])[:, :3]
+    # `n` counts transitions of the embedding sequence, which `embeddings_for` already started at
+    # `first_pair`; the labels must start there too (0 for clips without the field: unchanged)
+    f = body_targets(bm, k, n, start=first_pair_of(clip))
     return torch.as_tensor((f - stats[0]) / stats[1], dtype=torch.float32)
 
 

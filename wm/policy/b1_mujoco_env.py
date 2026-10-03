@@ -246,7 +246,17 @@ class B1MuJoCoEnv:
         # gait's true_froude came back ~0.0025 through this bug, ~0.196 computed correctly over a
         # full trajectory). Fix: keep a rolling window of real position/quat history and recompute
         # over the full window every step, taking the most recent (rightmost) smoothed value.
-        self.hist_len = max(3, round(BODY_WINDOW_S / self.dt)) + 5
+        #
+        # **Which sample of the smoothed history is read (2026-10-01).** `smooth` is edge-correct
+        # (averages only in-history frames, no zero padding), so the rightmost value `[-1]` is a
+        # trailing HALF-window (~0.5 s) average -- a shorter timescale than the 1 s labels. (Before
+        # `smooth` existed, `[-1]` of the zero-padded convolve was that half-window sum divided by
+        # the full window, i.e. ~0.5x too small.) Reading index `hist_len - 1 - (w-1)//2` instead
+        # gives the value whose centred 1 s window ends at the newest sample: a trailing
+        # full-1 s average, the labels' own timescale, made causal.
+        self.body_w = max(3, int(round(BODY_WINDOW_S / self.dt)))
+        self.hist_len = self.body_w + 5
+        self.read_idx = self.hist_len - 1 - (self.body_w - 1) // 2
         self.pos_hist = None
         self.quat_hist = None
 
@@ -349,7 +359,7 @@ class B1MuJoCoEnv:
         true_fr = np.concatenate([
             body_velocity(self.pos_hist, self.quat_hist, self.dt, "b1"),
             yaw_rate(self.quat_hist, self.dt, "b1", height),
-        ], axis=1)[-1]
+        ], axis=1)[self.read_idx]
 
         # `tracking_reward` itself stays the pure, bounded (0, 1] score -- interpretable, and what
         # gets logged. TRACKING_WEIGHT is applied only when composing the trained reward, so a

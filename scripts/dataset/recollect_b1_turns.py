@@ -79,11 +79,12 @@ def _face_forward(pos, quat):
     d = pos[:, :2] - pos[0, :2]
     pos[:, 0], pos[:, 1] = pos[0, 0] + c * d[:, 0] - s * d[:, 1], pos[0, 1] + s * d[:, 0] + c * d[:, 1]
     rw, rz = np.cos(-yaw / 2), np.sin(-yaw / 2)          # rotation about world z, as (w,x,y,z)
-    qw, qx, qy, qz = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
-    quat[:, 0] = rw * qw - rz * qz
-    quat[:, 1] = rw * qx - rz * qy
-    quat[:, 2] = rw * qy + rz * qx
-    quat[:, 3] = rw * qz + rz * qw
+    # F293: COPIES, not views. Reading `quat[:, 0]` after overwriting it made x/y/z mix the rotated w
+    # back in -- stored quats were neither unit nor a pure yaw rotation, and hard-turn Froude labels
+    # were off by up to 0.15. Normalised so float error cannot accumulate either.
+    qw, qx, qy, qz = (quat[:, i].copy() for i in range(4))
+    quat = np.stack([rw * qw - rz * qz, rw * qx - rz * qy, rw * qy + rz * qx, rw * qz + rz * qw], axis=1)
+    quat /= np.linalg.norm(quat, axis=1, keepdims=True)
     return pos, quat
 
 

@@ -126,6 +126,8 @@ def main():
     n = mujoco.mj_stateSize(m, STATE)
     S = np.empty(n); mujoco.mj_getState(m, d, S, STATE)
     LAST, SI = last.copy(), si
+    SENS = d.sensordata.copy()     # the PRE-step sensor values the policy reads next; mj_forward would
+    #                                recompute them for the post-step state (~1e-3 rad off within 20 frames)
 
     os.makedirs(os.path.join(os.path.dirname(HERE), "..", args.out), exist_ok=True) \
         if not os.path.isabs(args.out) else os.makedirs(args.out, exist_ok=True)
@@ -135,7 +137,7 @@ def main():
         specs.append((specs[0][0] + "_repeat", specs[0][1].copy()))
 
     for name, cmd in specs:
-        mujoco.mj_setState(m, d, S, STATE); mujoco.mj_forward(m, d)
+        mujoco.mj_setState(m, d, S, STATE); mujoco.mj_forward(m, d); d.sensordata[:] = SENS
         log = {k: list(v) for k, v in shared.items()}
         last, si = LAST.copy(), SI
         for _ in range(args.branch_steps):

@@ -43,7 +43,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.data.strided import action_chunks, body_targets, pair_latents, stride_of  # noqa: E402
+from wm.data.strided import action_chunks, body_targets, first_pair_of, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
@@ -144,24 +144,26 @@ def main():
                 cache[path] = encode_clip(encoder, clip["frames"], args.chunk).cpu().half()
             e = cache[path].float().to(device)
             motion = np.asarray(clip["body_motion"])[:, channels]
-            n = min(len(e) - stride, len(motion) - stride)
+            # transitions start at the clip's `first_pair` (CF branches; 0 otherwise = unchanged)
+            s0 = first_pair_of(clip)
+            n = min(len(e) - stride, len(motion) - stride) - s0
             if projector is not None:
-                n = min(n, len(clip["actions"]) - lag - stride + 1)
-            z_itm = (pair_latents(itm, e, stride, n, batch=1).cpu()
+                n = min(n, len(clip["actions"]) - lag - stride + 1 - s0)
+            z_itm = (pair_latents(itm, e, stride, n, batch=1, start=s0).cpu()
                      if args.latent in ("itm", "both") else None)
             z_proj = None
             if projector is not None:
                 # **The command that caused the transition, `actions[t + lag]`** -- the convention
                 # `wm.fit_projector` fits the projector on. This used `actions[:n]`, one step early,
                 # so the projector path of this head was fitted on mislabelled latents (F260).
-                acts = torch.tensor(action_chunks(clip["actions"], lag, stride, n),
+                acts = torch.tensor(action_chunks(clip["actions"], lag, stride, n, start=s0),
                                     dtype=torch.float32).to(device)
                 z_proj = projector(acts, args.embodiment).cpu()
             z = torch.cat([window_mean(x, args.z_window) for x in (z_itm, z_proj)
                            if x is not None])
             zs.append(z)
             reps = sum(x is not None for x in (z_itm, z_proj))
-            ys.append(torch.tensor(body_targets(motion, stride, n), dtype=torch.float32).repeat(reps, 1))
+            ys.append(torch.tensor(body_targets(motion, stride, n, start=s0), dtype=torch.float32).repeat(reps, 1))
             groups.append(torch.full((n * reps,), i))
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
@@ -184,13 +186,14 @@ def main():
                         cache2[path] = encode_clip(encoder, clip["frames"], args.chunk).cpu().half()
                     e = cache2[path].float().to(device)
                     motion = np.asarray(clip["body_motion"])[:, channels]
-                    n = min(len(e) - stride, len(motion) - stride)
+                    s0 = first_pair_of(clip)
+                    n = min(len(e) - stride, len(motion) - stride) - s0
                     # **ITM latents only for the other robot.** A stage-3 projector carries a
                     # head for the robot it was adapted to and nothing else, and the goal side is
                     # read through the ITM at scoring time anyway.
-                    extra_z.append(window_mean(pair_latents(itm, e, stride, n, batch=1).cpu(),
+                    extra_z.append(window_mean(pair_latents(itm, e, stride, n, batch=1, start=s0).cpu(),
                                                args.z_window))
-                    extra_y.append(torch.tensor(body_targets(motion, stride, n), dtype=torch.float32))
+                    extra_y.append(torch.tensor(body_targets(motion, stride, n, start=s0), dtype=torch.float32))
                     # one group id per clip, so the other robot gets a held-out split too. Without
                     # this its every transition was in training and the reported held-out ratio
                     # covered the adapted robot ONLY -- which is how a systematic goal-reading error

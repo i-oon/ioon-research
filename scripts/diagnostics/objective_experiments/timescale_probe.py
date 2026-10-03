@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
-from wm.data.embodiment import G, HEXAPOD_DT, REGISTRY, forward_axis, heading, load  # noqa: E402
+from wm.data.embodiment import G, HEXAPOD_DT, REGISTRY, forward_axis, heading, load, smooth  # noqa: E402
 from wm.evaluate import encode_clip  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
@@ -55,8 +55,9 @@ def per_step_froude(path, embodiment):
 def moving_average(x, w):
     if w <= 1:
         return x
-    k = np.ones(w) / w
-    return np.stack([np.convolve(x[:, j], k, mode="same") for j in range(x.shape[1])], axis=1)
+    # edge-correct centred average (wm.data.embodiment.smooth), not np.convolve(mode="same"),
+    # which zero-pads and shrinks the first/last w//2 frames toward 0
+    return np.stack([smooth(x[:, j], w) for j in range(x.shape[1])], axis=1)
 
 
 def gather(paths, itm, encoder, reg, device):

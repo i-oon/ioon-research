@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# NOTE 2026-10-03: data paths are older than data/counterfactual_walks; switch to data/counterfactual_walks (doc/DATA.md) before running.
 # Evaluate the augmentation pilots (scripts/run/aug_pilot.sh): fit the B1 projector (Stage 2 only; B1 is in
 # pretraining), then B1 selection on (1) the v3 library = the training rendering ("clean", must not drop) and
 # (2) the old-render library, never trained on, no adaptation ("rendering change", robustness).
@@ -25,8 +26,8 @@ PYEOF
 done
 echo "=== B1, training rendering (v3 library)"
 $PY scripts/diagnostics/objective_experiments/selection_eval.py --candidates_dir data/egocentric_v3/beh12_b1_ego_flat_cleantrain \
-    --cache results/wm/cache/selection_eval_cands_v3.pt "${CK[@]}" --windows 11 | grep -E "w=|bounds"
+    --cache results/wm/cache/selection_eval_cands_v3.pt "${CK[@]}" --windows 21 | grep -E "w=|bounds"
 echo "=== B1, rendering change (old-render library, no adaptation)"
 $PY scripts/diagnostics/objective_experiments/selection_eval.py --candidates_dir data/egocentric/beh12_b1_ego_flat_cleantrain \
-    --cache results/wm/cache/selection_eval_cands.pt "${CK[@]}" --windows 11 | grep -E "w=|bounds"
+    --cache results/wm/cache/selection_eval_cands.pt "${CK[@]}" --windows 21 | grep -E "w=|bounds"
 echo AUG_PILOT_EVAL_DONE

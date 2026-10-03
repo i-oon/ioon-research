@@ -44,16 +44,29 @@ PER_FRAME = 2.5            # policy steps per rendered frame (50 Hz policy, 20 H
 
 
 def snapshot(w):
-    s = np.empty(mujoco.mj_stateSize(w.m, STATE))
-    mujoco.mj_getState(w.m, w.d, s, STATE)
-    return s, w.last.copy(), w.step_i
+    # B1Walker.snapshot: integration state + sensordata + last action + gait clock + settings. (Before
+    # 2026-10-01 sensordata was recomputed by mj_forward on restore; the policy reads the PRE-step sensor
+    # values, so every branch started ~1e-3 rad off the uninterrupted run within 20 frames.)
+    return w.snapshot()
 
 
 def restore(w, snap):
-    s, last, step_i = snap
-    mujoco.mj_setState(w.m, w.d, s, STATE)
-    mujoco.mj_forward(w.m, w.d)
-    w.last, w.step_i = last.copy(), step_i
+    w.restore(snap)
+
+
+def clip_policy(path):
+    """The policy the start-state candidate was recorded with: its `policy` field, else the exact replay
+    (build_b1_cf_branches.locate). Raises if neither determines it -- never a default walker."""
+    with np.load(path, allow_pickle=True) as f:
+        if "policy" in f.files:
+            return str(f["policy"])
+    sys.path.insert(0, os.path.join(ROOT, "scripts/dataset"))
+    import build_b1_cf_branches as B
+    try:
+        return B.locate(path)["policy"]
+    except RuntimeError as e:
+        raise SystemExit(f"{path}: recording policy unknown (no `policy` field, replay does not "
+                         f"reproduce it): {e}")
 
 
 def run_frames(w, cmds, render):
@@ -87,7 +100,8 @@ def main():
     ap.add_argument("--warmup", type=int, default=45, help="policy steps before recording, as the physics loop")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
-    ap.add_argument("--cache", default="results/wm/cache/physics_counterfactual_b1.pt")
+    ap.add_argument("--cache", default="results/wm/cache/physics_counterfactual_b1_v2.pt",
+                    help="v2: start-state policy = the candidate's own, sensordata restored (2026-10-01)")
     args = ap.parse_args()
     dev = "cuda"
     cands = load_candidates(os.path.join(ROOT, args.candidates_dir), "b1", per_condition=999)
@@ -109,7 +123,9 @@ def main():
         D = {}
         for s in S:
             for t in args.steps:
-                w = B1Walker()
+                # the start state is walked with candidate s's recorded commands, so by candidate s's own
+                # policy (heading gains need not match: the recorded yaw command is replayed, no PI here)
+                w = B1Walker(policy=clip_policy(cands[s]["path"]))
                 for _ in range(args.warmup):
                     w.policy_step(cmds[s][0])
                 w.d.qpos[0:2] -= w.d.qpos[0:2].copy()       # centre in the room, as the physics loop

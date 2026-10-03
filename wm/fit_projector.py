@@ -37,7 +37,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.data.strided import action_chunks, pair_latents, stride_of  # noqa: E402
+from wm.data.strided import action_chunks, first_pair_of, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.action_projector import ActionProjector  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
@@ -71,15 +71,18 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
             e = e - off.to(device)
         # stride k (`wm/data/strided.py`): z = ITM(e_t, e_t+k), labelled with the k commands that
         # caused it. At k = 1: the original one-step pairs and `actions[lag:lag + n]`, unchanged.
-        n = len(e) - k
+        # transitions start at the clip's `first_pair` (CF branches never contribute pre-branch or
+        # straddling pairs; 0 for every clip without the field, i.e. unchanged)
+        s0 = first_pair_of(clip)
+        n = len(e) - k - s0
         # the commands that caused frames[t] -> frames[t+k]; short clips are dropped rather than
         # padded, since a padded action is a wrong label and F39 measured what wrong labels cost
-        if n <= 0 or len(clip["actions"]) < n + lag + k - 1:
+        if n <= 0 or len(clip["actions"]) < s0 + n + lag + k - 1:
             continue
-        z = pair_latents(itm, e, k, n)
-        actions = torch.as_tensor(action_chunks(clip["actions"], lag, k, n), dtype=torch.float32,
-                                  device=device)
-        E.append(e[:n].cpu().half()); Z.append(z); A.append(actions)
+        z = pair_latents(itm, e, k, n, start=s0)
+        actions = torch.as_tensor(action_chunks(clip["actions"], lag, k, n, start=s0),
+                                  dtype=torch.float32, device=device)
+        E.append(e[s0:s0 + n].cpu().half()); Z.append(z); A.append(actions)
         C.append(torch.full((n,), len(C), dtype=torch.long))
         P.append(path)
         del e

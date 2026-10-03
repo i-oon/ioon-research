@@ -40,6 +40,73 @@ def capture(sim, cam):
     return np.flipud(np.frombuffer(buf, dtype=np.uint8).reshape(res[1], res[0], 3)).copy()
 
 
+# **Per-frame world pose of the ego camera** (DATA_PLAN stage 3 A), read from the simulator at the moment
+# each frame is captured. Shared with sim/render/render_hex_replay.py and collect_ik.py.
+CAM_POSE_CONVENTION = ("cam_pose[t] = (px, py, pz, qx, qy, qz, qw): world pose of the vision sensor vjepa_cam at "
+                       "frame t, in the clip's stored world frame (the same frame as base_pos / head / com_pos, "
+                       "i.e. after re-centring), metres; quaternion scalar-LAST (CoppeliaSim getObjectPose order); "
+                       "camera axes: +z = optical axis (looks along), +y = image up, +x = image left")
+
+
+def cam_pose(sim, cam):
+    return np.asarray(sim.getObjectPose(cam, sim.handle_world), np.float64)
+
+
+def mount_heading(sim, root):
+    """Heading (rad, wm.data.embodiment b1 convention) of the base as it stands in the scene right now.
+    The ego camera is aimed along this before it is parented, so it stays on the body's own forward axis."""
+    import sys as _s
+    _s.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from wm.data.embodiment import heading as _heading   # noqa: E402
+    x, y, z, w = sim.getObjectQuaternion(root, sim.handle_world)
+    return float(_heading(np.array([[w, x, y, z]], float), "b1")[0])
+
+
+def ego_setup(sim, scene, pos0, quat0_wxyz, seed, ego_box=0.0, ground_uv_mult=1.0, cam_fov=90.0,
+              legacy_mount=False):
+    """`main()`'s --ego --match_floor path as a function (no --align_yaw / --cam_back / --ego_offset):
+    load the scene, build the room around pos0, mount the camera on the base looking along quat0's heading.
+    Returns (root, joints, cam). Used by in-process renderers (counterfactual branches) so they share the
+    exact camera mount and room of the main clips."""
+    import sys as _s
+    _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scene"))
+    _s.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from ego_camera import (attach_ego, build_texture_box, randomise_ground, room_for, scale_floor,  # noqa: E402
+                            WALK_PITCH)
+    from wm.data.embodiment import heading as _heading   # noqa: E402
+    settle(sim)
+    sim.loadScene(os.path.abspath(scene))
+    settle(sim)
+    jm = {sim.getObjectAlias(h): h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_joint_type)}
+    joints = [jm[a] for a in JOINT_ALIASES_SDK]
+    sm = {sim.getObjectAlias(h): h for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type)}
+    root = sm[ROOT_ALIAS]
+    cam = sim.getObject("/" + SENSOR)
+    R = room_for(sim.getObjectPosition(root, sim.handle_world)[2])
+    if ego_box > 0:
+        R["size"] = ego_box
+    build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"], seed=seed,
+                      centre=(float(pos0[0]), float(pos0[1])))
+    psi = (float(_heading(np.asarray(quat0_wxyz, float)[None], "b1")[0]) if legacy_mount
+           else mount_heading(sim, root))
+    attach_ego(sim, cam, root, [float(np.cos(psi)), float(np.sin(psi)), 0.0], (0, 0, 0),
+               offset_frac=R["offset_frac"], pitch_comp=WALK_PITCH["b1"])
+    scale_floor(sim, R["size"])
+    randomise_ground(sim, seed=seed, uv=R["ground_uv"] * ground_uv_mult)
+    sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle, float(np.deg2rad(cam_fov)))
+    return root, joints, cam
+
+
+def pose_and_capture(sim, root, joints, cam, pos, quat_wxyz, jpos, render=True):
+    """Set the base pose (w,x,y,z) + 12 SDK-order joints; returns (frame or None, cam_pose)."""
+    q = quat_wxyz
+    sim.setObjectPosition(root, sim.handle_world, [float(v) for v in pos])
+    sim.setObjectQuaternion(root, sim.handle_world, [float(q[1]), float(q[2]), float(q[3]), float(q[0])])
+    for h, a in zip(joints, jpos):
+        sim.setJointPosition(h, float(a))
+    return (capture(sim, cam) if render else None), cam_pose(sim, cam)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=23000)
@@ -105,6 +172,13 @@ def main():
                     help="--ego: multiply the floor-texture tile size (room_for's ground_uv) -- a "
                          "calibration knob to match the hexapod's image detail; 1.0 reproduces the "
                          "current renders")
+    ap.add_argument("--legacy_mount", action="store_true",
+                    help="--ego: aim the camera along the CLIP's frame-0 heading while the base is still at its "
+                         "authored pose (the pre-2026-10-02 rule). The camera is parented to the base, so its yaw "
+                         "relative to the body is then (clip heading - authored heading): correct only for clips "
+                         "that start facing +x (v3, face-forwarded / --align_yaw); the v4 B1 main clips (orientation "
+                         "kept) looked up to 168 deg off the body axis. Default: aim along the base's own heading at "
+                         "mount time (camera fixed to the body axis for any start heading)")
     ap.add_argument("--max_frames", type=int, default=0,
                     help="stop after this many frames, so every condition yields the same clip "
                          "length regardless of how fast the robot happens to walk")
@@ -227,7 +301,10 @@ def main():
             import sys as _s2
             _s2.path.insert(0, ROOTDIR)
             from wm.data.embodiment import heading as _heading   # noqa: E402
-            psi = float(_heading(base_quat[:1], "b1")[0])
+            if args.legacy_mount:
+                psi = float(_heading(base_quat[:1], "b1")[0])
+            else:
+                psi = mount_heading(sim, root)
             fwd = [float(np.cos(psi)), float(np.sin(psi)), 0.0]
         _cam_info = attach_ego(sim, cam, root, fwd,
                                args.ego_offset or (0, 0, 0),
@@ -277,6 +354,7 @@ def main():
     keep = keep[keep < n]
 
     frames = []
+    cam_poses = []
     kept_index = []
     for k in keep:
         # B1 covers 1.3-3.1 m depending on commanded speed while the camera sees about 2.1 m,
@@ -293,6 +371,7 @@ def main():
         for h, a in zip(joints, jpos[k]):
             sim.setJointPosition(h, float(a))
         frames.append(capture(sim, cam))
+        cam_poses.append(cam_pose(sim, cam))
 
     frames = np.asarray(frames, np.uint8)
     n = len(frames)   # the travel gate can stop early; everything saved must match
@@ -318,8 +397,10 @@ def main():
         # under --fps it silently pairs frame i with the proprioception of a different moment.
         idx = np.asarray(kept_index, int)
         extra = {k: T[k][idx] for k in ("joint_pos", "joint_vel", "action", "command",
-                                        "foot_contact", "base_pos", "base_quat")
-                 if k in T.files}
+                                        "foot_contact", "base_pos", "base_quat", "com_pos")
+                 if k in T.files}            # com_pos: CoM (F301), same frame as the stored base_pos
+        # the rollout's settings (rollout_b1_mujoco `rollout_*` fields) travel with the clip
+        extra.update({k: T[k] for k in T.files if k.startswith("rollout_")})
         np.savez_compressed(os.path.join(args.out, tag + ".npz"),
                             frames=frames, joint_order_sdk=T["joint_order_sdk"],
                             # from the requested rate, not from idx[1]-idx[0]: a 2.5-step stride
@@ -327,6 +408,8 @@ def main():
                             # reports 0.04 s where the average interval is 0.05
                             dt=(1.0 / args.fps) if args.fps > 0 else float(T["dt"]),
                             fps=float(args.fps) if args.fps > 0 else 1.0 / float(T["dt"]),
+                            cam_pose=np.asarray(cam_poses, np.float64),
+                            cam_pose_convention=np.array(CAM_POSE_CONVENTION),
                             **extra)
         print(f"saved -> {os.path.join(args.out, tag + '.npz')}")
 

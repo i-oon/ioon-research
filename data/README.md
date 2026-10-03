@@ -1,3 +1,6 @@
+> **2026-10-03: the current data and its layout are documented in `doc/DATA.md`.** Only `data/counterfactual_walks/` is in use;
+> older dirs are in `data/_archive_old_datasets/`. The text below is historical.
+
 # data — what each set is
 
 **Naming.** `<behaviours>_<body>_<variant>`, the same rule as `wm/runs/`.

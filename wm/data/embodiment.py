@@ -19,7 +19,63 @@ G = 9.81
 BODY_WINDOW_S = 1.0
 
 
-def body_motion(position, dt):
+def smooth(x, window, segment=None):
+    """Centred moving average over `window` frames that only averages frames that exist.
+
+    **No zero padding at the clip edges.** `np.convolve(..., mode="same")` averages the missing
+    frames beyond each end as zeros, which shrank every clip's first and last ~window/2 labels
+    toward 0 (a steady B1 walk read 0.070 at t=0 against 0.143 mid-clip). Here each output is the
+    mean of the in-clip frames inside the window, so a steady clip reads the same at the edges.
+
+    **Never across a command switch.** `segment` (one int per frame, optional) marks where the
+    commanded action changes -- counterfactual branches, switching clips. The window is cut at a
+    segment boundary, so a label after the switch reflects only the new command. Without
+    `segment` the whole clip is one segment. In the interior of a segment the result equals the
+    plain moving average exactly.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    seg = np.zeros(len(x), dtype=np.int64) if segment is None else np.asarray(segment).astype(np.int64)
+    k = np.ones(int(window))
+    out = np.empty_like(x)
+    starts = np.flatnonzero(np.r_[True, seg[1:] != seg[:-1]])
+    ends = np.r_[starts[1:], len(x)]
+    off = (len(k) - 1) // 2          # numpy's "same" centring, also for segments shorter than k
+    for a, b in zip(starts, ends):
+        n = b - a
+        num = np.convolve(x[a:b], k)[off:off + n]
+        den = np.convolve(np.ones(n), k)[off:off + n]
+        out[a:b] = num / den
+    return out
+
+
+def gradient(x, dt, segment=None):
+    """`np.gradient(x, dt, axis=0)`, **never across a command switch**.
+
+    The central difference at the first frame of a segment reads the last frame of the previous one,
+    and `smooth` then spreads that one value over the next ~window/2 labels: on v4 counterfactual
+    branches, perturbing only the pre-branch poses moved the labels of the first ~10 post-branch
+    frames by 0.04-0.06 (Froude), i.e. the "after the switch" labels still depended on the prefix.
+    Within each segment this is `np.gradient` (one-sided at the segment's own ends, exactly as
+    numpy does at the clip's ends); a one-frame segment gets 0. Without `segment` it IS
+    `np.gradient`, bit for bit, so every clip without the field is labelled as before.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    if segment is None:
+        return np.gradient(x, dt, axis=0)
+    seg = np.asarray(segment).astype(np.int64)
+    out = np.zeros_like(x)
+    starts = np.flatnonzero(np.r_[True, seg[1:] != seg[:-1]])
+    for a, b in zip(starts, np.r_[starts[1:], len(x)]):
+        if b - a >= 2:
+            out[a:b] = np.gradient(x[a:b], dt, axis=0)
+    return out
+
+
+def _segment_of(data):
+    return data["segment"] if "segment" in data.files else None
+
+
+def body_motion(position, dt, segment=None):
     """Forward and lateral speed over sqrt(g * h), smoothed across roughly one stride.
 
     Two choices carry this, and both were measured rather than assumed.
@@ -37,11 +93,10 @@ def body_motion(position, dt):
     """
     height = float(np.median(position[:, 2]))
     window = max(3, int(round(BODY_WINDOW_S / dt)))
-    kernel = np.ones(window) / window
     out = []
     for axis in (0, 1):
-        speed = np.gradient(position[:, axis].astype(np.float64), dt)
-        out.append(np.convolve(speed, kernel, mode="same"))
+        speed = gradient(position[:, axis].astype(np.float64), dt, segment)
+        out.append(smooth(speed, window, segment))
     return (np.stack(out, axis=1) / np.sqrt(G * max(height, 1e-6))).astype(np.float32)
 
 
@@ -64,16 +119,37 @@ def body_motion(position, dt):
 BODY_CHANNELS = (0,)
 
 
+def _com_reference(data, position):
+    """Reference point and Froude height for the labels (FINDINGS F301).
+
+    **Centre of mass when the clip carries it.** A clip with a per-frame `com_pos` (world, metres;
+    `wm.data.com`) is labelled at its CoM: velocity from `com_pos`, Froude height (velocity and yaw
+    scale) = median CoM z, the forward axis still from the body orientation. The hexapod `head` is
+    0.246 m ahead of its CoM, so a head-referenced lateral label = CoM lateral + yaw x 0.246 / h
+    (lever arm): on turns and backward walks it was mostly yaw. The B1 base is within 2 cm of its
+    CoM (labels differ <= 0.003). `froude_height`, if stored (counterfactual branches: the source
+    clip's median), overrides the height. Returns (position, height, used_com)."""
+    if "com_pos" in data.files:
+        com = data["com_pos"].astype(np.float64)
+        h = float(data["froude_height"]) if "froude_height" in data.files else float(np.median(com[:, 2]))
+        return com, h, True
+    return position, None, False
+
+
 def _hexapod(data):
+    """Labels at `com_pos` when present (F301); otherwise, unchanged for old clips, at `head` with the
+    median head height (and `froude_height` ignored, as before)."""
     dt = _dt_of(data, HEXAPOD_DT)
     position = data["head"].astype(np.float64)
+    position, h, used_com = _com_reference(data, position)
+    if not used_com:
+        h = float(np.median(position[:, 2]))
     if "body_quat" in data.files:
         motion = np.concatenate(
-            [body_velocity(position, data["body_quat"], dt, "hexapod"),
-             yaw_rate(data["body_quat"], dt, "hexapod",
-                      float(np.median(position[:, 2])))], axis=1)
+            [body_velocity(position, data["body_quat"], dt, "hexapod", height=h, segment=_segment_of(data)),
+             yaw_rate(data["body_quat"], dt, "hexapod", h, segment=_segment_of(data))], axis=1)
     else:
-        motion = body_motion(position, dt)      # pre-2026-08-22 clips carry no orientation
+        motion = body_motion(position, dt, _segment_of(data))   # pre-2026-08-22 clips carry no orientation
     return {
         "frames": data["frames"],
         "actions": data["actions"].astype(np.float32),
@@ -87,13 +163,20 @@ def _hexapod(data):
 def _b1(data):
     dt = _dt_of(data, B1_DT)
     position = data["base_pos"].astype(np.float64)
+    # Reference point: `com_pos` (MuJoCo subtree CoM of the trunk) when the clip carries it (F301),
+    # else the base as before.
+    position, h_com, used_com = _com_reference(data, position)
     if "base_quat" in data.files:
+        # Froude height: the clip's median reference (CoM / base) height, unless the clip stores the
+        # height of the recording it was cut from (counterfactual branches: `froude_height` = source
+        # clip's median, so a 31-frame branch is scaled exactly like its 66-frame source)
+        h = h_com if used_com else (float(data["froude_height"]) if "froude_height" in data.files
+                                    else float(np.median(position[:, 2])))
         motion = np.concatenate(
-            [body_velocity(position, data["base_quat"], dt, "b1"),
-             yaw_rate(data["base_quat"], dt, "b1",
-                      float(np.median(position[:, 2])))], axis=1)
+            [body_velocity(position, data["base_quat"], dt, "b1", height=h, segment=_segment_of(data)),
+             yaw_rate(data["base_quat"], dt, "b1", h, segment=_segment_of(data))], axis=1)
     else:
-        motion = body_motion(position, dt)
+        motion = body_motion(position, dt, _segment_of(data))
     return {
         # optional: proprioceptive-only B1 collections (e.g. clone_b1's matched-physics data,
         # data/proprioceptive/beh12_b1_flatreal) carry no video at all -- every caller that reads
@@ -124,9 +207,12 @@ def _gecko(data):
     """
     dt = _dt_of(data, GECKO_DT)
     position = data["base_pos"].astype(np.float64)
+    position, h, used_com = _com_reference(data, position)     # `com_pos` if present (F301)
+    if not used_com:
+        h = float(np.median(position[:, 2]))
     motion = np.concatenate(
-        [body_velocity(position, data["base_quat"], dt, "gecko"),
-         yaw_rate(data["base_quat"], dt, "gecko", float(np.median(position[:, 2])))], axis=1)
+        [body_velocity(position, data["base_quat"], dt, "gecko", height=h, segment=_segment_of(data)),
+         yaw_rate(data["base_quat"], dt, "gecko", h, segment=_segment_of(data))], axis=1)
     n = len(position)
     contact = ((data["foot_contact"].astype(np.float32) > 0.5).astype(np.int64)
               if "foot_contact" in data.files else np.zeros((n, 4), dtype=np.int64))
@@ -223,7 +309,7 @@ def forward_axis(quat, embodiment):
     return v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-9)
 
 
-def body_velocity(position, quat, dt, embodiment):
+def body_velocity(position, quat, dt, embodiment, height=None, segment=None):
     """Forward and lateral speed **in the robot's own frame**, dimensionless, stride-averaged.
 
     **The world frame is the wrong frame and it is not a small error.** `body_motion` differenced
@@ -235,15 +321,15 @@ def body_velocity(position, quat, dt, embodiment):
     that turning means slowing down, by different amounts on the two robots -- which is a difference
     between the robots' turn rates wearing the label "speed".
     """
-    height = float(np.median(position[:, 2]))
+    if height is None:
+        height = float(np.median(position[:, 2]))
     scale = np.sqrt(G * max(height, 1e-6))
-    v = np.gradient(position[:, :2].astype(np.float64), dt, axis=0)
+    v = gradient(position[:, :2].astype(np.float64), dt, segment)
     f = forward_axis(quat, embodiment)
     left = np.stack([-f[:, 1], f[:, 0]], axis=1)
     out = np.stack([(v * f).sum(1), (v * left).sum(1)], axis=1) / scale
     window = max(3, int(round(BODY_WINDOW_S / dt)))
-    k = np.ones(window) / window
-    return np.stack([np.convolve(out[:, c], k, mode="same") for c in (0, 1)], axis=1).astype(np.float32)
+    return np.stack([smooth(out[:, c], window, segment) for c in (0, 1)], axis=1).astype(np.float32)
 
 
 def heading(quat, embodiment):
@@ -274,7 +360,7 @@ def heading(quat, embodiment):
     return np.arctan2(fy, fx)
 
 
-def yaw_rate(quat, dt, embodiment, height):
+def yaw_rate(quat, dt, embodiment, height, segment=None):
     """Dimensionless turn rate, smoothed over the same window as `body_motion`.
 
     **The two robots store orientation differently and neither convention is guessable.** The
@@ -286,9 +372,9 @@ def yaw_rate(quat, dt, embodiment, height):
     robots were turning opposite ways -- and in signed data that made yaw separate the robots at
     AUC 0.871, the exact failure the embodiment gate exists to catch.
     """
-    omega = np.gradient(np.unwrap(heading(quat, embodiment)), dt)
+    omega = gradient(np.unwrap(heading(quat, embodiment)), dt, segment)
     window = max(3, int(round(BODY_WINDOW_S / dt)))
-    omega = np.convolve(omega, np.ones(window) / window, mode="same")
+    omega = smooth(omega, window, segment)
     return (omega * np.sqrt(max(height, 1e-6) / G)).astype(np.float32)[:, None]
 
 HEXAPOD = Embodiment("hexapod", 18, 6, _hexapod)
@@ -298,8 +384,27 @@ GECKO = Embodiment("gecko", 16, 4, _gecko)
 REGISTRY = {e.name: e for e in (HEXAPOD, B1, GECKO)}
 
 
-def load(path, embodiment):
+class _LazyFramesView:
+    """The opened .npz, except `frames` is a `LazyFrames` (no decompression into RAM)."""
+
+    def __init__(self, data, path):
+        self._data, self._path, self.files = data, path, data.files
+
+    def __getitem__(self, key):
+        if key == "frames":
+            from .frame_store import LazyFrames
+            return LazyFrames(self._path)
+        return self._data[key]
+
+
+def load(path, embodiment, lazy_frames=False):
+    """One clip. `lazy_frames=True` keeps `clip["frames"]` on disk (wm/data/frame_store.py):
+    same values on indexing, read on demand; everything else is loaded exactly as before."""
     with np.load(path, allow_pickle=True) as data:
-        clip = embodiment.read(data)
+        clip = embodiment.read(_LazyFramesView(data, path) if lazy_frames else data)
+        # first frame a training pair may start at. Counterfactual branches set it to the branch
+        # point: earlier pairs repeat the source clip (24x per source) or straddle the switch,
+        # so their action chunk and label would describe two different commands.
+        clip["first_pair"] = int(data["first_pair"]) if "first_pair" in data.files else 0
     clip["embodiment"] = embodiment.name
     return clip

@@ -77,6 +77,7 @@ def build_planner(ckpt_path, candidates_dir, embodiment, horizon, free_offset, d
     proj.load_state_dict(checkpoint["projector"])
     planner = DirectFroudePlanner(proj, md, cands, embodiment, horizon, device, free_offset=free_offset)
     planner.action_lag = max(1, cfg.action_lag)
+    planner.window = 21          # 1 s read-out at the 0.05 s frame (2026-10-01 convention)
     channels = [int(c) for c in cfg.body_channels]
     mean_s, std_s = checkpoint["body_stats"]
     planner.mean_s = np.asarray(mean_s).ravel()[:len(channels)]

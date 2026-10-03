@@ -116,6 +116,8 @@ def main():
     ap.add_argument("--model", action="append", default=[], metavar="NAME=CKPT",
                     help="checkpoints to measure instead of the default stride-1/5 pair (repeatable); "
                          "a jointly pretrained hexapod+B1 best.pt works as is (only its ITM is used)")
+    ap.add_argument("--c10", default="", metavar="DIR=CACHE",
+                    help="c10 clips and their embedding cache (use the heldout split for test numbers)")
     ap.add_argument("--b1", default="", metavar="DIR=CACHE",
                     help="B1 clips and their embedding cache to use instead of the default (e.g. re-rendered data)")
     args = ap.parse_args()
@@ -123,6 +125,9 @@ def main():
     if args.b1:
         d, c = args.b1.split("=", 1)
         BODIES[2] = ("B1", "b1", d, c)
+    if args.c10:
+        d, c = args.c10.split("=", 1)
+        BODIES[0] = ("c10 (pretrain)", "hexapod", d, c)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt

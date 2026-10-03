@@ -2657,6 +2657,11 @@ Data alone (same objective, same optimizer settings, same clip count, old vs v2)
 
 Sideways stays at chance under both arms (19%/20% vs 17%) — fourth independent measurement of this failure, first on data with no known defect.
 
+**F293 note.** Affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303, `recollect_b1_turns.py`) were
+rendered and labelled from a corrupted `base_quat` (F293): the stronger turns show about half their yaw rate,
+with a false lateral speed. Grading is by condition label, but the turn-selection numbers (43% vs 22%) rest on
+those frames. Direction of the result likely holds; not re-measured.
+
 ---
 
 ### F108. The two hexapod bodies (pretraining vs. goal source) turn in opposite directions; fixed by re-collecting to match the pretraining body
@@ -2676,6 +2681,8 @@ Fix: re-collected held-out body and B1 to match the pretraining body's sign (re-
 The direction was also confirmed in the image frame, which is the frame that matters: taking the principal axis of the robot's silhouette through a clip, all three sets rotate anticlockwise on screen (+140deg pretraining, +152 held-out, +54 B1) — the two scenes share identical cameras, so on-screen sense is a shared language, and being unable to name the turn direction from the picture alone would concede the project's own claim that vision carries shared meaning across bodies.
 
 Lesson: an empty cell in a comparison table reads as "not applicable" but can mean "not checked" — fill every cell or state why it's missing.
+
+**F293 note.** The re-collection described here is the affected collector (`recollect_b1_turns.py` / `recollect_b1_more.py`): every hard-turn clip it produced had a corrupted `base_quat` until F293. No number in this finding is computed from the stored labels.
 
 ---
 
@@ -2698,6 +2705,11 @@ Three data leaks found and fixed before the stage-3 rebuild ran (rebuild was 19 
 
 Note: stage 1's pool changed from 9-of-48 to 9-of-24, so its rollout ratios are no longer comparable to F45 or F87 — quote only against runs under the new rule. None of the three leaks could change the MSE-vs-contrastive ordering (all six runs share one stage 1 checkpoint and one projector), but each would have been an uncontrolled caveat on every absolute number the run produces.
 
+**F293 note.** Affected: the B1 row is computed from the corrupted `base_quat` of the recollected turn clips
+(F293); the strongest levels are understated (e.g. ep1301 turn_w0.075 clip-mean yaw 0.066 stored vs 0.119
+correct). The sign agreement across sets holds; the B1 magnitudes and the cross-body match at the top levels
+do not. Not re-measured.
+
 ---
 
 ### F110. Three seeds confirm: the contrastive term makes the quadruped's actions selectable offline; MSE is below chance
@@ -2719,6 +2731,11 @@ Reproduces F88's pattern on data now free of the four B1 defects, slightly bette
 Scope: this is offline discrimination over recorded clips (ranking 12 candidate actions against a known next embedding), not closed-loop. F90's warning applies — forward selection has cleared chance before with /mean-z as high as 0.977.
 
 Scripts: `scripts/diagnostics/summarise_stage3_seeds.py` (no log kept — rerun against seed checkpoints to reproduce). `adapt3` stores only the final step in its checkpoint; family metric wanders ~4 points between evaluations (nce seed 0 final step reads 57% vs its 53.7% window mean).
+
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
 
 ---
 
@@ -2744,6 +2761,12 @@ Bug found and partially fixed: `score_closed_loop.py`'s `S.R. behaviour` class i
 
 Data: runs in `results/wm/closed_loop/b1_{nce,mse}_s0_b1_ep*/`.
 
+**F293 note.** Affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303, `recollect_b1_turns.py`) were
+rendered and labelled from a corrupted `base_quat` (F293): the stronger turns show about half their yaw rate,
+with a false lateral speed. The yaw targets of the B1 turn goals come from these labels, so the true targets
+are larger and the turn achieved-of-target fraction is lower still; the conclusion (neither arm turns) holds.
+Not re-measured.
+
 ---
 
 ### F112. With turn signs finally agreeing across all sets, cross-embodiment (insect-goal) control is still at chance and the quadruped does not turn
@@ -2767,6 +2790,11 @@ Bug fixed: `score_closed_loop.py` previously read the reference from `--demo` (t
 
 Data: runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_*/`.
 
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
+
 ---
 
 ### F113. Committing three steps restores B1 yaw magnitude in cross-embodiment loops, but it is not tracking the goal's turn
@@ -2782,6 +2810,11 @@ Selection stays at chance under every setting (contrastive 32/34/36%, MSE 33/35/
 Conclusion: the turn-sign defect (F108) was real and fixing it was necessary, but it was not what stood between this pipeline and cross-embodiment turning. With sign now correct: forward travel crosses embodiments, turning does not (F100's claim confirmed without the sign confound). Warm start is not load-bearing for survival either — at warm 0 the robot starts standing and still survives 65/65 in all twelve runs; its only effect is setting an initial yaw the robot then coasts on (per F100).
 
 Data: runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_c{1,3w10,3w0}_*/`.
+
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
 
 ---
 
@@ -2804,6 +2837,11 @@ Uncorrected exact-condition selection was below chance; corrected, both metrics 
 
 Scripts: `wm/policy/planner.py` (where the shift was to be applied), `plan_open_loop.py`.
 
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
+
 ---
 
 ### F115. The goal mean-shift that fixed offline selection (F114) does nothing in the closed loop
@@ -2825,6 +2863,11 @@ Flagged control (not yet run at time of writing, resolved in F116): shuffle whic
 
 Data: runs in `results/wm/closed_loop/b1_hexgoal_{nce,mse}_s0_c3w0ctr_*/`.
 Known bug: the shift-norm diagnostic print computes norm after the shift is applied, so it always prints 0.00 (cosmetic only; the shift itself is correct).
+
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
 
 ---
 
@@ -2862,6 +2905,11 @@ Logs: `/tmp/ol_mismatch.log`, `/tmp/ol_mismatch_raw.log`, `/tmp/ol_dsmean_mismat
 
 Next: `does_rollout_matter.py`'s `blind` arm should run before `loop_frames_are_off_manifold.py` — check whether the goal term influences the argmin at all under any metric.
 
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
+
 ---
 
 ### F117. The forward model rollout works well same-robot, but this measured behaviour-classification not goal-following
@@ -2889,6 +2937,11 @@ Design-change proposal that followed from this (pursued in F119/F120): a raw emb
 
 Caveat on the 73%/38.9% numbers: same-robot goals here come from clips the candidates did not come from, but the goal is still the demonstration's own future, so F116's confound applies to this table too (part of 73% may be a readout of `e_t` rather than goal-following) — this is exactly what the F118 mismatch control (not run in this script) was built to test.
 
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
+
 ---
 
 ### F118. Even within one robot, the planner's argmin does not follow its goal; the rollout is a state classifier, not a controller
@@ -2913,6 +2966,11 @@ Consequence: any proposed fix must be judged on the `roll/goal` column (score vs
 This also puts a number on the teacher-student argument (Q16): candidate scoring here is not failing to pick the best candidate — it is not conditioning on the request at all. Emitting a policy makes the request part of training rather than something a run-time argmin has to honour.
 
 Log: `/tmp/rollout_mismatch.log`.
+
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. Grading here is by condition label (unaffected);
+only the turn candidates' frames are involved. Not re-measured.
 
 ---
 
@@ -2948,6 +3006,12 @@ Why (measured, not assumed): the two datasets' speed conditions are calibrated t
 Revised implication (per F120): the same-robot 49% result is a real, valid demonstration that scoring in a shared coordinate restores goal-conditioning, and it is a lower bound, since it was measured with a head reading B1 as near-constant. It also corrects F118's stronger claim that run-time search cannot be made to honour a goal — it can, this is the demonstration. The concrete next experiment is a pretraining change, not a planner change: widen the body head to yaw and lateral (`body_channels 0,1,2`) and check its calibration against measured speed on both robots before scoring anything with it.
 
 Log: the tables above are reproducible with `--goal_dir data/allocentric/beh12_c08f09t09_flat`.
+
+**F293 note.** Possibly affected: the B1 turn clips of `beh12_b1_flat` (eps 1000-1303,
+`recollect_b1_turns.py`) were rendered and labelled from a corrupted `base_quat` (F293): the stronger turns
+show about half their yaw rate, with a false lateral speed. The forward-speed head is fit and scored on these
+labels (hard-turn forward off by -0.02..-0.03). The same-robot vs cross-embodiment contrast likely holds; not
+re-measured.
 
 ---
 
@@ -2986,6 +3050,11 @@ Prescribed next run (handed to com7):
 ```
 then stages 1-3, then per-channel calibration on both robots. Pass bar set in advance: all three channels within ~1.5x compression on both robots, and `roll/goal` above 28% on mismatched cross-embodiment goals. If forward calibrates but yaw does not, that reproduces F73's channel competition on corrected data, meaning the bottleneck is the pretraining objective, not head width — stop and report rather than tune further.
 
+**F293 note.** Affected: the B1 calibration and the head fit use `beh12_b1_flat` Froude labels, whose turn
+clips (eps 1000-1303) were wrong (F293; forward off by -0.02..-0.03 on hard turns, frames rendered from the
+corrupted pose). Forward-only, so the effect is small; the qualitative result (unfitted head compresses B1,
+refit fixes it) likely holds. Not re-measured.
+
 ---
 
 ### F121. A shared head can serve both robots once it is fitted on both
@@ -3010,6 +3079,11 @@ Durable bug note: an early version of the fit script built the motion decoder wi
 
 Checkpoints: `stage3_b1_nce_s0_bodyfit.pt` (B1 only), `stage3_b1_nce_s0_bodyfit_both.pt` (both).
 Logs: `/tmp/bodyfit*.log`, `/tmp/bodycal_{fit,both}.log`.
+
+**F293 note.** Affected: the B1 calibration and the head fit use `beh12_b1_flat` Froude labels, whose turn
+clips (eps 1000-1303) were wrong (F293; forward off by -0.02..-0.03 on hard turns, frames rendered from the
+corrupted pose). Forward-only, so the effect is small; the qualitative result (unfitted head compresses B1,
+refit fixes it) likely holds. Not re-measured.
 
 ---
 
@@ -3039,6 +3113,11 @@ Scope: one channel (forward speed only), one checkpoint, one seed, offline, no s
 
 Checkpoint: `stage3_b1_nce_s0_bodyfit_proj.pt`.
 Logs: `/tmp/bodyfit_proj.log`, `/tmp/score_proj_{same,cross}.log`.
+
+**F293 note.** Affected: the B1 calibration and the head fit use `beh12_b1_flat` Froude labels, whose turn
+clips (eps 1000-1303) were wrong (F293; forward off by -0.02..-0.03 on hard turns, frames rendered from the
+corrupted pose). Forward-only, so the effect is small; the qualitative result (unfitted head compresses B1,
+refit fixes it) likely holds. Not re-measured.
 
 ---
 
@@ -3070,6 +3149,10 @@ Scope: offline selection among 12 recorded B1 behaviours, one checkpoint, one se
 
 Logs: `/tmp/f132_{A,B,C}.log`; `scripts/diagnostics/score_by_body_motion.py --mode {A,B,C}`.
 
+**F293 note.** Possibly affected: the B1 head behind these scores was fit on `beh12_b1_flat` labels and
+frames, whose turn clips are corrupted (F293); grading is by behaviour family (unaffected). Forward-only
+channel, so the effect is likely small; not re-measured.
+
 ---
 
 ### F124. The contrastive objective, not mode A, is what makes the rollout carry usable information
@@ -3087,6 +3170,10 @@ Mode A is identical under both objectives (expected — it never calls the forwa
 Links F110 (training-objective statement) and F123 (cross-embodiment selection statement) as the same fact: the contrastive term makes the FDM rollout carry action-specific information, and mode C is the only rule that uses it. A checkpoint differing in one flag failing exactly where that flag predicts is stronger evidence than a same-config second seed would be. Second-seed replication (`stage3_b1_nce_s{1,2}`, on com7) still outstanding.
 
 Logs: `/tmp/f133_{A,C}_mse.log`, `/tmp/f132_{A,C}.log`.
+
+**F293 note.** Possibly affected: the B1 head behind these scores was fit on `beh12_b1_flat` labels and
+frames, whose turn clips are corrupted (F293); grading is by behaviour family (unaffected). Forward-only
+channel, so the effect is likely small; not re-measured.
 
 ---
 
@@ -3117,6 +3204,10 @@ Correlations fall to +0.60-0.88, three of six cells fail the bar — second inde
 Open question: whether 3 channels beat F123's 42% forward-only bar under mode C with mismatch control — needs checkpoints, still on com7.
 
 Run: `beh12_hex-b1_body3`, commit ba12c71. No log kept (scratch file was reused/removed).
+
+**F293 note.** Affected: the B1 calibration uses `beh12_b1_flat` labels whose turn clips (eps 1000-1303) were
+wrong (F293: yaw ~half, false lateral ~0.065 on hard turns); the B1 yaw/lateral cells (e.g. 'B1 turning yaw
+0.038->0.038') are in the corrupted units. That the head fits both bodies likely holds; not re-measured.
 
 ---
 
@@ -3155,6 +3246,10 @@ Turning is best-identified on a forward-speed-only coordinate (54-62%) since tur
 Durable bug: first mode-D run reported 0% on every column with healthy sample count because the goal-encoding block still tested `mode == "C"`, silently skipping every sample. Now raises instead of skipping.
 
 Log: `/tmp/f135_D.log`.
+
+**F293 note.** Possibly affected: the B1 head behind these scores was fit on `beh12_b1_flat` labels and
+frames, whose turn clips are corrupted (F293); grading is by behaviour family (unaffected). Forward-only
+channel, so the effect is likely small; not re-measured.
 
 ---
 
@@ -3198,6 +3293,11 @@ Scope: one checkpoint, one seed, offline selection among 12 recorded behaviours,
 
 Checkpoint: `wm/runs/beh12_hex-b1_body3/stage3_b1_nce_s0_bodyfit_proj.pt`.
 Logs: `/tmp/f136_{fit,cal,C,D}.log`.
+
+**F293 note.** Affected: the B1 head is fit and calibrated on `beh12_b1_flat` labels whose turn clips were
+wrong (F293: yaw ~half, false lateral ~0.065), so the B1 yaw (+0.91) and lateral (+0.83) cells and the
+turn-family selection rest on them. Grading is by family label; the 3-channel gain likely holds. Not
+re-measured.
 
 ---
 
@@ -3561,6 +3661,10 @@ Alternative explanation considered and weighed against: this run used only 10 ep
 
 Scripts: `scripts/diagnostics/check_actswm_wiring.py`, `wm/actswm_short.py`, `scripts/run/com7_pretrain_actswm.sh`, `scripts/run/com7_pretrain_lag3.sh`. Runs: `wm/runs/beh12_actswm/`, `wm/runs/beh12_lag3_nohinge`.
 
+**F293 note.** Possibly affected: the B1 body-head correlations (+0.95 to +0.99) are scored against
+`beh12_b1_flat` labels whose turn clips were wrong (F293). The rebuild's failure (hexapod, rollout horizon) is
+unaffected.
+
 ---
 
 ### F142. One-step prediction does not need the action; no lambda weighting can fix the ActSWM hinge
@@ -3709,6 +3813,10 @@ Part 2 — transfer destroyed (body-motion coordinate fitted on insect, applied 
 Differencing halves the within-insect coordinate and annihilates cross-body transfer (forward transfer 0.63 → -0.05).
 
 Decision: Direction B killed on the cheapest candidate, failing both criteria (action-necessity, body-transfer). Does not prove no encoder could work (a learned motion encoder differs from a difference of an appearance encoder), but the cheap evidence points against it — proceed with Direction A (write up what's measured) instead.
+
+**F293 note.** Possibly affected: the B1 side of the transfer test is scored against `beh12_b1_flat` Froude
+labels whose turn clips were wrong (F293). The collapse of transfer (0.63 -> -0.05) is too large to be
+explained by it; not re-measured.
 
 ---
 
@@ -3916,6 +4024,11 @@ Data: `data/egocentric/beh12_c10f10t10_ego_flat`, `data/egocentric/beh12_b1_ego_
 
 Script: `scripts/diagnostics/degait_coordinate.py`.
 
+**F293 note.** Affected: the Q2 transfer is scored against `data/egocentric/beh12_b1_ego_flat` turn clips (eps
+1000-1303) carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065, forward -0.02..-0.03 on hard
+turns) and frames rendered from the corrupted pose. The B1 yaw transfer (0.07 -> 0.64) is the number most
+exposed; the pass of Q2 likely holds. Not re-measured.
+
 ---
 
 ### F156. Which wall texture V-JEPA2 reads motion from, measured directly; plus ten scene defects, a data reorg, a grayscale test, and egocentric-training scoping
@@ -3980,6 +4093,11 @@ First time null/real moves meaningfully in the entire F141-F154 chain. Real beat
 **Unexpected finding: the B1's action was never recoverable from its pose** (0.166, essentially F145's insect-only mechanism) — pose-redundancy is an insect-specific route to the ignored-action problem, not universal; the B1's null/real still sat at allocentric ~1.03 without any pose-based explanation. Egocentric fixing the B1's null/real (to 1.13, per GATE C) cannot be explained as "removing the pose" since there was no pose-based redundancy to remove on the B1. This narrows F145's central mechanism to the insect and is a real gap in the account, flagged for correction in reporting (deck's mechanism slide currently overstated).
 
 Scripts: `scripts/diagnostics/motion_decoder_ceiling.py`, `scripts/run/step2_gate_projector.sh`. No log saved for the main training run; egocentric arms tracked at `wm/runs/beh12_ego` (com7).
+
+**F293 note.** Possibly affected: the B1 body-motion coordinate ('B1 similar') is scored on
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. GATE
+C's null/real is embedding-level and unaffected by labels.
 
 ---
 
@@ -4599,6 +4717,10 @@ Runs: `sim/collect/rollout_b1_mujoco.py` (new flags), CoppeliaSim port 23000, `s
 
 **Overall conclusion.** Across this session's arc, six independent, mechanistically distinct fixes -- training recipe (F173 rollout supervision), architecture (F173 deeper injection), data volume (this entry, 5x hexapod), readout design (F177 z-alone, this entry's aux clip-average loss), and the counterfactual-target mechanism fix at both approximate and exact strength (this entry) -- all null. This is a characterized structural limitation, not "nothing worked": teacher-forced training removes the incentive for a video world model to depend on the action at all (confirmed here to apply beyond UWM-JEPA's toy benchmark), and the obvious remedy (counterfactual targets) does not transfer to video-scale locomotion prediction at this data budget. Coarse behaviour-family discrimination works; fine within-family magnitude discrimination does not, and every cheap-to-moderate lever tried has been ruled out.
 
+**F293 note.** Possibly affected: item 4's B1 baseline (L_b1 on the 48-clip `beh12_b1_ego_flat`) uses its
+Froude labels, whose turn clips were wrong (F293). The 24 exact counterfactuals were measured live in MuJoCo.
+The null result likely holds; not re-measured.
+
 ---
 
 ### F179. Dreamer-style imagination-RL on the frozen FTM for B1: original arc confounded by a non-converging critic; full critic-stabilization ladder and PPO both fail on an FTM-side long-horizon error; escalation ladder exhausted
@@ -4810,6 +4932,11 @@ Scripts: `rssm_stage1_gate.py`, `condition_confusion.py --rssm wm/runs/rssm_stag
 
 **Overall shape of the arc.** Systematic elimination (loss weight, prediction target, 4 architecture variants spanning pooled/spatial x recurrent/non-recurrent, input representation) localized the cause to joint-training gradient competition on z; stop-gradient fixed the action-lever by ~9x, the first working fix in this arc -- but this did not convert to ranking improvement (exact accuracy tied, mean-rank regressed slightly), confirming "readable," "rankable," and "controllable" are three separate bars. The rollout mechanism itself (not horizon length, not architecture sophistication up to and including a real RSSM) is the unresolved obstacle to closing the ranking gap.
 
+**F293 note.** Possibly affected: the B1 cells (items 1, 3, 9, 12-14 where B1 is reported) use
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. Hexapod
+cells are unaffected; the arc's conclusions rest mainly on hexapod. Not re-measured.
+
 ---
 
 ### F181. Zero-shot babble-grounding of a genuinely unseen body (gecko) fails; the diagnosis points to fine-tuning, not the babble fit, as the missing step
@@ -4831,6 +4958,11 @@ Superseded/corrected by F189: the full fine-tune pipeline does NOT recover gecko
 
 Scripts: `wm/fit_gecko_projector.py`, `scripts/diagnostics/objective_experiments/gecko_froude_transfer.py`.
 Checkpoints: `wm/runs/beh12_body_stopgrad/projector_stopgrad_gecko.pt`, `wm/runs/ftm_froude_stopgrad_head_hexapod.pt`. Data: `data/gecko/babble/babble_{1..36}.npz`.
+
+**F293 note.** Affected: the B1 reference row (rho 0.181 / 0.427 / 0.628) is scored against
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. The
+gecko result is unaffected.
 
 ---
 
@@ -4871,6 +5003,11 @@ Selection/control on this checkpoint: see F184-F188 (mode A/D clear, rollout doe
 Scripts: `wm.finetune_new_body`, `wm.adapt`, `wm.fit_projector`, `wm.assemble_teacher`, `wm.fit_body_head`.
 Checkpoints: `wm/runs/b1_adapt/adapted_b1.pt` (stage 1), `wm/runs/b1_adapt/projector_b1.pt` (stage 2), `wm/runs/b1_adapt/teacher_b1.pt` (merged), `wm/runs/b1_adapt/body_head_b1.pt` (stage 4). Manual: `doc/FINETUNE_GUIDE.md`.
 
+**F293 note.** Affected: the B1 rho and held-out ratio (1.330x -> 0.751x) are fit and scored against
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. The
+conclusion (staged adaptation recovers B1) likely holds; not re-measured.
+
 ---
 
 ### F184. Goal transfer on the correctly-adapted B1 checkpoint: mode A (direct) clears chance, mode C (rollout) does not
@@ -4894,6 +5031,11 @@ Consistent with F126/F127 (rolling the FTM into a score makes ranking worse, not
 Script: `scripts/diagnostics/planning/score_by_body_motion.py --mode {A,C}`.
 Checkpoint: `wm/runs/b1_adapt/body_head_b1.pt`. Goal source: `data/egocentric/beh12_c10f10t10_ego_flat`.
 
+**F293 note.** Affected: the B1 head was fit on, and the candidates/grading use,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. The
+weak turn family (15-36%) is the cell most exposed. Not re-measured.
+
 ---
 
 ### F185. Live rendered cross-embodiment closed loop on adapted B1: direct beats rollout again; both share a weak spot traced to categorical yaw-data absence
@@ -4914,6 +5056,11 @@ Direct's one class miss traced to data: hexapod's own turn library never has yaw
 Proposed fix (not yet run): refit `body_head_b1.pt` with `--latent projector` only, matching what's used at control time (same fix pattern as F122).
 
 Scripts: `sim/control/close_loop_direct_froude.py`, `wm/policy/planner.py`. Checkpoint: `wm/runs/b1_adapt/body_head_b1.pt`. Runs: `results/wm/closed_loop/direct_froude/{direct,rollout}_*.npz`.
+
+**F293 note.** Affected: the B1 head (`body_head_b1*.pt`) was fit on, and the candidate library is,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+Turn-goal and yaw readings are the most exposed; direct-beats-rollout likely holds. Not re-measured.
 
 ---
 
@@ -4938,6 +5085,11 @@ Methodological fix: F185 confounded `--mechanism` (direct/rollout) with `--goal_
 
 Scripts: `wm/fit_body_head.py --also`, `sim/control/close_loop_direct_froude.py --goal_source`, `wm/policy/planner.py` (`vision_goal`). Checkpoint: `wm/runs/b1_adapt/body_head_b1_hex.pt`.
 
+**F293 note.** Affected: the B1 head (`body_head_b1*.pt`) was fit on, and the candidate library is,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+Turn-goal and yaw readings are the most exposed; direct-beats-rollout likely holds. Not re-measured.
+
 ---
 
 ### F187. Mode D: a vision-only goal costs direct-Froude selection nothing once body_head is properly calibrated
@@ -4955,6 +5107,11 @@ A vision-only goal costs nothing (median error slightly better than mode A). Lat
 What this settles: candidate scoring that never touches vision, combined with a goal read only from vision, performs on par with using privileged physics state for the goal. What still fails regardless is the rollout mechanism on the candidate side (mode C) — the open problem is localized to candidate scoring, not to whether vision alone can specify a goal.
 
 Scripts: `sim/control/close_loop_direct_froude.py --mechanism direct --goal_source vision`. Checkpoint: `wm/runs/b1_adapt/body_head_b1_hex.pt`. Runs: `results/wm/closed_loop/direct_froude/direct-vision_*.npz`.
+
+**F293 note.** Affected: the B1 head (`body_head_b1*.pt`) was fit on, and the candidate library is,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+Turn-goal and yaw readings are the most exposed; direct-beats-rollout likely holds. Not re-measured.
 
 ---
 
@@ -4993,6 +5150,11 @@ Rollout prefers the single worst candidate (side_R_lvl1, farthest of all 12 from
 Caveat: "3/3 behaviour class" counts the dominant pick per episode; 20-22% of individual steps are in the wrong family under A/D. Kept for comparability with F95/F101, not because it's the better measure.
 
 Scripts: `sim/control/close_loop_direct_froude.py --mechanism rollout --goal_source physics`, `wm/policy/planner.py`. Checkpoint: `wm/runs/b1_adapt/body_head_b1_hex.pt`. Runs: `results/wm/closed_loop/direct_froude/rollout-physics_*.npz`, `rollout-vision_b1_ep2301_b1_ep2.npz`. See also F116-F118, F126.
+
+**F293 note.** Affected: the B1 head (`body_head_b1*.pt`) was fit on, and the candidate library is,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+Turn-goal and yaw readings are the most exposed; direct-beats-rollout likely holds. Not re-measured.
 
 ---
 
@@ -5068,6 +5230,10 @@ Lateral goal-reading (mode D, vision-only) per hexapod side_* clip: 4/4 broken (
 
 Checkpoints: `wm/runs/b1_babble_adapt2/{adapted_b1,projector_b1,teacher_b1,body_head_b1,body_head_b1_hex}.pt`. Data: `results/wm/dataset/b1_babble/batch2_rendered/`.
 
+**F293 note.** Possibly affected: the expert-pool row uses `data/egocentric/beh12_b1_ego_flat` turn clips (eps
+1000-1303) carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065, forward -0.02..-0.03 on hard
+turns) and frames rendered from the corrupted pose. The babble rows are unaffected.
+
 ---
 
 ### F192. Hexapod's own lateral visual signal is genuinely weak, not a windowing artifact
@@ -5132,6 +5298,10 @@ Goal source (A vs D, both free_offset=False): babble worsens under vision goal (
 
 Full 8-cell table in `results/wm/dataset/b1_babble/clean_redo_log.txt` and `corrected_free_offset_full_log.txt`.
 
+**F293 note.** Possibly affected: the expert arm (lift_expert, the capture-ratio denominator) uses the
+`beh12_b1_ego_flat` library and labels, whose turn clips were wrong (F293). The babble arm is unaffected. Not
+re-measured.
+
 ---
 
 ### F195. F136's reward-quality wall generalizes to B1: current checkpoint's scoring function is at/below chance on local action perturbations, in real MuJoCo physics
@@ -5152,6 +5322,8 @@ Method: 8 branch points, 16 Gaussian perturbations at sigma 0.1/0.3/0.5, execute
 At or below chance at every perturbation size, matching F136's insect-side shape on a different body/checkpoint/physics engine. Building an RL controller on this checkpoint would likely reproduce F179's collapse — the reward signal has no local gradient for PPO-style exploration. Does not test whether a different checkpoint/objective/fitting procedure could produce a locally-discriminative reward.
 
 Scripts: `scripts/diagnostics/objective_experiments/reward_quality_gate_b1.py`. Log: `results/wm/dataset/b1_babble/reward_quality_gate_log.txt`.
+
+**F293 note.** Possibly affected: the truth is live physics and the baseline a speed clip, but the scoring head was likely fit on pre-fix beh12 B1 labels. The chance-level verdict would not change.
 
 ---
 
@@ -5238,6 +5410,8 @@ Best B1 reward-quality-gate result in project history. F199's hexapod-level impr
 
 Scripts: `scripts/diagnostics/objective_experiments/family_z_ceiling.py`, `scripts/diagnostics/objective_experiments/b1_adaptation_sep_check.py`, `wm/adapt.py --lambda_hinge/--hinge_margin`. Training flags: `--lambda_hinge 0.5 --lambda_readout 1.0 --lambda_rollout 1.0 --hinge_K 2 --hinge_margin 0.1 --lambda_recon 1.0`. Checkpoints: `wm/runs/beh12_hinge_multistep_anchor/best.pt`, `wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/`.
 
+**F293 note.** Possibly affected: the truth is live physics, but the scoring head was likely fit on pre-fix beh12 B1 labels. The chance-level verdict would not change.
+
 ---
 
 ### F200. Current native-Coppelia B1 babble: claim-honest and visibly walkable as a preview, but still below the pretraining Froude band
@@ -5271,6 +5445,8 @@ Fixes tried and outcomes:
 Mechanism: B1 `wm.adapt` stage 1 originally used a single one-step MSE loss with no separation term, silently discarding action-sensitivity from pretraining (measured via `b1_adaptation_sep_check.py`, 38-62% loss of `sep`). Adding K=1 hinge to stage 1 cut that loss to 23-51%, but the resulting gate improvement did not reproduce (see withdrawal above).
 
 Scripts: `scripts/diagnostics/objective_experiments/b1_adaptation_sep_check.py`, `wm/adapt.py --lambda_hinge/--hinge_margin`. Checkpoint: `wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/`.
+
+**F293 note.** Possibly affected: the truth is live physics, but the scoring head was likely fit on pre-fix beh12 B1 labels. The chance-level verdict would not change.
 
 ---
 
@@ -5373,6 +5549,11 @@ Shorter horizon is worse, opposite of what a spacing-artifact hypothesis predict
 
 Scripts: `sim/control/close_loop_direct_froude.py` (4 modes). Runs: `results/wm/closed_loop/direct_froude_hinge_v2/`, `results/wm/closed_loop/rollout_h1/`, `rollout_h2/`.
 
+**F293 note.** Affected: the B1 head was fit on, and the candidate library and its grading use,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. Not
+re-measured.
+
 ---
 
 ### F208. One flag served two unrelated jobs and depressed every vision-goal number in the project; fixed, vision goal matches measured goal exactly (100% vs 100%)
@@ -5390,6 +5571,11 @@ Implication: F188's 0.0293 error was this bug plus a favorable clip; F207's clai
 Lesson: where a spacing/horizon/window appears in more than one place in the pipeline, it needs its own name; metrics must be computed in the units the system actually scores in.
 
 Scripts: `sim/control/close_loop_direct_froude.py` (`--goal_horizon`), `wm/fit_body_head.py` (`--also` validation split), `wm/policy/b1_mujoco_env.py`, `b1_coppelia_env.py` (`GOAL_HORIZON`). Runs: `results/wm/closed_loop/direct_froude_v2head_gh1/`. Checkpoint: `wm/runs/beh12_hinge_multistep_anchor_v2/b1_adapt_hinge/body_head_b1_hex_v2.pt`.
+
+**F293 note.** Affected: the B1 head was fit on, and the candidate library and its grading use,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. Not
+re-measured.
 
 ---
 
@@ -5438,6 +5624,11 @@ Vision goal matches or beats the privileged recorded goal on every metric across
 One bug fixed to run this: `final_2x2x2_test.py` still passed `--horizon` (planner window, default 5) into `vision_goal` as frame spacing (F208's bug), missed in the earlier fix elsewhere. Split into `--goal_horizon` (default 1). Every mode C/D number this script produced before 2026-09-14 is not comparable to the table above.
 
 Scripts: `scripts/diagnostics/objective_experiments/final_2x2x2_test.py`.
+
+**F293 note.** Affected: the B1 head was fit on, and the candidate library and its grading use,
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. Not
+re-measured.
 
 ---
 
@@ -5514,6 +5705,10 @@ NOTE: F215 later found this linear-vs-ITM comparison (Result 1) suffered a data-
 
 Scripts (both fixed in place, no new files): `scripts/diagnostics/cross_embodiment/body_head_hidden_share.py`, `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py`.
 
+**F293 note.** Affected: the B1 Froude targets (clustering and R2) come from
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+
 ---
 
 ### F215. ITM's Froude read vs linear/MLP baselines on the raw frame pair: initial "ITM wins" result had a data leak; on a clean split, ITM loses to both baselines, and the loss traces to `z`'s lossy compression, not to the fitting
@@ -5567,6 +5762,11 @@ No consistent winner: MLP(z) beats `body_head` on hexapod but loses on B1; linea
 Caveat on trust: the MLP baselines (pair and z alike) are fit on only 48 clips total (24 hexapod + 24 B1, `--epochs 3000`, 128 hidden units) and repeatedly reach train R2 = +1.000, a memorization signature at this sample size, not evidence the representation makes Froude trivial to read. The held-out MLP numbers are noisier for this reason than the linear ones; the linear(z) vs `body_head` comparison (both closer to +0.5, neither near a perfect train fit) is the more trustworthy half of this table.
 
 Script: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py` (extended in place with `PairMLP`/`mlp_fit`/`mlp_predict`, the per-body union-fit, and the `z`-input baselines, no new file).
+
+**F293 note.** Affected: the B1 R2 cells (e.g. ITM+body_head +0.302) are fit and scored against
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. The
+hexapod cells are unaffected. Not re-measured.
 
 ---
 
@@ -5640,6 +5840,10 @@ Status: goal-conditioning gate not passed for turn; speed regressed from F217's 
 
 Scripts: `sim/control/clone_b1.py` (unchanged). `scripts/dataset/recollect_b1_flatreal.py` (`collect_recovery()` extended with `--wz`/`--recovery_ep0`). `sim/collect/rollout_b1_mujoco.py` (`--yaw0`, reused). Data: `data/proprioceptive/beh12_b1_flatreal`, 60 clips. Checkpoints (all FAIL): `b1_bc_flatreal_all_trim12_yaw.pt`, `b1_bc_flatreal_all_trim12_noyaw.pt`, `b1_bc_flatreal_all_trim12_noyaw_5k.pt`, `b1_bc_flatreal_all_trim12_yaw_v2.pt`.
 
+**F293 note.** Possibly affected: the turn goals and turn training clips come from
+`proprioceptive/beh12_b1_flatreal` / `recollect_b1_flatreal.py`, listed as affected by F293 (wrong Froude goal
+for hard turns). The closed-loop failure (static collapse / falls) is not explained by it; not re-measured.
+
 ---
 
 ### F219. A fourth instance of hexapod turn-sign instability; this one saturates rather than inverts
@@ -5678,6 +5882,11 @@ Methodology bug caught before trusting the number: an earlier version misaligned
 Not covered: one goal clip, one body pair, one horizon (2); mode C (vision goal + rollout) not run.
 
 Scripts: `scripts/diagnostics/objective_experiments/froude_match_timevarying.py` (checked in, supersedes earlier scratch versions). Outputs: `results/deck/froude_{1,2,3}_*.png`, `results/deck/froude_match_2x2_*.png`.
+
+**F293 note.** Affected: candidates and their 'achieved' local Froude come from
+`data/egocentric/beh12_b1_ego_flat` turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half,
+false lateral ~0.065, forward -0.02..-0.03 on hard turns) and frames rendered from the corrupted pose.
+Direct-beats-rollout likely holds; not re-measured.
 
 ---
 
@@ -5720,6 +5929,10 @@ Not yet done: re-measuring Slides 22 and 23 against this same clean checkpoint a
 
 Scripts: `scripts/dataset/make_clean_split.py`, `scripts/run/clean_retrain.sh`, `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (the correction), fixes in `wm/data/dataset.py`, `wm/config.py`, `wm/train.py`. Run on BIAS-2. Checkpoint: `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/body_head_b1_hex_clean.pt`.
 
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
+
 ---
 
 ### F223. beh24 (24-condition behaviour library) assembled for both bodies; cross-body Froude calibration mostly matches; clean-retrain shows a real accuracy regression from beh12 due to interference, not just a harder task
@@ -5761,6 +5974,11 @@ Not yet done: diagnosing which of the candidate explanations accounts for the re
 
 Scripts: `scripts/dataset/build_beh24_hex_ego_flat.py`, `build_beh24_b1_ego_flat.py`, `check_beh24_froude_match.py`, `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (extended with `--conditions` and raw-unit MSE reporting, no new file).
 
+**F293 note.** Affected: the B1 cross-body calibration and clean-retrain B1 numbers use beh24 B1 data whose
+hard-turn clips (`recollect_b1_turns.py` / `recollect_b1_more.py`) were labelled from a corrupted `base_quat`
+(F293: 13 of 48 cleantrain clips); the turn-pair mismatches (29.1%, 32.8%) involve these levels. Not
+re-measured.
+
 ---
 
 ### F224. Gait periodicity measured directly for the first time: dominant period is ~6.6 frames, not the ~19 previously cited
@@ -5796,6 +6014,9 @@ Regret is small and shrinks with horizon even on the weakest-by-discrete-grade f
 
 Scripts: `scripts/diagnostics/planning/score_by_body_motion.py` (`full_body_motion()`, regret computation added). Cache: `results/wm/cache/b1_body3_scoretest.pt`, `results/wm/cache/bodycal_hexapod.pt`.
 
+**F293 note.** Possibly affected: the B1 candidates and regret are computed from `beh12_b1_flat`-era labels
+whose turn clips were wrong (F293). Not re-measured.
+
 ---
 
 ### F226. Replacement for the withdrawn "92% across all 12 goal conditions" claim: direct beats rollout on 12/12 conditions; vision-read goal costs nothing on average
@@ -5815,6 +6036,11 @@ Result, all 12 conditions, real Froude units:
 Direct beats rollout on 12/12 conditions (mean error less than half). Vision-read goal costs nothing on average and beats the privileged number (0.0438 vs 0.0495). This replaces the withdrawn 92% claim (same scope, corrected per-timestep methodology, continuous real-unit distance instead of family-match percentage) — the two numbers are not directly comparable; 92% should not be requoted alongside this.
 
 Scripts: `scripts/diagnostics/objective_experiments/froude_match_all12.py` (new), reuses `froude_match_timevarying.py`'s functions verbatim.
+
+**F293 note.** Affected: the B1 candidates' achieved Froude comes from `data/egocentric/beh12_b1_ego_flat`
+turn clips (eps 1000-1303) carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065, forward
+-0.02..-0.03 on hard turns) and frames rendered from the corrupted pose. Direct-beats-rollout likely holds;
+the vision-goal claim was later found not to hold for current models (F291).
 
 ---
 
@@ -5863,6 +6089,8 @@ Command: `reward_quality_gate_b1.py --ckpt wm/runs/beh12_hinge_multistep_anchor_
 
 Addendum, same day — a second, real bug the user caught, checked, fixed, and it does not change the verdict. `goal_fr` was computed once as `body_motion.mean(0)` over the ENTIRE goal clip and reused identically at every branch point, regardless of where in the expert clip's own episode that branch point sat — the same whole-clip-mean anti-pattern this project already found and fixed in `final_2x2x2_test.py`/`froude_match_timevarying.py`, just not caught in this script until now. Fixed: the goal is now read from a short local window in the goal clip, matched to the same fractional progress through the episode as the current branch point (`goal_at()`, new). Rerun at the large sample size (32 branch points x 32 samples, seed 0) after the fix: hit rate 1.0% (1/96), Spearman rho 0.022, regret 0.0093 — statistically indistinguishable from the pre-fix numbers above. The goal-averaging bug was real and worth fixing, but it was not the explanation for F201's non-reproduction — the gate sits at chance either way.
 
+**F293 note.** Possibly affected: the truth is live physics, but the scoring head was likely fit on pre-fix beh12 B1 labels. The chance-level verdict would not change.
+
 ---
 
 ### F229. `_cleantrain`/`_cleanheldout` directories were broken symlinks on this machine — fixed locally with relative paths; F222's held-out result reproduced exactly
@@ -5878,6 +6106,10 @@ Reproduced F222 exactly after the fix: B1 train 0.665/held-out 0.730, hexapod tr
 This relative-symlink fix should be committed so it doesn't silently re-break on the next clone/machine.
 
 Scripts: none changed. Data fix: 72 symlinks across the four `_clean{train,heldout}` directories, re-pointed from absolute aria-desktop path to relative sibling-directory path.
+
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
 
 ---
 
@@ -5896,6 +6128,10 @@ Not simply an improvement on the original leak-affected claim (0.572/0.449/0.670
 
 Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (per-channel Spearman rho added to `score()`).
 
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
+
 ---
 
 ### F231. Zero-shot baseline measured cleanly: B1 fails outright before adaptation (ratio 1.061, worse than the mean), on the same held-out set F230 used
@@ -5910,6 +6146,10 @@ Closed F230's flagged gap: ran `eval_body_head_true_heldout.py` against `wm/runs
 Zero-shot is worse than predicting the mean (ratio >1.0) — genuinely failing, not just weak — while staged adaptation clears the mean by a real margin on the same held-out clips. Fully clean, apples-to-apples comparison: same split, same held-out set, same metric, both points measured this session.
 
 Scripts: `scripts/diagnostics/objective_experiments/eval_body_head_true_heldout.py` (run against the pretrain checkpoint instead of the adapted one, no code changes).
+
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
 
 ---
 
@@ -5934,6 +6174,9 @@ Original co-trained protocol replicated on this exact checkpoint (one head fit j
 A joint head has no real "cross" cell (insect->b1 = b1->b1, b1->insect = insect->insect by construction) — the honest read is 2 numbers, ~0.13-0.14 on both, one mediocre generalist function, not recovered cross-body sharing. Neither protocol reaches Section 8's numbers on the non-detached checkpoint. Whatever produced Section 8's genuine cross-body result needs z's gradient un-detached — `z.detach()` is a same-body fix, not a cross-body one, on this evidence. (Superseded/refined by F233: the detach turns out unnecessary entirely.)
 
 Scripts: `scripts/diagnostics/objective_experiments/cross_body_head_4way.py` (new, `--hex_ckpt`/`--b1_ckpt`/`--hex_dir`/`--b1_dir` args). Checkpoints: `wm/runs/beh12_body_stopgrad/head_hexonly.pt`, `head_b1only.pt`, `head_joint.pt`.
+
+**F293 note.** Affected: the B1 cells are fit and scored on `beh12_b1_ego_flat` clean-split data, whose turn
+clips carry wrong Froude labels (F293). Hexapod cells are unaffected. Not re-measured.
 
 ---
 
@@ -5977,6 +6220,9 @@ recorded config field. The controlled comparison is `scripts/run/detach_2x2_step
 beh24 vs switch babble x detach on/off) and `scripts/run/detach_joint_step2.sh` (hexapod + B1 jointly
 pretrained, detach on/off, fit-on-one-body / test-on-the-other read-out).
 
+**F293 note.** Affected: the B1 cells are fit and scored on `beh12_b1_ego_flat` clean-split data, whose turn
+clips carry wrong Froude labels (F293). Hexapod cells are unaffected. Not re-measured.
+
 ---
 
 ### F234. beh12 vs beh24, same clean-split eval, both bodies: real accuracy cost confirmed on hexapod (~2x), smaller on B1, with a genuine per-channel gain on B1's forward
@@ -6001,6 +6247,10 @@ Forward nearly triples on B1 with beh24, plausibly because beh24 adds real backw
 Read as a real mixed trade-off: beh24 costs measurable per-condition accuracy (~2x on hexapod) but buys real new capability (backward motion, opposite turn direction) beh12 could not represent. Neither dataset is strictly better.
 
 Scripts: none changed beyond F233's `eval_body_head_true_heldout.py` extension. Data fix: 192 symlinks across `beh24_{b1,c10f10t10}_ego_flat_clean{train,heldout,val}`, same relative-path fix as F229.
+
+**F293 note.** Affected: both B1 columns use B1 data with wrong hard-turn labels (beh12 turn clips; beh24 13
+of 48 cleantrain clips, F293), so the B1 ratios and per-channel rho shift; hexapod columns are unaffected. Not
+re-measured.
 
 ---
 
@@ -6031,6 +6281,9 @@ Clustering, re-run for the first time on the clean checkpoint:
 Reading: both headline numbers measured the leaked, non-stratified split, not genuine cross-embodiment structure. Consistent with Section 8's action-lever result and Slide 15's context-collapse fix: z is a lossy bottleneck relative to the raw frame pair; what clears the bar happens downstream of z through body_head's own fit, not through z carrying more information than raw pixels.
 
 Scripts: `scripts/diagnostics/cross_embodiment/linear_vs_itm_froude.py`, `scripts/diagnostics/cross_embodiment/body_head_hidden_share.py` (already pointed at the clean checkpoint; no code changes, only execution).
+
+**F293 note.** Affected: the B1 cells are fit and scored on `beh12_b1_ego_flat` clean-split data, whose turn
+clips carry wrong Froude labels (F293). Hexapod cells are unaffected. Not re-measured.
 
 ---
 
@@ -6112,6 +6365,10 @@ Scope: sweeps stage 4 only, using curated behaviour clips, not random motor babb
 
 Scripts: `wm.adapt` (checkpoint `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/b1_adapted_prebody.pt`), `wm.fit_body_head` (4x, `--data` pointed at stratified subsets), `eval_body_head_true_heldout.py` (unchanged). Subset dirs: `data/egocentric/beh12_b1_ego_flat_subset{3,6,12,24}` (relative symlinks into `_cleantrain`).
 
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
+
 ---
 
 ### F239. Direct null-vs-real action test run for the first time on Stage 1's own single-embodiment setup: action is redundant, confirming F142 across horizons 1-16
@@ -6170,6 +6427,10 @@ Caveat: the head was fit on ITM z (stage 4 default), not refit on projector z; a
 
 Reading: the projector is not the single bottleneck — the ITM route itself is mediocre (ratio 0.73, forward rho 0.26); fine-ranking failures appear through both, but the projector route does cost lateral/yaw signal.
 
+**F293 note.** Affected: the B1 numbers are fit and scored on `beh12_b1_ego_flat_clean{train,heldout}`, whose
+turn clips carry wrong Froude labels (F293: yaw ~half, false lateral ~0.065 on hard turns) and frames from the
+corrupted pose. Yaw and lateral are the most exposed channels. Not re-measured.
+
 ---
 
 ### F242. Direct action selection over a B1 motor-babble library works once every stage (not just the projector) is fit on the babble
@@ -6187,6 +6448,9 @@ Test: `scripts/diagnostics/objective_experiments/babble_library_eval.py`, driver
 Fitting only the projector on babble leaves the expert-fit head misreading babble z (near-chance results); fitting every stage on babble raises both libraries to 41-48%, close to expert's 54%. v2 covers goal space well (oracle 0.044) but has a worse scorer (loss 0.049); spring has a better scorer (loss 0.019) but is forward-only, so even its oracle misses lateral goals (side_* oracle 0.12-0.16).
 
 Scope: 12 goals, one run, no seed variance; libraries differ in size/composition (24/36/40); projector and head fit in-sample per library; goals are hexapod clips read by physics, not vision.
+
+**F293 note.** Possibly affected: the expert reference (54%) uses the `beh12_b1_ego_flat` library and labels
+with the corrupted turn clips (F293); the babble rows are unaffected.
 
 ---
 
@@ -6348,6 +6612,13 @@ F246's gains for beh24 (probe R2, zero-shot rollout) do not carry into selection
 Checkpoints: `wm/runs/beh24_hinge_cleansplit/b1_adapt_beh24_lora_c3/ckpt_lib_s4.pt`,
 `wm/runs/beh12_hinge_cleansplit/b1_adapt_clean/ckpt_lib_beh12_b1_ego_flat_cleantrain.pt`.
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F251. Single-step `z` carries per-step body motion, not the 1-second Froude that selection is graded on; reading over ~11 steps (one gait cycle) improves selection
@@ -6379,6 +6650,13 @@ every 2 steps, same setup as F250:
 each, rollout from one fixed start frame.
 
 Scripts: `timescale_probe.py`, `wm/policy/planner.py` (`window`), `plot_direct_vs_rollout.py --window`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
 
 ---
 
@@ -6424,6 +6702,13 @@ ITM(e, FTM(e, z)) keeps 16-60% of z's across-action variance.
 
 Scripts: `selection_eval.py`, `selection_readout_diag.py`, `rollout_state_action_anova.py`.
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F253. A counterfactual cycle loss makes the FTM follow `z`; with the ITM trainable it also degrades `z`'s Froude read-out, and selection gets worse
@@ -6443,6 +6728,13 @@ Selection at w=11: control direct 0.062 / roll_live 0.127; cycle 0.086 / 0.154. 
 forward on the B1 library: control 0.35, cycle 0.12. Val body loss 0.67 (cycle) vs 0.55 (control).
 
 Runs: `wm/runs/beh24_ft_{cycle,ctrl}`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
 
 ---
 
@@ -6467,6 +6759,13 @@ pipeline (R2 -0.27 control, -0.45 cycle, out-of-sample).
 
 Scope: six goals, one seed, 6-epoch fine-tunes, lambda_cycle 1.0.
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F255. Withdrawn -- rendered closed-loop numbers measured on an incorrect ego view (F256); the valid result is F257
@@ -6490,6 +6789,10 @@ Scope: six goals, one seed, 6-epoch fine-tunes, lambda_cycle 1.0.
   `set_ego_fov`), the closed loop refuses a first frame with profile correlation < 0.97, and
   `--level_body` (planar position and heading composed, attitude from the candidate) is its default.
 
+**F293 note.** Correction: 'All beh12/beh24 B1 ego sets are correct' refers to the lens only. The hard-turn
+clips of these sets were rendered with a camera heading off by up to 87 deg and carry wrong Froude labels
+(F293); fixed and re-rendered for v3 on 2026-10-01.
+
 ---
 
 ### F257. In a rendered closed loop with the correct view, the cycle loss's rollout beats control in 6/6 conditions (gap +0.37); direct remains best on average
@@ -6507,6 +6810,12 @@ posing, F254's in-sample checkpoints, same six goals. Mean L2 error (gap):
 
 Rollout + cycle beats direct on side_L_lvl0 and speed_c8.8. Scope: kinematic (cannot fall), one seed,
 six goals, in-sample Stage 2/4. Clips and plots: `results/deck/cycle_closed_loop/`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The in-sample checkpoints' Stages 2/4 were fit on the same library. Grading of the rendered
+loop uses the picked candidate's stored Froude. Not re-measured.
 
 ---
 
@@ -6530,6 +6839,11 @@ identifies the clip, within-clip R2 -2.0).
 
 Scripts: `counterfactual_truth_check.py`, `independent_reader_check.py`.
 
+**F293 note.** Affected: the counterfactuals start from library states posed from the stored (corrupted for
+turn clips) `base_quat`, and the truth of each branch is the candidate's recorded Froude, wrong for the
+hard-turn candidates (F293). Yaw/lateral correlations are the most exposed; the qualitative pattern was later
+reproduced on the hexapod (F288). Not re-measured.
+
 ---
 
 ### F259. The action becomes visible in the real future only over several steps
@@ -6549,6 +6863,11 @@ Over one 50 ms step the action is nearly invisible even in reality, so a one-ste
 any k.
 
 Script: `counterfactual_horizon_check.py` (cache `results/wm/cache/counterfactual_horizon.pt`).
+
+**F293 note.** Affected: the counterfactuals start from library states posed from the stored (corrupted for
+turn clips) `base_quat`, and the truth of each branch is the candidate's recorded Froude, wrong for the
+hard-turn candidates (F293). Yaw/lateral correlations are the most exposed; the qualitative pattern was later
+reproduced on the hexapod (F288). Not re-measured.
 
 ---
 
@@ -6616,7 +6935,14 @@ candidate's recorded frame); the rendered closed loop (F257's setup) has not bee
 Val losses at epoch 50 are not comparable across strides (different target spacing).
 
 Checkpoints: `wm/runs/beh24_stride5_cleansplit/{best.pt, b1_lora_c3/ckpt_lib_s4.pt, b1_lora_c3/ckpt_lib_insample.pt}`.
-Raw: `results/deck/window_sweep/stride5_selection.txt`.
+Raw: `results/deck/_archive_2026-10-01/window_sweep/stride5_selection.txt`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
 
 ---
 
@@ -6651,6 +6977,13 @@ alone, not the adaptation as a whole.
 
 Scope: one seed, six goals, physics goal (the hexapod side never passes through the body head here).
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F263. The stride-5 gain holds in the rendered closed loop: direct 0.050 vs 0.069, rollout 0.092 vs 0.140 (w=11), stride 5 better in 6/6 and 5/6 conditions
@@ -6677,7 +7010,13 @@ auxiliary loss and without the pass-through (F258, F261).
 
 Scope: kinematic (cannot fall), one seed, six goals. Driver `scripts/run/closed_loop_stride_grid.sh`;
 raw `results/wm/closed_loop/stride_live/grid.txt`; plots and 4-panel clips
-`results/deck/stride_closed_loop/` (`scripts/figures/closed_loop_report.py --preset stride`).
+`results/deck/_archive_2026-10-01/stride_closed_loop/` (`scripts/figures/closed_loop_report.py --preset stride`).
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). Not re-measured.
 
 ---
 
@@ -6722,9 +7061,16 @@ candidates: c08's 48 clips; oracle 0.020, random 0.121)**
 Scope: one seed per stride, six goals; c08 has only beh12 data (12 conditions x 4 clips), so its
 library is 48 clips; no rendered closed loop for c08 (the closed-loop script supports B1 only).
 
-Raw: `results/deck/window_sweep/{stride10_selection,c08_zeroshot_selection}.txt`. Checkpoints:
+Raw: `results/deck/_archive_2026-10-01/window_sweep/{stride10_selection,c08_zeroshot_selection}.txt`. Checkpoints:
 `wm/runs/beh24_stride10_cleansplit/`, `wm/runs/*/c08_zeroshot/ckpt_lib_zeroshot.pt`.
 Scripts: `scripts/run/{stride10_full,c08_zeroshot_eval}.sh`; `selection_eval.py --embodiment`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
 
 ---
 
@@ -6759,7 +7105,14 @@ read of the real outcome (0.24 / 0.52 / 0.24), so the prediction gain is not a p
 
 Scope: one seed, 2,000 steps (LAC-WM: 35k), six goals, recorded-frame evaluation.
 Checkpoints: `wm/runs/beh24_stride5_cleansplit/b1_lora_c3/ckpt_lib_s3_lz{0,1}.pt`.
-Raw: `results/deck/window_sweep/stage3_selection.txt`.
+Raw: `results/deck/_archive_2026-10-01/window_sweep/stage3_selection.txt`.
+
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
 
 ---
 
@@ -6795,6 +7148,11 @@ the start-state effect. The own-state row has no such switch.
 
 Scope: stride 1 and 5 B1 checkpoints (out-of-sample Stages 2/4), 24 state-steps, one seed.
 
+**F293 note.** Affected: the counterfactuals start from library states posed from the stored (corrupted for
+turn clips) `base_quat`, and the truth of each branch is the candidate's recorded Froude, wrong for the
+hard-turn candidates (F293). Yaw/lateral correlations are the most exposed; the qualitative pattern was later
+reproduced on the hexapod (F288). Not re-measured.
+
 ---
 
 ### F267. A read-out fitted on counterfactual transitions reads the rollout 2-3x better on unseen start states (r 0.48 / 0.63 / 0.72 vs 0.10 / 0.23 / 0.21) -- the ITM latent carries the action; the body head was not reading it
@@ -6827,6 +7185,11 @@ proj(a); part of what it reads may be the action passing through the FTM rather 
 
 Scope: selection with such a head not yet measured.
 
+**F293 note.** Affected: the counterfactuals start from library states posed from the stored (corrupted for
+turn clips) `base_quat`, and the truth of each branch is the candidate's recorded Froude, wrong for the
+hard-turn candidates (F293). Yaw/lateral correlations are the most exposed; the qualitative pattern was later
+reproduced on the hexapod (F288). Not re-measured.
+
 ---
 
 ### F268. Plugging the counterfactual-trained read-out into rollout selection does not improve it (roll_live w11 +0.40 -> +0.33; w0 +0.13 -> +0.17)
@@ -6853,8 +7216,13 @@ selection. Differences between the two settings that plausibly explain it (not s
 A read-out for counterfactual transitions needs training data drawn from the same scenes, times and
 read-out mode that selection uses.
 
-Raw: `results/deck/window_sweep/cf_readout_selection.txt`; head
+Raw: `results/deck/_archive_2026-10-01/window_sweep/cf_readout_selection.txt`; head
 `wm/runs/beh24_stride5_cleansplit/b1_lora_c3/readout_cf_rollout.npz`.
+
+**F293 note.** Affected: the counterfactuals start from library states posed from the stored (corrupted for
+turn clips) `base_quat`, and the truth of each branch is the candidate's recorded Froude, wrong for the
+hard-turn candidates (F293). Yaw/lateral correlations are the most exposed; the qualitative pattern was later
+reproduced on the hexapod (F288). Not re-measured.
 
 ---
 
@@ -6866,7 +7234,7 @@ ramped over 4 frames; each clip in its own randomised room (`--ego_seed` 1000+i)
 (2-98 pct) vs beh24: forward -0.27..+0.20 (beh24 -0.21..+0.22), lateral -0.29..+0.24 (-0.19..+0.16),
 yaw -0.10..+0.11 (-0.08..+0.07), spread across the range rather than at a few fixed speeds. On c08
 `--spin` turns the opposite way to c10 (yaw ~ -0.1 x spin - 0.02). Review renders:
-`results/deck/babble_review/`.
+`results/deck/_archive_2026-10-01/babble_review/`.
 
 **Adaptation** (`scripts/run/c08_babble_adapt.sh`), `beh24_stride5_cleansplit/best.pt`, one dataset
 for every stage: Stage 1 LoRA (38 clips, 10 held out; held-out rollout ratio 1.93-1.95 vs hold-still),
@@ -6945,6 +7313,13 @@ fitted silently wrong); `collect_ik.py --plan` refuses the heading loop; the clo
 `--free_offset` with `--replan_every > 1` and non-B1 embodiments. Open, not needed by any run so far:
 at stride k with decision horizon h > k the direct and rollout paths score different spans.
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F272. Measured directly, z is shared between the two hexapod morphologies but NOT with the B1, at stride 1 or stride 5 -- F262's "shared across bodies" reading was wrong
@@ -6961,7 +7336,7 @@ B1 (beh12 library, 24); every 2nd step.
 
 (body-ID: logistic regression, 5-fold grouped by clip, bodies subsampled to equal size; read-out:
 ridge; kNN: share of 10 nearest neighbours from another body over its random expectation.) PCA and
-UMAP (seeds 0, 1, 2, all shown; `results/deck/shared_latent/latent_stride{1,5}.png`) agree: the two
+UMAP (seeds 0, 1, 2, all shown; `results/deck/_archive_2026-10-01/shared_latent/latent_stride{1,5}.png`) agree: the two
 hexapods intermix, the B1 occupies its own region in every projection; within each body the latent is
 ordered by behaviour (side / turn / forward regions).
 
@@ -6978,6 +7353,10 @@ ordered by behaviour (side / turn / forward regions).
   body head), not through a shared ITM latent.
 
 Scope: one checkpoint per stride, recorded clips, a linear and a kNN probe.
+
+**F293 note.** Possibly affected: the B1 points (beh12 library) include turn clips with wrong Froude labels
+and corrupted-pose frames (F293), which enter the B1 R2 and retrieval. The large separation of the B1 likely
+holds; current-model sharing re-measured in F294.
 
 ---
 
@@ -7007,6 +7386,13 @@ real counterfactual future A 0.24/0.52/0.24, B 0.23/0.49/0.54, C 0.36/0.58/0.64.
 - F261's stride-5 numbers came from seed A, which is at the favourable end; the stride-1 vs stride-5
   comparison rests on one seed each and needs replication before it is claimed.
 
+**F293 note.** Affected: Selection is graded with the B1 library's own labels (local Froude of each
+candidate's `body_motion`), which included the corrupted turn clips (6 of 23 in the beh12 library, plus
+`b1_ep2002`, since removed); the library ranking barely changes (Spearman 0.94-1.0, F293), so the grading
+error is small. The B1 Stages 1/2/4 were fit on `beh24_b1_ego_flat_cleantrain` (13 of 48 clips with wrong turn
+labels; frames of the hard turns rendered with a wrong camera heading). The relative comparisons likely hold;
+not re-measured (current models re-measured in F294).
+
 ---
 
 ### F274. Physics closed loop: rollout does not beat direct on either body, for any of the four models; direct beats random clearly, rollout on the B1 is at random level
@@ -7026,7 +7412,7 @@ switching. No falls in any run. Mean L2 error over the six goals:
 | c08 phase-matched | A / A2 / B / C | 0.065 / 0.073 / 0.060 / 0.065 | 0.100 / 0.104 / 0.093 / 0.087 | 0.111 |
 
 Per-condition values: `results/wm/closed_loop/physics/summary.txt`; figures
-`results/deck/physics_closed_loop/`.
+`results/deck/_archive_2026-10-01/physics_closed_loop/`.
 
 **Reading.**
 - Direct < rollout in all 12 model x body x execution cells; the hypothesis that state-awareness lets
@@ -7039,6 +7425,11 @@ Per-condition values: `results/wm/closed_loop/physics/summary.txt`; figures
 - Phase matching helps direct slightly and makes rollout worse in every model; not explained.
 - What is established: selection in the world model's latent space (direct) is clearly better than
   random under real physics on both bodies (B1 0.070-0.078 vs 0.089; c08 0.059-0.078 vs 0.111-0.126).
+
+**F293 note.** Affected (B1 only): kinematic B1 selection is graded with the library's labels (6 of 23
+beh12 library clips plus `b1_ep2002` had wrong turn labels; small effect, Spearman 0.94-1.0), and the B1 pipelines
+were fit on beh24 B1 data with 13 of 48 wrong turn labels (F293). The physics loop is graded by the simulated
+body's own motion (unaffected). Not re-measured.
 
 ---
 
@@ -7250,6 +7641,11 @@ No B1 run fell. c08 falls are not detected by the loop (not checked here).
 
 Scope: one c10 body pretrained; B1 via the four-stage pipeline; c08 zero-shot; 2 seeds per arm, 6 goals.
 
+**F293 note.** Affected (B1 only): kinematic B1 selection is graded with the library's labels (6 of 23
+beh12 library clips plus `b1_ep2002` had wrong turn labels; small effect, Spearman 0.94-1.0), and the B1 pipelines
+were fit on beh24 B1 data with 13 of 48 wrong turn labels (F293). The physics loop is graded by the simulated
+body's own motion (unaffected). Not re-measured.
+
 ---
 
 ### F277. Letting the Froude head shape z (detach off) improves selection on every body, both seeds, direct and rollout; and a same-body test shows rollout < direct with no body change at all
@@ -7317,6 +7713,11 @@ B1 0.089, c08 plain 0.126, c08 phase-matched 0.111):
   (0.072) -- the first model whose rollout matches direct on the B1 in physics; s1 0.098.
 - Direct <= rollout still holds in every cell.
 
+**F293 note.** Affected (B1 only): kinematic B1 selection is graded with the library's labels (6 of 23
+beh12 library clips plus `b1_ep2002` had wrong turn labels; small effect, Spearman 0.94-1.0), and the B1 pipelines
+were fit on beh24 B1 data with 13 of 48 wrong turn labels (F293). The physics loop is graded by the simulated
+body's own motion (unaffected). Not re-measured.
+
 ---
 
 ### F278. Existing joint hexapod+B1 pretrains (egocentric, stride 1, Froude head NOT detached) do not share z with the B1 under the strict test either
@@ -7328,7 +7729,7 @@ hard-coded detach (2026-09-08), so all trained with the Froude head's gradient r
 read-out loss (`beh12_ego`: lambda_hinge 0, lambda_readout 0).
 
 `scripts/figures/shared_latent_figure.py --model ...` (F272 protocol: pretrained ITM, recorded clips of
-c10 / c08 / B1, ridge Froude read-out fit on c10 only), `results/deck/shared_latent_joint_check/`:
+c10 / c08 / B1, ridge Froude read-out fit on c10 only), `results/deck/_archive_2026-10-01/shared_latent_joint_check/`:
 
 | model | body-ID acc (chance 0.33) | c10 -> c08 R2 fwd/lat/yaw | c10 -> B1 R2 fwd/lat/yaw | kNN mixing |
 |---|---|---|---|---|
@@ -7375,6 +7776,9 @@ standardised Froude) of every body. Body targets are standardised with pooled st
 (two bodies with offset z: nearest-other-body Froude cosine 0.90 after optimisation, from ~0); GPU
 smoke run, joint hexapod + B1, 2 epochs: sim 0.646 -> 0.368, ~1000 cross-body pairs per step,
 `lambda_sim` recorded in config.yaml.
+
+**F293 note.** Possibly affected: the B1 read-out and retrieval use beh12 B1 clips with wrong turn labels
+(F293), and the joint beh12 pretrains trained on them. Not re-measured.
 
 ---
 
@@ -7425,6 +7829,11 @@ Physics closed loop, mean L2 error over six goals (random B1 0.089, c08 plain 0.
 D's direct is the lowest measured on both bodies (B1 0.061-0.063, c08 0.045-0.047); rollout is mixed
 across seeds (c08 plain 0.055-0.085, B1 0.081-0.108).
 
+**F293 note.** Affected (B1 only): kinematic B1 selection is graded with the library's labels (6 of 23
+beh12 library clips plus `b1_ep2002` had wrong turn labels; small effect, Spearman 0.94-1.0), and the B1 pipelines
+were fit on beh24 B1 data with 13 of 48 wrong turn labels (F293). The physics loop is graded by the simulated
+body's own motion (unaffected). Not re-measured.
+
 ---
 
 ### F280. Joint hexapod + B1 pretraining with the Froude-similarity loss: the B1's video latents move toward the hexapod's (retrieval 0.05 -> 0.34) and B1 selection is the best measured
@@ -7435,7 +7844,7 @@ read-out / rollout as FS, joint-command motion decoder on, `--lambda_sim 0.05` (
 recent z). One seed. **No matched control** (same run with `lambda_sim 0`) yet: the comparison rows
 differ in more than the similarity loss.
 
-Shared latent (pretrained ITM; `results/deck/shared_latent_joint_sim/`):
+Shared latent (pretrained ITM; `results/deck/_archive_2026-10-01/shared_latent_joint_sim/`):
 
 | model | body-ID probe | cross-body R2 c10 -> c08 | cross-body R2 c10 -> B1 | k-NN mixing | retrieval c10 -> c08 | retrieval c10 -> B1 |
 |---|---|---|---|---|---|---|
@@ -7454,6 +7863,10 @@ the within-hexapod level (0.34 vs 0.43); B1 selection and mechanism numbers are 
 hexapod-side numbers unchanged. z still encodes body identity (probe), alongside the shared motion
 structure. Which ingredient does it (similarity loss vs joint stride-5 pretraining itself) is not
 separated.
+
+**F293 note.** Affected: the joint pretrain / B1 adaptation used beh24 B1 clean-train labels (13 of 48
+hard-turn clips wrong, F293) and B1 selection is graded on the beh12 library's labels (small effect, Spearman
+0.94-1.0). Old renders; superseded by the v3 results (F285-F290) and their re-measurement (F294).
 
 ---
 
@@ -7475,6 +7888,10 @@ c10 -> c08 retrieval unchanged (0.42-0.43). Each anchor moves the B1 toward the 
 forward R2 -1.36 -> -0.45) at a small cost in B1 prediction (ratio 1.67 -> 1.74 at h=1), far short of
 joint pretraining (0.34, F280). Not separated: the adaptation budget (3 clips, 1000 steps, rank-2 LoRA on
 Mlp layers only), and whether Stages 2-4 (without Stage 4's head refit) preserve or use the alignment.
+
+**F293 note.** Affected: the joint pretrain / B1 adaptation used beh24 B1 clean-train labels (13 of 48
+hard-turn clips wrong, F293) and B1 selection is graded on the beh12 library's labels (small effect, Spearman
+0.94-1.0). Old renders; superseded by the v3 results (F285-F290) and their re-measurement (F294).
 
 ---
 
@@ -7510,6 +7927,10 @@ for both adapted ITMs.
 - Current best route to a shared, usable B1 latent: pretrain the bodies together (with the similarity
   loss); adapt only the projector. Single seed each; the matched similarity on/off pair is training.
 
+**F293 note.** Affected: the joint pretrain / B1 adaptation used beh24 B1 clean-train labels (13 of 48
+hard-turn clips wrong, F293) and B1 selection is graded on the beh12 library's labels (small effect, Spearman
+0.94-1.0). Old renders; superseded by the v3 results (F285-F290) and their re-measurement (F294).
+
 ---
 
 ### F283. A stronger anchored adaptation (LoRA rank 8, 3000 steps) makes the hexapod's own Froude head read the B1 without any head refit; retrieval stays at ~0.19
@@ -7537,6 +7958,10 @@ Stage 1 rollout ratio h=10: 1.72 (rank 2: 1.79-1.80), i.e. the B1 prediction als
   The Stage 4 refit adds nothing (A1) or lowers rollout (A2).
 - Nearest-neighbour retrieval stays at 0.18-0.19: the Froude-relevant part of z is aligned, the rest is not.
 - Still below joint pretraining on every selection column.
+
+**F293 note.** Affected: the joint pretrain / B1 adaptation used beh24 B1 clean-train labels (13 of 48
+hard-turn clips wrong, F293) and B1 selection is graded on the beh12 library's labels (small effect, Spearman
+0.94-1.0). Old renders; superseded by the v3 results (F285-F290) and their re-measurement (F294).
 
 ---
 
@@ -7575,6 +8000,10 @@ ITM), NS at w=11; shared latent on pretrained ITMs. **All on the old B1 renders*
 - Joint pretraining gives the best B1 rollout measured (+0.74-0.76 / +0.60-0.65) in every variant.
 - Pending: the same comparison on B1 data with matched rendering (v3).
 
+**F293 note.** Affected: the joint pretrain / B1 adaptation used beh24 B1 clean-train labels (13 of 48
+hard-turn clips wrong, F293) and B1 selection is graded on the beh12 library's labels (small effect, Spearman
+0.94-1.0). Old renders; superseded by the v3 results (F285-F290) and their re-measurement (F294).
+
 ---
 
 ### F285. The joint models' B1 representation depends on the old B1 rendering: fed matched-render (v3) frames, B1 selection and sharing collapse
@@ -7604,6 +8033,9 @@ static test, 0.552.
   B1 results (F280-F284) rest partly on render-specific features, so they cannot be carried over.
   Cross-body results must be retrained on v3 to be clean.
 
+**F293 note.** Affected: v3 frames of 23 beh24 + 9 beh12 hard-turn clips were rendered with a wrong camera
+heading (F293), and labels as in F284. The collapse is far larger than this; re-measured models in F294.
+
 ---
 
 ### F286. Adapting the old-render joint models to v3 frames restores most of the B1 selection but not the cross-body sharing
@@ -7632,6 +8064,9 @@ B1 selection on the v3 library, NS at w=11; shared latent with the B1 on v3.
 - It does not recover cross-body sharing: retrieval 0.16-0.22 and negative forward R2. The alignment the
   joint pretraining built was tied to the old B1 rendering.
 - Clean sharing numbers need pretraining on v3 (`scripts/run/jointD3_server.sh`).
+
+**F293 note.** Affected: every stage used v3 B1 data with wrong hard-turn labels and frames (F293). Not
+re-measured; current models in F294.
 
 ---
 
@@ -7667,6 +8102,10 @@ Pearson r across the 24 branches vs achieved Froude, fwd / lat / yaw:
   action do not come from the same clip, e.g. varied-action data in pretraining or physical counterfactual
   branches like these.
 
+**F293 note.** Possibly affected: the truth is the simulated body's achieved Froude (unaffected), but the
+start states are library clips and the models were B1-adapted on beh24 data with wrong turn labels (F293). The
+read-out failure was reproduced on the hexapod (F288).
+
 ---
 
 ### F288. The read-out collapse on counterfactual futures also happens on the hexapod c10 (in pretraining): it is not a cross-body effect
@@ -7700,6 +8139,10 @@ corr 0.994 mean / 0.990 min. Log `results/wm/logs/counterfactual_readout_hex_c08
 direct 0.98 / 0.80 / 0.95; own 0.91 / 0.55 / 0.38; real counterfactual 0.40 / 0.42 / 0.38 (S0 0.42 / 0.41 / 0.39,
 S1 0.38 / 0.43 / 0.36); FTM-predicted 0.35 / 0.31 / 0.62. Forward drops 0.91 -> 0.40 as on c10 and the B1; yaw's own-read
 is already low on c08 (0.38), so the yaw drop is not measurable there.
+
+**F293 note.** The B1 column (from F266 / F287, and the F289 addenda) is pre-fix: B1 labels of the hard-turn
+candidates and the adapted models were wrong (F293), and the B1's weak own-transition yaw read may partly be
+this. The B1 column is being re-measured on the corrected data. The hexapod rows are unaffected.
 
 ---
 
@@ -7745,6 +8188,11 @@ counterfactual 0.19 / 0.40 / 0.38; FTM-predicted 0.21 / 0.09 / 0.39; direct 0.94
 of the own read (yaw 0.22 -> 0.54, forward 0.47 -> 0.58) but not to the old checkpoint's 0.75 / 0.58 / 0.83 (old rendering,
 older model), and does not help the counterfactual read or the FTM read (lateral 0.24 -> 0.09).
 
+**F293 note.** Affected: Stage 1 and the library used v3 B1 data with wrong hard-turn labels and frames
+(F293). Re-measured on the corrected data (F294): S0 +0.83 / +0.39 / +0.39 (was +0.81 / +0.49 / +0.46), S1
++0.74 / +0.29 / +0.29 (was +0.69 / +0.40 / +0.41); retrieval B1 0.25 / 0.24. Direct holds, rollout ~0.1 lower.
+The two addenda to F288 (counterfactual read-out, B1 v3) are pre-fix and being re-measured.
+
 ---
 
 ### F290. Joint hexapod + B1 pretraining on the matched (v3) B1 rendering: best B1 selection so far, but z is not shared with the B1, with or without the similarity loss
@@ -7772,6 +8220,10 @@ kNN mixing 0.35 / 0.36; retrieval c08 0.41 / 0.44, B1 0.17 / 0.16.
 - The similarity loss changes nothing measurable here (retrieval 0.16 vs 0.17, B1 selection equal, rollout from the
   recorded frame lower, +0.50 vs +0.66). One seed each.
 
+**F293 note.** Affected: pretraining used pre-fix B1 labels; the v3 library had wrong turn labels and frames
+(F293). Re-measured with the projector on fixed data (F294): nosim +0.92 / +0.61 / +0.55, sim +0.94 / +0.45 /
++0.57; retrieval B1 0.22 / 0.24. Conclusions (joint best on B1, z not shared) hold.
+
 ---
 
 ### F291. Reading the goal from vision (the model's own ITM + Froude head on the goal clip's frames) costs 0.03-0.10 normalised score on direct selection with the current models; F226's "vision goal costs nothing" does not hold for them
@@ -7797,6 +8249,10 @@ mixed (joint models unchanged, hexapod-only S0 loses 0.21 from the current frame
 stride-1 checkpoint and does not carry over. Every other selection / physics number in this period uses the recorded
 (physics) goal.
 
+**F293 note.** Affected: B1 models and library as in F289 / F290 (F293). Re-measured (F294), direct /
+roll_live with vision goal: hexapod-only S0 +0.60 / +0.25, S1 +0.46 / +0.35; jointD3 nosim +0.84 / +0.56, sim
++0.84 / +0.57. Vision costs 0.08 (joint) to 0.28 (hexapod-only S1) on B1 direct, more than stated here.
+
 ---
 
 ### F292. With the current adaptation (F289 recipe) on the v3 rendering, the joint-command decoder and Froude-only pretrains adapt the B1 about equally; the decoder is ahead on rollout from the recorded frame
@@ -7814,3 +8270,436 @@ retrieval B1 0.17 / 0.15, c08 0.37 / 0.38. Direct and roll_live equal within see
 decoder (+0.53 to +0.60 vs +0.40 to +0.49). The earlier "Froude only equal or slightly better on the B1" (F279) was on the
 old rendering with the old recipe.
 
+**F293 note.** Superseded on the B1: re-measured on corrected data (F294), decoder S0 +0.80 / +0.54 / +0.46,
+S1 +0.85 / +0.34 / +0.38; Froude-only S0 +0.83 / +0.39 / +0.39, S1 +0.74 / +0.29 / +0.29. The decoder now
+leads B1 rollout by ~0.1; 'about equal' does not hold.
+
+
+---
+
+### F293. `_face_forward` in `recollect_b1_turns.py` / `recollect_b1_more.py` corrupts the stored B1 `base_quat` (in-place aliasing); the Froude labels of hard-turn clips are wrong by about their own size
+
+The function rotates the quaternion component by component while reading `qw, qx, qy, qz` as VIEWS of the array it is
+writing, so later components use already-rotated values: the stored quaternion is neither unit nor a pure yaw-rotated
+pose. The error grows with the heading at the window start; windows start at multiples of 165 steps of one long rollout,
+so hard-turn clips begin at up to ~180 degrees. Measured by `scripts/diagnostics/dataset/check_face_forward_labels.py`
+(exact MuJoCo replay of each clip -> raw pose -> correct face-forward -> `body_motion` via the loader), 95 of 96 clips
+(library `b1_ep2002` not reproducible):
+
+| group | n | affected (>1e-4) | max clip-mean diff fwd / lat / yaw |
+|---|---|---|---|
+| beh24 cleantrain | 48 | 13 | .030 / .102 / .077 |
+| beh24 cleanval | 24 | 5 | .001 / .006 / .005 |
+| beh12 library | 23 | 6 | .021 / .060 / .053 |
+
+Worst clips (clip-mean fwd / lat / yaw, stored -> correct): ep1301 turn_w0.075 0.099 / 0.062 / 0.066 -> 0.119 / 0.003 /
+0.119; ep1303 0.105 / 0.063 / 0.058 -> 0.123 / -0.039 / 0.135; ep3901 turn_w0.075_neg 0.074 / -0.068 / -0.056 -> 0.104 /
+0.002 / -0.120 (label means: fwd 0.093, lat 0.042, yaw 0.017). Hard turns are labelled ~half their yaw rate with a false
+sideways speed ~0.065. Speed / side / backward clips and the older beh12 speed collector (eps 0-303) are unaffected.
+Library ranking barely changes (Spearman buggy vs correct clip-mean: 0.984 / 0.944 / 0.999).
+
+**Consequences.** Every B1 model in this project trained or adapted on these labels; the B1's weak yaw read (own
+transition 0.22, F288) may be partly this. The counterfactual-branch set (`data/egocentric_v3/b1_cf_branches_*`,
+`scripts/dataset/build_b1_cf_branches.py`) reproduces the buggy convention on purpose; fix both together.
+
+**F293 resolution (2026-10-01).** Code fixed (`_face_forward` in recollect_b1_turns / recollect_b1_more; invariance test
+`scripts/diagnostics/dataset/check_face_forward_invariance.py`: Froude diff 0.0 under random yaw, old function 0.318). Data:
+569 B1 files re-posed from an exact MuJoCo replay (`scripts/dataset/fix_face_forward_f293.py`; originals kept as
+`base_pos_buggy` / `base_quat_buggy`, field `pose_fix`); stored-vs-correct label diff 0.0 everywhere. Active v3 frames
+re-rendered from the corrected poses where the camera orientation differed by > 0.05 deg (`scripts/dataset/rerender_b1_f293.py`:
+23 beh24 + 9 beh12 clips, 1181 counterfactual branches; old frames kept as `frames_buggy`). Retired old-render dirs
+(data/egocentric, allocentric) are re-posed but NOT re-rendered and tagged so in `pose_fix`. Library clip `b1_ep2002`
+(not reproducible) removed from `beh12_b1_ego_flat_cleantrain` (library now 23 clips; B1 bounds oracle 0.0341 /
+random 0.1267). `locate` now takes the best match (gait periodicity made windows one period apart tie). Counterfactual
+branches store `froude_height` = source clip median height; `wm.data.embodiment._b1` uses it when present (otherwise
+unchanged), removing a 4.6e-4 label offset; the remaining 2.6e-3 at branch frame 10 is the one-sided gradient at the
+clip edge (one pair per branch).
+
+---
+
+### F294. B1 results re-measured on the corrected data (F293): Froude-only adaptation loses ~0.1 on rollout; the joint-command decoder now leads B1 rollout; joint pretraining still best
+
+`scripts/run/reeval_f293.sh` (log `results/wm/logs/reeval_f293.log`). NS w=11 on the 23-clip v3 library, direct /
+roll_fixed / roll_live (before F293 in brackets):
+
+| model | B1 |
+|---|---|
+| hexapod-only Froude-only + current adaptation S0 | +0.83 / +0.39 / +0.39 (+0.81 / +0.49 / +0.46) |
+| same S1 | +0.74 / +0.29 / +0.29 (+0.69 / +0.40 / +0.41) |
+| joint-command decoder + current adaptation S0 | +0.80 / +0.54 / +0.46 (+0.74 / +0.60 / +0.46) |
+| same S1 | +0.85 / +0.34 / +0.38 (+0.80 / +0.53 / +0.43) |
+| jointD3 nosim (pretrained on pre-fix labels; projector on fixed) | +0.92 / +0.61 / +0.55 (+0.94 / +0.66 / +0.56) |
+| jointD3 sim (same) | +0.94 / +0.45 / +0.57 (+0.94 / +0.50 / +0.53) |
+
+Vision-read goal, direct / roll_live: hexapod-only S0 +0.60 / +0.25, S1 +0.46 / +0.35; jointD3 nosim +0.84 / +0.56, sim
++0.84 / +0.57. c08 / c10 unchanged (+0.78 to +0.79; +0.90 to +0.91). Shared latent (adapted ITM): hexapod-only S0 / S1
+body-ID 0.69 / 0.66, retrieval B1 0.25 / 0.24, B1 R2 -0.17 / +0.26 / +0.19 and -1.29 / -0.04 / -0.27; decoder S0 / S1
+retrieval B1 0.14 / 0.23; jointD3 nosim / sim body-ID 0.73 / 0.73, retrieval B1 0.22 / 0.24, B1 R2 -1.40 / -0.07 / -0.87
+and -1.59 / -0.09 / -1.06.
+
+**Reading.** With correct hard-turn labels, direct is the same or slightly higher everywhere, rollout of the
+Froude-only adapted model drops ~0.1, and the decoder model now leads the B1's rollout by ~0.1 (F292's "about equal"
+does not hold on corrected data). Joint pretraining stays best on the B1; z is still not shared with the B1
+(retrieval 0.22-0.25 vs hexapods 0.38-0.44). Reading the goal from vision costs 0.08 (joint) to 0.28 (hexapod-only S1)
+on B1 direct.
+
+**F294 addendum (2026-10-01): remaining re-measurements on corrected data** (`scripts/run/reeval_f293_b.sh`, log
+`results/wm/logs/reeval_f293_b.log`).
+- Old adaptation recipe (LoRA r2, no Froude loss, Stage 4 refit), fmd S0: B1 +0.88 / +0.36 / +0.32 vs the current
+  recipe S0 +0.83 / +0.39 / +0.39. On corrected data the current recipe is no longer better on every column: the refit
+  gives higher direct, the current recipe slightly higher rollout.
+- Hexapod-only pretrained ITM, B1 not adapted (S0 / S1): body-ID 0.68 / 0.69, c10 -> B1 R2 -1.74 / +0.01 / -0.37 and
+  -1.62 / -0.41 / -0.70, retrieval B1 0.16 / 0.17, c08 0.42 / 0.42, kNN mixing 0.46.
+- B1 counterfactual read-out (F288 protocol, 24 states x 23 actions, current adaptation, v3 corrected frames, view check
+  pixel corr 1.000), mean S0 / S1: direct 0.85 / 0.80 / 0.92; own 0.53 / 0.73 / 0.87; real counterfactual 0.12 / 0.44 /
+  0.33; FTM-predicted 0.33 / 0.14 / 0.37 (per seed: own 0.58 / 0.71 / 0.84, 0.47 / 0.75 / 0.90; real cf 0.15 / 0.45 /
+  0.32, 0.08 / 0.43 / 0.34; FTM 0.38 / 0.24 / 0.51, 0.27 / 0.03 / 0.22). The B1's own-transition yaw read rises from
+  0.22 to 0.87 with correct labels and frames: the earlier weak yaw read was the F293 data error. The counterfactual
+  drop is unchanged (F288's conclusion holds on all three bodies).
+
+---
+
+### F295. Froude labels were zero-padded at every clip edge; timescales verified; labels made edge-correct and switch-aware, read-out window set to 21 frames
+
+**Timing (verified).** One frame = 0.05 s for the hexapod (CoppeliaSim scene time step 0.05 for c10 and c08, one
+capture per `sim.step` in `sim/collect/collect_ik.py`) and the B1 v3 data (file `dt` 0.05; ep0 measured 0.32 m/s against
+a 0.30 m/s command). Gait period from base-height oscillation: B1 median 10 frames, hexapod 11 (0.5 s).
+
+**Label window.** Between-clip spread over within-clip rocking, beh24 clean-train, fwd / lat / yaw:
+
+| label window | B1 | hexapod |
+|---|---|---|
+| 0.25 s (= one z) | 20 / 5.3 / 4.2 | 4.0 / 0.78 / 0.58 |
+| 0.5 s | 44 / 22 / 15 | 7.6 / 1.9 / 1.9 |
+| 1 s (kept) | 115 / 28 / 17 | 13 / 3.0 / 2.7 |
+
+At the z's own 0.25 s the hexapod's lateral and yaw labels are mostly gait rocking (ratio < 1), so the 1 s label is kept.
+
+**Edge bug.** `body_velocity`, `yaw_rate` and `body_motion` smoothed with `np.convolve(..., mode="same")`, which
+averages zeros beyond the clip ends: the first and last ~10 frames of every clip (~30% of a 66-frame clip) were shrunk
+toward 0 (steady B1 walk ep0: 0.070 at t=0, 0.107 at t=5, 0.143 mid-clip; an 11-frame window already gives 0.143 at
+t=5). This was documented in `scripts/diagnostics/shared_body_target/show_body_motion_edges.py` but never fixed in the
+loader. It affected training labels, goals and grading for every model so far.
+
+**Fix.** `wm.data.embodiment.smooth(x, window, segment)`: centred moving average over in-clip frames only, cut at
+`segment` boundaries (command switches); equal to the plain moving average in a segment's interior. Used by all label
+functions (hexapod, B1, gecko). Counterfactual branches carry `segment` (0 before / 1 from the branch), `first_pair`
+(= branch index; `wm/data/dataset.py` starts training pairs there) and `froude_height` (`scripts/dataset/tag_cf_branches.py`).
+Tests: `tests/test_froude_labels.py` (interior unchanged, constant signal flat at edges, post-switch labels independent
+of pre-switch frames, real B1 edges near mid-clip, branch segment field) — all pass.
+
+**Read-out window 11 vs 21 frames** (`scripts/run/window_check.sh`, corrected labels; B1 bounds now oracle 0.0380 / random
+0.1363, c10 0.0144 / 0.1640), NS direct / roll_fixed / roll_live:
+
+| model | B1 w=11 | B1 w=21 | c10 w=11 | c10 w=21 |
+|---|---|---|---|---|
+| hexapod-only adapted S0 | +0.82 / +0.39 / +0.41 | +0.81 / +0.39 / +0.42 | +0.91 / +0.72 / +0.61 | +0.90 / +0.70 / +0.69 |
+| hexapod-only adapted S1 | +0.74 / +0.26 / +0.29 | +0.80 / +0.28 / +0.31 | +0.91 / +0.73 / +0.67 | +0.90 / +0.73 / +0.67 |
+| jointD3 nosim | +0.92 / +0.60 / +0.56 | +0.93 / +0.63 / +0.65 | +0.91 / +0.78 / +0.70 | +0.90 / +0.75 / +0.68 |
+| jointD3 sim | +0.94 / +0.45 / +0.58 | +0.94 / +0.59 / +0.65 | | |
+
+Direct within ±0.01 (S1 B1 +0.06); B1 rollout up 0.02-0.14; c10 mixed within ±0.08. 21 frames (~1 s) matches the goal's
+timescale and is the default from here on.
+
+---
+
+### F296. Hexapod c10 switching clips (commanded behaviour changes every 15-25 frames, one continuous physics run); `collect_beh24.py`'s recipe table does not match the beh24 clips it is documented to produce
+
+`scripts/dataset/collect_switch_hex.py` (log `results/wm/logs/hex_switch.log`): `collect_ik.py --plan` per-frame drives,
+4-frame ramp per switch, gait phase continuous, no reset; new optional plan key `sym` blends the symmetrised (sideways)
+and raw stance poses (0.134 rad apart). 48 train clips (`data/egocentric/beh24_c10f10t10_switch_train`, eps 20000-20047,
+room seeds 7000+i; 164 segments, each of the 24 conditions 6-7 times, all 30 ordered behaviour-type pairs) and 12 val
+(`..._switch_val`, eps 21000-21011, seeds 8000+i). Fields: beh24 fields + `segment`, `seg_*`, `schedule`, `plan_*`.
+
+**Recipe mismatch.** Fitting the 24 conditions from the stored commands of the beh24 c10 clips (residual 0.0000 rad)
+gives values that differ from the table in `collect_beh24.py`: turn spin sign is opposite (`turn_sX` ran spin -X);
+backward cycles 3.49 / 3.90 / 4.97 / 5.05 (table 5.8-8.8); side-left strafe -0.48 / -0.83 / -1.30 / -1.40 (table -0.4 ..
+-1.6); side-right +0.488 / +0.73 / +0.83 / +0.87 (table +0.4 .. +1.6). The switching clips use the fitted values; a
+one-segment plan reproduces beh24 commands within 2e-4 rad and labels (speed_c8.8_bwd -0.208 vs -0.211). Anyone
+regenerating beh24 from the table would not get the stored data.
+
+**Checks.** Render: first-frame row-profile corr vs beh24 0.954-0.997 (beh24 among themselves 0.989-0.998). Labels in
+segment interiors vs steady beh24 per condition: corr fwd 0.997 / lat 0.92 / yaw 0.94, slope 0.84 / 0.78 / 0.90 (last 8
+frames of a segment 0.94 / 0.93 / 0.97: the body is still settling after a switch, which the labels correctly show).
+Side-right reaches 55-65% of steady within 15-25 frames. Labels from a switch on are unchanged (diff 0.0) when every
+frame before a-1 is scrambled; frame a-1 enters through the velocity difference at the switch frame (physical state).
+Max tilt 22.5 deg (steady beh24 19.1), never fell.
+
+---
+
+### F297. The selection test sets overlapped the training data: B1 library and hexapod goal clips partly in train / val; test data moved to the beh24 heldout split
+
+Content check (md5 of frames 0 / 30 / 60): the B1 selection library `beh12_b1_ego_flat_cleantrain` shares 8 clips with
+the B1 training split `beh24_b1_ego_flat_cleantrain` (e.g. ep1301, ep1203, ep101, ep1003) and 1 with its val split
+(ep102); the hexapod goal set `beh12_c10f10t10_ego_flat_cleanheldout` shares 3 clips with `beh24_c10f10t10_ego_flat_cleantrain`
+(ep200, ep1303 -- the turn goal of the physics clips -- and ep1100) and 3 with its val split (ep1000, ep103, ep1); the c10
+same-body library was the val split itself. The beh12 and beh24 splits were made separately and never cross-checked.
+Every selection number so far was measured partly on clips the model trained on (goals: frames seen in training;
+libraries: candidates whose transitions trained the projector / head).
+
+Test protocol from now on (`scripts/run/eval_suite.sh`): goals = all 24 clips of `beh24_c10f10t10_ego_flat_cleanheldout`;
+libraries = `beh24_b1_ego_flat_cleanheldout` (B1), `beh12_c08f09t09_ego_flat` (c08, never trained), c10 heldout with the
+goal clip itself excluded (`selection_eval.py` leave-goal-out); shared latent and counterfactual read-out on the same
+heldout clips. Train / val / heldout overlap is checked by `scripts/diagnostics/dataset/check_splits.py` before training.
+Smoke test, hexapod-only D S0, c10 heldout leave-goal-out, 24 goals, w=21: direct +0.92 (oracle 0.0358, random 0.1897).
+
+---
+
+### F298. Hexapod turn sign resolved: `turn_sX` turns left (CCW), `turn_sX_neg` right; negative `--spin` has always yawed the hexapod left; the recipe table was never updated after F66 and the beh24 recalibrations
+
+Two independent measurements on `data/egocentric/beh24_c10f10t10_ego_flat` (all clips `morph` c10f10t10, scale 0.65):
+heading from `body_quat` (wm.data.embodiment.heading, + = CCW) and horizontal image shift in the ego frames (phase
+correlation, + = scene moves right = camera turns left):
+
+| condition (stored spin) | heading change over clip | image shift |
+|---|---|---|
+| turn_s0.15 (-0.15) / _neg (+0.15) | +27.6 / -28.0 deg | +150 / -128 px |
+| turn_s0.29 (-0.29) / _neg (+0.29) | +51.1 / -54.5 deg | +120 / -172 px |
+| turn_s0.56 (-0.56) / _neg (+0.56) | +109.1 / -114.3 deg | +357 / -365 px (predicted ~310 for 109 deg at FOV 90) |
+
+side_L moves left in the body frame (+0.10 / +0.32 / +0.62 / +0.61 m per clip), side_R right (-0.14 ... -0.73 m); the
+image check is inconclusive for side (low wall texture, heading drift up to +-28 deg). Names, labels and images agree.
+
+**History explained.** F66 re-collected the turns at negative `--spin` (the hexapod yaws opposite to the sign) but
+`turn_conditions()` kept +X. F174's "root cause not identified" sign flip of a from-scratch collection = the table's +X;
+`--spin_sign -1` restores F66's command. F219's "turn_neg saturates rather than inverts" = `beh24_hex_new12_raw/turn_s*_neg`
+used spin -X, the same command as `turn_sX`, so it turned left too. The canonical `beh24_hex_turnneg_raw` used +X (a
+real mirror, probably `--spin_sign -1`; no command log). Backward was recalibrated to cycles 3.49 / 3.90 / 4.97 / 5.05 so
+its displacement mirrors the forward ladder (table's 5.8-8.8 gave a flat -0.78..-0.82 m); side was recalibrated to
+L -0.48 / -0.83 / -1.30 / -1.40, R +0.488 / +0.73 / +0.83 / +0.87 (lateral targets 0.03 / 0.08 / 0.13 / 0.14). None of these
+were written back to `collect_beh24.py` or committed; raw dirs hold no command logs. Recipe fits: residual 0.0000 rad.
+Visual check: `results/check/hex_turn_sign.mp4`, `results/check/hex_side_sign.mp4`.
+
+---
+
+### F299. B1 counterfactual branches switched heading controller at the branch point for 16 sources; generator and every B1 restore path now take all rollout settings from the recording
+
+The beh12 speed sources (ep 0-303, 16 clips across train / val / heldout) were rolled out with heading gains kp 2.5 /
+ki 1 (F69), the branches with kp 0.5 / ki 0, so the controller changed with the command (own-command branch vs source:
+joint up to 2.4e-2 rad, Froude up to 1.2e-2). `scripts/dataset/build_b1_cf_branches.py` now runs each branch under the
+settings `locate` recovers for its source (gains, ki clip, policy checkpoint, gait frequency, model), raises if they
+cannot be determined or tie, and `restore()` refuses a settings mismatch; each branch stores them (`heading_kp`, ...).
+960 branches regenerated (train 576, val 192, heldout 192); pair counts unchanged (38016 / 12672 / 12672). Own-command
+branch vs source over the branch frames, all splits: joint <= 8.3e-7 rad, base pos <= 1.2e-7, Froude <= 1e-7, pixel corr
+>= 0.9998 (heldout ep3001 0.99778: its v3 frames were rendered from a pose 0.03 deg off, under the 0.05 deg re-render
+threshold of F293). Old files in the scratchpad `cf_old/`.
+
+Same bug class fixed elsewhere: `sim/collect/rollout_b1_mujoco.py` now writes its settings as `rollout_*` fields and
+`--save_state_at` / `--load_state` carry settings + `sensordata` (resume bit-exact; a wrong kp is refused);
+`render_b1_replay.py` passes `rollout_*` through, so the recollect collectors record settings; `B1Walker` has
+`settings()` / `snapshot()` / `restore()` with sensordata; `physics_counterfactual_check.py` uses them and the source
+clip's own policy (cache renamed `physics_counterfactual_b1_v2.pt`; the old cache and F287's numbers came from the
+gait3-only, no-sensordata version); `close_loop_b1_physics_froude.py` takes and records `--policy`;
+`branch_b1_mujoco.py` restores sensordata. Unchanged with reason: open-loop action replay (`close_loop_b1_physics.py`),
+the PPO env, re-render-only scripts.
+
+---
+
+### F300. The hexapod beh24 clips of a condition are the same motion: identical joint commands in all 4 clips (train / val / heldout), differing only in room
+
+All 144 same-condition pairs of `data/egocentric/beh24_c10f10t10_ego_flat_clean{train,val,heldout}` have identical
+joint-command sequences (max diff 0.0) and the same start; travelled-distance curves differ by ~1-2 cm (physics noise).
+The clips differ only in the room (seed = `repeat`, 4 rooms). So the hexapod has 24 distinct motions, not 96 clips,
+and its heldout clips repeat its training motions in another room: every hexapod test number so far overstates
+generalisation. The B1 clips of a condition are windows at different times of one long rollout (command diff >= 0.44
+rad, different start states) -- genuinely different. Fix planned: collect hexapod clips the way the B1's were made
+(one long walk per condition, clips cut at different times), with rooms per split shared by both bodies; add a
+duplicate-motion check to `check_splits.py`.
+
+---
+
+### F301. Hexapod Froude labels are measured at the head, 0.246 m ahead of the centre of mass: on turns and backward walks the lateral channel is mostly lever-arm geometry; the B1 base is within 2 cm of its CoM
+
+`scripts/diagnostics/dataset/centre_reference_froude.py`, `hex_shape_masses.py` (v4 hexapod clips with recorded link
+poses). Hexapod CoM = mass-weighted origins of the 29 dynamic shapes (1.920 kg; abdomen 0.4, T3 0.5, T2 0.4, T1 0.1,
+head 0.1, 18 leg links 0.02, 6 feet 0.01; visual spheres excluded; shape inertia frames are identity). Offsets from the
+head in the walking frame: CoM (-0.246, -0.001, -0.030) m, hip centre (-0.197, 0, -0.029) m. Clip-mean lateral at the CoM
+= head lateral - yaw x 0.246 / h on every clip (within 0.0008). Forward is identical at all points.
+
+| condition | lateral at head | lateral at CoM | yaw |
+|---|---|---|---|
+| turn_s0.56 / _neg | +0.026 / -0.045 | -0.070 / +0.077 | +0.069 / -0.089 |
+| speed_c5.8_bwd / c7.1_bwd | -0.107 / -0.069 | -0.044 / -0.021 | -0.046 / -0.035 |
+| speed_c5.8 (fwd) | -0.015 | -0.003 | -0.008 |
+| side_L_lvl2 / side_R_lvl3 | +0.180 / -0.175 | +0.154 / -0.158 | ~0 |
+
+The hexapod really slips OUT of its turns at the CoM (as large as the turn rate); the head happens to sit near the
+no-slip point (~0.17 m ahead of the CoM). Most "backward drift" and all forward drift at the head is yaw x lever arm.
+The head amplifies per-frame lateral sway ~2.5x on forward walks and turns. B1: CoM is (-0.0185, 0, -0.033) m from the
+base (fixed); base vs CoM labels differ <= 0.003. Every hexapod label in this project so far mixes yaw into lateral
+through the head reference; the B1 v4 walks (stage 2) were tuned to these head-based targets. Old beh24 clips have no
+link poses (head - 0.246 x forward_axis reproduces CoM clip means within 0.0008 on v4).
+
+---
+
+### F302. Centre-of-mass Froude reference implemented for both bodies; B1 main clips re-tuned to the hexapod's CoM targets (24/24 within 0.002)
+
+`wm/data/embodiment.py` uses the per-frame `com_pos` field (CoM position) and the median CoM height when present (old
+data unchanged); `wm/data/com.py` (`hex_com`: 29 dynamic shapes from the scene masses, `sim/env/medauroidea_c10f10t10_masses.json`;
+`b1_com`: MuJoCo subtree CoM of the trunk). All collectors / renderers / branch generators now write `com_pos`
+(`collect_ik --record_state`, `rollout_b1_mujoco.py`, `render_b1_replay.py`, `build_b1_cf_branches.py`; `tag_cf_branches.py`
+uses the source's median CoM z). `scripts/dataset/add_com_pos.py` back-filled the v4 dirs. Tests 8/8
+(`tests/test_froude_labels.py`: no `com_pos` -> bit-identical labels; lever-arm relation; CoM height).
+
+CoM targets vs head targets: forward ~10% larger (lower Froude height); turns now slip outward (left turn lateral
+-0.077 at turn_s0.56, right +0.086); backward drift 0.04-0.06 smaller. B1 tuned commands in
+`data/egocentric_v4/b1_main_walks/tuning.json` (the B1 reproduces outward slip with vy opposite to the turn); final
+clips within 0.002 of target on every channel for all 24 conditions; room seeds identical per (split, condition, copy);
+`check_splits.py --v4` OK (pairs 2688 / 1344 / 1344 per body). Individual clips vary around the condition mean more on
+the hexapod than on the B1 (e.g. one c5.8_bwd val clip: hexapod yaw -0.058 vs B1 -0.043; condition means match).
+Head-target B1 data kept in `data/egocentric_v4/_superseded_headref/`.
+
+---
+
+### F303. Velocity differencing now also stops at command switches: labels after a branch no longer include motion from before it
+
+`smooth()` already cut the 1 s average at `segment` boundaries (F295), but the per-frame velocity came from `np.gradient`
+over the whole clip, so the velocity at the branch frame b was the central difference (x[b+1] - x[b-1]) / 2dt, which
+includes the pre-switch step b-1 -> b; the 1 s average then spread it over ~10 labels after the branch. Replacing only
+the pre-branch poses with noise changed labels at and after b by 0.04-0.06 (comparable to label differences between some
+commands). The training pair starting at b sees frames b .. b+5 only. Fix: `wm.data.embodiment.gradient(x, dt, segment)`
+differences within each segment (one-sided at a switch), used by `body_motion`, `body_velocity`, `yaw_rate`; identical to
+`np.gradient` without `segment`. After the fix the prefix-noise test gives 0.0 difference (`tests/test_froude_labels.py`,
+9/9). Post-switch inertia (the body still moving with the old command after b) stays in the labels, because it happens
+after b and is visible in the frames. Same review: `first_pair` now honoured by every pair builder (adapt, adapt_joint,
+fit_projector, fit_body_head, strided helpers) and normalisation statistics use only frames that can enter a pair;
+`collect_beh24.py` keeps all 24 conditions under `--spin_sign` / `--lvl0_strafe`; `eval_suite.sh` B1 selection now passes
+the v4 goal dir.
+
+---
+
+### F304. Stage 3 (v4 branches) built; B1 v4 main clips had the ego camera yawed off the body (re-rendered); hexapod replay noise grows with depth into the walk
+
+`scripts/dataset/build_cf_branches_v4.py`, gates `scripts/dataset/check_cf_branches_v4.py`; data
+`data/egocentric_v4/{hex,b1}_cf_{train,val,heldout}` (3456 / 1728 / 1728 files per body; all 576 source->target pairs per
+split, 6 / 3 / 3 each; pairs 38016 / 19008 / 19008 per body; rooms = source rooms, identical seed sets per body; 31 frames,
+`segment`, `first_pair`=10, `froude_height`, `com_pos`, `cam_pose`; branch points spread over gait phase, `cf_points.json`).
+
+**B1 camera bug.** `render_b1_replay --ego` aimed the camera along the clip's frame-0 heading while the base was still at
+its scene pose, then attached it: on v4 windows (not rotated to start facing +x) the camera was yawed off the body by a
+median 22.6 deg, max 168.5 deg (74 / 96 clips > 10 deg). v3 clips (rotated to +x) were unaffected; hexapod unaffected
+(max 2.1 deg). Fixed (camera along the base's heading; old behaviour `--legacy_mount`); B1 main clips re-rendered into
+`data/egocentric_v4/b1_main_camfix_*` (camera within 0.10 deg of the body), B1 branches built from those. Stage-2 checks
+and `b1_hex_matched_samples.mp4` used the bad frames. `cam_pose` (n x 7, xyz + qx qy qz qw, `cam_pose_convention`) back-filled
+/ recorded; renderer re-render matches to 4e-16.
+
+**B1 branches:** prefix identical across groups (0 diff); own-command branch vs source joint <= 3.4e-7 rad in 286 / 288
+groups, max 3.7e-5 (one source: walk reproduction vs recording at float32). **Hexapod branches:** prefix commands
+bit-identical to the source plan; physical prefix deviates from the source window by CoM 63 / 239 / 2540 mm (median / p90 /
+max; max = global drift on late windows of long walks, Bullet non-determinism), pixel MAE 6.0 / 9.2 / 18; own-command
+branch vs source after the branch: Froude diff fwd 0.015 / 0.037 / 0.080, lat 0.021 / 0.065 / 0.181, yaw 0.007 / 0.022 /
+0.057. Switching effect exceeds the noise p90 from frame 4 (backward, sideways) and 9-10 (forward, turns). Each hexapod
+branch carries its own replayed frames and labels (internally exact), but the 24 branches of a group start from states
+tens of mm (sometimes metres in world position) apart, unlike the B1's identical state.
+
+Infrastructure fixes: SIGSEGV from two threads sharing one MuJoCo model in `wm.data.com.b1_com` (one process per worker;
+237 possibly-raced files regenerated); parallel renderers overwrote each other's room textures in /tmp (per-process files);
+hung CoppeliaSim instances (per-branch child process, 300 s timeout, restart; 13 retries, all succeeded).
+
+---
+
+### F305. Hexapod v4 main clips and branches re-collected with scene reuse: every branch start bit-identical, own-command branch == walk; B1 targets drift on 4 / 24 conditions
+
+`scripts/dataset/collect_hex_det_v4.py` + `sim/collect/scene_reuse.py` (`collect_ik.drive_and_record(..., reuse=...)`, off by
+default). Re-runs after `sim.loadScene` are not bit-identical; with the scene loaded once, runs fall into bit-identical
+"classes" that change with the run count since the load (switches at runs 1, 8, 85, 261, 361, 528; the run-85 class
+returns at 361). Method: 90 short warm-up runs, full walks until 3 in a row identical, each branch assigned to the class
+whose walk its prefix matches bit for bit, the walk of the first class with all 288 branches kept (every condition:
+winning class first seen at run 93, 2 classes, 481 runs; ~75 min physics + ~15 min rendering per condition on one
+instance). Output `data/egocentric_v4/hex_det_main_{walks,train,val,heldout}` (24 / 48 / 24 / 24) and
+`hex_det_cf_{train,val,heldout}` (3456 / 1728 / 1728).
+
+Gates (`check_cf_branches_v4.py --det`): hexapod prefix (11 frames: state and pixels) vs source window and across each
+group 0 / 0 / 0 (median / p90 / max); own-command branch == source on all 31 frames (state, labels, pixels); replay noise
+0, so every switched command is distinguishable from frame 1 after the branch (CoM effect at k=5: 9-24 mm). B1 integrity:
+the gate reported FAIL (its own-command Froude threshold 1e-6 is exceeded in 279 / 288 groups, max 2.6e-5; joint <= 3.4e-7
+rad; base position differs ~2e-5 m, consistent with float32 storage) -- correction added below. Coverage, rooms, falls (hexapod max tilt 31 deg),
+loader and prefix-independent labels pass; `check_splits.py --v4 --det` OK (pairs equal per body: main 2688 / 1344 / 1344,
+branches 38016 / 19008 / 19008); `tests/test_froude_labels.py` with `FROUDE_TEST_HEX=hex_det` 9/9.
+
+**B1 targets.** The new walks are another physical realisation of the same commands; per-condition hexapod targets moved
+by at most fwd 0.007 / lat 0.035 / yaw 0.006. The existing B1 camfix clips stay within max(10%, 0.005) on 20 / 24
+conditions; out: speed_c8.8 (lat 0.057 vs B1 0.089), speed_c8.8_bwd (lat 0.005 vs 0.012), side_L_lvl1 (lat 0.119 vs 0.083,
+fwd), side_L_lvl3 (lat 0.198 vs 0.171, fwd, yaw). Two render-stage tracebacks (`os.replace` FileNotFoundError) came from two
+workers rendering the same file after an instance restart; outputs are deterministic and complete, no `.tmp` left.
+
+**F305 correction / follow-up (2026-10-02 evening).** B1 re-tuned for the 4 out-of-tolerance conditions (speed_c8.8 vy
+0.242 -> 0.164; speed_c8.8_bwd vy 0.047 -> 0.036; side_L_lvl1 vy 0.231 -> 0.312; side_L_lvl3 vy 0.436 -> 0.502, wz 0.027 -> 0.056;
+all within max(3%, 0.002)); their walks, 16 main clips and 1152 branches regenerated (old in
+`data/egocentric_v4/_superseded_b1_pre_det/`); `collect_hex_det_v4.py targets` 24/24 OK; `check_splits.py --v4 --det` OK.
+Open at this point: 960 B1 branches of the other sources that switch TO those 4 commands still used the old commands;
+the B1 own-command gate threshold is below float32 storage precision. Both being fixed (regeneration + a tolerance
+derived from the storage dtype).
+
+Follow-up done: the 960 stale B1 branches regenerated (all 6912 B1 branch files' `cf_command` == tuning.json; 576 pairs per
+split); `b1_main_walks/targets.npy` = deterministic hexapod targets (old kept as `targets_pre_det.npy`);
+`collect_b1_main_v4.py check` reads `b1_main_camfix_*` and compares rooms with `hex_det_main_*` (ALL GATES PASS). B1
+own-command gate: threshold 1e-6 -> 3e-5, derived from float32 storage of base_pos (label bound 2.68e-5); measured max
+2.62e-5. **But the cause is not storage rounding:** own-command branch vs walk differs by 2.0-2.6e-5 m in base position and
+3.4e-6 in quaternion (20-28x the rounding bound) while joints agree to 3.4e-7 rad: the B1 snapshot restore is not
+bit-exact for the base (~0.03 mm, pixel MAE <= 0.008). Open: find and fix the residual in the B1 restore. All gates pass
+(`collect_hex_det_v4.py targets` 24/24, `check_cf_branches_v4.py --det`, `check_splits.py --v4 --det`, label tests).
+
+**F305 closed (B1 restore).** The MuJoCo snapshot/restore was already bit-exact (qpos, qvel, qacc_warmstart, act, ctrl,
+sensordata, time all 0.0 after restore and over 20 decision steps). The drift came from the command: B1 walks were run
+through the CLI with `--vx/--vy/--wz %.6f` (6-decimal command), the branch builder reproduced the walk and ran branches with
+the full-precision `tune_cmd` (difference <= 5e-7 -> 2e-5 m base drift over 400 steps; joints only 3e-7, so the joint-only
+reproduction gate at 1e-5 missed it). Fix in `build_cf_branches_v4.py`: `b1_cmd_as_run()` rounds every B1 command to 6
+decimals as the walk ran; walk reproduction must be exactly 0 on every recorded field. All 6912 B1 branches regenerated
+(old in `data/egocentric_v4/_superseded_b1_restore/`); every walk reproduction 0.0. Strict B1 gate restored: own-command
+branch vs source -- joint, quat, action, command bit-identical (0 groups differ); base pos <= 4.77e-7 m (float32 re-rounding
+after the window offset, bound 1.07e-6); Froude 8.9e-8; pixel MAE 0.001. All gates pass. Lesson: a reproduction check must
+cover every recorded field at exact equality, not one field with a tolerance.
+
+---
+
+### F306. c08f09t09 v4 test set (held-out morphology, test only): deterministic, same heldout rooms; c08 moves the right way on all 24 commands, side_L_lvl0 at 0.47x c10
+
+`scripts/dataset/collect_c08_det_v4.py` (scene reuse as F305; the exact c10 walk plans run on the c08 scene; c08's own
+fitted centre pose; CoM from `sim/env/medauroidea_c08f09t09_masses.json`, `wm/data/com.hex_com(morph=)`). Output
+`data/egocentric_v4/c08_det_main_heldout` (24 clips, window = the c10 heldout copy's, rooms 200 + condition index) and
+`c08_det_cf_heldout` (1728 branches, the c10 heldout branch points). Gates: prefix / own-command exactness 0; 576 pairs;
+no falls (branches min CoM z 0.109 m, max tilt 27.6 deg); labels after the branch independent of the prefix; CoM collector
+vs `hex_com` 1.4e-15 m; `check_splits.py --v4 --det` OK with c08 as test-only (0 shared frames). Achieved CoM Froude vs c10
+(same window): forward / backward ratio 0.98-1.09; turn yaw 0.92-1.16 (larger ratios only on tiny values); side_R 0.71-0.82;
+side_L 0.47 (lvl0), 1.21, 1.44, 0.75 -- c08's side_L is not monotone in level (lvl2 > lvl3); c08 forward walks drift +0.012
+to +0.038 lateral. No wrong sign, none below 0.25x. `eval_suite.sh` uses it (selection library + branch read-out).
+
+---
+
+### Renaming (2026-10-03): v4 data, scripts and flags renamed to descriptive names (old entries keep the old names)
+
+No data content changed. Directories moved (`mv`); in every current npz (15 792 of 15 890 files incl. `_work` / `_physics`,
+`_superseded/` not touched) string fields holding old paths (`cf_source_path`, `cf_source_walk`, `source_walk`,
+`cf_settings`, `plan_from`, `c10_counterpart`, `render`, `camfix_from`) were rewritten with the same map, field
+`camfix_from` renamed `remount_from`; all other arrays verified bit-identical before each atomic replace. Keys of
+`branch_points.json` (old `cf_points.json`) point to the stage-1/2 source clips, now under `_superseded/`.
+
+| old (`data/egocentric_v4/...`) | new (`data/counterfactual_walks/...`) |
+|---|---|
+| `hex_det_main_{train,val,heldout}` / `hex_det_cf_*` / `hex_det_main_walks` | `c10_clips_*` / `c10_branches_*` / `c10_walks` |
+| `b1_main_camfix_{train,val,heldout}` / `b1_cf_*` / `b1_main_walks` | `b1_clips_*` / `b1_branches_*` / `b1_walks` |
+| `c08_det_main_heldout` / `c08_det_cf_heldout` / `c08_det_main_walks` | `c08_clips_heldout` / `c08_branches_heldout` / `c08_walks` |
+| `cf_points.json` | `branch_points.json` |
+| `_superseded_hex_replay` (incl. `hex_main_*`, `hex_cf_*`) | `_superseded/c10_replay_noise` |
+| `_superseded_badcam` (`b1_main_{train,val,heldout}`, legacy camera mount) | `_superseded/b1_camera_yawed` |
+| `_superseded_headref` | `_superseded/b1_head_reference_targets` |
+| `_superseded_b1_pre_det` | `_superseded/b1_tuned_to_replay_targets` |
+| `_superseded_b1_restore` | `_superseded/b1_full_precision_command` |
+
+| old script | new script |
+|---|---|
+| `scripts/dataset/collect_hex_det_v4.py` | `scripts/dataset/collect_c10_walks_and_branches.py` |
+| `scripts/dataset/build_cf_branches_v4.py` (step `b1_camfix`) | `scripts/dataset/build_branches.py` (step `b1_remount`) |
+| `scripts/dataset/check_cf_branches_v4.py --det` / `--det --hex_prefix c08_det ...` | `scripts/dataset/check_branches.py` / `--c08` |
+| `scripts/dataset/collect_b1_main_v4.py` | `scripts/dataset/collect_b1_walks.py` |
+| `scripts/dataset/collect_c08_det_v4.py` | `scripts/dataset/collect_c08_test_set.py` |
+| `scripts/dataset/collect_hex_main_v4.py` (superseded) | `scripts/dataset/collect_c10_replay_superseded.py` |
+| `scripts/diagnostics/objective_experiments/counterfactual_readout_v4.py` | `.../counterfactual_readout.py` |
+| `scripts/diagnostics/dataset/check_hex_v4_froude_independent.py` | `.../check_c10_froude_independent.py` (now reads `c10_clips_*`) |
+| `check_splits.py --v4 --det` | `check_splits.py` (default; `--no_c08`, `--legacy` for the older dirs) |
+| `FROUDE_TEST_HEX=hex_det` / `c08_det` | default `c10` / `FROUDE_TEST_HEX=c08` |
+| `eval_suite.sh` env `V4` | `CW` |
+| `add_cam_pose.py verify_camfix` | `verify_remount` |
+
+Result / check video names (`results/check/hex_det_*.mp4`, `c08_det_samples.mp4`) and cache names are unchanged.

@@ -1,51 +1,29 @@
-"""Collect the twenty-four matched behaviour conditions for one body, from a recipe kept in code.
+"""Collect the 24 beh24 behaviour conditions for one hexapod body, from the recipe kept in this file.
 
-**Extends `collect_beh12.py`'s original twelve with the mirror twelve.** The original set covers
-only one direction per channel except lateral: forward speed only (no backward), one turn direction
-only (no opposite spin), and both strafe directions but only two magnitude levels each. This means
-every model built on it has *zero* training examples of walking backward or turning the other way --
-not weak signal, none at all. The twelve new conditions below fix that: 4 backward speeds (mirroring
-the 4 existing forward ones), 4 opposite-direction turns (the existing `turn_conditions(sign=-1.0)`
-mechanism, never previously called), and 2 more strafe levels per side (lvl2/lvl3).
+The 24 conditions: forward at 4 speeds (`speed_cX`), backward at 4 (`speed_cX_bwd`), left turns at 4 levels
+(`turn_sX`), right turns at 4 (`turn_sX_neg`), sideways left and right at 4 levels each (`side_L/R_lvlN`).
 
-**The new conditions are NOT verified yet -- their magnitudes are first guesses, extrapolated from
-the existing ones, and need the same `--separability`/`--verify`-style check this file already
-applies to the original twelve before they can be trusted.** Do not treat `SIDE_LVL2_STRAFE` etc.
-as final; they are a starting point for tuning, exactly as this file's own docstring warns for the
-original set.
+**The recipe below reproduces the canonical c10f10t10 clips** (`data/egocentric/beh24_c10f10t10_ego_flat`):
+every value was fitted back from the clips' stored joint commands (residual 0.0000 rad, F296 / F298), because
+the clips were assembled from several hand-run collections (`build_beh24_hex_ego_flat.py`, F223) whose commands
+were never logged, and an earlier version of this table did not match them. Conventions that bit before:
 
-**The existing `data/allocentric/beh12_c10f10t10_flat` was collected by hand, one command per condition, and the
-commands were never written down.** Ten of the twelve are recoverable from the condition names --
-`speed_c7.1` is `--cycles 7.1`, `turn_s0.29` is `--spin 0.29` -- and the two sideways levels per
-direction are recoverable from nothing at all. The base sideways recipe survives in FINDINGS F62,
-but which two magnitudes became `lvl0` and `lvl1` does not, and the achieved lateral speeds are not
-symmetric between left and right (0.071 / 0.185 against -0.118 / -0.186), so they were tuned
-per direction rather than scaled from one number.
+- **Negative `--spin` yaws the hexapod LEFT (CCW).** `turn_sX` (left) runs `--spin -X`, `turn_sX_neg` (right)
+  runs `--spin +X` (F66, F298; verified by heading and by ego image motion).
+- Backward uses its own cycles (3.49 / 3.90 / 4.97 / 5.05) so its displacement mirrors the forward ladder.
+- Sideways strafes were retuned per side to lateral targets |0.03 / 0.08 / 0.13 / 0.14|, so L and R differ.
 
-That makes the principal Stage 2 dataset unreproducible, which is a defect independent of any new
-body. This file is the fix: the recipe is data, and `--verify` re-collects it on the body the
-original came from and compares the achieved Froude, yaw and lateral speed against the stored clips.
-**`--verify` asks whether the recipe reproduces the recorded *values*, which is the stricter of two
-possible standards and not always the right one.** Reproducing the values matters when clips from
-two bodies will be compared against each other. It does not matter when a body's clips are only
-ever compared with its own -- a planner choosing among one robot's behaviours to reproduce that
-robot's own demonstration never crosses bodies, and the achieved Froude of a shorter-legged insect
-being 0.11 where the original was 0.126 changes nothing about it.
+**Commands are not portable across bodies.** `--cycles` and `--strafe` act on foot paths scaled about each
+body's hip, so the same numbers give different Froude on another leg geometry (F96, F108). For another body,
+re-tune (`--lvl0_strafe`, `--spin_sign`) and check with `--separability` / `--turn_sign` rather than assuming.
 
-The standard that matters there is **separability**: are the twelve conditions further apart than
-their own spread across clips. `--separability` measures that instead, and the recipe in this file
-passes it -- 62 of 66 pairs above 2x, the four sideways conditions 9.3x to 15.6x apart -- while
-failing `--verify` on `speed_c8.15` and both left strafes.
+`--verify` re-collects on c10f10t10 and compares the achieved Froude against `REFERENCE`, which covers only
+the 12 original beh12 conditions (from `data/allocentric/beh12_c10f10t10_flat`, older label code) -- it does
+not yet check the 12 newer ones or the beh24 egocentric clips;
+`--separability` checks that the conditions are further apart than their own spread across clips.
 
-**The commands are not portable across bodies and are not meant to be.** `--cycles` is a temporal
-frequency on a foot path scaled about each body's hip, so the same number gives a different Froude
-on different segment lengths -- task-space quantities scale with leg length and joint-space ones do
-not. Matching *achieved* behaviour across bodies is a separate re-derivation; what this reproduces
-is the twelve **distinguishable** conditions, which is what a planner needs to choose between.
-
-  .venv/bin/python3 scripts/dataset/collect_beh12.py --verify
-  .venv/bin/python3 scripts/dataset/collect_beh12.py --morph c08f09t09=medauroidea_c08f09t09.ttt \\
-      --out data/allocentric/beh12_c08f09t09
+  .venv/bin/python3 scripts/dataset/collect_beh24.py --dry_run
+  .venv/bin/python3 scripts/dataset/collect_beh24.py --verify
 """
 import argparse
 import os
@@ -70,7 +48,7 @@ COMMON = ["--gait", "cpg", "--scale", "0.65", "--cam_dx", "-0.6", "--behavior", 
 # from `data/allocentric/beh12_c10f10t10_flat` -- reading 1000 and 2300 back as expert indices is out of range and
 # is what made the first verification run die on the fifth condition.
 #
-# One expert episode for all twelve. In `--gait cpg` the behaviour comes from the oscillator flags;
+# One expert episode for all conditions. In `--gait cpg` the behaviour comes from the oscillator flags;
 # the expert path only supplies the foot geometry the IK targets, so holding it fixed removes a
 # variable rather than losing one.
 SPEED = [("speed_c5.8", ["--cycles", "5.8"]),
@@ -81,14 +59,21 @@ SPEED = [("speed_c5.8", ["--cycles", "5.8"]),
 # **New.** `--lead` sets stride direction (`collect_ik.py`: "0.25 and 0.75 walk opposite ways");
 # `COMMON` never sets it, so every condition above defaults to 0.25 (forward). Same 4 `--cycles`
 # magnitudes, `--lead 0.75` added, nothing else changed -- the mirror of SPEED, not a new tuning.
-SPEED_BWD = [(f"{name}_bwd", flags + ["--lead", "0.75"]) for name, flags in SPEED]
+# **Recalibrated, fitted from the stored c10f10t10 clips (F298).** The same cycles as SPEED walked backward
+# a flat -0.78..-0.82 m per clip at every level (no ladder); the canonical clips ran these cycles, whose
+# displacement mirrors the forward ladder (-0.586 / -0.672 / -0.826 / -0.827 m vs +0.585 ... +0.819).
+BWD_CYCLES = {"speed_c5.8": 3.49, "speed_c7.1": 3.90, "speed_c8.15": 4.97, "speed_c8.8": 5.05}
+SPEED_BWD = [(f"{name}_bwd", ["--cycles", f"{BWD_CYCLES[name]:g}", "--lead", "0.75"]) for name, _ in SPEED]
 
 TURN_LEVELS = (0.05, 0.15, 0.29, 0.56)
 
 
 def turn_conditions(sign=1.0, suffix=""):
-    """`--spin` per level, signed. The name keeps the magnitude; the sign is a collection choice."""
-    return [(f"turn_s{v:.2f}".rstrip("0").rstrip(".") + suffix, ["--spin", f"{sign * v:g}"])
+    """`--spin` per level. **Negative `--spin` yaws the hexapod LEFT (CCW, + heading)** -- F66, F298.
+    The name keeps the magnitude; `turn_sX` (sign=+1) turns left and therefore runs `--spin -X`;
+    `turn_sX_neg` (sign=-1) turns right and runs `--spin +X`. Verified on the stored c10f10t10 clips
+    by heading and by ego image motion (F298)."""
+    return [(f"turn_s{v:.2f}".rstrip("0").rstrip(".") + suffix, ["--spin", f"{-sign * v:g}"])
             for v in TURN_LEVELS]
 
 
@@ -108,14 +93,20 @@ SIDE_BASE = ["--amps", "0.00", "0.20", "0.30", "--ft_phase", "0.5", "--symmetric
 # 0.4 produces a robot that barely moves -- +0.017 lateral against `lvl1`'s -0.131, with the sign
 # of the residue rather than of a strafe (F96). The recipe's own rule is that commands do not port
 # across geometries; this makes the one number that failed adjustable instead of baked in.
-LVL0_STRAFE = 0.4
+LVL0_STRAFE = 0.48
+# **Recalibrated, fitted from the stored c10f10t10 clips (F298):** all four levels per side were retuned
+# together to lateral targets |0.03 / 0.08 / 0.13 / 0.14| (`recollect_b1_more.py`), so left and right
+# differ. The original 0.4 / 0.8 / 1.2 / 1.6 ladder is not what the canonical clips ran.
+SIDE_STRAFE = {"L": (-0.48, -0.83, -1.30, -1.40), "R": (0.488, 0.73, 0.83, 0.87)}
 
 
 def side_conditions(lvl0=LVL0_STRAFE):
-    return [("side_L_lvl0", SIDE_BASE + ["--strafe", f"{-lvl0}", "--spin", "0.19"]),
-            ("side_L_lvl1", SIDE_BASE + ["--strafe", "-0.8", "--spin", "0.19"]),
-            ("side_R_lvl0", SIDE_BASE + ["--strafe", f"{lvl0}", "--spin", "-0.24"]),
-            ("side_R_lvl1", SIDE_BASE + ["--strafe", "0.8", "--spin", "-0.24"])]
+    """`lvl0` overrides only level 0 (per-body tuning, F96); default = the canonical values."""
+    L, R = list(SIDE_STRAFE["L"]), list(SIDE_STRAFE["R"])
+    if lvl0 != LVL0_STRAFE:
+        L[0], R[0] = -lvl0, lvl0
+    return [(f"side_L_lvl{i}", SIDE_BASE + ["--strafe", f"{L[i]:g}", "--spin", "0.19"]) for i in (0, 1)] + \
+           [(f"side_R_lvl{i}", SIDE_BASE + ["--strafe", f"{R[i]:g}", "--spin", "-0.24"]) for i in (0, 1)]
 
 
 SIDE = side_conditions()
@@ -126,10 +117,9 @@ SIDE = side_conditions()
 # side), so lvl2/lvl3 reuse the same per-side spin rather than guessing a new one. **This is a
 # starting point for `--separability`/`--verify`, not a trusted number** -- flag raised in this
 # file's own module docstring.
-SIDE_EXTRA = [("side_L_lvl2", SIDE_BASE + ["--strafe", "-1.2", "--spin", "0.19"]),
-              ("side_L_lvl3", SIDE_BASE + ["--strafe", "-1.6", "--spin", "0.19"]),
-              ("side_R_lvl2", SIDE_BASE + ["--strafe", "1.2", "--spin", "-0.24"]),
-              ("side_R_lvl3", SIDE_BASE + ["--strafe", "1.6", "--spin", "-0.24"])]
+SIDE_EXTRA = [(f"side_{d}_lvl{i}", SIDE_BASE + ["--strafe", f"{SIDE_STRAFE[d][i]:g}",
+                                                 "--spin", "0.19" if d == "L" else "-0.24"])
+              for d in ("L", "R") for i in (2, 3)]
 
 CONDITIONS = SPEED + SPEED_BWD + TURN + TURN_NEG + SIDE + SIDE_EXTRA
 
@@ -290,8 +280,8 @@ def main():
                     help="index into the 1000 expert episodes, 0-999. Same value for every "
                          "condition: the behaviour comes from the oscillator, not from this.")
     ap.add_argument("--lvl0_strafe", type=float, default=LVL0_STRAFE,
-                    help="strafe magnitude for the two `lvl0` lateral conditions. 0.4 is the base "
-                         "body's value; a shorter-legged body needs more to move at all")
+                    help="strafe magnitude for the two `lvl0` lateral conditions. 0.48 is c10f10t10's "
+                         "canonical value (F298); a shorter-legged body needs more to move at all")
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--dry_run", action="store_true", help="print the commands and collect nothing")
     ap.add_argument("--verify", action="store_true",
@@ -300,7 +290,8 @@ def main():
                          "one produces a dataset that differs from the original without saying so.")
     ap.add_argument("--verify_out", default="data/allocentric/beh12_verify_raw")
     ap.add_argument("--spin_sign", type=float, default=1.0,
-                    help="multiply every turn level's --spin by this. **The same positive spin "
+                    help="multiply every turn level's --spin by this. Default 1 = the canonical c10f10t10 "
+                         "commands (turn_sX runs --spin -X, F298). **The same positive spin "
                          "rotates c10f10t10 one way and c08f09t09 the other** (F108), so a body "
                          "whose turns must match a reference collects them with -1 here. Verify "
                          "with --separability --turn_sign rather than assuming the flag flips "
@@ -319,15 +310,20 @@ def main():
                     help="relative agreement required on the condition's dominant channel")
     args = ap.parse_args()
     if args.lvl0_strafe != LVL0_STRAFE or args.spin_sign != 1.0:
-        global CONDITIONS, SIDE, TURN
+        # **All 24 conditions stay.** This used to rebuild CONDITIONS as SPEED + TURN + SIDE, so
+        # either flag silently dropped SPEED_BWD, TURN_NEG and SIDE_EXTRA (12 of 24) and left the
+        # mirrored turns un-re-signed. TURN_NEG is the mirror of TURN, so it takes -spin_sign.
+        global CONDITIONS, SIDE, TURN, TURN_NEG
         SIDE = side_conditions(args.lvl0_strafe)
         TURN = turn_conditions(args.spin_sign)
-        CONDITIONS = SPEED + TURN + SIDE
+        TURN_NEG = turn_conditions(-args.spin_sign, suffix="_neg")
+        CONDITIONS = SPEED + SPEED_BWD + TURN + TURN_NEG + SIDE + SIDE_EXTRA
+        assert len(CONDITIONS) == 24, len(CONDITIONS)
         if args.lvl0_strafe != LVL0_STRAFE:
             print(f"lvl0 strafe {args.lvl0_strafe} (default {LVL0_STRAFE})")
         if args.spin_sign != 1.0:
             print(f"spin sign {args.spin_sign:+g}: " +
-                  " ".join(f"{n}={c[1]}" for n, c in TURN))
+                  " ".join(f"{n}={c[1]}" for n, c in TURN + TURN_NEG))
 
     if args.separability:
         separability(os.path.join(ROOT, args.separability), args.turn_sign)

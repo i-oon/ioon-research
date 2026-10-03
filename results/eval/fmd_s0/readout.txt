@@ -1,0 +1,18 @@
+--- counterfactual read-out c10
+=== fmd_s0: 24 start states x 24 actions, K=5; r fwd / lat / yaw
+  own     0.95 / 0.74 / 0.62
+  real cf 0.21 / 0.41 / 0.32
+  FTM cf  0.23 / 0.35 / 0.56
+  direct  0.99 / 0.92 / 0.97
+--- counterfactual read-out c08
+=== fmd_s0: 24 start states x 48 actions, K=5; r fwd / lat / yaw
+  own     0.90 / 0.57 / 0.24
+  real cf 0.42 / 0.41 / 0.39
+  FTM cf  0.38 / 0.29 / 0.62
+  direct  0.98 / 0.81 / 0.92
+--- counterfactual read-out B1
+=== fmd_s0: 24 start states x 23 actions, K=5; r fwd / lat / yaw
+  own     0.56 / 0.76 / 0.75
+  real cf 0.10 / 0.43 / 0.34
+  FTM cf  0.37 / 0.11 / 0.37
+  direct  0.90 / 0.89 / 0.90

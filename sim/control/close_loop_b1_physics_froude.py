@@ -12,7 +12,7 @@ The outcome depends on the state (momentum, gait phase, heading): the achieved F
 from the simulated body, not read from the candidate's recording, so a state-blind selector can
 pick the right behaviour and still miss the goal. The body can fall; a fall ends the episode.
 
-    .venv/bin/python3 sim/control/close_loop_b1_physics_froude.py --mechanism rollout --window 11 \\
+    .venv/bin/python3 sim/control/close_loop_b1_physics_froude.py --mechanism rollout --window 21 \\
         --ckpt wm/runs/beh24_stride5_cleansplit/b1_lora_c3/ckpt_lib_s4.pt \\
         --goal data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_ep302.npz
 """
@@ -48,9 +48,13 @@ def main():
     ap.add_argument("--candidates_dir", default="data/egocentric/beh12_b1_ego_flat_cleantrain")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--replan_every", type=int, default=2)
-    ap.add_argument("--window", type=int, default=0)
+    ap.add_argument("--window", type=int, default=21)
     ap.add_argument("--policy_warmup", type=int, default=45, help="policy steps walking the first "
                     "candidate's command before recording, as the collector crops the spawn transient")
+    ap.add_argument("--policy", choices=("gait3", "sym"), default="gait3",
+                    help="the B1 body's walking policy (the controller executing every candidate's recorded "
+                         "command). gait3 = the walker's long-standing default, now explicit and saved in the "
+                         "output; the candidates' recorded yaw command is replayed, so no heading gains apply")
     ap.add_argument("--steps", type=int, default=65)
     ap.add_argument("--fall_ratio", type=float, default=0.6)
     ap.add_argument("--port", type=int, default=23000)
@@ -77,7 +81,8 @@ def main():
     goal_bm = np.asarray(load(goal_path, REGISTRY[args.goal_embodiment])["body_motion"])[:, :3]
     steps = min(args.steps, len(goal_bm), min(len(c) for c in cmds))
 
-    walker = B1Walker()
+    walker = B1Walker(policy=args.policy)
+    print(f"  B1 body settings: {walker.settings()}")
     for _ in range(args.policy_warmup):
         walker.policy_step(cmds[0][0])
     settled_z = float(walker.d.qpos[2])
@@ -136,7 +141,8 @@ def main():
                         condition="closed_loop", behaviour="closed_loop", level=-1, expert_episode=-1,
                         chosen=np.asarray(chosen), goal=os.path.basename(goal_path),
                         mechanism=args.mechanism, window=args.window,
-                        fell_at=-1 if fell_at is None else fell_at, settled_z=settled_z)
+                        fell_at=-1 if fell_at is None else fell_at, settled_z=settled_z,
+                        **{f"body_{k}": np.array(v) for k, v in walker.settings().items()})
     achieved = np.asarray(load(out, REGISTRY["b1"])["body_motion"])[:, :3]
     n = min(len(achieved), len(goal_bm))
     dec = np.arange(0, n, args.replan_every)

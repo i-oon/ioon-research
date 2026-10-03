@@ -48,7 +48,7 @@ from render_b1_replay import JOINT_ALIASES_SDK, ROOT_ALIAS, SENSOR, capture, set
 
 from wm.data.embodiment import REGISTRY, heading, load  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
-from wm.data.embodiment import B1_DT, GECKO_DT, HEXAPOD_DT  # noqa: E402
+from wm.data.embodiment import B1_DT, GECKO_DT, HEXAPOD_DT, _dt_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
@@ -184,8 +184,8 @@ def main():
                          "`selection_eval.py` uses. Each step's achieved Froude (the executed "
                          "candidate's recorded body_motion at the index it was posed from) and the "
                          "goal at that step are saved, and the mean L2 error is printed.")
-    ap.add_argument("--window", type=int, default=0,
-                    help="planner read-out window (F251); 0 is the original scoring")
+    ap.add_argument("--window", type=int, default=21,
+                    help="planner read-out window (F251); 21 = 1 s, the label timescale; 0 is the original scoring")
     ap.add_argument("--replan_every", type=int, default=1,
                     help="decide every N steps and hold the chosen candidate in between; 1 is the "
                          "original behaviour. `selection_eval.py` decides every --horizon steps.")
@@ -497,7 +497,11 @@ def main():
     # Froude computation on the saved file is wrong by whatever ratio the two differ by. This was
     # hardcoded to 0.05 (B1/hexapod's old convention) and would have silently corrupted gecko's
     # numbers by 2.5x (0.05 vs gecko's real 0.02) the first time this script was pointed at it.
-    real_dt = {"hexapod": HEXAPOD_DT, "b1": B1_DT, "gecko": GECKO_DT}[args.embodiment]
+    # 2026-10-01: read from the candidate clips themselves (`_dt_of`), not the per-embodiment
+    # constant -- B1_DT is 0.02 (old 50 Hz B1 clips) but B1 v3 data is recorded at 0.05 s.
+    _fallback = {"hexapod": HEXAPOD_DT, "b1": B1_DT, "gecko": GECKO_DT}[args.embodiment]
+    with np.load(planner.candidates[0]["path"], allow_pickle=True) as _z:
+        real_dt = _dt_of(_z, _fallback)
 
     # The goal the loop actually consumed, in BOTH forms: standardised (what the planner compares
     # against) and Froude (what a human can read). Saved because the video and every later analysis

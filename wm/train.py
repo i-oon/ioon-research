@@ -10,6 +10,7 @@ Run from the repository root:
 import argparse
 import os
 import sys
+import time
 from dataclasses import asdict
 
 import numpy as np
@@ -34,6 +35,7 @@ from wm.data.dataset import (  # noqa: E402
     load_clip,
 )
 from wm.data.embodiment import REGISTRY  # noqa: E402
+from wm.data.frame_store import check_frame_budget, resident_frame_bytes  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -371,7 +373,11 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
     for model in models.values():
         model.train(training)
 
-    totals, count = {}, 0
+    totals, count, smoke_times = {}, 0, []
+    # profiling only: WM_SMOKE_STEPS=N stops the process after N training steps and prints the
+    # step times and peak RSS (unset in every real run)
+    smoke = int(os.environ.get("WM_SMOKE_STEPS", "0") or 0) if training else 0
+    tick = time.perf_counter()
     for batch in loader:
         with torch.set_grad_enabled(training):
             with torch.amp.autocast("cuda", dtype=torch.float16):
@@ -389,6 +395,19 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
         for key, value in parts.items():
             totals[key] = totals.get(key, 0.0) + value
         count += 1
+        if smoke:
+            now = time.perf_counter()
+            smoke_times.append(now - tick)
+            tick = now
+            if count % 50 == 0 or count == smoke:
+                import resource
+                peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 ** 2
+                later = smoke_times[10:] or smoke_times
+                print(f"smoke step {count}: mean step {np.mean(later) * 1e3:.1f} ms "
+                      f"(median {np.median(later) * 1e3:.1f}, steps 11+), peak RSS {peak:.2f} GB",
+                      flush=True)
+            if count >= smoke:
+                raise SystemExit("WM_SMOKE_STEPS reached")
     return {key: value / max(count, 1) for key, value in totals.items()}
 
 
@@ -518,14 +537,18 @@ def build_cross_embodiment(cfg, root):
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                      body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k)
+                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k,
+                                     lazy_frames=cfg.lazy_frames,
+                                     max_frame_ram_gb=cfg.max_frame_ram_gb)
     # body_stats too, not only the action stats: a validation split that centres body motion on
     # its own mean is scoring against a different target than the one being trained.
     val_set = MultiEmbodimentPairs(val_sources, stats=train_set.stats, seed=cfg.seed,
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                    body_stats=train_set.body_stats,
                                    body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                   action_chunk=chunk_of(cfg), rollout_k=rollout_k)
+                                   action_chunk=chunk_of(cfg), rollout_k=rollout_k,
+                                     lazy_frames=cfg.lazy_frames,
+                                     max_frame_ram_gb=cfg.max_frame_ram_gb)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
     return train_set, val_set, heads
 
@@ -622,17 +645,27 @@ def main():
         train_set = IKWalkPairs(data_dir, cfg.train_morphs, train_episodes, seed=cfg.seed,
                                 frame_range=frame_range, within_body_std=cfg.within_body_std,
                                 cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
-                                frame_stride=cfg.frame_stride, action_chunk=chunk_of(cfg))
+                                frame_stride=cfg.frame_stride, action_chunk=chunk_of(cfg),
+                                lazy_frames=cfg.lazy_frames,
+                                max_frame_ram_gb=cfg.max_frame_ram_gb)
         val_set = IKWalkPairs(
             data_dir, cfg.train_morphs, val_episodes,
             mean=train_set.mean, std=train_set.std, seed=cfg.seed, frame_range=frame_range,
             cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
             frame_stride=cfg.frame_stride, action_chunk=chunk_of(cfg),
+            lazy_frames=cfg.lazy_frames, max_frame_ram_gb=cfg.max_frame_ram_gb,
         )
         print(f"train episodes {train_episodes} | val episodes {val_episodes}")
         loader_args = dict(batch_size=cfg.batch_size, num_workers=cfg.num_workers, drop_last=False)
         train_loader = DataLoader(train_set, shuffle=True, **loader_args)
         val_loader = DataLoader(val_set, shuffle=False, **loader_args)
+
+    # RAM guard, after construction too (the datasets already refuse eager loads over the limit
+    # from the .npz headers before reading anything): whatever frames ended up resident
+    resident = sum(resident_frame_bytes(d.clips) for d in (train_set, val_set))
+    print(f"frames resident in RAM: {resident / 1024 ** 3:.2f} GB "
+          f"(lazy_frames={cfg.lazy_frames}, limit {cfg.max_frame_ram_gb:g} GB)")
+    check_frame_budget(resident, cfg.max_frame_ram_gb, "train+val datasets")
 
     encoder = VJEPA2FrameEncoder(device=str(device))
     n_bodies = len(getattr(train_set, "morphs", []) or [])

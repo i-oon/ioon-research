@@ -361,6 +361,11 @@ class Config:
     epochs: int = 50
     grad_clip: float = 1.0
     num_workers: int = 4
+    # Frames are read on demand from an uncompressed per-clip cache (wm/data/frame_store.py)
+    # instead of being held in RAM; identical samples either way. False loads them eagerly, and
+    # is refused at startup if that would hold more than `max_frame_ram_gb` (0 = no limit).
+    lazy_frames: bool = True
+    max_frame_ram_gb: float = 8.0
 
     device: str = "cuda"
     seed: int = 0

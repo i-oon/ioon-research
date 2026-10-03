@@ -54,12 +54,19 @@ def embeddings_for(encoder, paths, chunk):
     A clip is 99 x 256 x 1408 floats, about 140 MB; holding all of them on an 11 GB card leaves
     nothing for activations and the first backward pass runs out of memory. Chunks are moved to
     the device as they are used instead.
+
+    **Starts at the clip's `first_pair`** (CF branches), so `adapt` and `rollout`, which index the
+    returned sequence from 0, never use a pre-branch or straddling pair.
     """
     out = []
     for path in paths:
         with np.load(path, allow_pickle=True) as data:
             frames = data["frames"]
-        out.append(encode_clip(encoder, frames, chunk).cpu())
+            # counterfactual-branch clips: transitions start at the branch index (`first_pair`),
+            # the same pairs the training Datasets use. Encoded whole, THEN sliced, so the frames
+            # kept embed exactly as before; 0 (no field) returns the full sequence unchanged.
+            first = int(data["first_pair"]) if "first_pair" in data.files else 0
+        out.append(encode_clip(encoder, frames, chunk).cpu()[first:])
     return out
 
 

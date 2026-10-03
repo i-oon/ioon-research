@@ -20,6 +20,7 @@ flow is the entire signal the egocentric view is supposed to provide**, and a wa
 provides none.
 """
 import os
+import threading
 import sys
 import tempfile
 
@@ -200,12 +201,16 @@ def randomise_ground(sim, seed=0, uv=0.5, octaves=((4, .4), (8, .25), (16, .2), 
     a 2D pan, which has no depth, no parallax and no shadows, and the real question is what a walking
     robot's rendered view carries. That is measured in the 3D scene, not tuned here.
     """
-    path = os.path.join(tempfile.gettempdir(), f"ego_ground_{RECIPE}_{seed}.png")
+    # per-process/thread file name: several renderers running in parallel (same seed) must never read a
+    # half-written PNG of another (2026-10-02, stage 3 branches); the content is unchanged
+    path = os.path.join(tempfile.gettempdir(),
+                        f"ego_ground_{RECIPE}_{seed}_{os.getpid()}_{threading.get_ident()}.png")
     grey = _octave_noise(1024, seed * 31 + 7, octaves)
     rng = np.random.default_rng(seed * 31 + 7)
     tint = 0.55 + 0.25 * rng.random(3)
     Image.fromarray(_tinted(grey, tuple(tint), lift=0.35)).save(path)
     carrier, tid, _res = sim.createTexture(path, 0)
+    os.remove(path)                                # per-call file (see above): loaded, not needed
     n = 0
     for h in sim.getObjectsInTree(sim.handle_scene, sim.object_shape_type):
         try:
@@ -395,10 +400,12 @@ def build_texture_box(sim, size=8.0, height=3.0, thickness=0.05, seed=0, tint=Tr
             # this file replaced were still on disk, so a "fixed" recipe rendered with the old
             # images and looked unchanged. A stale cache is indistinguishable from a fix that did
             # not work.
-            path = os.path.join(tempfile.gettempdir(), f"ego_wall_{RECIPE}_{seed + i}.png")
+            path = os.path.join(tempfile.gettempdir(),
+                                f"ego_wall_{RECIPE}_{seed + i}_{os.getpid()}_{threading.get_ident()}.png")
             Image.fromarray(_tinted(_wall_texture(seed + i),
                                     colours[i % len(colours)])).save(path)
             carrier, tid, _res = sim.createTexture(path, 0)
+            os.remove(path)
             # **Cube mapping, one tile spanning the wall.** The vertical lines that split each
             # wall into sections were a texture seam: a 6 m tile on an 8 m wall repeats 1.33 times,
             # so the wrap was visible. Setting the tile to the wall's own size removes the repeat,

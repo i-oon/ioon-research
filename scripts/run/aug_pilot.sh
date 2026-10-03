@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# NOTE 2026-10-03: data paths are older than data/counterfactual_walks; switch to data/counterfactual_walks (doc/DATA.md) before running.
 # Augmentation pilot (2026-09-30): does Egocentric VSM-style view randomisation make the model robust to a
 # rendering change without hurting clean performance? jointD3 similarity recipe (c10 + B1 v3, Froude only,
 # lambda_sim 0.05, S0), shortened to 17 epochs (~1/3), three arms run ONE AT A TIME:

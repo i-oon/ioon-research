@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.data.strided import action_chunks, pair_latents, stride_of  # noqa: E402
+from wm.data.strided import action_chunks, first_pair_of, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
@@ -59,13 +59,16 @@ def transitions(paths, spec, cache, encoder_box, itm, k, lag, offset, device):
         e = cache[p].float()
         if offset is not None:
             e = e - offset.float().reshape(e.shape[1:])
-        n = len(e) - k
-        if n <= 0 or len(clip["actions"]) < n + lag + k - 1:
+        # transitions start at the clip's `first_pair` (CF branches; 0 otherwise = unchanged), and
+        # `e` is stored from there so `gather`'s e[t], e[t + k] index the same transition as a[t]
+        s0 = first_pair_of(clip)
+        n = len(e) - k - s0
+        if n <= 0 or len(clip["actions"]) < s0 + n + lag + k - 1:
             continue
-        a = torch.as_tensor(action_chunks(clip["actions"], lag, k, n), dtype=torch.float32)
+        a = torch.as_tensor(action_chunks(clip["actions"], lag, k, n, start=s0), dtype=torch.float32)
         with torch.no_grad():
-            z = pair_latents(itm, e.to(device), k, n).cpu()
-        out.append((e.half(), a, z))
+            z = pair_latents(itm, e.to(device), k, n, start=s0).cpu()
+        out.append((e[s0:].half(), a, z))
     return out
 
 

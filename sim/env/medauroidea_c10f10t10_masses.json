@@ -1,0 +1,331 @@
+[
+ {
+  "name": "/abdomen",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.4,
+  "com_local": null
+ },
+ {
+  "name": "/T3",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.5,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_FL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_ML",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/m1_ML/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_HL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/m1_HL/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_FR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/m1_FR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_MR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/m1_MR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_HR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/m1_HR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/T2",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.4,
+  "com_local": null
+ },
+ {
+  "name": "/femur_FL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_FL/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/femur_ML",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_ML/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/femur_HL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_HL/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/femur_FR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_FR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/femur_MR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_MR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/femur_HR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/coxa_HR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/T1",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.1,
+  "com_local": null
+ },
+ {
+  "name": "/tibia_FL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_FL/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/tibia_ML",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_ML/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/tibia_HL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_HL/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/tibia_FR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_FR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/tibia_MR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_MR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/tibial_HR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.02,
+  "com_local": null
+ },
+ {
+  "name": "/femur_HR/Sphere",
+  "static": 1,
+  "respondable": 0,
+  "mass": 0.5235987755983333,
+  "com_local": null
+ },
+ {
+  "name": "/head",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.1,
+  "com_local": null
+ },
+ {
+  "name": "/foot_FL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ },
+ {
+  "name": "/foot_ML",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ },
+ {
+  "name": "/foot_HL",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ },
+ {
+  "name": "/foot_FR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ },
+ {
+  "name": "/foot_MR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ },
+ {
+  "name": "/foot_HR",
+  "static": 0,
+  "respondable": 1,
+  "mass": 0.01,
+  "com_local": null
+ }
+]

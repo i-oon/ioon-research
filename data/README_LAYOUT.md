@@ -1,3 +1,6 @@
+> **2026-10-03: the current data and its layout are documented in `doc/DATA.md`.** Only `data/counterfactual_walks/` is in use;
+> older dirs are in `data/_archive_old_datasets/`. The text below is historical.
+
 # data/ layout
 
     allocentric/   every set collected before 2026-09-01: the fixed third-person camera

@@ -228,7 +228,8 @@ def cpg_frame(recipe, leg_gain, leg_off, t, spin):
 
 def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20),
                  lead=0.25, mirror_joints=(0, 1, 2), strafe=0.0, spin=0.0,
-                 spin_amp=None, ft_phase=0.0, symmetric=False, legtune=None, pace=None):
+                 spin_amp=None, ft_phase=0.0, symmetric=False, legtune=None, pace=None, sym=None,
+                 xfade=None):
     """Joint-space oscillator, the pattern from the lab's `student_Locomotion_Control_olaf_6legs`.
 
     **No IK.** Two sinusoids a quarter cycle apart drive the three joints of every leg, with the
@@ -306,6 +307,23 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     brake, travel 0.37 to 0.21 m, because shortening both legs on one side slows the robot more than
     it turns it. **`--spin` is the steering drive** (F62).
     """
+    if xfade is not None:
+        # **Joint-space cross-fade between two commands on ONE gait clock** (DATA_PLAN stage 3,
+        # counterfactual branches): cmd = (1 - w) * cmd_old + w * cmd_new, both evaluated on the same
+        # phase (the clock integrates the given `pace`), so phase-type drives (lead, ft_phase) are never
+        # interpolated -- only the resulting joint angles are. `xfade = dict(w=per-frame weight,
+        # spin=, strafe=, lead=, ft_phase=, a0=, a1=, a2=, sym=)` (the new command's per-frame drives).
+        # Where w == 0 the result is cmd_old bit for bit (1.0 * a + 0.0 * b == a).
+        kw = dict(cycles=cycles, mirror_joints=mirror_joints, spin_amp=spin_amp, symmetric=symmetric,
+                  legtune=legtune, pace=pace)
+        c_old, info = cpg_commands(sim, scene, frames, centre, amps=amps, lead=lead, strafe=strafe, spin=spin,
+                                   ft_phase=ft_phase, sym=sym, **kw)
+        x = xfade
+        c_new, _ = cpg_commands(sim, scene, frames, centre, amps=(x["a0"], x["a1"], x["a2"]), lead=x["lead"],
+                                strafe=x["strafe"], spin=x["spin"], ft_phase=x["ft_phase"], sym=x.get("sym"), **kw)
+        w = np.asarray(x["w"], dtype=np.float64)[:, None]
+        out = ((1.0 - w) * c_old.astype(np.float64) + w * c_new.astype(np.float64)).astype(c_old.dtype)
+        return out, info
     sim.loadScene(f"{ENV}/{scene}")
     # **Oscillate around the animal's walking posture, not the model's spawn pose.** The scene's
     # default joint angles are where the body happens to sit when loaded, and using them put the
@@ -314,7 +332,11 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
     # posture that moves between behaviours makes the one quantity both robots share incomparable.
     # The mean of the IK commands is the pose the recording actually walks in.
     bias = np.asarray(centre, dtype=np.float32)
-    if symmetric:
+    # **`sym` (per-frame, 0..1, `--plan` key "sym") blends the raw centre into its left-right
+    # symmetrised version**, so one clip can switch between beh24's walking recipes (raw pose) and
+    # its sideways recipe (`--symmetric`) with the pose ramped, not jumped. None = unchanged.
+    bias_raw = bias.copy()
+    if symmetric or sym is not None:
         # **Average each left-right pair, because the animal is not symmetric and the pose is its
         # mean.** The model's two sides mirror exactly -- the same physical stance reads as equal
         # and opposite joint angles -- but the recording does not: the middle pair's lift joints sit
@@ -363,6 +385,9 @@ def cpg_commands(sim, scene, frames, centre, cycles=6.0, amps=(0.25, 0.20, 0.20)
                                      np.sin(ph + 2 * np.pi * ft_phase)), axis=1)
 
     cmds = np.tile(bias, (frames, 1))
+    if sym is not None:
+        w = np.asarray(sym, dtype=float)[:, None]
+        cmds = ((1.0 - w) * bias_raw[None, :] + w * bias[None, :]).astype(cmds.dtype)
     # Kept so the collector can regenerate one frame with a different spin, which is what closing
     # the heading loop needs. Everything below writes into `cmds`; this records what it took.
     recipe = dict(bias=bias.copy(), amps=tuple(amps), lead=lead, ft_phase=ft_phase,
@@ -603,7 +628,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
                      ego=False, ego_euler=None, ego_offset=None, ego_box=0.0, ego_seed=0,
                      cam_fov=0.0,
                      cmd_noise=0.0, noise_tau=5.0, noise_seed=0,
-                     active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None):
+                     active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None,
+                     state_out=None, capture_frames=True, state_from=0, reuse=None):
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
 
     **`heading` closes the loop on body direction, and exists to remove an asymmetry we created.**
@@ -624,8 +650,22 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     warmup. The frame it receives is the **previous** step's capture, because this loop commands
     before it observes -- which is the causal order a controller actually runs in, and the same
     order the collector's `action_lag` convention already encodes.
+
+    **`state_out` (a dict) records the actual physical state of every frame**, for the hexapod replay
+    renderer (`sim/render/render_hex_replay.py`, DATA_PLAN v2): abdomen world pose, the measured
+    position of EVERY joint in the scene (the 18 leg joints and the 4 body joints B1-B4), and the world
+    pose of every shape of the robot. Read right after the frame's `sim.step`, at the same moment the
+    frame is captured. `capture_frames=False` skips the camera (physics-only long walks); nothing else
+    changes. Both default off, so every existing caller is unchanged.
+
+    **`reuse` (default None = unchanged): scene-reuse mode** (`sim/collect/scene_reuse.py`). A dict shared
+    across runs; the first run loads the scene and builds the ego camera / floor / room as usual and sets
+    `reuse["built"] = True`; later runs skip `loadScene` and that build and only stop/start the simulation on
+    the already-built scene. After ~8-10 such runs Bullet repeats a run bit for bit (FINDINGS F305).
     """
-    sim.loadScene(f"{ENV}/{scene}")
+    _reused = reuse is not None and reuse.get("built", False)
+    if not _reused:
+        sim.loadScene(f"{ENV}/{scene}")
     settle(sim)
     active_legs = active_legs or LEGS
     remove_legs = remove_legs or []
@@ -662,16 +702,17 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         R = room_for(sim.getObjectPosition(track, sim.handle_world)[2])
         if ego_box > 0:
             R["size"] = ego_box
-        scale_floor(sim, R["size"])            # the floor must reach past the walls
-        randomise_ground(sim, seed=ego_seed, uv=R["ground_uv"])
-        # the walls are built AFTER the respawn, further down -- see the note there
-        fwd = ego_euler if ego_euler is not None else insect_forward(sim)
-        # the field of view is set AFTER startSimulation, further down -- see the note there
-        _cam_info = attach_ego(sim, cam, track, fwd,
-                               ego_offset or (0, 0, 0),
-                               offset_frac=None if ego_offset else R["offset_frac"],
-                               pitch_comp=WALK_PITCH["hexapod"])
-        print(f"    ego camera: {_cam_info}")
+        if not _reused:
+            scale_floor(sim, R["size"])            # the floor must reach past the walls
+            randomise_ground(sim, seed=ego_seed, uv=R["ground_uv"])
+            # the walls are built AFTER the respawn, further down -- see the note there
+            fwd = ego_euler if ego_euler is not None else insect_forward(sim)
+            # the field of view is set AFTER startSimulation, further down -- see the note there
+            _cam_info = attach_ego(sim, cam, track, fwd,
+                                   ego_offset or (0, 0, 0),
+                                   offset_frac=None if ego_offset else R["offset_frac"],
+                                   pitch_comp=WALK_PITCH["hexapod"])
+            print(f"    ego camera: {_cam_info}")
     cam0 = np.array(sim.getObjectPosition(cam, sim.handle_world))
     trk0 = np.array(sim.getObjectPosition(track, sim.handle_world))
     off_xy, cam_z = cam0[:2] - trk0[:2], cam0[2]
@@ -703,7 +744,7 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         sim.setObjectPosition(root, sim.handle_world,
                               [spawn[0] + pos[0] - head[0], spawn[1] + pos[1] - head[1], pos[2]])
 
-    if ego:
+    if ego and not _reused:
         # **Built after the respawn, on the position the robot will actually stand at.** The early
         # ego block runs before `spawn` moves the robot to the floor centre, so a room centred
         # there left the insect about 2.8 m off centre: the near wall sat 1.2 m away instead of 4,
@@ -764,6 +805,18 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         observation = capture(sim, cam)
     _rng = np.random.default_rng(noise_seed)
     _noise = np.zeros(len(cmds[0]), np.float64)
+    if state_out is not None:
+        _all_j = sim.getObjectsInTree(sim.handle_scene, sim.object_joint_type)
+        _shapes = sim.getObjectsInTree(body, sim.object_shape_type)   # includes the abdomen itself
+        state_out.update(state_joint_names=np.array([sim.getObjectAlias(h, 1) for h in _all_j]),
+                         state_link_names=np.array([sim.getObjectAlias(h, 1) for h in _shapes]),
+                         # scene mass per shape, 0 for static (visual) shapes: the CoM weights (F301)
+                         state_link_mass=np.array([0.0 if sim.getObjectInt32Param(h, sim.shapeintparam_static)
+                                                   else float(sim.getShapeMass(h)) for h in _shapes]))
+        _st = {k: [] for k in ("state_abdomen_pos", "state_abdomen_quat", "state_joint_pos",
+                               "state_link_pose", "state_sim_time")}
+        if ego:
+            _st["cam_pose"] = []      # ego camera world pose per frame (render_b1_replay.CAM_POSE_CONVENTION)
     for t in range(len(cmds)):
         step_cmd = cmds[t]
         if policy is not None:
@@ -807,7 +860,16 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             if not ego:
                 sim.setObjectPosition(cam, sim.handle_world,
                                       [p[0] + off_xy[0] + cam_dx, p[1] + off_xy[1] + cam_dy, cam_z])
-        frames.append(capture(sim, cam))
+        if capture_frames:
+            frames.append(capture(sim, cam))
+        if state_out is not None and t >= state_from:     # state_from: skip the (slow) state reads before it
+            _st["state_abdomen_pos"].append(sim.getObjectPosition(body, sim.handle_world))
+            _st["state_abdomen_quat"].append(sim.getObjectQuaternion(body, sim.handle_world))
+            _st["state_joint_pos"].append([sim.getJointPosition(h) for h in _all_j])
+            _st["state_link_pose"].append([sim.getObjectPose(h, sim.handle_world) for h in _shapes])
+            _st["state_sim_time"].append(sim.getSimulationTime())
+            if ego:
+                _st["cam_pose"].append(sim.getObjectPose(cam, sim.handle_world))
         if policy is not None:
             observation = frames[-1]
         actions.append(step_cmd[active_cols].copy())
@@ -835,9 +897,38 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         if travel > 0 and float(np.linalg.norm(p[:2] - start_xy)) >= travel:
             break
     sim.stopSimulation(); settle(sim)
+    if reuse is not None:
+        reuse["built"] = True
+    if state_out is not None:
+        state_out.update({k: np.asarray(v, np.float64) for k, v in _st.items()})
+        state_out["state_from"] = np.int64(state_from)     # state_* / com_pos / cam_pose row 0 = frame state_from
+        if ego:
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "render"))
+            from render_b1_replay import CAM_POSE_CONVENTION   # noqa: E402
+            state_out["cam_pose_convention"] = np.array(CAM_POSE_CONVENTION)
+        # centre of mass per frame (world, m; FINDINGS F301): mass-weighted dynamic-shape origins, the
+        # loader's Froude reference point (wm.data.com.hex_com with this scene's own masses)
+        _m = state_out["state_link_mass"]
+        if len(state_out["state_link_pose"]):
+            state_out["com_pos"] = (state_out["state_link_pose"][:, :, :3] * _m[None, :, None]).sum(1) / _m.sum()
     return (np.asarray(frames, np.uint8), np.asarray(actions, np.float32),
             np.asarray(forces, np.float32), np.asarray(heads, np.float32),
             np.asarray(oris, np.float32))
+
+
+def _state_fields(state, ikdiag, args, n, pace):
+    """Extra fields of a --record_state clip: the recorded state + the oscillator phase per frame
+    (in cycles, mod 1; the CF 'lift' clock `ph` of cpg_commands) + the live render settings."""
+    out = dict(state)
+    if args.gait == "cpg":
+        frames = int(ikdiag["frames"])
+        rate = np.ones(frames) if pace is None else np.asarray(pace, dtype=float)
+        cyc = float(ikdiag["cycles"]) * (np.cumsum(rate) - rate) / frames
+        out["cpg_phase"] = np.mod(cyc, 1.0)[:n]
+        out["cpg_cycles_total"] = cyc[:n]
+    out.update(rec_ego=bool(args.ego), rec_ego_box=float(args.ego_box), rec_cam_fov=float(args.cam_fov),
+               rec_spawn=np.asarray(args.spawn, float), rec_warmup=int(args.warmup), dt=STEP_DT)
+    return out
 
 
 def main():
@@ -1038,8 +1129,28 @@ def main():
     ap.add_argument("--remove_legs", type=str, default="",
                     help="comma-separated legs to ghost-remove at runtime, e.g. ML,MR. "
                          "Handles stay present for scene scripts, but shapes are hidden/non-respondable.")
+    ap.add_argument("--frames", type=int, default=EP,
+                    help="clip length in frames, --gait cpg only. Default 66 (EP) = every clip so far. "
+                         "Longer clips keep the oscillator's frequency: --cycles stays 'cycles per 66 "
+                         "frames' and is scaled by frames/66 internally; --plan arrays must have this "
+                         "many values (long walks for DATA_PLAN v2)")
+    ap.add_argument("--record_state", action="store_true",
+                    help="also store the actual per-frame physical state (state_abdomen_pos/quat, "
+                         "state_joint_pos of all 22 joints incl. body joints, state_link_pose, "
+                         "state_link_mass, com_pos (CoM, F301), cpg_phase) for render_hex_replay.py. Off = unchanged files")
+    ap.add_argument("--record_from", type=int, default=0,
+                    help="--record_state: record the state from this frame on only (faster; physics unchanged; "
+                         "the clip's `state_from` field says where row 0 is)")
+    ap.add_argument("--stop_after", type=int, default=0,
+                    help="run only the first K frames of the computed commands (0 = all)")
+    ap.add_argument("--no_frames", action="store_true",
+                    help="physics only: do not capture camera frames (saved `frames` is empty)")
     ap.add_argument("--out", type=str, required=True)
     args = ap.parse_args()
+    if args.frames != EP and args.gait != "cpg":
+        raise SystemExit("--frames needs --gait cpg")
+    if args.frames != EP and (args.schedule or args.spin_schedule or args.strafe_schedule):
+        raise SystemExit("--frames with a *_schedule is not supported; use --plan")
     # **A turn rate that varies inside the clip**, so the onset frame exists. Built once here
     # because both collection branches take it, and `EP` is the clip length everywhere.
     if args.view == "egocentric":
@@ -1061,6 +1172,8 @@ def main():
     pace_arg = piecewise(args.schedule, EP) if (args.schedule and args.gait == "cpg") else None
     strafe_arg = piecewise(args.strafe_schedule, EP) if args.strafe_schedule else args.strafe
     lead_arg, amps_arg, ft_arg, plan = args.lead, tuple(args.amps), args.ft_phase, None
+    sym_arg = None
+    xfade_arg = None
     if args.plan:
         import json
         if args.gait != "cpg":
@@ -1070,12 +1183,22 @@ def main():
                              "scalar drives only)")
         with open(args.plan) as fh:
             plan = {k: np.asarray(v, dtype=float) for k, v in json.load(fh).items()}
-        bad = [k for k, v in plan.items() if len(v) != EP]
+        bad = [k for k, v in plan.items() if len(v) != args.frames]
         if bad:
-            raise SystemExit(f"--plan arrays must have {EP} values: {bad}")
+            raise SystemExit(f"--plan arrays must have {args.frames} values: {bad}")
         pace_arg, spin_arg, strafe_arg = plan["pace"], plan["spin"], plan["strafe"]
         lead_arg, ft_arg = plan["lead"], plan["ft_phase"]
         amps_arg = (plan["a0"], plan["a1"], plan["a2"])
+        sym_arg = plan.get("sym")
+        if "xf_w" in plan:      # cross-fade to a second command (cpg_commands xfade); plan keys xf_<drive>
+            xfade_arg = dict(w=plan["xf_w"], **{k: plan[f"xf_{k}"] for k in
+                                                ("spin", "strafe", "lead", "ft_phase", "a0", "a1", "a2")})
+            if "xf_sym" in plan:
+                xfade_arg["sym"] = plan["xf_sym"]
+            if (sym_arg is None) != ("xf_sym" not in plan):
+                raise SystemExit("plan keys sym / xf_sym must come together")
+        if sym_arg is not None and args.symmetric:
+            raise SystemExit("plan key 'sym' sets the symmetrisation per frame; drop --symmetric")
     if args.strafe_schedule and args.gait != "cpg":
         raise SystemExit("--strafe_schedule needs --gait cpg")
     if args.spin_schedule and (args.head_kp or args.head_ki):
@@ -1132,7 +1255,7 @@ def main():
                                             mirror_joints=tuple(args.mirror),
                                             strafe=strafe_arg,
                                             spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
-                                            ft_phase=ft_arg,
+                                            ft_phase=ft_arg, sym=sym_arg,
                                             symmetric=args.symmetric, legtune=legtune)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
                   f"shared-scale={ikdiag['scale']:.3f} "
@@ -1187,16 +1310,22 @@ def main():
             else:
                 centre = centre_override
             if args.gait == "cpg":
-                cmds, ikdiag = cpg_commands(sim, scene, EP, centre, cycles=args.cycles,
+                # cycles are per 66 frames; a longer clip keeps the same frequency
+                cmds, ikdiag = cpg_commands(sim, scene, args.frames, centre,
+                                            cycles=args.cycles * args.frames / EP,
                                             amps=amps_arg, lead=lead_arg,
                                             mirror_joints=tuple(args.mirror),
                                             strafe=strafe_arg,
                                             spin=spin_arg, spin_amp=args.spin_amp, pace=pace_arg,
-                                            ft_phase=ft_arg,
-                                            symmetric=args.symmetric, legtune=legtune)
+                                            ft_phase=ft_arg, sym=sym_arg,
+                                            symmetric=args.symmetric, legtune=legtune, xfade=xfade_arg)
             print(f"  {morph:6s} leg={ikdiag['target_leg_length']:.4f}m "
                   f"shared-scale={ikdiag['scale']:.3f} "
                   f"IK residual mean/max={ikdiag['residual_mean_mm']:.2f}/{ikdiag['residual_max_mm']:.2f}mm")
+            if args.stop_after > 0:
+                # physics for the first K frames of a longer plan only (the plan, and therefore the gait
+                # clock / every command, is computed for the full --frames; counterfactual branches)
+                cmds = cmds[:args.stop_after]
             if args.loops > 1:
                 cmds = np.tile(cmds, (args.loops, 1))
             pre = "" if args.behavior == "walk" else f"{args.behavior}_"
@@ -1210,8 +1339,10 @@ def main():
                                         ("bias", "amps", "lead", "ft_phase", "mirror_joints",
                                          "strafe", "spin", "spin_amp", "cycles", "frames")},
                                 leg_gain=ikdiag["leg_gain"], leg_off=ikdiag["leg_off"])
+                state = {} if args.record_state else None
                 f, a, fc, h, o = drive_and_record(
                     sim, scene, cmds, args.travel, args.warmup, args.cam_dx, args.cam_dy, args.spawn,
+                    state_out=state, capture_frames=not args.no_frames, state_from=args.record_from,
                     ego=args.ego, ego_euler=args.ego_forward, ego_offset=args.ego_offset,
                     ego_box=args.ego_box, ego_seed=args.ego_seed + rep, cam_fov=args.cam_fov,
                     cmd_noise=args.cmd_noise, noise_tau=args.noise_tau,
@@ -1225,7 +1356,9 @@ def main():
                                     morph=morph, expert_episode=ep, repeat=rep, scale=args.scale,
                                     behavior=args.behavior, schedule=args.schedule,
                                     gait=args.gait,
-                                    **({f"plan_{k}": v for k, v in plan.items()} if plan else {}))
+                                    **({f"plan_{k}": v for k, v in plan.items()} if plan else {}),
+                                    **(_state_fields(state, ikdiag, args, len(a), pace_arg)
+                                       if state is not None else {}))
                 fwd, lat, verdict = walk_check(h)
                 hip = float(np.median(h[:, 2]))
                 # Froude beside the raw distance: the whole cross-robot comparison is

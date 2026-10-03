@@ -182,7 +182,20 @@ class DirectFroudePlanner:
     which read the goal as a recorded number rather than from frames (mode C, reading the goal from
     frames via the ITM, is the version that failed). A real deployment states a goal as "achieve
     this dimensionless speed", which is exactly this input.
+
+    **Read-out window (`window`, default 21 since 2026-10-01; was effectively 0 before).** With
+    `window > horizon` each candidate is scored on a 21-ACTION window that is, by default
+    (`window_align = "centre"`), CENTRED on the decision (`t + lag + h//2`), clipped into the
+    candidate: at stride k it reads the projector on every k-chunk inside those 21 actions. This is
+    NOT the same window `RolloutFroudePlanner` reads -- that one rolls ceil(21 / k) FTM steps
+    FORWARD from `t + lag` (21 frames at k = 1). The two only cover the same span when this planner
+    is set to `window_align = "forward"` (`selection_eval.py --direct_window_align forward`); a
+    direct-vs-rollout comparison at the default compares a centred window with a forward one.
+    `window = 0` gives the original single-step scoring.
     """
+    # Read-out window default (2026-10-01): 21 frames = 1 s at the 0.05 s frame, the Froude labels'
+    # own timescale. Set `window = 0` explicitly for the original single-step scoring.
+    window = 21
 
     def __init__(self, projector, md, candidates, embodiment, horizon=5, device="cuda",
                 free_offset=False):
@@ -414,7 +427,18 @@ class RolloutFroudePlanner:
 
     Needs `e_t`, the current observation's embedding, every step -- unlike `DirectFroudePlanner`,
     which never looks at the frame at all. That is the whole methodological difference under test.
+
+    **Read-out window (`window`, default 21 since 2026-10-01; was effectively 0 before).** With
+    `window > horizon` each candidate is rolled FORWARD from the current frame: 21 one-frame FTM
+    steps at stride 1, ceil(21 / k) stride-k steps (k-command chunks starting at
+    `t + lag + i*k`) above it, the ITM read on each imagined pair and averaged. It cannot look back
+    past `e_t`, so it never reads a centred window; `DirectFroudePlanner` reads a CENTRED
+    21-action window by default and matches this one only with `window_align = "forward"`.
+    `window = 0` gives the original single-step scoring.
     """
+    # Read-out window default (2026-10-01): 21 frames = 1 s at the 0.05 s frame, the Froude labels'
+    # own timescale. Set `window = 0` explicitly for the original single-step scoring.
+    window = 21
 
     def __init__(self, itm, ftm, projector, md, candidates, embodiment, horizon=5, device="cuda"):
         self.itm, self.ftm, self.proj, self.md = itm, ftm, projector, md

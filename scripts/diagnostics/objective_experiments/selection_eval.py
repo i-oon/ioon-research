@@ -14,7 +14,7 @@ TRUE local Froude at the same offset; mean L2 error, real Froude units), but:
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/selection_eval.py \\
         --ckpt old=wm/runs/.../ckpt_lib_beh12_b1_ego_flat_cleantrain.pt \\
-        --ckpt new_zwin=wm/runs/.../ckpt_lib_s4_zwin11.pt@z --windows 0 11
+        --ckpt new_zwin=wm/runs/.../ckpt_lib_s4_zwin11.pt@z --windows 0 21
 
 `name=path@z` reads windows by averaging z first then the body head (for heads fit with
 `fit_body_head --z_window`); default `@pred` averages the head's per-step outputs.
@@ -46,8 +46,9 @@ def main():
     ap.add_argument("--ckpt", action="append", required=True, help="name=path[@z|@pred]")
     ap.add_argument("--candidates_dir", default="data/egocentric/beh12_b1_ego_flat_cleantrain")
     ap.add_argument("--goal_dir", default="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout")
-    ap.add_argument("--conditions", nargs="+", default=CONDITIONS)
-    ap.add_argument("--windows", type=int, nargs="+", default=[0, 11])
+    ap.add_argument("--conditions", nargs="+", default=CONDITIONS,
+                    help="goal conditions; `all` = every condition in --goal_dir (one clip each)")
+    ap.add_argument("--windows", type=int, nargs="+", default=[0, 21])
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--modes", nargs="+", default=["direct", "roll_fixed", "roll_live"])
     ap.add_argument("--cache", default="results/wm/cache/selection_eval_cands.pt")
@@ -55,7 +56,7 @@ def main():
                     help="physics: the goal clip's recorded body_motion (privileged). vision: the goal read "
                          "from the goal clip's frames through each model's own ITM + Froude head, pairs "
                          "(t, t+stride) averaged over a centred --goal_window; grading stays physical")
-    ap.add_argument("--goal_window", type=int, default=11)
+    ap.add_argument("--goal_window", type=int, default=21)
     ap.add_argument("--goal_cache", default="results/wm/cache/selection_eval_goals.pt")
     ap.add_argument("--rollout_readout", default="",
                     help="npz (coef, intercept; raw Froude) from counterfactual_readout_fit.py --save: "
@@ -80,18 +81,28 @@ def main():
         o = min(t, len(bm) - 1)
         return bm[o:o + max(min(h, len(bm) - o), 1)].mean(0)
 
-    goals = {}
+    goals, goal_file = {}, {}
     for p in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
         with np.load(p, allow_pickle=True) as d:
             c = str(d["condition"])
-        if c in args.conditions and c not in goals:
+        if ("all" in args.conditions or c in args.conditions) and c not in goals:
             goals[c] = np.asarray(load(p, REGISTRY["hexapod"])["body_motion"])[:, :3]
+            goal_file[c] = os.path.realpath(p)
+
+    # Leave-goal-out: a candidate that IS the goal clip (same file, after resolving symlinks) is never
+    # allowed -- relevant when the goal and the library are the same split (c10 same body).
+    cand_file = [os.path.realpath(c["path"]) for c in cands]
+    allowed = {c: np.array([f != goal_file[c] for f in cand_file]) for c in goals}
+    n_out = sum(int((~a).sum()) for a in allowed.values())
+    if n_out:
+        print(f"leave-goal-out: {n_out} candidate(s) excluded (goal clip itself in the library)")
 
     # the library's own bounds, independent of any model
     bounds = {}
     for c, g in goals.items():
         steps = list(range(0, len(g) - h, h))
         d = np.array([[np.linalg.norm(local(i, t) - g[t]) for i in range(len(cands))] for t in steps])
+        d = d[:, allowed[c]]
         bounds[c] = (d.min(1).mean(), d.mean())
 
     need_frames = any(m.startswith("roll") for m in args.modes) or args.goal_source == "vision"
@@ -199,11 +210,15 @@ def main():
                     e_fixed = frame(0, 0) if mode == "roll_fixed" else None
                     for t in steps:
                         if mode == "direct":
-                            _, i, _, _ = planner.act(g_std[t], t)
+                            _, i, sc, _ = planner.act(g_std[t], t)
+                            if not allowed[c].all():
+                                i = int(np.argmin(np.where(allowed[c], sc, np.inf)))
                         else:
                             e_t = e_fixed if mode == "roll_fixed" else frame(prev, t)
                             gt = torch.as_tensor(g_std[t], dtype=torch.float32)
-                            _, i, _ = rp.act(e_t, gt, t)
+                            _, i, sc = rp.act(e_t, gt, t)
+                            if not allowed[c].all():
+                                i = int(np.argmin(np.where(allowed[c], np.asarray(sc), np.inf)))
                         errs.append(np.linalg.norm(local(i, t) - g[t]))
                         prev = i
                     results[(name, w, mode, c)] = float(np.mean(errs))
