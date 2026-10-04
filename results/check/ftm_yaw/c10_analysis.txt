@@ -1,0 +1,108 @@
+== results/check/ftm_yaw/c10_B.npz  groups 72  K 5  P 11
+-- within-group r across 24 commands (mean over groups) fwd / lat / yaw
+  F_real     0.90 / 0.68 / 0.86
+  F_direct   0.97 / 0.85 / 0.78
+  F_ftm_proj 0.85 / 0.80 / 0.41
+  F_ftm_true 0.90 / 0.64 / 0.82
+-- read-out amplitude: slope of read on truth (pooled within-group centred), fwd / lat / yaw
+  F_real     0.54 / 0.27 / 0.42
+  F_direct   1.10 / 1.04 / 0.77
+  F_ftm_proj 0.42 / 0.37 / 0.18
+  F_ftm_true 0.50 / 0.24 / 0.39
+-- truth std across commands (mean over groups): 0.095 / 0.059 / 0.020
+-- yaw r within family (8-command turn family, 4 per sign etc.)
+  turn  yaw truth std 0.033 | real 0.97 direct 0.98 ftm_proj 0.41 ftm_true 0.97
+  side  yaw truth std 0.017 | real 0.83 direct 0.44 ftm_proj 0.33 ftm_true 0.82
+  fwd   yaw truth std 0.019 | real 0.57 direct 0.07 ftm_proj -0.01 ftm_true 0.52
+  bwd   yaw truth std 0.021 | real 0.29 direct 0.13 ftm_proj 0.21 ftm_true 0.38
+-- spread of the future embedding across 24 commands (full tokens): total var, share explained by fwd/lat/yaw
+  real  var 4971666.8  share 0.121 / 0.093 / 0.098
+  proj  var 933034.2  share 0.188 / 0.174 / 0.131
+  true  var 1059776.7  share 0.198 / 0.131 / 0.174
+-- predicted vs real centred future: cos, norm ratio (mean per family)
+  proj: fwd cos 0.25 nr 0.36 | bwd cos 0.23 nr 0.50 | turn cos 0.28 nr 0.36 | side cos 0.36 nr 0.45 | 
+  true: fwd cos 0.41 nr 0.39 | bwd cos 0.46 nr 0.44 | turn cos 0.43 nr 0.42 | side cos 0.54 nr 0.49 | 
+-- z: ridge probe (4-fold by group) from z, within-group r fwd / lat / yaw
+  z_real: 0.90 / 0.66 / 0.85
+  z_proj: 0.98 / 0.90 / 0.88
+  z_real: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 0.56
+  z_proj: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 0.67
+  cos(z_proj, z_real) centred, per family: fwd 0.62 bwd 0.80 turn 0.69 side 0.58
+-- linear probe (ridge, 4-fold by group) on 4x4-pooled delta; within-group r fwd / lat / yaw
+  fit+test on real : 0.66 / 0.28 / -0.05  (lam 225.28)
+  fit+test on proj : 0.96 / 0.85 / 0.78  (lam 225.28)
+  fit real, test proj : 0.42 / 0.40 / 0.23
+  fit+test on true : 0.81 / 0.54 / 0.80  (lam 22.528)
+  fit real, test true : 0.41 / 0.26 / -0.08
+== results/check/ftm_yaw/c10_H.npz  groups 72  K 5  P 11
+-- within-group r across 24 commands (mean over groups) fwd / lat / yaw
+  F_real     0.92 / 0.75 / 0.89
+  F_direct   0.97 / 0.86 / 0.80
+  F_ftm_proj 0.83 / 0.75 / 0.36
+  F_ftm_true 0.90 / 0.72 / 0.89
+-- read-out amplitude: slope of read on truth (pooled within-group centred), fwd / lat / yaw
+  F_real     0.62 / 0.33 / 0.51
+  F_direct   1.17 / 1.08 / 0.82
+  F_ftm_proj 0.41 / 0.35 / 0.18
+  F_ftm_true 0.56 / 0.31 / 0.50
+-- truth std across commands (mean over groups): 0.095 / 0.059 / 0.020
+-- yaw r within family (8-command turn family, 4 per sign etc.)
+  turn  yaw truth std 0.033 | real 0.98 direct 0.99 ftm_proj 0.56 ftm_true 0.98
+  side  yaw truth std 0.017 | real 0.84 direct 0.45 ftm_proj 0.32 ftm_true 0.83
+  fwd   yaw truth std 0.019 | real 0.53 direct 0.10 ftm_proj -0.02 ftm_true 0.55
+  bwd   yaw truth std 0.021 | real 0.32 direct 0.12 ftm_proj 0.14 ftm_true 0.27
+-- spread of the future embedding across 24 commands (full tokens): total var, share explained by fwd/lat/yaw
+  real  var 4971666.8  share 0.121 / 0.093 / 0.098
+  proj  var 888962.9  share 0.206 / 0.162 / 0.130
+  true  var 1040663.8  share 0.201 / 0.133 / 0.175
+-- predicted vs real centred future: cos, norm ratio (mean per family)
+  proj: fwd cos 0.23 nr 0.36 | bwd cos 0.22 nr 0.50 | turn cos 0.26 nr 0.36 | side cos 0.34 nr 0.43 | 
+  true: fwd cos 0.39 nr 0.39 | bwd cos 0.45 nr 0.44 | turn cos 0.42 nr 0.42 | side cos 0.51 nr 0.48 | 
+-- z: ridge probe (4-fold by group) from z, within-group r fwd / lat / yaw
+  z_real: 0.91 / 0.67 / 0.92
+  z_proj: 0.98 / 0.89 / 0.87
+  z_real: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 0.58
+  z_proj: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 0.65
+  cos(z_proj, z_real) centred, per family: fwd 0.65 bwd 0.82 turn 0.76 side 0.64
+-- linear probe (ridge, 4-fold by group) on 4x4-pooled delta; within-group r fwd / lat / yaw
+  fit+test on real : 0.66 / 0.28 / -0.05  (lam 225.28)
+  fit+test on proj : 0.96 / 0.86 / 0.81  (lam 2252.8)
+  fit real, test proj : 0.56 / 0.32 / 0.12
+  fit+test on true : 0.78 / 0.57 / 0.79  (lam 2.2528)
+  fit real, test true : 0.51 / 0.33 / -0.09
+== results/check/ftm_yaw/c10_A.npz  groups 72  K 5  P 11
+-- within-group r across 24 commands (mean over groups) fwd / lat / yaw
+  F_real     0.32 / 0.34 / 0.16
+  F_direct   0.98 / 0.87 / 0.81
+  F_ftm_proj 0.57 / 0.57 / 0.26
+  F_ftm_true 0.20 / 0.42 / 0.11
+-- read-out amplitude: slope of read on truth (pooled within-group centred), fwd / lat / yaw
+  F_real     0.11 / 0.11 / 0.03
+  F_direct   1.44 / 1.41 / 0.96
+  F_ftm_proj 0.18 / 0.21 / 0.06
+  F_ftm_true 0.06 / 0.13 / 0.02
+-- truth std across commands (mean over groups): 0.095 / 0.059 / 0.020
+-- yaw r within family (8-command turn family, 4 per sign etc.)
+  turn  yaw truth std 0.033 | real 0.24 direct 0.97 ftm_proj 0.47 ftm_true 0.21
+  side  yaw truth std 0.017 | real 0.18 direct 0.60 ftm_proj 0.19 ftm_true 0.20
+  fwd   yaw truth std 0.019 | real 0.02 direct -0.03 ftm_proj -0.06 ftm_true -0.00
+  bwd   yaw truth std 0.021 | real 0.09 direct 0.12 ftm_proj 0.06 ftm_true 0.05
+-- spread of the future embedding across 24 commands (full tokens): total var, share explained by fwd/lat/yaw
+  real  var 4971666.8  share 0.121 / 0.093 / 0.098
+  proj  var 928796.0  share 0.209 / 0.150 / 0.167
+  true  var 831845.8  share 0.192 / 0.157 / 0.093
+-- predicted vs real centred future: cos, norm ratio (mean per family)
+  proj: fwd cos 0.26 nr 0.34 | bwd cos 0.26 nr 0.52 | turn cos 0.31 nr 0.38 | side cos 0.35 nr 0.44 | 
+  true: fwd cos 0.33 nr 0.34 | bwd cos 0.32 nr 0.41 | turn cos 0.34 nr 0.34 | side cos 0.46 nr 0.45 | 
+-- z: ridge probe (4-fold by group) from z, within-group r fwd / lat / yaw
+  z_real: 0.62 / 0.56 / 0.23
+  z_proj: 0.98 / 0.91 / 0.88
+  z_real: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 0.26
+  z_proj: |mean(turn+) - mean(turn-)|^2 / mean |z - group mean|^2 = 1.16
+  cos(z_proj, z_real) centred, per family: fwd 0.07 bwd 0.29 turn 0.16 side 0.26
+-- linear probe (ridge, 4-fold by group) on 4x4-pooled delta; within-group r fwd / lat / yaw
+  fit+test on real : 0.66 / 0.28 / -0.05  (lam 225.28)
+  fit+test on proj : 0.97 / 0.87 / 0.79  (lam 2252.8)
+  fit real, test proj : 0.80 / 0.53 / 0.00
+  fit+test on true : 0.54 / 0.47 / 0.15  (lam 22528)
+  fit real, test true : 0.33 / 0.30 / 0.04

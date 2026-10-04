@@ -114,3 +114,164 @@ re-collected this way (`scripts/dataset/collect_c10_walks_and_branches.py`, `sim
 every branch's state at the branch frame must equal the walk's state bit-exactly (else re-run), and the own-command
 branch equals the walk. B1 targets are re-checked against the new hexapod labels (stop if out of tolerance).
 
+
+## 9. Four-leg bodies (adaptation test) — plan, 2026-10-04, not yet built
+
+**Question.** Does the pretrained model adapt to a new body with a different gait from **babbling only** (no behaviour
+labels, no counterfactual branches of the new body in adaptation), measured with the same heldout tests as c10 / B1?
+**Bodies.** c10f10t10 with one leg pair ghost-removed (`collect_ik.ghost_remove_legs`, `drive_and_record(remove_legs=,
+active_legs=)`): `hind_loss` first, then `middle_loss`, `front_loss` with the identical pipeline. Feasibility
+(`results/check/four_leg_feasibility/summary.txt`): c10 commands do not reproduce c10 behaviours on any variant;
+hind_loss babble 0.84 falls per upright minute, 90 % usable, 17/24 c10 targets within 0.05 Froude, misses backward
+(segments reach fwd -0.091 vs target -0.236) and the strongest turns.
+
+**Each variant = its own embodiment**: 12-D action (joint targets of the 4 remaining legs, `collect_ik.LEGS` order),
+own projector head, own Froude height H4 = median CoM z over the upright frames of its train babble episodes (hind_loss
+≈ 0.11 m), stored as `froude_height` in every file so all windows and branches of a body share one scale
+(`wm/data/embodiment.py:122` `_com_reference` honours it). Labels = measured CoM Froude (fwd, lat, yaw), loader
+conventions (1 s edge-correct, segment-aware, read-out window 21).
+
+Names below for hind_loss (`h4hind`); `h4mid`, `h4front` analogous. All dirs under `data/counterfactual_walks/`.
+
+### 9.1 Adaptation data (train / val): babbling
+
+| | 4-leg babble | B1 reference (eval_suite `hexonly`) |
+|---|---|---|
+| files | `h4hind_babble_train` **48** windows, `h4hind_babble_val` **24** windows, 66 frames each | `b1_clips_train` 48 / `b1_clips_val` 24, 66 frames |
+| adaptation budget | `wm.adapt --clips 44 --test_clips 4` on the 48 train windows = **44 x 66 = 2,904 frames (145 s)** | same flags, `--stratify` (see 9.3) |
+| projector fit | 48 train windows (fit_projector's own clip-level 20 % val) | 48 train clips |
+| rooms | train window k -> seed k (0-47), val window k -> 100 + k (100-123); one room per file | train 2i+k, val 100+i |
+| source | train: 16 episodes, val: 8 episodes, disjoint seeds; **no episode in two splits** | windows of one long walk per behaviour, shared across splits |
+
+- **Episode**: 20 frames settle (holding the first pose, `DRIVE_KW warmup=20`) + 290 frames babble; windows = frames
+  [20 + 66j, 86 + 66j), j = 0..3; first 48 (train) / 24 (val) usable windows in (episode, j) order are kept, the rest
+  archived. Usable = no frame of the window, nor the 10 after it, is fallen by the feasibility rule (CoM z < 0.5 H6 or
+  tilt > 45 deg, held 10 frames; H6 = 0.1422 m). A fall ends the episode (offline truncation = reset: the next episode
+  restarts from spawn; nothing after a fall is used). Gate: >= 48 / 24 usable windows, else collect more episodes
+  with new seeds (never re-use or hand-pick).
+- **Rooms**: babble has no behaviours, so no behaviour<->room link can exist; rooms are assigned by window order only.
+  Same seed sets as c10 / B1 (the pretrained model has seen rooms 0-47 with c10 / B1 behaviours; 100-123 / 200-223
+  never). Unlike c10 train rooms (one behaviour each, F307), a babble window contains 2-3 command segments, so its room
+  is not a label of its motion. Check: |Pearson r| between room seed and window-mean Froude reported (no rule needed).
+- **Babble generator** = `four_leg_feasibility.sample_segment` / `babble_plan` (CPG per leg on a shared clock,
+  20-40-frame segments, 4-frame cross-fade, per-leg gain U(0.7, 1.3), phase pattern {tripod, trot, random},
+  joint offsets N(0, 0.05), OU command noise 0.03 rad / tau 5; recorded action = the executed, perturbed command;
+  `clean_actions`, `segment`, segment metadata stored), with the feasibility report's changes:
+
+  | knob | feasibility | plan |
+  |---|---|---|
+  | family odds fwd / bwd / turn / side / free | 0.2 each | 0.15 / **0.30** / 0.20 / 0.20 / 0.15 |
+  | bwd pace (cycles / 66 fr) | 3.0-5.5, lead 0.75 | **3.0-9.5**, lead 0.75, a1/a2 U(0.2, 0.3) |
+  | turn spin | +-0..0.7 | **+-0..1.0** |
+  | side strafe | L -1.5..-0.4, R 0.4..1.0; spin per side | **both signs symmetric**: sign +-1, abs U(0.4, 1.5), spin N(0, 0.15) |
+  | falls | measured only | episode ends at the fall (reset), windows by the rule above |
+
+  Pilot gate before collection (physics only, 16 episodes, as the feasibility run): falls <= 1.5 per upright minute,
+  usable fraction >= 0.8, and coverage >= 20/24 c10 targets within 0.05 with some segment at fwd <= -0.15. If backward
+  stays out of reach, the knobs are not tuned further: the uncovered goals are reported as such (decision D2).
+- **Rendering**: physics first (scene loaded once, `scene_reuse`), then each window rendered by replay in its room with
+  the same re-centring / spawn convention as c10 (window's first frame at the room centre). `render_hex_replay.py` has
+  no ghost-leg support (only `collect_ik.py:98/671`, `render_leg_loss_walk.py` do): add `remove_legs` (removed legs'
+  shapes hidden) and gate: replay render of a live-rendered window reproduces its frames (pixel corr ~1.0, as section 0.1).
+- **Fields** (the hexapod reader `wm/data/embodiment.py:139-159` needs `actions`, `forces`, `head`, `body_quat`,
+  `morph`, `expert_episode`): those + `com_pos`, `cam_pose`, `froude_height` (= H4), `segment`, `room_seed`, `dt`,
+  `variant`, `legs`, `babble_episode`, `window_start`, `clean_actions`, `noise_seed`, `segments` (json). No
+  `condition` field (nothing may read one; see 9.3).
+
+### 9.2 Heldout test set (rooms 200-223), built like c10
+
+| part | 4-leg | c10 |
+|---|---|---|
+| (a) selection library | `h4hind_clips_heldout`: **24** clips x 66 fr, probe command j in room 200 + j | `c10_clips_heldout` 24 |
+| (b) branches | `h4hind_branches_heldout`: 24 clips x 3 branch points x **24 probe commands = 1,728**, 31 frames (10 + branch + 20), all 576 pairs | `c10_branches_heldout` 1,728 |
+| (c) goals | the 24 `c10_clips_heldout` clips (hexapod goals, as for every body) | same |
+
+- **Probe commands (K = 24)**: a constant babble knob set (one segment held, per-leg gain / phase / offset fixed, no OU
+  noise) = the 4-leg analogue of a c10 behaviour. Chosen from a **pilot pool** of 200 sets drawn with the plan's babble
+  distribution under a seed disjoint from all train / val episodes, each run 150 frames on the body. **Chosen from the
+  new body's own reachable motion, never by reference to c10 or to the goals** (user, 2026-10-04: matching test commands
+  to the seen body's behaviours is circular -- it shapes the test library around the goals and inflates the oracle and
+  the selection score): k-means (k = 24) on the fall-free sets' standardised measured mean Froude (frames 20..150), one
+  set per cluster = the member nearest the centroid. The chosen 24 and their Froude are stored (`h4hind_probes.json`);
+  the distance from each c10 goal to the nearest probe is computed only afterwards and only reported (it shows which
+  goals the body can reach, it never selects anything).
+- **Clips + branches**: exactly `collect_c10_walks_and_branches.py` with the probe sets in place of the 24 beh24 plans
+  and `remove_legs`: one long walk per probe, heldout window = the c10 heldout window position, 3 branch points from the
+  CPG clock spread over gait phase (>= 10 frames before, 20 after), the 24 probe commands with the causal 4-frame
+  cross-fade (`build_branches.py:65` FADE = 4); scene reuse, run classes, a probe's walk and its 72 branches on one
+  instance. Gates as F305: every branch's state at the branch frame bit-identical to the walk; own-command branch == walk
+  on all 31 frames (state, labels, pixels); no fall in any branch (rule above); labels after the branch independent of
+  the prefix. Only the heldout split is built (no 4-leg branches are used for adaptation).
+- Branch file fields as c10 (`cf_source`, `cf_t`, `first_pair` = 10, `segment`, `cf_command_index`, `cf_own`, ...),
+  `cf_command_name` = `probe_jj` (cluster index; no c10 behaviour attached).
+
+### 9.3 What the tools assume, and the minimal changes (c10 / B1 paths unchanged)
+
+| where | assumption | change |
+|---|---|---|
+| `wm/data/embodiment.py:380-384` | REGISTRY = hexapod 18-D / b1 / gecko | add `h4hind`, `h4mid`, `h4front` = `Embodiment(name, 12, 4, reader)`; reader = `_hexapod` (same axes / `forward_axis("hexapod")`) with `contact` sliced to the 4 active feet and `body` = variant name |
+| `counterfactual_readout.py:51, 75` | `choices=("hexapod","b1")`; action dim `18 if hexapod else 12` | `choices=tuple(REGISTRY)`, dim = `REGISTRY[e].action_dim` (identical result for hexapod / b1) |
+| `wm/fit_projector.py:138` | fits only `("hexapod", hex_dir), ("b1", b1_dir)` | add repeatable `--extra NAME=DIR`; heads are independent (`ActionProjector.nets` ModuleDict, per-embodiment stats), so fitting `--hex_dir c10 --b1_dir "" --extra h4hind=...` leaves the hexapod head's task unchanged |
+| `wm/adapt.py:53-60` | `--stratify` groups clips by `condition` | do **not** pass `--stratify` for babble: plain seeded permutation (lines 81-83) picks 44 adapt + 4 test of the 48 windows; no code change. `--anchor_froude` reads labels via `REGISTRY[args.embodiment]` (registry entry suffices) |
+| `wm/policy/planner.py:51-76` | `load_candidates` groups by `condition_of`; falls back to the file name | none: with `per_condition=999` (selection_eval) every file is a candidate; library clips may carry `condition = probe_jj` |
+| `selection_eval.py:88, 113` | goals grouped by `condition` | none: goals are c10 heldout clips (have it). `--embodiment h4hind` already free text |
+| `selection_eval.py:100-107` | oracle / random bounds | **already label-free**: oracle = per decision step the candidate with the smallest true-Froude error to the goal (ground truth), random = mean error over all candidates; normalised score = (random - selector) / (random - oracle). Unchanged; report per-goal oracle error too, so unreachable goals (backward) are visible |
+| `wm/evaluate.py:66` `offset_for` | `offsets[embodiment]` KeyError if a checkpoint was trained with `center_embeddings` | current runs have it off (`wm/config.py:63`); evaluate only such checkpoints, refuse otherwise |
+| `wm/models/ftm.py:75-78` | per-embodiment FTM token raises for an unknown body | off in current runs (`wm/config.py:62`); same rule |
+| `scripts/run/eval_suite.sh` | B1 / c08 / c10 only | **untouched**. New `scripts/run/eval_newbody.sh NAME VARIANT PT` mirroring its `hexonly` branch: `wm.adapt --data h4hind_babble_train --embodiment h4hind --clips 44 --test_clips 4 --lambda_hinge 0.5 --hinge_margin 0.1 --lora_rank 8 --steps 3000 --anchor_froude 1.0`; `fit_projector` (c10 + `--extra`); merge; selection (recorded goal, vision-read goal, w = 21) on `h4hind_clips_heldout`; read-out `--pairs 1 11` on `h4hind_branches_heldout`; plus the same with projector only (no LoRA) as the "no adaptation" row |
+| `render_hex_replay.py` | six visible legs | `remove_legs` option + replay-vs-live gate (9.1) |
+| `check_splits.py`, `tests/test_froude_labels.py` | c10 / B1 / c08 dirs | add the 4-leg dirs (`FROUDE_TEST_HEX=h4hind`) |
+
+### 9.4 Checks before use, cost
+
+1. Splits: no episode / frame in two splits; heldout probe walks separate from babble; rooms train 0-47 / val 100-123 /
+   heldout 200-223 exactly once each (`check_splits.py`).
+2. Determinism (heldout): F305 gates (branch start bit-identical, own-command == walk on every field, all 576 pairs).
+3. Labels: `tests/test_froude_labels.py` on the new dirs; `froude_height` = H4 in every file; segment-aware labels after
+   a switch independent of the prefix; CoM collector vs `wm.data.com` with the removed legs' mass included.
+4. Falls removed: no fallen frame (rule) in any kept window, clip or branch; max tilt and min CoM z reported.
+5. Coverage: babble pilot gate (9.1); per c10 goal, nearest probe distance and oracle error; babble train Froude
+   histogram vs c10 targets (as `coverage_<variant>.png`).
+6. Rendering: replay == live gate; ego view checked (FOV 90, `check_ego_view`); removed legs invisible in the ego view.
+7. **Human review videos**: 6 babble windows (ego + third person), the 24 probe clips as a grid labelled with Froude
+   and the matched c10 behaviour, one branch group (same state, 6 commands side by side), one room per split.
+
+Cost per variant (CPU only, <= 6 own CoppeliaSim instances, load < ~12, no GPU until evaluation): babble pilot ~15 min;
+babble 24 episodes physics ~30 min + render 72 windows ~15 min; probe pool 200 x 150 frames ~30 min; probe walks +
+1,728 branches with scene reuse ~2-3 h (24 probes / 6 instances, ~72 branches each instead of c10's 288) + render ~1 h;
+checks + videos ~30 min. **~5 h per variant**, hind_loss first; middle / front only after hind_loss's gates and review pass.
+Evaluation (GPU, one job): adapt 3000 steps + projector + selection + read-out ~ as `eval_suite` hexonly B1 part.
+
+### 9.5 Open decisions (recommendation first)
+
+| | decision | recommended |
+|---|---|---|
+| D1 | probe commands for library + branches | **decided (user): from the body's own babble only** — k-means on its reachable Froude, one per cluster; never matched to c10 or the goals |
+| D2 | goals the body cannot reach (hind: backward) | keep all 24 goals (same test as every body); report per family and with the oracle, which shows the ceiling |
+| D3 | base checkpoint | the hexapod-only checkpoint (arm H; B1 and 4-leg both unseen), the joint round-1 B checkpoint as second row |
+| D4 | baseline rows | projector only (no LoRA), and LoRA + projector (current recipe); both on the same 44 windows |
+| D5 | babble windows contain segment switches | yes (that is babbling; labels / pairs are segment-aware) vs constant-command windows |
+| D6 | Froude height | one constant H4 per body (babble postures vary, a per-clip median would rescale clips differently) |
+| D7 | budget | 44 windows = B1's; a budget sweep (e.g. 11 / 22 / 44 / 88 windows, 4-panel video per point) only after the 44 result |
+| D8 | order | hind_loss end-to-end incl. evaluation before collecting middle / front |
+
+**Claims rule (user, 2026-10-04).** c10 is the pretraining (seen) body: its numbers are a sanity reference, never evidence
+for transfer. Claims rest on bodies the model was not pretrained on -- c08 (zero-shot), B1 under hexapod-only pretraining
++ adaptation, the 4-leg variants. Nothing in a new body's test set may be chosen using the seen body or the goals. Goals
+from c10 heldout clips are the task (imitate another body's demonstration) and stay; a second goal source (B1 heldout) can
+be added to show the result does not depend on the hexapod's goals.
+
+## 10. B1 as a new robot: babbling adaptation, expert library as upper bound (user, 2026-10-04)
+
+The claim is driving a robot with **no prior knowledge** of it. B1's existing clips use commands tuned to the hexapod's
+Froude (knowledge of the task), so they cannot be the adaptation data for that claim. After hexapod-only pretraining:
+
+| row | adaptation data | candidate library (heldout rooms 200-223) | role |
+|---|---|---|---|
+| realistic | B1 babbling (train / val rooms), labels = measured CoM Froude | B1 babbling clips, 24 picked by k-means on B1's own reachable Froude (never by c10 or the goals) | the claim |
+| upper bound | the same adapted model | `b1_clips_heldout` (tuned behaviour clips, "expert" walking-policy commands) | cost of babbling candidates vs the best |
+| reference | none (B1 in joint pretraining, round-1 arm B) | `b1_clips_heldout` | ceiling of the method |
+
+B1 babbling: random walking-policy commands (vx, vy, wz) with switches every 1-2 s over the policy's safe range, exact
+MuJoCo, same window length (66 frames), budget and room seeds as the 4-leg babble (9.1). The hexapod expert CSV stays
+banned; "expert" here means only B1's own tuned walking-policy clips.

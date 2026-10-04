@@ -1,0 +1,3 @@
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+round1_clips_s0         0.48         +0.59 / +0.43 / +0.34         +0.09 / -0.28 / -0.90      0.50      0.52     0.04
+-> results/eval/round1_clips_s0/shared_latent

@@ -1,0 +1,15 @@
+== c10 B: 24 held-out (odd) groups, P 11; within-group r fwd / lat / yaw
+  ftm proj                  0.84 / 0.78 / 0.46
+  direct proj               0.97 / 0.86 / 0.79
+  ftm true                  0.89 / 0.60 / 0.85
+  direct true               0.91 / 0.61 / 0.86
+  ftm shrink0.5             0.76 / 0.67 / 0.47
+  direct shrink0.5          0.96 / 0.85 / 0.76
+  ftm shrink0.3             0.68 / 0.54 / 0.44
+  direct shrink0.3          0.96 / 0.84 / 0.75
+  ftm cal                   0.71 / 0.42 / 0.14
+  direct cal                0.90 / 0.73 / 0.72
+  ftm cal_shrink0.5         0.67 / 0.37 / 0.18
+  direct cal_shrink0.5      0.91 / 0.65 / 0.70
+  ftm proj_dev+real_mean    0.84 / 0.76 / 0.36
+  direct proj_dev+real_mean 0.97 / 0.85 / 0.79

@@ -96,6 +96,69 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
     return torch.cat(E), torch.cat(Z), torch.cat(A), torch.cat(C), P
 
 
+def rollout_fit(args, cfg, checkpoint, itm, ftm, proj, data, splits, device):
+    """Phase 2 of --objective rollout (F311): fit the projector through the frozen FTM + ITM + body head."""
+    from wm.models.motion_decoder import MotionDecoder
+    md = MotionDecoder(cfg, {n: v[2].shape[-1] for n, v in data.items()}).to(device).eval()
+    md.load_state_dict(checkpoint["md"], strict=False)
+    for p in md.parameters():
+        p.requires_grad_(False)
+
+    def read(e, z):
+        return md.body(None, itm(e, ftm(e, z)))
+
+    # targets: the rollout read of the TRUE z, computed once (frozen models)
+    target = {}
+    with torch.no_grad():
+        for name, (e, z, _a, _c, _p) in data.items():
+            target[name] = torch.cat([read(e[i:i + 64].to(device).float(), z[i:i + 64])
+                                      for i in range(0, len(z), 64)])
+    train_t = torch.cat([target[n][~splits[n]] for n in data])
+    scale = train_t.std(0).clamp_min(1e-6)                 # per channel: yaw's std is 5-13x smaller
+    print(f"rollout fit: read-of-true-z std per channel {[round(x, 4) for x in scale.tolist()]}")
+
+    def val_loss():
+        out = {}
+        with torch.no_grad():
+            for name, (e, z, a, _c, _p) in data.items():
+                idx = torch.nonzero(splits[name].cpu(), as_tuple=True)[0]
+                se = torch.zeros(scale.shape[0], device=device)
+                for i in range(0, len(idx), 64):
+                    sl = idx[i:i + 64]
+                    r = read(e[sl].to(device).float(), proj(a[sl.to(device)], name))
+                    se += (((r - target[name][sl.to(device)]) / scale) ** 2).sum(0)
+                out[name] = (se / len(idx)).tolist()
+        return out
+
+    print(f"  before: val read error per channel (standardised) {val_loss()}")
+    opt = torch.optim.Adam(proj.parameters(), lr=args.rollout_lr)
+    g = torch.Generator().manual_seed(0)
+    items = [(name, i) for name in data for i in torch.nonzero(~splits[name].cpu(), as_tuple=True)[0].tolist()]
+    for ep in range(args.rollout_epochs):
+        proj.train()
+        order = torch.randperm(len(items), generator=g).tolist()
+        tot = n = 0
+        for b in range(0, len(order), args.rollout_batch):
+            batch = [items[j] for j in order[b:b + args.rollout_batch]]
+            opt.zero_grad()
+            loss = 0.0
+            for name in data:
+                sl = torch.tensor([i for nm, i in batch if nm == name], dtype=torch.long)
+                if not len(sl):
+                    continue
+                e, z, a = data[name][0], data[name][1], data[name][2]
+                sd = sl.to(device)
+                zp = proj(a[sd], name)
+                r = read(e[sl].to(device).float(), zp)
+                loss = loss + (((r - target[name][sd]) / scale) ** 2).mean() * len(sl) / len(batch) \
+                    + args.w_z * torch.nn.functional.mse_loss(zp, z[sd]) * len(sl) / len(batch)
+            loss.backward()
+            opt.step()
+            tot += loss.item(); n += 1
+        proj.eval()
+        print(f"  rollout epoch {ep + 1:3d}  train {tot / max(n, 1):.4f}  val per channel {val_loss()}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", required=True)
@@ -114,6 +177,15 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--val_frac", type=float, default=0.2)
     ap.add_argument("--out", default="")
+    ap.add_argument("--objective", choices=("z", "rollout"), default="z",
+                    help="z: match the ITM's z (MSE, the original fit). rollout (F311): after the z fit, train the "
+                         "projector so that the ROLLOUT read of its z -- head(ITM(e_t, FTM(e_t, proj(a)))) -- matches the "
+                         "rollout read of the true z, each Froude channel standardised. The z fit alone leaves z wrong "
+                         "along the direction the FTM uses for yaw (nearly orthogonal to the head's), so rollout loses yaw.")
+    ap.add_argument("--rollout_epochs", type=int, default=15)
+    ap.add_argument("--rollout_batch", type=int, default=32)
+    ap.add_argument("--rollout_lr", type=float, default=3e-4)
+    ap.add_argument("--w_z", type=float, default=0.1, help="weight of the z-MSE kept as an anchor in the rollout phase")
     args = ap.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -182,6 +254,9 @@ def main():
         loss.backward(); opt.step()
         if (epoch + 1) % 50 == 0:
             print(f"epoch {epoch + 1:4d}  train {loss.item():.4f}")
+
+    if args.objective == "rollout":
+        rollout_fit(args, cfg, checkpoint, itm, ftm, proj, data, splits, device)
 
     print(f"\n{'embodiment':<12}{'z MSE':>10}{'vs mean-z':>11}{'rollout gap':>14}{'vs mean-z':>11}")
     proj.eval()

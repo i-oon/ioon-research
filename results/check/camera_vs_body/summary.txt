@@ -1,0 +1,115 @@
+Camera vs body motion (cam_pose vs CoM Froude labels). Units: Froude (v/sqrt(gh), w*sqrt(h/g)); angles deg.
+Scales: gait = per-frame central diff, step5 = over 5 frames (0.25 s), label1s = 1 s smoothing (= labels).
+
+=== c10 (hexapod), 72 clips, CoM height h median 0.143 m
+lever arm camera-CoM (body frame fwd, left, up) median [ 4.240e-01 -1.000e-04  1.822e-01] m, within-clip std [0.0042 0.0097 0.0101] m; camera heading - body heading median 0.04 deg, std 0.66 deg
+Rigid prediction of camera planar motion from CoM fwd/lat/yaw + fixed lever arm: R^2 pooled (resid RMS / signal RMS)
+  gait     fwd 0.928 (0.25)  lat 0.921 (0.28)  yaw 0.965 (0.19)
+  step5    fwd 0.950 (0.21)  lat 0.934 (0.26)  yaw 0.969 (0.17)
+  label1s  fwd 0.997 (0.05)  lat 0.990 (0.10)  yaw 0.990 (0.10)
+  camera(label1s) vs raw CoM labels (no lever arm): fwd R^2 0.997  lat 0.476  yaw 0.990
+Per family: resid/signal RMS at step5 | label1s (fwd, lat, yaw)
+  fwd        0.14 0.25 0.19  |  0.03 0.22 0.16
+  bwd        0.19 0.64 0.19  |  0.05 0.17 0.18
+  turn_left  0.29 0.22 0.15  |  0.04 0.15 0.05
+  turn_right 0.21 0.24 0.15  |  0.04 0.12 0.04
+  side_L     0.36 0.14 0.25  |  0.24 0.05 0.14
+  side_R     0.23 0.07 0.12  |  0.12 0.03 0.05
+Outside the labels: RMS (pooled over frames) of camera rates, Froude; planar signal = RMS of labels
+  fwd        planar |v| 0.201 |yaw| 0.016 ||  gait: vert 0.112 roll 0.104 pitch 0.036  step5: vert 0.054 roll 0.065 pitch 0.018  label1s: vert 0.014 roll 0.014 pitch 0.005
+  bwd        planar |v| 0.210 |yaw| 0.033 ||  gait: vert 0.108 roll 0.122 pitch 0.045  step5: vert 0.065 roll 0.103 pitch 0.034  label1s: vert 0.016 roll 0.022 pitch 0.008
+  turn_left  planar |v| 0.161 |yaw| 0.038 ||  gait: vert 0.084 roll 0.110 pitch 0.022  step5: vert 0.055 roll 0.081 pitch 0.016  label1s: vert 0.012 roll 0.014 pitch 0.004
+  turn_right planar |v| 0.171 |yaw| 0.048 ||  gait: vert 0.088 roll 0.113 pitch 0.023  step5: vert 0.048 roll 0.083 pitch 0.015  label1s: vert 0.014 roll 0.015 pitch 0.005
+  side_L     planar |v| 0.163 |yaw| 0.014 ||  gait: vert 0.224 roll 0.062 pitch 0.044  step5: vert 0.141 roll 0.037 pitch 0.029  label1s: vert 0.027 roll 0.010 pitch 0.006
+  side_R     planar |v| 0.156 |yaw| 0.014 ||  gait: vert 0.193 roll 0.048 pitch 0.017  step5: vert 0.097 roll 0.015 pitch 0.010  label1s: vert 0.022 roll 0.005 pitch 0.002
+  ALL        planar |v| 0.178 |yaw| 0.030 ||  gait: vert 0.145 roll 0.097 pitch 0.033  step5: vert 0.083 roll 0.071 pitch 0.022  label1s: vert 0.018 roll 0.014 pitch 0.005
+Within-clip std (median over clips): camera z 10.5 mm (7.52% of h), pitch 1.16 deg, roll 5.06 deg; mean pitch 1.0 deg
+Dominant frequency (median over clips): z 1.82 Hz, roll 1.82 Hz, pitch 1.82 Hz
+Per model step (5 frames, 0.25 s), physical: RMS |d yaw| vs |d pitch| |d roll| (deg), |d fwd/lat| vs |d z| (mm)
+  fwd        yaw 5.55  pitch 2.11  roll 7.77 deg | planar 87.0  vert 16.0 mm
+  bwd        yaw 8.64  pitch 4.03  roll 12.41 deg | planar 75.2  vert 19.0 mm
+  turn_left  yaw 8.21  pitch 1.89  roll 9.60 deg | planar 99.1  vert 16.3 mm
+  turn_right yaw 8.47  pitch 1.81  roll 9.90 deg | planar 98.6  vert 14.2 mm
+  side_L     yaw 2.81  pitch 3.44  roll 4.41 deg | planar 72.4  vert 41.8 mm
+  side_R     yaw 2.17  pitch 1.22  roll 1.84 deg | planar 62.6  vert 28.4 mm
+CoM - base (body frame fwd, left, up) median [-0.2463 -0.0011 -0.0302] m; within-clip std median [0.67 0.6  4.95] mm; its rate RMS (Froude) per-frame [0.0074 0.0087 0.0574], 1 s smoothed [0.0012 0.0011 0.0086]; label planar RMS 0.178
+
+=== c08 (hexapod), 24 clips, CoM height h median 0.142 m
+lever arm camera-CoM (body frame fwd, left, up) median [ 0.4236 -0.0005  0.1851] m, within-clip std [0.0043 0.0098 0.0099] m; camera heading - body heading median 0.04 deg, std 0.67 deg
+Rigid prediction of camera planar motion from CoM fwd/lat/yaw + fixed lever arm: R^2 pooled (resid RMS / signal RMS)
+  gait     fwd 0.932 (0.25)  lat 0.920 (0.28)  yaw 0.967 (0.18)
+  step5    fwd 0.948 (0.22)  lat 0.936 (0.25)  yaw 0.973 (0.16)
+  label1s  fwd 0.998 (0.04)  lat 0.989 (0.11)  yaw 0.991 (0.09)
+  camera(label1s) vs raw CoM labels (no lever arm): fwd R^2 0.998  lat 0.440  yaw 0.991
+Per family: resid/signal RMS at step5 | label1s (fwd, lat, yaw)
+  fwd        0.14 0.26 0.18  |  0.04 0.25 0.18
+  bwd        0.19 0.61 0.19  |  0.05 0.17 0.18
+  turn_left  0.33 0.22 0.14  |  0.03 0.13 0.05
+  turn_right 0.22 0.24 0.15  |  0.03 0.14 0.04
+  side_L     0.32 0.12 0.20  |  0.24 0.05 0.10
+  side_R     0.26 0.09 0.20  |  0.14 0.04 0.12
+Outside the labels: RMS (pooled over frames) of camera rates, Froude; planar signal = RMS of labels
+  fwd        planar |v| 0.211 |yaw| 0.014 ||  gait: vert 0.112 roll 0.102 pitch 0.035  step5: vert 0.057 roll 0.064 pitch 0.017  label1s: vert 0.017 roll 0.014 pitch 0.005
+  bwd        planar |v| 0.216 |yaw| 0.034 ||  gait: vert 0.104 roll 0.123 pitch 0.045  step5: vert 0.063 roll 0.104 pitch 0.034  label1s: vert 0.013 roll 0.023 pitch 0.007
+  turn_left  planar |v| 0.160 |yaw| 0.045 ||  gait: vert 0.087 roll 0.112 pitch 0.023  step5: vert 0.056 roll 0.083 pitch 0.017  label1s: vert 0.011 roll 0.014 pitch 0.004
+  turn_right planar |v| 0.175 |yaw| 0.049 ||  gait: vert 0.089 roll 0.114 pitch 0.024  step5: vert 0.051 roll 0.085 pitch 0.017  label1s: vert 0.012 roll 0.015 pitch 0.004
+  side_L     planar |v| 0.174 |yaw| 0.019 ||  gait: vert 0.217 roll 0.064 pitch 0.036  step5: vert 0.131 roll 0.037 pitch 0.024  label1s: vert 0.026 roll 0.011 pitch 0.005
+  side_R     planar |v| 0.124 |yaw| 0.008 ||  gait: vert 0.185 roll 0.055 pitch 0.014  step5: vert 0.080 roll 0.018 pitch 0.008  label1s: vert 0.021 roll 0.006 pitch 0.002
+  ALL        planar |v| 0.179 |yaw| 0.032 ||  gait: vert 0.141 roll 0.099 pitch 0.031  step5: vert 0.078 roll 0.071 pitch 0.021  label1s: vert 0.018 roll 0.015 pitch 0.005
+Within-clip std (median over clips): camera z 10.6 mm (7.48% of h), pitch 1.21 deg, roll 5.14 deg; mean pitch 1.2 deg
+Dominant frequency (median over clips): z 1.82 Hz, roll 1.82 Hz, pitch 1.82 Hz
+Per model step (5 frames, 0.25 s), physical: RMS |d yaw| vs |d pitch| |d roll| (deg), |d fwd/lat| vs |d z| (mm)
+  fwd        yaw 5.52  pitch 2.07  roll 7.58 deg | planar 87.7  vert 16.8 mm
+  bwd        yaw 9.15  pitch 4.05  roll 12.53 deg | planar 77.5  vert 18.6 mm
+  turn_left  yaw 8.91  pitch 2.06  roll 9.74 deg | planar 101.9  vert 16.7 mm
+  turn_right yaw 8.89  pitch 2.01  roll 10.03 deg | planar 100.0  vert 15.1 mm
+  side_L     yaw 3.31  pitch 2.88  roll 4.39 deg | planar 83.6  vert 38.5 mm
+  side_R     yaw 1.45  pitch 0.99  roll 2.16 deg | planar 55.3  vert 23.4 mm
+CoM - base (body frame fwd, left, up) median [-0.2461 -0.0011 -0.0327] m; within-clip std median [0.75 0.48 5.03] mm; its rate RMS (Froude) per-frame [0.0075 0.0078 0.0548], 1 s smoothed [0.0011 0.001  0.0082]; label planar RMS 0.179
+
+=== b1 (b1), 72 clips, CoM height h median 0.527 m
+lever arm camera-CoM (body frame fwd, left, up) median [0.4181 0.0032 0.3606] m, within-clip std [0.0051 0.0061 0.0055] m; camera heading - body heading median -0.01 deg, std 0.03 deg
+Rigid prediction of camera planar motion from CoM fwd/lat/yaw + fixed lever arm: R^2 pooled (resid RMS / signal RMS)
+  gait     fwd 0.938 (0.23)  lat 0.803 (0.44)  yaw 0.995 (0.07)
+  step5    fwd 0.989 (0.10)  lat 0.956 (0.21)  yaw 0.999 (0.02)
+  label1s  fwd 1.000 (0.02)  lat 0.999 (0.04)  yaw 1.000 (0.02)
+  camera(label1s) vs raw CoM labels (no lever arm): fwd R^2 1.000  lat 0.934  yaw 1.000
+Per family: resid/signal RMS at step5 | label1s (fwd, lat, yaw)
+  fwd        0.03 0.35 0.03  |  0.01 0.09 0.03
+  bwd        0.06 0.59 0.03  |  0.02 0.07 0.02
+  turn_left  0.06 0.43 0.01  |  0.01 0.13 0.00
+  turn_right 0.06 0.50 0.01  |  0.01 0.17 0.00
+  side_L     0.90 0.19 0.04  |  0.17 0.03 0.04
+  side_R     1.00 0.06 0.06  |  0.21 0.03 0.07
+Outside the labels: RMS (pooled over frames) of camera rates, Froude; planar signal = RMS of labels
+  fwd        planar |v| 0.199 |yaw| 0.008 ||  gait: vert 0.020 roll 0.044 pitch 0.040  step5: vert 0.009 roll 0.021 pitch 0.013  label1s: vert 0.002 roll 0.004 pitch 0.003
+  bwd        planar |v| 0.206 |yaw| 0.031 ||  gait: vert 0.058 roll 0.067 pitch 0.070  step5: vert 0.026 roll 0.042 pitch 0.024  label1s: vert 0.005 roll 0.005 pitch 0.005
+  turn_left  planar |v| 0.160 |yaw| 0.035 ||  gait: vert 0.020 roll 0.046 pitch 0.039  step5: vert 0.011 roll 0.017 pitch 0.017  label1s: vert 0.002 roll 0.003 pitch 0.003
+  turn_right planar |v| 0.170 |yaw| 0.047 ||  gait: vert 0.016 roll 0.047 pitch 0.042  step5: vert 0.007 roll 0.022 pitch 0.018  label1s: vert 0.001 roll 0.004 pitch 0.003
+  side_L     planar |v| 0.148 |yaw| 0.013 ||  gait: vert 0.053 roll 0.105 pitch 0.066  step5: vert 0.024 roll 0.046 pitch 0.027  label1s: vert 0.004 roll 0.008 pitch 0.004
+  side_R     planar |v| 0.141 |yaw| 0.012 ||  gait: vert 0.049 roll 0.089 pitch 0.061  step5: vert 0.031 roll 0.015 pitch 0.037  label1s: vert 0.004 roll 0.006 pitch 0.005
+  ALL        planar |v| 0.172 |yaw| 0.028 ||  gait: vert 0.040 roll 0.070 pitch 0.055  step5: vert 0.020 roll 0.030 pitch 0.024  label1s: vert 0.003 roll 0.005 pitch 0.004
+Within-clip std (median over clips): camera z 4.7 mm (0.89% of h), pitch 0.85 deg, roll 0.88 deg; mean pitch -0.6 deg
+Dominant frequency (median over clips): z 2.12 Hz, roll 2.12 Hz, pitch 3.94 Hz
+Per model step (5 frames, 0.25 s), physical: RMS |d yaw| vs |d pitch| |d roll| (deg), |d fwd/lat| vs |d z| (mm)
+  fwd        yaw 0.85  pitch 0.80  roll 1.27 deg | planar 114.3  vert 4.8 mm
+  bwd        yaw 2.08  pitch 1.45  roll 2.61 deg | planar 120.5  vert 14.7 mm
+  turn_left  yaw 2.28  pitch 1.05  roll 1.07 deg | planar 89.2  vert 6.5 mm
+  turn_right yaw 2.98  pitch 1.08  roll 1.34 deg | planar 95.0  vert 4.1 mm
+  side_L     yaw 1.11  pitch 1.67  roll 2.85 deg | planar 88.0  vert 13.6 mm
+  side_R     yaw 1.06  pitch 2.30  roll 0.92 deg | planar 83.2  vert 17.6 mm
+CoM - base (body frame fwd, left, up) median [-0.0185  0.0001 -0.0334] m; within-clip std median [1.15 0.5  1.49] mm; its rate RMS (Froude) per-frame [0.0078 0.0041 0.0105], 1 s smoothed [0.0005 0.0003 0.0006]; label planar RMS 0.172
+
+--- Reading (2026-10-04) ---
+(2) Planar: at the label scale (1 s) the camera's fwd/lat/yaw are the CoM labels plus a fixed lever arm (hexapod
+    camera 0.42 m ahead of the CoM, B1 0.42 m): R^2 >= 0.99 on every channel and body (lat without the lever arm only
+    0.44-0.48 hexapod, 0.93 B1 -> the lever arm is the only thing a camera target would add, and it is a per-body
+    constant). At 5 frames the rigid prediction keeps R^2 0.93-0.97 (hexapod) / 0.96-1.00 (B1); the residual
+    (21-26 % hexapod, 2-21 % B1) is gait oscillation, not a different planar motion.
+(3) Outside the labels: hexapod camera bobs 10.5 mm (7.5 % of h) and rolls 5 deg std at 1.8 Hz (stride), B1 4.7 mm
+    (0.9 % of h), 0.9 deg roll / pitch at 2.1 Hz (pitch ~3.9 Hz). Per 5-frame step the hexapod rolls 8-12 deg RMS,
+    as much as or more than it yaws (2-9 deg); B1 1-3 deg. After 1 s smoothing all of it is <= 0.03 Froude (vs planar
+    0.17-0.18). Sway is body/gait-specific: hexapod roll-dominated, ~6x B1 in vertical rate (Froude), c08 identical
+    to c10 (same gait).
+(4) CoM vs base: fixed offset (hexapod -0.246 m, B1 -0.019 m), moves < 1.2 mm in plane and 5 mm (hex) / 1.5 mm (B1)
+    vertically within a clip; its planar rate is <= 0.009 Froude per frame, ~0.001 after 1 s -> negligible for labels.

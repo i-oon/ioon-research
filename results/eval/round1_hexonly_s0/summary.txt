@@ -1,0 +1,48 @@
+=== round1_hexonly_s0 (hexonly) wm/runs/round1_hexonly_s0/best.pt Sun 04 Oct 2026 07:44:08 PM +07
+--- selection B1, recorded goal
+round1_hexonly_s0 w=21   direct 0.0291 (gap +0.97)  roll_fixed 0.0821 (gap +0.68)  roll_live 0.0774 (gap +0.70)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round1_hexonly_s0 w=21   direct 0.0536 (gap +0.83)  roll_fixed 0.1023 (gap +0.57)  roll_live 0.1018 (gap +0.57)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round1_hexonly_s0 w=21   direct 0.0430 (gap +0.91)  roll_fixed 0.0936 (gap +0.64)  roll_live 0.0873 (gap +0.67)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round1_hexonly_s0 w=21   direct 0.0546 (gap +0.93)  roll_fixed 0.1030 (gap +0.65)  roll_live 0.0970 (gap +0.69)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197
+--- shared latent
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+round1_hexonly_s0         0.40         +0.74 / +0.42 / +0.53         +0.27 / +0.17 / +0.15      0.62      0.63     0.30
+-> results/eval/round1_hexonly_s0/shared_latent
+--- counterfactual read-out hexapod (physics branches, heldout)
+=== round1_hexonly_s0: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.55 / 0.18 / 0.34
+  FTM cf  0.41 / 0.36 / 0.13
+  direct  0.88 / 0.70 / 0.57
+--
+=== round1_hexonly_s0: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.75 / 0.89
+  FTM cf  0.83 / 0.75 / 0.36
+  direct  0.97 / 0.86 / 0.80
+--- counterfactual read-out B1 (physics branches, heldout)
+=== round1_hexonly_s0: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.13 / -0.12 / 0.30
+  FTM cf  0.45 / 0.67 / 0.00
+  direct  0.90 / 0.87 / 0.25
+--
+=== round1_hexonly_s0: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.58 / 0.50 / 0.57
+  FTM cf  0.72 / 0.85 / -0.03
+  direct  0.97 / 0.97 / 0.45
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)
+=== round1_hexonly_s0: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.59 / 0.31 / 0.37
+  FTM cf  0.42 / 0.40 / 0.18
+  direct  0.87 / 0.63 / 0.60
+--
+=== round1_hexonly_s0: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.93 / 0.76 / 0.90
+  FTM cf  0.84 / 0.74 / 0.31
+  direct  0.97 / 0.82 / 0.80
+EVAL_SUITE_DONE round1_hexonly_s0

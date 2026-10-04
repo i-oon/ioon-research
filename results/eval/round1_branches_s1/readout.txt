@@ -1,0 +1,30 @@
+--- counterfactual read-out hexapod (physics branches, heldout)
+=== round1_branches_s1: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.57 / 0.17 / 0.35
+  FTM cf  0.46 / 0.43 / 0.16
+  direct  0.88 / 0.70 / 0.51
+--
+=== round1_branches_s1: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.90 / 0.70 / 0.84
+  FTM cf  0.83 / 0.78 / 0.36
+  direct  0.97 / 0.84 / 0.78
+--- counterfactual read-out B1 (physics branches, heldout)
+=== round1_branches_s1: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.28 / -0.06 / 0.34
+  FTM cf  0.52 / 0.78 / 0.18
+  direct  0.87 / 0.94 / 0.28
+--
+=== round1_branches_s1: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.83 / 0.73 / 0.61
+  FTM cf  0.78 / 0.87 / 0.29
+  direct  0.97 / 0.98 / 0.43
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)
+=== round1_branches_s1: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.60 / 0.27 / 0.34
+  FTM cf  0.43 / 0.33 / 0.18
+  direct  0.86 / 0.64 / 0.58
+--
+=== round1_branches_s1: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.91 / 0.73 / 0.85
+  FTM cf  0.81 / 0.75 / 0.30
+  direct  0.97 / 0.81 / 0.78

@@ -1,0 +1,10 @@
+== c10 H: 16 groups, P 11
+            cos(g,h)      r(zt.g,y)      r(zp.g,y)   r(zp.g,zt.g)      r(zp.h,y)  std zp.g/zt.g
+fwd             0.18           0.71           0.64           0.69           0.95           0.85
+lat             0.12           0.42           0.56           0.59           0.84           0.87
+yaw             0.13           0.87           0.29           0.32           0.75           0.68
+FTM read r fwd / lat / yaw with z_proj, and z_proj with ONE coordinate (along g_c) set to z_true's:
+  proj           0.80 / 0.79 / 0.37
+  proj+yaw_dir   0.93 / 0.78 / 0.88
+  proj+fwd_dir   0.89 / 0.78 / 0.66
+  proj+rand_dir  0.82 / 0.79 / 0.41

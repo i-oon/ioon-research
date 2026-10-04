@@ -8729,3 +8729,114 @@ Reading:
   with branches in training, never on clips alone.
 - Caveats: a linear probe on pooled tokens; a nonlinear head could read more. c10 alpha at the top of the grid (1e5).
 - Not tested: the probe on branch frames (room fixed, 24 commands), the cleanest version; only needed if this becomes decisive.
+
+### F308. Round 1: training on counterfactual branches makes the model read another action's future (primary rule met on c10 and B1, both seeds); rollout selection improves on the hexapods, not on B1
+
+Arms (`scripts/run/round1_counterfactual.sh`, joint c10 + B1, current pipeline, ~30k steps each, batch 8): A `round1_clips_s0` =
+main clips only (45 epochs, best.pt at epoch 34, trained on a second PC with the same code); B `round1_branches_s0/_s1` = clips +
+both bodies' branches (3 epochs). All evaluated here with `scripts/run/eval_suite.sh NAME joint` on heldout data
+(`results/eval/<NAME>/summary.txt`). Decision rule written before results (doc/STATUS.md).
+
+Counterfactual read-out on the heldout physics branches, 11-pair window, Pearson r across the 24 commands from one state,
+mean of fwd / lat / yaw (per-channel values in the summaries):
+
+| body | read | A clips | B s0 | B s1 | B - A |
+|---|---|---|---|---|---|
+| c10 | FTM-predicted future | 0.47 | 0.69 | 0.66 | +0.22 / +0.19 |
+| B1 | FTM-predicted future | 0.55 | 0.70 | 0.65 | +0.15 / +0.10 |
+| c08 (zero-shot) | FTM-predicted future | 0.48 | 0.65 | 0.62 | +0.17 / +0.14 |
+| c10 | real future | 0.27 | 0.81 | 0.81 | +0.54 |
+| B1 | real future | 0.32 | 0.74 | 0.72 | +0.40 / +0.42 |
+| c08 | real future | 0.29 | 0.81 | 0.83 | +0.52 / +0.54 |
+
+Selection, normalised score (w = 21), direct / rollout from the robot's current frame:
+
+| test | A clips | B s0 | B s1 |
+|---|---|---|---|
+| B1 | +0.97 / +0.72 | +0.94 / +0.75 | +0.94 / +0.73 |
+| B1, goal read from vision | +0.35 / +0.24 | +0.84 / +0.63 | +0.83 / +0.62 |
+| c08 zero-shot | +0.91 / +0.58 | +0.90 / +0.68 | +0.90 / +0.64 |
+| c10 | +0.94 / +0.59 | +0.92 / +0.71 | +0.92 / +0.68 |
+
+Shared latent: retrieval c10 -> B1 A 0.04, B 0.25 / 0.30; c10 -> c08 A 0.52, B 0.63 / 0.66.
+
+Reading:
+- Primary rule (FTM-predicted read-out, B - A >= 0.10 on c10 and B1): met on both seeds (B1 seed 1 exactly at +0.10).
+  The real-future read is where the gap is largest: trained on clips only, the model reads another action's real future at
+  r 0.27-0.32, i.e. z from a shared start state reports the clip's own behaviour, not the action taken -- consistent with
+  F307 (each training room holds one behaviour). With branches: 0.72-0.83 on all three bodies, including c08 (never trained).
+- Secondary rule (rollout from the current frame +0.10, direct not worse than -0.05): met on c10 (+0.12 / +0.09) and c08
+  (+0.10 / +0.06); NOT on B1 (+0.03 / +0.01). Direct changes -0.02 to -0.03 (within the rule).
+- Largest selection effect is the vision-read goal on B1: A +0.35 / +0.24 vs B +0.84 / +0.62. Clips-only reads a goal clip's
+  Froude from frames badly in heldout rooms (room shortcut); branches remove that.
+- Yaw is the weak channel of the FTM-predicted read in every arm (0.26-0.42) while the real future reads yaw at 0.61-0.86:
+  the FTM's turning prediction, not the read-out, limits rollout.
+- Caveats: one seed of A; B1 secondary within noise; A and B differ in epochs over different data (equal steps).
+
+### F309. The planar CoM labels + one fixed lever arm explain the camera's planar motion (R2 >= 0.99 at 1 s); what is left out is gait-specific sway, large on the hexapod
+
+`scripts/diagnostics/egocentric_view/camera_vs_body_motion.py` (non-frame keys of 72 c10, 24 c08, 72 B1 clips; labels from
+`wm.data.embodiment` at `com_pos`; summary `results/check/camera_vs_body/summary.txt`). Camera fwd / lat / yaw predicted from
+the CoM labels + a constant lever arm per body (camera - CoM: c10 0.424 fwd / 0.182 up m, B1 0.418 / 0.361 m):
+
+| body | R2 per frame | 5-frame | 1 s |
+|---|---|---|---|
+| c10 | .93 / .92 / .97 | .95 / .93 / .97 | .997 / .990 / .990 |
+| c08 | -- | .95 / .94 / .97 | .998 / .989 / .991 |
+| B1 | .94 / .80 / .995 | .99 / .96 / .999 | 1.000 / .999 / 1.000 |
+
+Without the lever arm, lateral R2 falls to 0.44-0.48 (hexapod): on turns the camera's sideways motion is yaw x 0.42 m, already
+fixed by the yaw label. Camera heading = body heading (0.04 deg). Out of the labels (sway): hexapod camera z std 10.5 mm
+(7.5% of h), roll std 5.1 deg at the 1.8 Hz stride, roll change per 5-frame step 8-12 deg RMS (larger than its yaw change,
+2-9 deg); B1 z 4.7 mm (0.9% of h), roll 0.9 deg, per step 1-3 deg. Rates in Froude units: 5-frame 0.08 / 0.07 / 0.02 (hexapod
+vertical / roll / pitch) vs 0.02 / 0.03 / 0.02 (B1); after 1 s <= 0.018 against a planar signal ~0.18. CoM is rigid with the
+body (< 1.2 mm planar, 5 mm vertical within a clip).
+
+Reading: a camera planar target adds nothing the labels don't fix; the claim "planar locomotion" is complete at the 1 s scale.
+The sway is body-specific (tripod roll ~6x the B1's), so it belongs in a per-body auxiliary head if anywhere, not the shared
+one. It does matter for what the FTM must reconstruct per 5-frame step -- on the hexapod the view rolls more than it yaws in
+one step, a candidate reason the FTM's yaw prediction is weak (F308; diagnosis running).
+
+### F310. Hexapod-only pretraining (clips + branches) + LoRA-adapted B1 selects almost as well as joint pretraining; the adapted FTM loses B1 yaw entirely; z is more shared
+
+`round1_hexonly_s0` (`round1_counterfactual.sh H`: c10 clips + branches only, 6 epochs = 30.5k steps, val 9.44 -> 8.68),
+evaluated with `eval_suite.sh ... hexonly` (B1: LoRA r8 3000 steps on 44 `b1_clips_train`, Froude loss through the frozen
+head, then projector). Note: B1's adaptation clips use commands tuned to the hexapod's Froude, so this is not yet the
+no-prior-knowledge B1 test (DATA_PLAN 10: babbling adaptation).
+
+| | hexonly + adapted B1 | joint round-1 B s0 / s1 |
+|---|---|---|
+| B1 selection direct / rollout current frame | +0.97 / +0.70 | +0.94 / +0.75, +0.94 / +0.73 |
+| B1 vision-read goal | +0.83 / +0.57 | +0.84 / +0.63, +0.83 / +0.62 |
+| B1 read-out w11, FTM-predicted fwd / lat / yaw | 0.72 / 0.85 / -0.03 | 0.83 / 0.85 / 0.42, 0.78 / 0.87 / 0.29 |
+| B1 read-out w11, real future | 0.58 / 0.50 / 0.57 | 0.86 / 0.73 / 0.64, 0.83 / 0.73 / 0.61 |
+| c08 zero-shot rollout / read-out w11 FTM | +0.67 / 0.84 / 0.74 / 0.31 | +0.68 / 0.85 / 0.76 / 0.34 |
+| shared latent body-ID / kNN mix / retrieval B1 | 0.40 / 0.62 / 0.30 | 0.55 / 0.46 / 0.25, 0.53 / 0.46 / 0.30 |
+
+Reading: a body absent from pretraining reaches rollout +0.70 vs +0.73-0.75 joint; c10 / c08 unchanged. The adapted
+FTM predicts B1 turning not at all (yaw -0.03) and reads B1's real future worse (0.50-0.58) than joint. z is more shared
+after single-body pretraining + adaptation (body-ID 0.40 vs 0.55, mixing 0.62 vs 0.46).
+
+### F311. The FTM keeps yaw; the action projector puts it on the wrong z direction (rollout reads yaw along a direction nearly orthogonal to the body head's)
+
+Diagnosis of F308 / F310's weak FTM-predicted yaw (`scripts/diagnostics/forward_model/ftm_yaw_{dump,analyse,zdir,zfix,grad}.py`,
+`results/check/ftm_yaw/`; heldout branches, P = 11, within-group r across the 24 commands; B = round1_branches_s0,
+H = round1_hexonly_s0 with LoRA-adapted B1). Yaw r:
+
+| | real future | FTM(z_true) | FTM(z_proj) | direct body(z_proj) | z_proj with its coordinate along g_yaw set to z_true's | same, random direction |
+|---|---|---|---|---|---|---|
+| c10 B | 0.86 | 0.82 | 0.41 | 0.78 | 0.86 | 0.45 |
+| c10 H | 0.89 | 0.89 | 0.36 | 0.80 | 0.88 | 0.41 |
+| B1 B | 0.64 | 0.58 | 0.42 | 0.47 | 0.60 | 0.43 |
+| B1 H | 0.57 | 0.52 | -0.03 | 0.45 | 0.57 | 0.02 |
+
+g_c = d body_c(ITM(e0, FTM(e0, z)))/dz (the rollout read's direction), h_c = d body_c(z)/dz (the direct read's): cos(g_yaw,
+h_yaw) = 0.11-0.18. The real z carries yaw along g_yaw (r 0.65-0.90); the projector's z does not (0.33 / 0.29 c10, 0.33 B1 B,
+-0.00 B1 H; agreement with z_true along g_yaw 0.32-0.45, 0.10 on B1 H) but does along h_yaw (0.75) -- so direct looks fine and
+rollout fails. A rank-1 replacement of that one coordinate restores FTM-cf yaw to the FTM(z_true) level; fwd / lat unchanged.
+Refuted: yaw too small in the embedding (it explains 0.10-0.13 of the real future's variance, like lateral; FTM(z_true) keeps it).
+FTM spread is 0.3-0.5x real for every channel (not the cause); rescaling / affine z calibration does not help. Cause: the
+projector is fitted by isotropic z-MSE on single-command clips (`wm/fit_projector.py`), which never asks for the FTM's yaw
+coordinate. Fixes ranked: (1) fit the projector through the frozen FTM + ITM + head (Froude of the rollout read + FTM gap),
+on clips + branches -- minutes, no retrain; (2) a training loss on the rollout read so g and h align; (3) train the FTM on
+projector z. Not supported: recon weighting, multi-step targets, chunk changes.

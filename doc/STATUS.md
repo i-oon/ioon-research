@@ -56,12 +56,28 @@ Every file: `com_pos` (Froude at the centre of mass), `cam_pose`; branches also 
    - *Secondary (does it reach selection):* rollout from the robot's current frame, normalised score, B1 and c10; improves by ≥ 0.10 with direct not worse by > 0.05.
    - *Noise:* one seed per arm; seed-to-seed differences seen before were up to ~0.1 normalised score, so a difference < 0.10 is "no difference" until a second seed.
    - c08 (zero-shot) is reported, not used to decide.
+   - **Result (2026-10-04, F308):** primary met on c10 (+0.22 / +0.19) and B1 (+0.15 / +0.10), both seeds of B vs A; secondary met on c10, not on B1 (+0.03 / +0.01). Real-future read 0.27-0.32 -> 0.72-0.83. Branches kept for all further training. Next: hexapod-only -> adapt B1; FTM yaw prediction is the weak point.
 3. **Render-shift test set** + **augmentation pilot** (update `aug_pilot*.sh` to v4 paths first).
 4. **Round 2:** camera vs body options (frame-conditioned Froude head / camera target), randomised or multi-version rendering, second seed, longer branches if post-switch rollout is weak.
 5. **Physics closed loop** with heldout goals; then **slides once**.
 6. Housekeeping: data scripts re-keyed to the current clips (2026-10-03: `branch_points_current.json`, walk plans copied to `c10_walks/_work/plans/`, shared constants in `scripts/dataset/beh24_conditions.py`); no current script reads `_superseded/`. Delete `data/counterfactual_walks/_superseded/` (~24 GB), `data/_archive_old_datasets/` and old runs only after round 1 is evaluated and the user agrees.
 
+7. **4-leg bodies (new-body adaptation test, 12-D actions, own projector each):** feasibility done 2026-10-04 (`scripts/dataset/four_leg_feasibility.py`, `results/check/four_leg_feasibility/`). c10 commands do not reproduce c10 behaviours on any variant; 12-D CPG babbling (4 min each): hind_loss best (falls 0.84/upright-min, 90% usable, 17/24 targets within 0.05), middle_loss borderline (body drags, CoM 0.085 m), front_loss weakest. All miss backward speeds and the strongest turns. Next: babble design per the report (more backward, wider spin, both strafe signs, resets), label by measured CoM Froude; heldout test set built like c10. After hexapod-only -> B1.
+
+8. **Claim = drive a new robot with no prior knowledge** (user 2026-10-04): c10 and joint-B1 rows are reference only. Claim rows: hexapod-only pretraining + babbling-adapted B1 (expert B1 library = upper bound, DATA_PLAN 10) and the 4-leg variants (DATA_PLAN 9, test commands from the body's own babble only).
+
 ## Open decisions / known issues
+
+- **Truthfulness of the setup (user 2026-10-04, DEFERRED -- do not re-collect / re-render until the user decides):**
+  (1) rooms scaled to each robot's camera height = resizing the world with knowledge of the robot (hides identity
+  artificially, body-ID 0.55). Options: (a) keep; (b) one fixed world (identity visible via apparent scale); (c) room size
+  random per clip from one wide range shared by all bodies (scene-level, rendered natively -- NOT image zoom, which would
+  leak identity through resampling blur). (c) = rendering only via replay renderers, same clip count; may need more
+  variety (multi-version rendering) -- measure. Small test first: a few clips per body in (c) + body-ID probe + single-frame
+  speed probe (F307) + frame review with the user.
+  (2)+(3) MEASURED (F309): labels + fixed lever arm explain camera planar motion R2 >= 0.99 at 1 s; sway (z / roll / pitch)
+  is gait-specific, large on the hexapod per 5-frame step, ~0 after 1 s -> no camera target needed; claim scope = planar locomotion. (4) labels need the robot's height and true velocity (sim / proprioception);
+  VSM labels a new body by visual odometry -- state as an assumption or test later.
 
 - Sideways hexapod heading drift (up to ±28°): accepted; revisit if side goals are worst in the baseline eval.
 - **Camera vs body motion:** LAC-WM splits z into end-effector + camera targets and conditions its motion decoder on the current frame; Egocentric VSM supervises base motion only. Round 2 tries (1) frame-conditioned Froude head (the same 3-d Froude target, one head for all bodies, reads the current frame + z; NOT the removed per-body joint-command decoder), (2) extra camera target (fwd/lat only, CoM-height scaling), vs the z-only Froude head. Decide by measurement.

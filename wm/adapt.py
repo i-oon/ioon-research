@@ -218,7 +218,7 @@ def main():
     ap.add_argument("--anchor_sim", type=float, default=0.0,
                     help="weight of the Froude-similarity loss (Config.lambda_sim form) between the new "
                          "body's z and a fixed bank of pretrained-body z: similar motion -> nearby z")
-    ap.add_argument("--anchor_bank_data", default="data/egocentric/beh24_c10f10t10_ego_flat_cleantrain",
+    ap.add_argument("--anchor_bank_data", default="data/counterfactual_walks/c10_clips_train",
                     help="clips of the pretrained body for the --anchor_sim bank (encoded by the "
                          "pretrained ITM before adaptation, then held fixed)")
     ap.add_argument("--anchor_bank_clips", type=int, default=12)

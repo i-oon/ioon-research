@@ -11,7 +11,7 @@ channel fwd / lat / yaw, then the mean over groups:
 
 Truth = mean label over [b, b+K) (the training target for the pair starting at b). With --pairs P > 1 every read
 is averaged over the P consecutive pairs b .. b+P-1 and the truth over [b, b+P-1+K) (a windowed read; P <= 11
-fits the 20 frames after the branch). Processed one group at a time (bounded RAM); no embedding cache.
+fits the 20 frames after the branch). Processed one group at a time (bounded RAM); tokens cached per file on disk (results/wm/cache/cf_tokens).
 
     .venv/bin/python3 scripts/diagnostics/objective_experiments/counterfactual_readout.py --embodiment b1 \\
         --cf_dir data/counterfactual_walks/b1_branches_heldout --ckpt NAME=results/eval/NAME/ckpt/b1.pt --pairs 1 11
@@ -45,6 +45,31 @@ def groups_of(cf_dir):
     return g
 
 
+CACHE = os.path.join(ROOT, "results/wm/cache/cf_tokens")
+
+
+def tokens(path, clip, bp, n, encoder):
+    """Frozen-encoder patch tokens of frames bp .. bp+n-1 of one branch, from a per-file disk cache.
+
+    The encoder is frozen, so these are the same for every model: encoded once (float32 encoder, stored fp16 like every
+    other embedding cache) and reused by every evaluation and diagnosis. One file per branch, loaded group by group, so RAM
+    stays bounded. Stamped with the source file's size + mtime and the frame range; a mismatch re-encodes."""
+    rel = os.path.relpath(path, ROOT).replace(os.sep, "__")
+    f = os.path.join(CACHE, rel + ".pt")
+    st = os.stat(path)
+    stamp = (st.st_size, st.st_mtime_ns, bp, n)
+    if os.path.exists(f):
+        d = torch.load(f, map_location="cpu")
+        if tuple(d["stamp"]) == stamp:
+            return d["e"]
+    e = encode_clip(encoder(), np.asarray(clip["frames"][bp:bp + n]), 8).half().cpu()
+    os.makedirs(CACHE, exist_ok=True)
+    tmp = f + ".tmp"
+    torch.save({"e": e, "stamp": stamp}, tmp)
+    os.replace(tmp, f)
+    return e
+
+
 @torch.no_grad()
 def main():
     ap = argparse.ArgumentParser()
@@ -65,10 +90,17 @@ def main():
     # **One group at a time, nothing kept.** Holding every branch's frames and patch-token embeddings
     # (1,728 files: ~10 GB frames + ~26 GB fp16 tokens) exhausted the 31 GB machine on 2026-10-03 and the OS
     # killed VS Code with it. Frames are read lazily, each group's 24 branches are encoded, read by every
-    # checkpoint at every P, and dropped. No embedding cache (it would be ~20 GB per body); encoding is redone.
+    # checkpoint at every P, and dropped. Tokens are cached per branch file on disk (~11.5 MB each, ~20 GB per body).
     P_max = max(args.pairs)
-    from vjepa2_encoder import VJEPA2FrameEncoder
-    enc = VJEPA2FrameEncoder(dtype=torch.float32, device=dev)
+    held = {}
+
+    def encoder():                     # loaded only if some branch has no current cached tokens
+        if "enc" not in held:
+            from vjepa2_encoder import VJEPA2FrameEncoder
+            held["enc"] = VJEPA2FrameEncoder(dtype=torch.float32, device=dev)
+        return held["enc"]
+
+    n_frames = None
     runs = []
     for spec in args.ckpt:
         name, path = spec.split("=", 1)
@@ -85,7 +117,8 @@ def main():
         clips = [load(p, REGISTRY[emb_name], lazy_frames=True) for p in paths]
         bs = [int(c["first_pair"]) for c in clips]
         # only the frames any read uses: b .. b + P_max - 1 + K_max
-        E = [encode_clip(enc, np.asarray(c["frames"][bp:bp + P_max + K_max]), 8).half() for c, bp in zip(clips, bs)]
+        n_frames = P_max + K_max
+        E = [tokens(p, c, bp, n_frames, encoder) for p, c, bp in zip(paths, clips, bs)]
         for r in runs:
             m, K = r["m"], r["m"].stride
             rd = lambda z, r=r: r["m"].md.body(None, z).float().cpu().numpy() * r["std"] + r["mean"]  # noqa: E731
@@ -110,7 +143,7 @@ def main():
         del clips, E
         if (gi + 1) % 12 == 0:
             print(f"  {gi + 1}/{len(G)} groups", flush=True)
-    del enc
+    held.clear()
     torch.cuda.empty_cache()
 
     for r in runs:
