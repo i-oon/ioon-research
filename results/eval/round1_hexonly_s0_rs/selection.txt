@@ -1,0 +1,12 @@
+--- selection B1, recorded goal
+round1_hexonly_s0_rs w=21   direct 0.0303 (gap +0.96)  roll_fixed 0.0896 (gap +0.64)  roll_live 0.0806 (gap +0.69)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round1_hexonly_s0_rs w=21   direct 0.0963 (gap +0.60)  roll_fixed 0.1309 (gap +0.41)  roll_live 0.1290 (gap +0.42)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round1_hexonly_s0_rs w=21   direct 0.0425 (gap +0.92)  roll_fixed 0.0877 (gap +0.67)  roll_live 0.0879 (gap +0.67)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round1_hexonly_s0_rs w=21   direct 0.0544 (gap +0.93)  roll_fixed 0.0952 (gap +0.70)  roll_live 0.0997 (gap +0.67)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197

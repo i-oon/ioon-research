@@ -1,0 +1,562 @@
+[
+ {
+  "body": "c10",
+  "split": "train",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_train/hexapod_ep401201100.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.794493152249244,
+   "max": 87,
+   "frac_px_diff": 0.017291653540826613,
+   "corr": 0.9776839306696516,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "train",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_train/hexapod_ep400001300.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8858565463814684,
+   "max": 105,
+   "frac_px_diff": 0.017836047757056453,
+   "corr": 0.9813283580803065,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "train",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_train/hexapod_ep40000.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.9416678072226168,
+   "max": 105,
+   "frac_px_diff": 0.01864069158380682,
+   "corr": 0.9793104778763938,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "train",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_train/hexapod_ep40120.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8335870299676452,
+   "max": 86,
+   "frac_px_diff": 0.018158421371922348,
+   "corr": 0.9758709334165865,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "val",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_val/hexapod_ep40002.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7364938138711332,
+   "max": 90,
+   "frac_px_diff": 0.018037738222064392,
+   "corr": 0.9830163377661292,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "val",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_val/hexapod_ep40122.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7983931724471275,
+   "max": 101,
+   "frac_px_diff": 0.018256678725733902,
+   "corr": 0.9817533007912094,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "val",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_val/hexapod_ep400021200.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7163666755922379,
+   "max": 90,
+   "frac_px_diff": 0.017381237399193547,
+   "corr": 0.9838842580285487,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "val",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_val/hexapod_ep401221100.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7923752979565692,
+   "max": 101,
+   "frac_px_diff": 0.017551052954889113,
+   "corr": 0.9824804369657063,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_heldout/hexapod_ep400031200.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7480965891192036,
+   "max": 97,
+   "frac_px_diff": 0.017691827589465726,
+   "corr": 0.9819798005643806,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c10_branches_heldout/hexapod_ep401231500.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8237775577011929,
+   "max": 90,
+   "frac_px_diff": 0.017902005103326613,
+   "corr": 0.9807622788746679,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_heldout/hexapod_ep40003.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7679421010643545,
+   "max": 97,
+   "frac_px_diff": 0.01830499822443182,
+   "corr": 0.9809531519730532,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c10",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c10_clips_heldout/hexapod_ep40123.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8472847986702967,
+   "max": 88,
+   "frac_px_diff": 0.018452962239583332,
+   "corr": 0.9799038229020688,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "train",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_train/b1_ep50000.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.36106071086845,
+   "max": 105,
+   "frac_px_diff": 0.022903904770359848,
+   "corr": 0.9693196229125302,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "train",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_train/b1_ep50120.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.1958628182459359,
+   "max": 87,
+   "frac_px_diff": 0.022934191154711174,
+   "corr": 0.965383720114218,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "train",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_train/b1_ep501201000.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.1482852402553763,
+   "max": 87,
+   "frac_px_diff": 0.02201449486517137,
+   "corr": 0.9671208366779971,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "train",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_train/b1_ep500001100.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.3238863381006385,
+   "max": 105,
+   "frac_px_diff": 0.022165606098790324,
+   "corr": 0.9711011965285243,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "val",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_val/b1_ep50002.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.0768366341639046,
+   "max": 92,
+   "frac_px_diff": 0.023197058475378788,
+   "corr": 0.9750930639263483,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "val",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_val/b1_ep50122.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.2893245966747553,
+   "max": 102,
+   "frac_px_diff": 0.02331751043146307,
+   "corr": 0.9707746079232914,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "val",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_val/b1_ep500021400.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.0485331217447917,
+   "max": 90,
+   "frac_px_diff": 0.022616970923639113,
+   "corr": 0.97619193494531,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "val",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_val/b1_ep501221300.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.2504251131447413,
+   "max": 103,
+   "frac_px_diff": 0.022654871786794355,
+   "corr": 0.972266033074337,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_heldout/b1_ep50003.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.1325692841500947,
+   "max": 97,
+   "frac_px_diff": 0.023352651885061554,
+   "corr": 0.9717718019393461,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/b1_clips_heldout/b1_ep50123.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.2816173669063684,
+   "max": 89,
+   "frac_px_diff": 0.023514025139086174,
+   "corr": 0.9683413667407889,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_heldout/b1_ep500031400.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.115519533875168,
+   "max": 97,
+   "frac_px_diff": 0.022796138640372984,
+   "corr": 0.9728998004598616,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "b1",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/b1_branches_heldout/b1_ep501231300.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 1.2535544774865592,
+   "max": 88,
+   "frac_px_diff": 0.022903934601814516,
+   "corr": 0.969761557015131,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c08",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c08_clips_heldout/hexapod_ep60003.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7469429247307054,
+   "max": 96,
+   "frac_px_diff": 0.018473307291666668,
+   "corr": 0.9815531776910079,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c08",
+  "split": "heldout",
+  "kind": "clips",
+  "file": "data/counterfactual_walks/c08_clips_heldout/hexapod_ep60123.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8573102084073153,
+   "max": 88,
+   "frac_px_diff": 0.018455736564867424,
+   "corr": 0.9794607323445239,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c08",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c08_branches_heldout/hexapod_ep601231500.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 1.0,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.8378773350869456,
+   "max": 87,
+   "frac_px_diff": 0.018129410282258066,
+   "corr": 0.9803724757491213,
+   "cam": 0.0
+  }
+ },
+ {
+  "body": "c08",
+  "split": "heldout",
+  "kind": "branches",
+  "file": "data/counterfactual_walks/c08_branches_heldout/hexapod_ep600031200.npz",
+  "orig_path_zero_offset": {
+   "mae": 0.0,
+   "max": 0,
+   "frac_px_diff": 0.0,
+   "corr": 0.9999999999999998,
+   "cam": 0.0
+  },
+  "rs_path_orig_size_zero_offset": {
+   "mae": 0.7292729859711021,
+   "max": 96,
+   "frac_px_diff": 0.017810452368951613,
+   "corr": 0.982640771828813,
+   "cam": 0.0
+  }
+ }
+]

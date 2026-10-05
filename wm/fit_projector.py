@@ -45,7 +45,7 @@ from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
-def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=(), k=1):
+def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=(), k=1):
     """Per clip: the frozen latent, the action that caused it, and the current embedding.
 
     **Embeddings come back on the CPU in half precision.** One clip is 65 x 256 x 1408 floats,
@@ -59,7 +59,7 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
     """
     E, Z, A, C, P = [], [], [], [], []
     skipped = 0
-    for path in sorted(glob.glob(os.path.join(directory, "*.npz"))):
+    for path in paths:
         if any(os.path.basename(path).startswith(p) for p in exclude):
             skipped += 1
             continue
@@ -92,7 +92,7 @@ def gather(name, directory, encoder, itm, checkpoint, cache, chunk, lag, device,
     if skipped:
         print(f"{name}: excluded {skipped} clips matching {list(exclude)}")
     if not E:
-        raise SystemExit(f"no clips left in {directory} after excluding {list(exclude)}")
+        raise SystemExit(f"no clips left after excluding {list(exclude)}")
     return torch.cat(E), torch.cat(Z), torch.cat(A), torch.cat(C), P
 
 
@@ -105,7 +105,7 @@ def rollout_fit(args, cfg, checkpoint, itm, ftm, proj, data, splits, device):
         p.requires_grad_(False)
 
     def read(e, z):
-        return md.body(None, itm(e, ftm(e, z)))
+        return md.body(e, itm(e, ftm(e, z)))   # head reads e_t, never the FTM output
 
     # targets: the rollout read of the TRUE z, computed once (frozen models)
     target = {}
@@ -182,6 +182,11 @@ def main():
                          "projector so that the ROLLOUT read of its z -- head(ITM(e_t, FTM(e_t, proj(a)))) -- matches the "
                          "rollout read of the true z, each Froude channel standardised. The z fit alone leaves z wrong "
                          "along the direction the FTM uses for yaw (nearly orthogonal to the head's), so rollout loses yaw.")
+    ap.add_argument("--b1_n", type=int, default=0, help="use only this many files of --b1_dir (0 = all)")
+    ap.add_argument("--b1_extra_dir", default="",
+                    help="a second B1 folder added to the fit (e.g. switching segments), --b1_extra_n files of it")
+    ap.add_argument("--b1_extra_n", type=int, default=0)
+    ap.add_argument("--pick_seed", type=int, default=0)
     ap.add_argument("--rollout_epochs", type=int, default=15)
     ap.add_argument("--rollout_batch", type=int, default=32)
     ap.add_argument("--rollout_lr", type=float, default=3e-4)
@@ -207,10 +212,21 @@ def main():
     print(f"stride {k}: z = ITM(e_t, e_t+{k}) from {k} command(s) per latent")
 
     data = {}
-    for name, d in (("hexapod", args.hex_dir), ("b1", args.b1_dir)):
-        if not d:
+    def pick(d, n):
+        """n files of folder d (0 = all), a fixed random subset (--pick_seed) so every fit sees the same files."""
+        ps = sorted(glob.glob(os.path.join(ROOT, d, "*.npz")))
+        if n and n < len(ps):
+            g = np.random.default_rng(args.pick_seed)
+            ps = sorted(g.choice(ps, n, replace=False).tolist())
+        return ps
+
+    for name, d, n, xd, xn in (("hexapod", args.hex_dir, 0, "", 0),
+                               ("b1", args.b1_dir, args.b1_n, args.b1_extra_dir, args.b1_extra_n)):
+        paths = (pick(d, n) if d else []) + (pick(xd, xn) if xd and xn else [])
+        if not paths:
             continue
-        data[name] = gather(name, os.path.join(ROOT, d), encoder, itm, checkpoint,
+        print(f"{name}: {len(paths)} files ({d or '-'}: {n or 'all'}, {xd or '-'}: {xn if xd else 0})")
+        data[name] = gather(name, paths, encoder, itm, checkpoint,
                             cache, args.chunk, lag, device, tuple(args.exclude), k=k)
     if not data:
         raise SystemExit("no source directories given")

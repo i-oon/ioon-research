@@ -144,7 +144,7 @@ def main():
             P = []
             for s in range(n):                                                 # one state row at a time
                 es = e[s:s + 1].expand(n, -1, -1)
-                P.append(rp.md.body(None, rp.itm(es, rp.ftm_step(es, z))).cpu())
+                P.append(rp.md.body(es, rp.itm(es, rp.ftm_step(es, z))).cpu())
             P = torch.stack(P).numpy()                                         # (state, action, ch)
             truth = np.stack([m[t:t + max(h, k if k > 1 else 0)].mean(0) for m in motion])
             row = []

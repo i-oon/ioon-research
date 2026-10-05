@@ -1,0 +1,5 @@
+c10 (hexapod): Froude-head MSE (standardised, mean of fwd/lat/yaw; per channel in brackets)
+  train    B: true z all 0.309 (0.19 / 0.43 / 0.31) | pair 0 0.394 (0.28 / 0.53 / 0.37) | pairs 1-10 0.300 (0.18 / 0.41 / 0.30) | z shuffled 1.031 (0.83 / 1.57 / 0.69) | shuf/true 3.34x
+  train    F: true z all 0.512 (0.37 / 0.68 / 0.48) | pair 0 0.532 (0.37 / 0.61 / 0.61) | pairs 1-10 0.510 (0.37 / 0.69 / 0.47) | z shuffled 0.882 (0.63 / 1.48 / 0.53) | shuf/true 1.72x
+  heldout  B: true z all 0.895 (0.68 / 0.98 / 1.02) | pair 0 1.362 (1.52 / 1.40 / 1.16) | pairs 1-10 0.848 (0.60 / 0.94 / 1.01) | z shuffled 1.438 (1.35 / 1.64 / 1.33) | shuf/true 1.61x
+  heldout  F: true z all 0.868 (0.71 / 1.07 / 0.82) | pair 0 0.922 (0.59 / 1.57 / 0.60) | pairs 1-10 0.863 (0.73 / 1.02 / 0.85) | z shuffled 1.248 (1.11 / 1.68 / 0.95) | shuf/true 1.44x

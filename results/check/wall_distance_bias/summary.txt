@@ -1,0 +1,7 @@
+within-clip corr(read error, wall proximity) and slope (Froude per unit proximity), forward channel, straight-walking heldout clips, steady part; round1_branches_s0
+  c10  original     no clips (missing cache entries: 0)
+  c10  random size  no clips (missing cache entries: 0)
+  c08  original     no clips (missing cache entries: 0)
+  c08  random size  no clips (missing cache entries: 0)
+  b1   original     no clips (missing cache entries: 0)
+  b1   random size  no clips (missing cache entries: 0)

@@ -121,20 +121,23 @@ def build_anchor(args, cfg, checkpoint, train, train_e, bank, k, device):
         from wm.models.motion_decoder import MotionDecoder
         md = MotionDecoder(cfg, {}).to(device)
         md.load_state_dict(checkpoint["md"], strict=False)
-        head = md.body_head.eval()
-        for p in head.parameters():
+        md.eval()
+        for p in md.parameters():
             p.requires_grad_(False)
+        head = md.body          # head(e_t, z); a z-only head ignores e_t (body_sees_frame=False)
     bz = bf = None
     if args.anchor_sim > 0:
         bz, bf = (x.to(device) for x in bank)
         bzn = F.normalize(bz, dim=1)
         bfn = F.normalize(bf, dim=1)
 
-    def anchor(z, f):
+    def anchor(z, f, e_t=None):
+        # e_t: the frames the pairs start at (finetune_ftm.adapt passes them), read only by a
+        # frame-conditioned head, which raises without them
         z = z.float().flatten(1)
         loss = z.new_zeros(())
         if head is not None:
-            loss = loss + args.anchor_froude * F.mse_loss(head(z), f)
+            loss = loss + args.anchor_froude * F.mse_loss(head(None if e_t is None else e_t.float(), z), f)
         if bz is not None:
             s_z = F.normalize(z, dim=1) @ bzn.T
             s_a = F.normalize(f, dim=1) @ bfn.T

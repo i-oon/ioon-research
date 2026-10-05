@@ -123,7 +123,7 @@ def stage2_fit_projector(adapted_ckpt, embodiment, data_dir, cache, epochs, lr, 
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     lag = max(1, cfg.action_lag)
 
-    e, z, a, c, paths = gather(embodiment, os.path.join(ROOT, data_dir), encoder, itm, checkpoint,
+    e, z, a, c, paths = gather(embodiment, sorted(glob.glob(os.path.join(ROOT, data_dir, "*.npz"))), encoder, itm, checkpoint,
                                cache_dict, chunk=2, lag=lag, device=device)
     if len(cache_dict) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)

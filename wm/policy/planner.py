@@ -200,6 +200,10 @@ class DirectFroudePlanner:
     def __init__(self, projector, md, candidates, embodiment, horizon=5, device="cuda",
                 free_offset=False):
         self.proj, self.md = projector, md
+        # the live observation e_t, for a frame-conditioned head (`body_sees_frame`): the caller
+        # sets it before `act`/`score`; ignored by a z-only head, and a frame-conditioned head
+        # raises while it is None
+        self.frame = None
         self.candidates = candidates
         self.embodiment = embodiment
         self.horizon = int(horizon)
@@ -292,14 +296,14 @@ class DirectFroudePlanner:
             # one latent for the k commands starting at t + lag: Froude over [t, t+k)
             a = np.stack([action_chunk_at(c["actions"], t + self.action_lag, k) for c in self.candidates])
             z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
-            pred = self.md.body(None, z)
+            pred = self.md.body(self.frame, z)
             return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         out = []
         for cand in self.candidates:
             a = torch.as_tensor(cand["actions"][t + self.action_lag:t + self.action_lag + h],
                                 device=self.device)
             z = self.proj(a, self.embodiment)
-            pred = self.md.body(None, z).mean(0)
+            pred = self.md.body(self.frame, z).mean(0)
             out.append(float(((pred - goal) ** 2).mean()))
         return np.asarray(out)
 
@@ -328,9 +332,9 @@ class DirectFroudePlanner:
                 a = np.stack([action_chunk_at(acts, j, k) for j in range(start, start + max(1, w - k + 1))])
                 z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
                 if getattr(self, "window_average", "pred") == "z":
-                    pred = self.md.body(None, z.mean(0, keepdim=True)).reshape(-1)
+                    pred = self.md.body(self.frame, z.mean(0, keepdim=True)).reshape(-1)
                 else:
-                    pred = self.md.body(None, z).mean(0)
+                    pred = self.md.body(self.frame, z).mean(0)
                 out.append(float(((pred - goal) ** 2).mean()))
             return np.asarray(out)
         out = []
@@ -350,9 +354,9 @@ class DirectFroudePlanner:
             z = self.proj(torch.as_tensor(a, device=self.device), self.embodiment)
             if getattr(self, "window_average", "pred") == "z":
                 # for a body head fit on window-averaged z (`fit_body_head --z_window`)
-                pred = self.md.body(None, z.mean(0, keepdim=True)).reshape(-1)
+                pred = self.md.body(self.frame, z.mean(0, keepdim=True)).reshape(-1)
             else:
-                pred = self.md.body(None, z).mean(0)
+                pred = self.md.body(self.frame, z).mean(0)
             out.append(float(((pred - goal) ** 2).mean()))
         return np.asarray(out)
 
@@ -381,7 +385,7 @@ class DirectFroudePlanner:
                                for tau in range(n_taus)])           # (n_taus, h, action_dim)
             a = torch.as_tensor(windows, device=self.device)
             z = self.proj(a, self.embodiment)                        # (n_taus, h, z_dim)
-            pred = self.md.body(None, z).mean(1)                     # (n_taus, body_dim)
+            pred = self.md.body(self.frame, z).mean(1)                     # (n_taus, body_dim)
             out.append(((pred - goal) ** 2).mean(-1).cpu().numpy())
         return out
 
@@ -507,7 +511,7 @@ class RolloutFroudePlanner:
         `g0`, `g1` are single-frame embeddings (1, tokens, dim), any horizon apart."""
         g0 = g0.to(self.device).float().unsqueeze(0) if g0.dim() == 2 else g0.to(self.device).float()
         g1 = g1.to(self.device).float().unsqueeze(0) if g1.dim() == 2 else g1.to(self.device).float()
-        return self.md.body(None, self.itm(g0, g1)).reshape(-1)
+        return self.md.body(g0, self.itm(g0, g1)).reshape(-1)
 
     @torch.no_grad()
     def score(self, e_t, goal, t):
@@ -530,7 +534,7 @@ class RolloutFroudePlanner:
                 a = np.stack([action_chunk_at(c["actions"], t + self.action_lag + i * k, k)
                               for c in self.candidates])
                 e = self.ftm(e, self.proj(torch.as_tensor(a, device=self.device), self.embodiment))
-            pred = self.md.body(None, self.itm(e_t.expand(n_c, -1, -1), e))
+            pred = self.md.body(e_t, self.itm(e_t.expand(n_c, -1, -1), e))
             return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         out = []
         for cand in self.candidates:
@@ -540,7 +544,7 @@ class RolloutFroudePlanner:
             e = e_t
             for i in range(len(z)):
                 e = self.ftm(e, z[i:i + 1])
-            pred = self.md.body(None, self.itm(e_t, e)).reshape(-1)
+            pred = self.md.body(e_t, self.itm(e_t, e)).reshape(-1)
             out.append(float(((pred - goal) ** 2).mean()))
         return np.asarray(out)
 
@@ -568,9 +572,9 @@ class RolloutFroudePlanner:
                 e = e_next
             zs = torch.stack(zs, dim=1)
             if getattr(self, "window_average", "pred") == "z":
-                pred = self.md.body(None, zs.mean(1))
+                pred = self.md.body(e_t, zs.mean(1))
             else:
-                pred = self.md.body(None, zs.reshape(n_cand * steps, -1)).reshape(n_cand, steps, -1).mean(1)
+                pred = self.md.body(e_t, zs.reshape(n_cand * steps, -1)).reshape(n_cand, steps, -1).mean(1)
             return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         windows = []
         for cand in self.candidates:
@@ -591,9 +595,9 @@ class RolloutFroudePlanner:
             e = e_next
         zs = torch.stack(zs, dim=1)                                       # (n_cand, w, z_dim)
         if getattr(self, "window_average", "pred") == "z":
-            pred = self.md.body(None, zs.mean(1))                        # (n_cand, body_dim)
+            pred = self.md.body(e_t, zs.mean(1))                        # (n_cand, body_dim)
         else:
-            pred = self.md.body(None, zs.reshape(n_cand * w, -1)).reshape(n_cand, w, -1).mean(1)
+            pred = self.md.body(e_t, zs.reshape(n_cand * w, -1)).reshape(n_cand, w, -1).mean(1)
         return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
 
     @torch.no_grad()

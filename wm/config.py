@@ -58,6 +58,7 @@ LEGACY_DEFAULTS = {
     "body_channels": (0,),
     "body_dim": 1,
     "body_sees_frame": False,
+    "body_frame_on_branches_only": False,
     "body_hidden": 128,
     "ftm_embodiment_channel": False,
     "center_embeddings": False,
@@ -347,6 +348,13 @@ class Config:
     # True reproduces F57's negative result: conditioning the shared head on the frame lets it
     # identify the robot and decode per-robot, and transfer collapses to -10.5 / -57.2.
     body_sees_frame: bool = False
+    # Round 2 (2026-10-05): the case is reopened because F311 found z state-dependent on B1, which a
+    # command-only projector cannot match; LAC-WM's MD(x_t, z) lets z stay action-like. Every head
+    # call passes the frame at the START of the pair (MotionDecoder.body raises on None).
+    # `body_frame_on_branches_only` (only with body_sees_frame): the body loss is applied in TRAINING
+    # only to pairs from counterfactual-branch clips (first_pair > 0), where all commands share one
+    # start state, so the frame cannot stand in for the command; validation still scores every pair.
+    body_frame_on_branches_only: bool = False
     body_hidden: int = 128
     adv_hidden: int = 128
     # Ramp the reversal strength from 0 to 1 over this many epochs. Pushing adversarially while

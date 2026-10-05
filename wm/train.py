@@ -234,7 +234,7 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         cross_target = batch["cross_action"].to(device)
         cross_pred = models["md"].chunk(cross_views, z, embodiment).reshape(cross_target.shape)
 
-    body_pred = body_target = None
+    body_pred = body_target = zshuf_pred = None
     if models["md"].body_head is not None and "body_motion" in batch:
         # `cfg.detach_body_z` (default True). `z.detach()`: L_body no longer shapes z. Isolated-frozen-z test (2026-09-08) found the
         # action->Froude signal IS in z (rho 0.69-0.94 per channel on the real absolute
@@ -244,8 +244,25 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         # because its own gradient was one more voice pulling z toward appearance/motion instead
         # of just reading what is already there. Stop-gradient makes this the same experiment as
         # the isolated test that passed: z is shaped by L_recon/L_motion alone, L_body only reads.
-        body_pred = models["md"].body(views["view1_t"], z.detach() if cfg.detach_body_z else z)
+        # `view1_t` is the frame at the START of the pair (z = ITM(view1_t, view1_next)): the
+        # only frame a frame-conditioned head (`body_sees_frame`, head(e_t, z)) may read.
+        body_z = z.detach() if cfg.detach_body_z else z
+        body_x = views["view1_t"]
         body_target = batch["body_motion"].to(device)
+        if (cfg.body_sees_frame and cfg.body_frame_on_branches_only and torch.is_grad_enabled()
+                and "branch" in batch):
+            # training only: plain clips give the frame a room/speed shortcut, branch pairs do not
+            keep = batch["branch"].to(device) > 0.5
+            body_z, body_x, body_target = body_z[keep], body_x[keep], body_target[keep]
+        if len(body_target):
+            body_pred = models["md"].body(body_x, body_z)
+        else:
+            body_target = None
+        if cfg.body_sees_frame and not torch.is_grad_enabled() and len(z) > 1 and body_pred is not None:
+            # z-dependence check (validation only): the same head with z shuffled within the batch
+            # (rolled by one: every row gets another pair's z, same frame). Logged as
+            # body_zshuf / body; a head that ignores z gives ~1.
+            zshuf_pred = models["md"].body(body_x, body_z.roll(1, dims=0))
 
     # L_state / state_head retired (2026-09-08): F177 showed its delta ingredient actively hurts
     # (z+delta R2 0.625 < z-alone 0.781), and its target is `batch["body_motion"]` -- identical to
@@ -334,6 +351,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     loss, parts = compute_losses(pred_next, views["view2_next"], pred_action, action, cfg,
                                  adv_logits, morph_id, probe_logits, cross_pred, cross_target,
                                  body_pred, body_target, state_pred, state_target)
+    if zshuf_pred is not None:
+        parts["body_zshuf"] = F.mse_loss(zshuf_pred, body_target).item()
     # **`parts["total"]` is set inside `compute_losses`, before anything below is added.** So the
     # printed total has never included the hinge, the readout or the LDAD term, and reading a run's
     # arithmetic as evidence that one of them is inactive is a mistake this comment exists to stop.
@@ -626,9 +645,19 @@ def main():
 
     if cross_embodiment:
         train_set, val_set, heads = build_cross_embodiment(cfg, ROOT)
+        if cfg.body_frame_on_branches_only:
+            if not cfg.body_sees_frame:
+                raise SystemExit("--body_frame_on_branches_only needs --body_sees_frame True")
+            train_set.mark_branches = True
+            n_br = sum(1 for i, _ in train_set.index if int(train_set.clips[i].get("first_pair", 0) or 0) > 0)
+            print(f"body loss on branch pairs only: {n_br} of {len(train_set)} training pairs")
         train_sampler = EmbodimentBatchSampler(train_set, cfg.batch_size, True, cfg.seed,
                                        balance=cfg.balance_embodiments)
-        val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, False, cfg.seed)
+        # with the frame head on, validation batches are drawn in a FIXED random order (same seed every epoch): the
+        # z-dependence check rolls z within a batch, and an ordered batch is consecutive pairs of one clip with one
+        # command, so the rolled z is nearly the true z and the ratio reads ~1 whatever the head does (seen on
+        # round2_framehead_s0, 2026-10-05). Off (every earlier run): unchanged order, unchanged val numbers.
+        val_sampler = EmbodimentBatchSampler(val_set, cfg.batch_size, bool(cfg.body_sees_frame), cfg.seed)
         train_loader = DataLoader(train_set, batch_sampler=train_sampler, num_workers=cfg.num_workers)
         val_loader = DataLoader(val_set, batch_sampler=val_sampler, num_workers=cfg.num_workers)
         counts = {k: len(v) for k, v in train_set.embodiment_indices().items()}
@@ -899,6 +928,13 @@ def main():
             + (f" probe {train_metrics['probe_accuracy']:.3f}"
                if "probe_accuracy" in train_metrics else "") + suffix
         )
+
+        if "body_zshuf" in val_metrics:
+            # only with body_sees_frame (see forward_step); a separate line so the epoch line above
+            # stays byte-identical for every other run
+            print(f"z-dependence {epoch:3d} | val Froude-head error, z shuffled within batch / true z: "
+                  f"{val_metrics['body_zshuf'] / max(val_metrics['body'], 1e-12):.3f}x "
+                  f"({val_metrics['body_zshuf']:.4f} / {val_metrics['body']:.4f}; ~1 = head ignores z)")
 
         # `selection`, not `total` -- see wm/losses.py. `total` includes whichever experimental
         # term this run enables, so selecting on it checkpoints the arms of a matched pair at

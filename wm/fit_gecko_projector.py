@@ -60,7 +60,7 @@ def main():
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     lag = max(1, cfg.action_lag)
 
-    e, z, a, c, paths = gather("gecko", os.path.join(ROOT, GECKO_DIR), encoder, itm, checkpoint,
+    e, z, a, c, paths = gather("gecko", sorted(glob.glob(os.path.join(ROOT, GECKO_DIR, "*.npz"))), encoder, itm, checkpoint,
                                 cache, chunk=2, lag=lag, device=device)
     if len(cache) > before:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)

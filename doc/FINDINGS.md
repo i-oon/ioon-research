@@ -8840,3 +8840,102 @@ projector is fitted by isotropic z-MSE on single-command clips (`wm/fit_projecto
 coordinate. Fixes ranked: (1) fit the projector through the frozen FTM + ITM + head (Froude of the rollout read + FTM gap),
 on clips + branches -- minutes, no retrain; (2) a training loss on the rollout read so g and h align; (3) train the FTM on
 projector z. Not supported: recon weighting, multi-step targets, chunk changes.
+
+**F311 fix test (2026-10-05).** `wm/fit_projector.py --objective rollout` (z fit, then 15 epochs through the frozen FTM + ITM +
+head, read of the projector's z matched to the read of the true z, channels standardised, w_z 0.1), fitted on c10 + B1
+`*_clips_train` for round1_branches_s0; counterfactual read-out on the heldout branches, P = 11 (old z-fit projector ->
+rollout-fit): c10 FTM-predicted 0.85 / 0.80 / 0.41 -> **0.89 / 0.80 / 0.61** (yaw +0.20; ceiling FTM(z_true) 0.82); B1
+0.83 / 0.85 / 0.42 -> 0.82 / 0.86 / 0.41 (no change). Direct unchanged. Partial fix: works on c10, not B1 -- the fit sees only
+steady single-command clips, where B1's within-clip yaw variation is tiny (its clip val error was already 0.09 standardised);
+next step per the diagnosis: include branches (switching transients) in the projector fit. Log
+`results/wm/logs/rollout_projector_test.log`.
+
+**F311 budget test (2026-10-05).** Same B1 adaptation budget (~2,900 frames), rollout-objective projector, round1_branches_s0,
+B1 heldout read-out P = 11, FTM-predicted fwd / lat / yaw (direct in brackets): (a) 44 steady clips 0.84 / 0.84 / 0.41
+(0.98 / 0.97 / 0.49); (b) 22 clips + 47 branch files 0.86 / 0.68 / 0.35 (0.94 / 0.91 / 0.29); (c) 94 branch files
+0.86 / 0.69 / 0.42 (0.89 / 0.85 / 0.54). Ceiling FTM(z_true) yaw 0.58. Switching segments do not fix B1 yaw at equal budget and
+cost lateral and direct (branch files give only their 10 post-branch pairs each: 1,504-2,094 transitions vs 2,684 for clips).
+B1's within-group yaw spread is tiny (std 0.007, F311), so the remaining gap (0.41 vs 0.58) is small in absolute terms.
+Decision: keep the rollout objective fitted on steady clips at the standard budget (helps c10 yaw +0.20, neutral on B1);
+no extra data for the projector. Log `results/wm/logs/projector_budget_test.log`.
+
+### F312. A state-aware projector P(a, e_t) closes about two-thirds of B1's yaw gap but memorises training rooms; state dependence of z is part of the cause, not all
+
+`scripts/diagnostics/forward_model/state_projector_diag.py` (`results/check/state_projector/result_main.txt`): round1_branches_s0
+frozen; per body 400 random `*_branches_train` files + 48 clips (9,328 pairs), source-grouped 20 % val; state-free vs
+state-aware (action + 4x4-pooled e_t -> 128-d) projector, identical z fit + 15 rollout-objective epochs; heldout branches P = 11:
+
+| | c10 FTM-pred fwd / lat / yaw | B1 FTM-pred fwd / lat / yaw |
+|---|---|---|
+| ceiling FTM(z_true) | 0.90 / 0.64 / 0.82 | 0.85 / 0.66 / 0.57 |
+| state-free | 0.90 / 0.81 / 0.71 | 0.87 / 0.73 / 0.41 |
+| state-aware | 0.93 / 0.78 / 0.77 | 0.88 / 0.75 / 0.52 |
+
+Direct reads unchanged (B1 0.92 / 0.85 / 0.54-0.56). Room memorisation: state-aware train error ~10x below state-free, val gain
+only ~2x (c10) / small (B1); absolute heldout error on B1 worse (0.21 / 0.20 / 0.08 vs 0.14 / 0.20 / 0.05). Note: with 400
+branch files the STATE-FREE rollout fit already reaches c10 yaw 0.71 (F311 clips-only 0.61; 47-94 files did not help B1).
+Reading: state information lets z land where the FTM reads yaw (B1 0.41 -> 0.52 of 0.57), so state dependence is part of
+the cause; a frame-reading projector is not adopted (memorises rooms, patch after the fact). Follow-up: the frame-conditioned
+Froude head during training (round 2, arm F) to make z itself state-independent.
+
+### F313. A frame-conditioned Froude head (LAC-WM's MD(x_t, z) form, round-2 arm F) is worse on every measure than the z-only head; not adopted
+
+`round2_framehead_s0` = round-1 arm B + `--body_sees_frame True` (same data, steps, seed), `eval_suite.sh ... joint`
+(`results/eval/round2_framehead_s0/summary.txt`; frame passed as e_t everywhere, audited). Against arm B s0:
+
+| | arm B s0 (head(z)) | arm F (head(e_t, z)) |
+|---|---|---|
+| z-dependence, heldout, z shuffled / true (hexapod, B1) | 3.0x (hexapod) | 1.7x / 1.9x |
+| selection direct / rollout current frame: c10 | +0.92 / +0.71 | +0.79 / +0.57 |
+| B1 | +0.94 / +0.75 | +0.84 / +0.73 |
+| B1 vision-read goal | +0.84 / +0.63 | +0.58 / +0.48 |
+| c08 | +0.90 / +0.68 | +0.74 / +0.56 |
+| read-out P=11 FTM-pred c10 fwd / lat / yaw | 0.85 / 0.80 / 0.41 | 0.81 / 0.76 / 0.25 |
+| B1 | 0.83 / 0.85 / 0.42 | 0.83 / 0.91 / 0.41 |
+| real future c10 (yaw) | 0.90 / 0.68 / 0.86 | 0.76 / 0.65 / 0.34 |
+| retrieval c10 -> B1 / c08 | 0.25 / 0.63 | 0.18 / 0.54 |
+
+Reading: the head still uses z (1.7-1.9x) but less than the z-only head, and every read of yaw collapses on the hexapods
+(direct 0.33 vs 0.78; real future 0.34 vs 0.86), so z carries less motion, as in F57. B1 yaw is not improved. The training-time
+z-dependence lines of this run (0.996x / 1.000x) were an artifact of ordered validation batches (STATUS); the eval check above
+is the valid one. Decision: keep the z-only head; state dependence of z (F312) is not fixed this way.
+
+**F313 leak check (2026-10-05).** User hypothesis: the frame head memorises pose-in-room in training rooms (branches of one
+source share a room and start pose). `scripts/diagnostics/forward_model/frame_head_leak_check.py`
+(`results/wm/logs/frame_head_leak.log`): Froude-head MSE (standardised, mean of 3 channels) on branch pairs, 8 groups x 24
+per room set, true z / z shuffled across the set:
+
+| | c10 train rooms | c10 heldout rooms | B1 train rooms | B1 heldout rooms |
+|---|---|---|---|---|
+| B head(z), true z | 0.38 | 0.56 | 0.31 | 0.64 |
+| F head(e_t, z), true z | 0.57 | 0.66 | 0.35 | 0.89 |
+| B, z shuffled (ratio) | 1.48 (3.9x) | 1.35 (2.4x) | 1.57 (5.1x) | 1.41 (2.2x) |
+| F, z shuffled (ratio) | 1.02 (1.8x) | 1.02 (1.6x) | 0.76 (2.2x) | 1.28 (1.4x) |
+
+No leak signature: F is WORSE than B in the training rooms too (and at pairs 1-10, where pose-in-room could reveal the
+command), and its train-to-heldout gap is not larger (c10 +0.09 vs B +0.18). What the frame gives F is a baseline without z
+(shuffled-z error 0.76-1.02 vs B's 1.35-1.57), and correspondingly less reliance on z. Reading: F313 is not a data-leak artefact;
+the frame input lowers the pressure on z and the frame-conditioned head fits worse even where it could cheat.
+
+### F314. Render-shift test (room size random 8-26.5 m, shared by all bodies): the hexapods are unaffected; B1 holds where motion is imagined or commanded, but reading its REAL video drops
+
+Heldout re-rendered with the same physics, room size log-uniform 8.0-26.47 m per room seed (instead of scaled to each body's
+camera height: hexapods 8 m, B1 17.65 m), `scripts/dataset/render_shift_heldout.py`, `data/counterfactual_walks/rs_*`
+(24 clips + 24 branch groups per body; gates: original size reproduces stored frames exactly). Model round1_branches_s0,
+unchanged; read-out compared on the SAME 24 groups in the original renders (`orig24_*`).
+Selection direct / rollout current frame (original -> random size): c10 +0.92 / +0.71 -> +0.92 / +0.70; c08 +0.90 / +0.68
+-> +0.91 / +0.68; B1 +0.94 / +0.75 -> +0.94 / +0.73; **B1 vision-read goal +0.84 / +0.63 -> +0.77 / +0.51**.
+Read-out P = 11, fwd / lat / yaw: c10 real 0.92 / 0.68 / 0.87 -> 0.88 / 0.64 / 0.85, FTM 0.86 / 0.84 / 0.42 -> 0.85 / 0.84 / 0.42;
+c08 essentially unchanged; **B1 real future 0.87 / 0.72 / 0.60 -> 0.39 / 0.64 / 0.45**, FTM-predicted 0.83 / 0.84 / 0.39 ->
+0.78 / 0.82 / 0.26. Retrieval c10 -> B1 0.25 -> 0.13.
+Reading: the room scaling did not prop up the hexapod results. For B1, everything driven by the command (direct, FTM
+imagination, rollout selection) holds; what reads B1's motion from real video (real-future read, vision goal) depends on
+the single scale it was trained at (B1 always saw 17.65 m rooms; in smaller rooms the same speed moves the image faster).
+Implication: training data needs room sizes randomised from one shared range (rendering only), and every new dataset
+(babbling, 4-leg) is rendered that way from the start. hexapod-only + adapted B1 on this set: pending.
+
+**F314, hexapod-only + LoRA-adapted B1 (round1_hexonly_s0) on the same render-shift set.** Selection direct / rollout
+(original -> random size): c10 +0.93 / +0.69 -> +0.93 / +0.67; c08 +0.91 / +0.67 -> +0.92 / +0.67; B1 +0.97 / +0.70 -> +0.96 /
++0.69; **B1 vision-read goal +0.83 / +0.57 -> +0.60 / +0.42**. Read-out P = 11 on the same 24 groups, B1 real future
+0.62 / 0.54 / 0.59 -> 0.50 / 0.32 / 0.40, FTM-predicted 0.75 / 0.86 / -0.03 -> 0.69 / 0.82 / -0.13; c10 / c08 essentially
+unchanged. Same pattern as arm B, stronger on the vision-read goal (-0.23 direct): B1 was adapted on its 17.65 m clips only.

@@ -13,7 +13,7 @@
 #   1. checkpoints: hexapod projector (c10, c08); B1: projector only (joint) or LoRA r8 3000 steps with the
 #      Froude loss + projector (hexonly)
 #   2. selection, normalised score, w=21: B1 (recorded goal and vision-read goal), c08 zero-shot, c10
-#   3. shared latent (body-ID, cross-body R2, kNN mixing, retrieval)
+#   3. shared latent (body-ID, cross-body R2, kNN mixing, retrieval); 3b. z-dependence of the Froude head
 #   4. counterfactual read-out on the heldout physics branches (Pearson r across the 24 commands): hexapod, B1,
 #      c08 (held-out body, zero-shot, hexapod projector)
 # Sequential; one GPU job at a time. Needs CoppeliaSim on port 23000 only if a read-out cache is missing.
@@ -82,6 +82,14 @@ echo "--- shared latent" | tee -a $OUT/summary.txt
 $PY scripts/figures/shared_latent_figure.py --device cuda --b1 "$LIB=$LIBC" --c10 "$HEXT=results/wm/cache/test_v4_hex_heldout.pt" \
     --c08 "$C08=results/wm/cache/test_v4_c08_heldout.pt" \
     --model "$NAME=$ITM_B1" --out $OUT/shared_latent 2>&1 | quiet | tail -3 | tee $OUT/shared_latent.txt | tee -a $OUT/summary.txt
+
+# 3b. z-dependence of the Froude head (z shuffled within a batch vs true z; ~1 = the head ignores z)
+ZD=scripts/diagnostics/objective_experiments/z_dependence.py
+{
+echo "--- z-dependence (Froude-head error, z shuffled / true z, heldout pairs)"
+$PY $ZD --ckpt $CK/hex.pt --embodiment hexapod --dir $HEXT --cache results/wm/cache/test_v4_hex_heldout.pt 2>&1 | grep "^z-dependence"
+$PY $ZD --ckpt $ITM_B1 --embodiment b1 --dir $LIB --cache $LIBC 2>&1 | grep "^z-dependence"
+} 2>&1 | tee $OUT/z_dependence.txt | tee -a $OUT/summary.txt
 
 # 4. counterfactual read-out on the v4 physics branches (heldout), no simulator
 CFH=${CFH:-$CW/c10_branches_heldout}; CFB=${CFB:-$CW/b1_branches_heldout}; CFC=${CFC:-$CW/c08_branches_heldout}

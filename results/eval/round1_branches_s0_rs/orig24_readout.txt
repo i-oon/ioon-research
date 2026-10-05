@@ -1,0 +1,31 @@
+=== round1_branches_s0: read-out on ORIGINAL renders, same 24 groups
+--- c10
+=== round1_branches_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.56 / 0.18 / 0.35
+  FTM cf  0.40 / 0.40 / 0.12
+  direct  0.89 / 0.71 / 0.51
+--
+=== round1_branches_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.68 / 0.87
+  FTM cf  0.86 / 0.84 / 0.42
+  direct  0.97 / 0.87 / 0.79
+--- b1
+=== round1_branches_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.39 / 0.01 / 0.40
+  FTM cf  0.62 / 0.64 / 0.09
+  direct  0.92 / 0.95 / 0.28
+--
+=== round1_branches_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.87 / 0.72 / 0.60
+  FTM cf  0.83 / 0.84 / 0.39
+  direct  0.98 / 0.98 / 0.46
+--- c08
+=== round1_branches_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.54 / 0.26 / 0.36
+  FTM cf  0.51 / 0.33 / 0.11
+  direct  0.87 / 0.64 / 0.53
+--
+=== round1_branches_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.91 / 0.70 / 0.89
+  FTM cf  0.85 / 0.78 / 0.36
+  direct  0.97 / 0.81 / 0.75

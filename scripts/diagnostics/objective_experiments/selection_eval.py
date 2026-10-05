@@ -107,6 +107,10 @@ def main():
         bounds[c] = (d.min(1).mean(), d.mean())
 
     need_frames = any(m.startswith("roll") for m in args.modes) or args.goal_source == "vision"
+    # a frame-conditioned Froude head (`body_sees_frame`) reads the live frame in `direct` mode too
+    need_frames = need_frames or any(
+        torch.load(os.path.join(ROOT, s.split("=", 1)[1].partition("@")[0]), map_location="cpu",
+                   weights_only=False)["config"].get("body_sees_frame", False) for s in args.ckpt)
     goal_paths = {}
     for p in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
         with np.load(p, allow_pickle=True) as d:
@@ -181,7 +185,7 @@ def main():
                 e = e.to(args.device)
                 with torch.no_grad():
                     z = rp.itm(e[:-k], e[k:])
-                    f = rp.md.body(None, z).float().cpu().numpy() * rp.std_s + rp.mean_s   # (T-k, 3) Froude
+                    f = rp.md.body(e[:-k], z).float().cpu().numpy() * rp.std_s + rp.mean_s   # (T-k, 3) Froude
                 half = args.goal_window // 2
                 n = len(goals[c])
                 vg = np.stack([f[max(0, t - half):min(len(f), t + half + 1)].mean(0) for t in range(min(n, len(f)))])
@@ -212,6 +216,8 @@ def main():
                     e_fixed = frame(0, 0) if mode == "roll_fixed" else None
                     for t in steps:
                         if mode == "direct":
+                            # the live frame, read only by a frame-conditioned head
+                            planner.frame = frame(prev, t) if need_frames else None
                             _, i, sc, _ = planner.act(g_std[t], t)
                             if not allowed[c].all():
                                 i = int(np.argmin(np.where(allowed[c], sc, np.inf)))

@@ -187,12 +187,33 @@ class MotionDecoder(nn.Module):
         return self.chunk(x_t, z, embodiment)[:, 0]
 
     def body(self, x_t, z):
-        """Body motion from `z` alone. `x_t` is accepted and ignored unless body_sees_frame."""
+        """Body motion (standardised Froude) from `z`, and from `x_t` when body_sees_frame.
+
+        `body_sees_frame=False` (default): `x_t` is ignored, output is exactly `body_head(z)`.
+
+        `body_sees_frame=True` (LAC-WM's MD(x_t, z)): `x_t` MUST be the embedding of the frame at
+        the START of the pair `z` describes -- the real current observation, never a later frame
+        and never an FTM prediction (planners pass the observed e_t for every imagined step). A
+        missing frame raises rather than being silently dropped. `z` may have any leading shape
+        (..., z_dim); `x_t` is (tokens, dim), (1, tokens, dim) -- broadcast over every z row -- or
+        (N, tokens, dim) with N = the number of z rows.
+        """
         if self.body_head is None:
             raise RuntimeError("lambda_body is 0; no shared body head was built")
-        if self.body_sees_frame:
-            return self.body_head(self.features(x_t, z)).squeeze(1)
-        return self.body_head(z)
+        if not self.body_sees_frame:
+            return self.body_head(z)
+        if x_t is None:
+            raise ValueError("body_sees_frame=True: the Froude head reads head(e_t, z) and needs the "
+                             "current-frame embedding e_t (frame at the start of the pair); got x_t=None")
+        lead = z.shape[:-1]
+        flat = z.reshape(-1, z.shape[-1])
+        if x_t.dim() == 2:
+            x_t = x_t.unsqueeze(0)
+        if x_t.shape[0] == 1 and flat.shape[0] > 1:
+            x_t = x_t.expand(flat.shape[0], -1, -1)
+        elif x_t.shape[0] != flat.shape[0]:
+            raise ValueError(f"body(): {x_t.shape[0]} frames for {flat.shape[0]} latents")
+        return self.body_head(self.features(x_t, flat)).squeeze(1).reshape(*lead, -1)
 
     def add_head(self, name, hidden, action_dim, device=None):
         """A body with a new action space needs its own head; the backbone stays frozen."""

@@ -54,9 +54,10 @@ def tokens(path, clip, bp, n, encoder):
     The encoder is frozen, so these are the same for every model: encoded once (float32 encoder, stored fp16 like every
     other embedding cache) and reused by every evaluation and diagnosis. One file per branch, loaded group by group, so RAM
     stays bounded. Stamped with the source file's size + mtime and the frame range; a mismatch re-encodes."""
-    rel = os.path.relpath(path, ROOT).replace(os.sep, "__")
+    real = os.path.realpath(path)      # a symlinked copy (e.g. a subset folder) reuses the original's entry
+    rel = os.path.relpath(real, ROOT).replace(os.sep, "__")
     f = os.path.join(CACHE, rel + ".pt")
-    st = os.stat(path)
+    st = os.stat(real)
     stamp = (st.st_size, st.st_mtime_ns, bp, n)
     if os.path.exists(f):
         d = torch.load(f, map_location="cpu")
@@ -121,7 +122,7 @@ def main():
         E = [tokens(p, c, bp, n_frames, encoder) for p, c, bp in zip(paths, clips, bs)]
         for r in runs:
             m, K = r["m"], r["m"].stride
-            rd = lambda z, r=r: r["m"].md.body(None, z).float().cpu().numpy() * r["std"] + r["mean"]  # noqa: E731
+            rd = lambda x, z, r=r: r["m"].md.body(x, z).float().cpu().numpy() * r["std"] + r["mean"]  # noqa: E731
             fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - o.reshape(e.shape[1:]))  # noqa: E731
             for P in args.pairs:
                 truth, reads = [], {k: [] for k in r["R"][P]}
@@ -133,9 +134,9 @@ def main():
                     e0, e1 = fix(e[:P]), fix(e[K:K + P])
                     chunk = np.stack([action_chunk_at(c["actions"], bp + j + m.action_lag, K) for j in range(P)])
                     z = m.proj(torch.as_tensor(chunk, device=dev), emb_name)
-                    reads["real cf"].append(rd(m.itm(e0, e1)).mean(0))
-                    reads["FTM cf"].append(rd(m.itm(e0, m.ftm_step(e0, z))).mean(0))
-                    reads["direct"].append(rd(z).mean(0))
+                    reads["real cf"].append(rd(e0, m.itm(e0, e1)).mean(0))
+                    reads["FTM cf"].append(rd(e0, m.itm(e0, m.ftm_step(e0, z))).mean(0))
+                    reads["direct"].append(rd(e0, z).mean(0))
                 truth = np.stack(truth)
                 for k in reads:
                     f = np.stack(reads[k])

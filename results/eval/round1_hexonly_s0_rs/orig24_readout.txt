@@ -1,0 +1,31 @@
+=== round1_hexonly_s0: read-out on ORIGINAL renders, same 24 groups
+--- c10
+=== round1_hexonly_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.59 / 0.20 / 0.42
+  FTM cf  0.36 / 0.35 / 0.17
+  direct  0.88 / 0.71 / 0.58
+--
+=== round1_hexonly_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.94 / 0.76 / 0.89
+  FTM cf  0.83 / 0.78 / 0.40
+  direct  0.97 / 0.88 / 0.80
+--- b1
+=== round1_hexonly_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.18 / -0.18 / 0.31
+  FTM cf  0.54 / 0.75 / 0.00
+  direct  0.88 / 0.88 / 0.20
+--
+=== round1_hexonly_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.62 / 0.54 / 0.59
+  FTM cf  0.75 / 0.86 / -0.03
+  direct  0.97 / 0.97 / 0.44
+--- c08
+=== round1_hexonly_s0: 24 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.52 / 0.33 / 0.43
+  FTM cf  0.41 / 0.41 / 0.16
+  direct  0.86 / 0.64 / 0.61
+--
+=== round1_hexonly_s0: 24 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.78 / 0.91
+  FTM cf  0.84 / 0.76 / 0.37
+  direct  0.97 / 0.82 / 0.79

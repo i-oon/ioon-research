@@ -1,0 +1,122 @@
+[
+ {
+  "body": "c10",
+  "file": "data/counterfactual_walks/c10_branches_heldout/hexapod_ep401233312.npz",
+  "mae": 0.8536688691826277,
+  "max": 88,
+  "frac_px_diff": 0.018601940524193547,
+  "corr": 0.9795802391390396,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c10",
+  "file": "data/counterfactual_walks/c10_branches_heldout/hexapod_ep400031205.npz",
+  "mae": 0.7254573042674731,
+  "max": 97,
+  "frac_px_diff": 0.0172882080078125,
+  "corr": 0.9829518256490646,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c10",
+  "file": "data/counterfactual_walks/c10_clips_heldout/hexapod_ep40003.npz",
+  "mae": 0.7679421010643545,
+  "max": 97,
+  "frac_px_diff": 0.01830499822443182,
+  "corr": 0.9809531519730532,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c10",
+  "file": "data/counterfactual_walks/c10_clips_heldout/hexapod_ep40132.npz",
+  "mae": 0.5017713296293008,
+  "max": 93,
+  "frac_px_diff": 0.018198649088541668,
+  "corr": 0.9908723728971861,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "b1",
+  "file": "data/counterfactual_walks/b1_clips_heldout/b1_ep50003.npz",
+  "mae": 1.1325692841500947,
+  "max": 97,
+  "frac_px_diff": 0.023352651885061554,
+  "corr": 0.9717718019393461,
+  "cam_pose_maxdiff": 0.0,
+  "room": 17.64705882352941
+ },
+ {
+  "body": "b1",
+  "file": "data/counterfactual_walks/b1_clips_heldout/b1_ep50132.npz",
+  "mae": 1.0184860229492188,
+  "max": 93,
+  "frac_px_diff": 0.02340813839074337,
+  "corr": 0.9771251996664891,
+  "cam_pose_maxdiff": 0.0,
+  "room": 17.64705882352941
+ },
+ {
+  "body": "b1",
+  "file": "data/counterfactual_walks/b1_branches_heldout/b1_ep501231912.npz",
+  "mae": 1.262918943999916,
+  "max": 88,
+  "frac_px_diff": 0.023172193957913305,
+  "corr": 0.969175226512875,
+  "cam_pose_maxdiff": 0.0,
+  "room": 17.64705882352941
+ },
+ {
+  "body": "b1",
+  "file": "data/counterfactual_walks/b1_branches_heldout/b1_ep500032105.npz",
+  "mae": 1.0945907100554435,
+  "max": 97,
+  "frac_px_diff": 0.02271000031502016,
+  "corr": 0.9732473263074365,
+  "cam_pose_maxdiff": 0.0,
+  "room": 17.64705882352941
+ },
+ {
+  "body": "c08",
+  "file": "data/counterfactual_walks/c08_branches_heldout/hexapod_ep601233312.npz",
+  "mae": 0.8674770888461861,
+  "max": 88,
+  "frac_px_diff": 0.018682172221522176,
+  "corr": 0.9789279615509915,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c08",
+  "file": "data/counterfactual_walks/c08_branches_heldout/hexapod_ep600031205.npz",
+  "mae": 0.7115644229355679,
+  "max": 96,
+  "frac_px_diff": 0.01747623566658266,
+  "corr": 0.9832767914303001,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c08",
+  "file": "data/counterfactual_walks/c08_clips_heldout/hexapod_ep60132.npz",
+  "mae": 0.5614519215593434,
+  "max": 93,
+  "frac_px_diff": 0.018280260490648674,
+  "corr": 0.9889624866700961,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ },
+ {
+  "body": "c08",
+  "file": "data/counterfactual_walks/c08_clips_heldout/hexapod_ep60003.npz",
+  "mae": 0.7469429247307054,
+  "max": 96,
+  "frac_px_diff": 0.018473307291666668,
+  "corr": 0.9815531776910079,
+  "cam_pose_maxdiff": 0.0,
+  "room": 8.0
+ }
+]

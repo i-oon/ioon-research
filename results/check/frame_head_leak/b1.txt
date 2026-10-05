@@ -1,0 +1,5 @@
+b1 (b1): Froude-head MSE (standardised, mean of fwd/lat/yaw; per channel in brackets)
+  train    B: true z all 0.308 (0.36 / 0.48 / 0.09) | pair 0 0.297 (0.31 / 0.50 / 0.07) | pairs 1-10 0.309 (0.36 / 0.48 / 0.09) | z shuffled 1.574 (1.57 / 1.06 / 2.09) | shuf/true 5.11x
+  train    F: true z all 0.346 (0.38 / 0.50 / 0.16) | pair 0 0.342 (0.36 / 0.54 / 0.12) | pairs 1-10 0.347 (0.38 / 0.49 / 0.17) | z shuffled 0.763 (0.98 / 1.08 / 0.23) | shuf/true 2.20x
+  heldout  B: true z all 0.641 (0.59 / 0.57 / 0.76) | pair 0 0.734 (0.58 / 0.81 / 0.82) | pairs 1-10 0.632 (0.59 / 0.55 / 0.76) | z shuffled 1.407 (1.30 / 1.14 / 1.78) | shuf/true 2.20x
+  heldout  F: true z all 0.890 (0.83 / 0.56 / 1.28) | pair 0 0.905 (0.90 / 0.71 / 1.10) | pairs 1-10 0.889 (0.82 / 0.54 / 1.30) | z shuffled 1.279 (1.44 / 1.07 / 1.34) | shuf/true 1.44x

@@ -482,6 +482,10 @@ class MultiEmbodimentPairs(Dataset):
                                  - self.body_stats[0]) / self.body_stats[1]).astype(np.float32)}
                if self.body_stats is not None else {}),
         }
+        if getattr(self, "mark_branches", False):
+            # set by wm/train.py only under `body_frame_on_branches_only`, so the batch is unchanged
+            # otherwise: 1 for a counterfactual-branch clip (first_pair > 0), 0 for a plain clip
+            sample["branch"] = np.float32(int(clip.get("first_pair", 0) or 0) > 0)
         if self.rollout_k >= 2:
             # a third timestep, same view families as the pair above: `view1_next2` pairs with
             # `view1_next` for z2 = ITM(e_t+1, e_t+2) (real frames only -- never the FTM's own

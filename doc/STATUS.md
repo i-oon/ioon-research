@@ -66,6 +66,15 @@ Every file: `com_pos` (Froude at the centre of mass), `cam_pose`; branches also 
 
 8. **Claim = drive a new robot with no prior knowledge** (user 2026-10-04): c10 and joint-B1 rows are reference only. Claim rows: hexapod-only pretraining + babbling-adapted B1 (expert B1 library = upper bound, DATA_PLAN 10) and the 4-leg variants (DATA_PLAN 9, test commands from the body's own babble only).
 
+**ON HOLD (user 2026-10-04): no new data collection (B1 babbling, 4-leg) until the pipeline is stable** -- first the
+projector-fit fix (F311 test) and a decision on the setup-truthfulness issues; otherwise new data may have to be redone.
+
+**Round 2 arm F (2026-10-05, running): frame-conditioned Froude head** (`round1_counterfactual.sh F`, arm B + `--body_sees_frame True`,
+run `round2_framehead_s0`). Its in-training "z-dependence" lines (0.996x, 1.000x) are a MEASUREMENT ARTIFACT, not evidence the
+head ignores z: validation batches were consecutive pairs of one clip, so rolling z within a batch barely changed it (fixed in
+`wm/train.py` for future frame-head runs: fixed random val order). Use `eval_suite` step 3b (`z_dependence.py`, random batches;
+arm B: 3.0x) to judge. Eval queued after training (`results/wm/logs/queue_framehead_eval.sh`).
+
 ## Open decisions / known issues
 
 - **Truthfulness of the setup (user 2026-10-04, DEFERRED -- do not re-collect / re-render until the user decides):**

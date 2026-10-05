@@ -1,0 +1,43 @@
+state_projector_diag tag=main n_branch=400 K=5
+free: read err std (fwd, lat, yaw, zMSE) train {'hexapod': [0.2336, 0.198, 0.1948, 3.2505], 'b1': [0.0523, 0.0549, 0.0462, 1.4015]} | val {'hexapod': [0.2722, 0.258, 0.2471, 3.4126], 'b1': [0.0677, 0.0643, 0.0771, 1.6842]}
+aware: read err std (fwd, lat, yaw, zMSE) train {'hexapod': [0.0205, 0.0228, 0.023, 0.4924], 'b1': [0.0138, 0.0161, 0.0083, 0.2859]} | val {'hexapod': [0.1326, 0.1563, 0.1727, 1.5996], 'b1': [0.0597, 0.064, 0.0662, 0.9572]}
+
+=== hexapod heldout (72 groups, 24 commands); r fwd / lat / yaw
+ P=1
+   real      0.53 / 0.12 / 0.30
+   ftm_true  0.50 / 0.07 / 0.29
+   ftm_free  0.47 / 0.27 / 0.27
+   ftm_aware 0.65 / 0.21 / 0.21
+   dir_true  0.53 / 0.12 / 0.30
+   dir_free  0.54 / 0.19 / 0.38
+   dir_aware 0.76 / 0.38 / 0.33
+ P=11
+   real      0.90 / 0.68 / 0.85
+   ftm_true  0.90 / 0.64 / 0.82
+   ftm_free  0.90 / 0.81 / 0.71
+   ftm_aware 0.93 / 0.78 / 0.77
+   dir_true  0.90 / 0.68 / 0.85
+   dir_free  0.96 / 0.87 / 0.84
+   dir_aware 0.96 / 0.85 / 0.83
+ heldout rollout read err (std, pair 0 vs FTM(z_true) read) {'free': [0.4867999851703644, 0.27720001339912415, 0.3018999993801117], 'aware': [0.46059998869895935, 0.20059999823570251, 0.34769999980926514]}
+ across-state std of z per command (mean over dims and commands) {'true': 2.4572291374206543, 'free': 1.8605581521987915, 'aware': 1.9758572578430176}
+
+=== b1 heldout (72 groups, 24 commands); r fwd / lat / yaw
+ P=1
+   real      0.37 / -0.00 / 0.37
+   ftm_true  0.33 / 0.05 / 0.32
+   ftm_free  0.40 / 0.11 / 0.19
+   ftm_aware 0.56 / 0.21 / 0.34
+   dir_true  0.37 / -0.00 / 0.37
+   dir_free  0.37 / 0.24 / 0.27
+   dir_aware 0.52 / 0.42 / 0.53
+ P=11
+   real      0.86 / 0.72 / 0.64
+   ftm_true  0.85 / 0.66 / 0.57
+   ftm_free  0.87 / 0.73 / 0.41
+   ftm_aware 0.88 / 0.75 / 0.52
+   dir_true  0.86 / 0.72 / 0.64
+   dir_free  0.92 / 0.85 / 0.54
+   dir_aware 0.92 / 0.84 / 0.56
+ heldout rollout read err (std, pair 0 vs FTM(z_true) read) {'free': [0.13940000534057617, 0.20409999787807465, 0.05400000140070915], 'aware': [0.20569999516010284, 0.19679999351501465, 0.08070000261068344]}
+ across-state std of z per command (mean over dims and commands) {'true': 2.4272067546844482, 'free': 2.3541500568389893, 'aware': 2.152750253677368}
