@@ -1,0 +1,46 @@
+train: 192 files (want 192), tmp leftovers 0
+val: 24 files (want 24), tmp leftovers 0
+heldout_pool: 96 files (want 96), tmp leftovers 0
+episodes per split [48, 6, 24], episode overlap between splits: none; distinct (episode, window) 312
+train room seeds 300-491 each once: True; overlap with existing clip rooms: none
+val room seeds 500-523 each once: True; overlap with existing clip rooms: none
+heldout_pool room seeds 600-695 each once: True; overlap with existing clip rooms: none
+labels finite: True; froude_height values [0.5274] (B1 clips' median CoM z 0.5274); loader uses it (fwd/lat scale 1/sqrt(h) check): True
+segment switches inside windows: 691; labels after a switch independent of the prefix (pose noise before the switch): 691/691; segments whose command changes inside: 0
+windows with a fallen frame: 0; camera clearance beyond margin: min 0.06 m (0 windows inside the margin)
+MultiEmbodimentPairs(train, lazy, stride 5, rollout 2): 10752 pairs; item keys ['action', 'body_motion', 'embodiment', 'morph_id', 'view1_next', 'view1_next2', 'view1_t', 'view2_next']...
+MultiEmbodimentPairs(val, lazy, stride 5, rollout 2): 1344 pairs; item keys ['action', 'body_motion', 'embodiment', 'morph_id', 'view1_next', 'view1_next2', 'view1_t', 'view2_next']...
+MultiEmbodimentPairs(heldout_pool, lazy, stride 5, rollout 2): 5376 pairs; item keys ['action', 'body_motion', 'embodiment', 'morph_id', 'view1_next', 'view1_next2', 'view1_t', 'view2_next']...
+
+Coverage (REPORTED only, never used to sample). Measured CoM Froude, channel ranges (1st..99th pct):
+  babble train frames        fwd -0.215..+0.209  lat -0.182..+0.157  yaw -0.134..+0.140
+  babble all segment means   fwd -0.212..+0.194  lat -0.180..+0.149  yaw -0.132..+0.137
+  B1 clip behaviours (24)    fwd -0.235..+0.224  lat -0.169..+0.190  yaw -0.071..+0.055
+  per B1 behaviour: nearest babble segment mean (Euclidean in Froude, 3 channels)
+    0 speed_vx0.30       [ 0.153 -0.003 -0.008]  nearest 0.015  segments within 0.05: 13
+    1 speed_vx0.38       [ 0.183 -0.008 -0.008]  nearest 0.017  segments within 0.05: 11
+    2 speed_vx0.40       [ 0.218  0.005 -0.007]  nearest 0.015  segments within 0.05: 2
+    3 speed_vx0.50       [ 0.225  0.057 -0.008]  nearest 0.056  segments within 0.05: 0
+    4 speed_vx-0.30      [-0.158 -0.049 -0.041]  nearest 0.036  segments within 0.05: 10
+    5 speed_vx-0.38      [-0.186 -0.022 -0.031]  nearest 0.025  segments within 0.05: 7
+    6 speed_vx-0.40      [-0.225  0.014 -0.025]  nearest 0.039  segments within 0.05: 1
+    7 speed_vx-0.50      [-0.238  0.007 -0.023]  nearest 0.033  segments within 0.05: 1
+    8 turn_w0.008        [ 0.158 -0.001  0.003]  nearest 0.023  segments within 0.05: 10
+    9 turn_w0.024        [ 0.156 -0.017  0.014]  nearest 0.022  segments within 0.05: 10
+   10 turn_w0.037        [ 0.154 -0.036  0.029]  nearest 0.024  segments within 0.05: 12
+   11 turn_w0.075        [ 0.149 -0.076  0.062]  nearest 0.004  segments within 0.05: 13
+   12 turn_w0.008_neg    [ 0.162  0.001 -0.01 ]  nearest 0.022  segments within 0.05: 12
+   13 turn_w0.024_neg    [ 0.162  0.012 -0.021]  nearest 0.016  segments within 0.05: 9
+   14 turn_w0.037_neg    [ 0.161  0.033 -0.042]  nearest 0.017  segments within 0.05: 10
+   15 turn_w0.075_neg    [ 0.17   0.086 -0.08 ]  nearest 0.023  segments within 0.05: 4
+   16 side_L_lvl0        [-0.012  0.079 -0.018]  nearest 0.022  segments within 0.05: 18
+   17 side_L_lvl1        [ 0.01   0.118 -0.003]  nearest 0.008  segments within 0.05: 10
+   18 side_L_lvl2        [0.024 0.163 0.016]  nearest 0.038  segments within 0.05: 3
+   19 side_L_lvl3        [0.018 0.198 0.013]  nearest 0.065  segments within 0.05: 0
+   20 side_R_lvl0        [-0.004 -0.079  0.016]  nearest 0.020  segments within 0.05: 24
+   21 side_R_lvl1        [ 0.013 -0.131  0.007]  nearest 0.008  segments within 0.05: 15
+   22 side_R_lvl2        [ 0.021 -0.162 -0.008]  nearest 0.006  segments within 0.05: 10
+   23 side_R_lvl3        [ 0.018 -0.17  -0.01 ]  nearest 0.006  segments within 0.05: 10
+  behaviours with a babble segment within 0.05: 22/24
+
+ALL CHECKS PASS

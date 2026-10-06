@@ -54,5 +54,9 @@ case $ARM in
   *) echo "arm must be A, B, H or F"; exit 1 ;;
 esac
 setsid nohup $PY -m wm.train $COMMON $VAL $ARGS ${EXTRA:-} --name $NAME >> results/wm/logs/$NAME.log 2>&1 &
-echo "started $NAME (pid $!); log results/wm/logs/$NAME.log"
+TRAIN_PID=$!
+echo "started $NAME (pid $TRAIN_PID); log results/wm/logs/$NAME.log"
+# GPU temperature guard on the training process itself (pause > 83 C, resume < 75 C); NO_GUARD=1 to skip
+[ -z "${NO_GUARD:-}" ] && setsid nohup bash scripts/tools/gpu_guard.sh $TRAIN_PID > results/wm/logs/gpu_guard_$NAME.log 2>&1 < /dev/null &
+echo "gpu_guard attached to $TRAIN_PID (results/wm/logs/gpu_guard_$NAME.log)"
 echo "check after a few minutes: grep -E '^train|^epoch' results/wm/logs/$NAME.log | tail -3"

@@ -8939,3 +8939,9 @@ Implication: training data needs room sizes randomised from one shared range (re
 +0.69; **B1 vision-read goal +0.83 / +0.57 -> +0.60 / +0.42**. Read-out P = 11 on the same 24 groups, B1 real future
 0.62 / 0.54 / 0.59 -> 0.50 / 0.32 / 0.40, FTM-predicted 0.75 / 0.86 / -0.03 -> 0.69 / 0.82 / -0.13; c10 / c08 essentially
 unchanged. Same pattern as arm B, stronger on the vision-read goal (-0.23 direct): B1 was adapted on its 17.65 m clips only.
+
+**F314, wall-distance check (2026-10-06).** `scripts/diagnostics/egocentric_view/wall_distance_bias.py` (round1_branches_s0,
+straight-walking heldout clips, steady part, real-future forward read): within-clip corr(read error, wall proximity) c10
++0.13 / +0.06 (original / random size), c08 -0.03 / -0.03, B1 -0.07 / +0.10. No sign of a "wall close = fast" shortcut, but
+the test is weak: within a 3.3 s clip the robot covers only 2-4 % of the half-room (proximity std 0.02-0.04). Random start
+positions in the new renders (`rr_*`) remove the link regardless.

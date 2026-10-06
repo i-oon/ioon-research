@@ -1,7 +1,7 @@
 within-clip corr(read error, wall proximity) and slope (Froude per unit proximity), forward channel, straight-walking heldout clips, steady part; round1_branches_s0
-  c10  original     no clips (missing cache entries: 0)
-  c10  random size  no clips (missing cache entries: 0)
-  c08  original     no clips (missing cache entries: 0)
-  c08  random size  no clips (missing cache entries: 0)
-  b1   original     no clips (missing cache entries: 0)
-  b1   random size  no clips (missing cache entries: 0)
+  c10  original     clips  8  pairs  328  corr +0.130  slope +0.164  proximity range 0.035 (std, demeaned)
+  c10  random size  clips  8  pairs  328  corr +0.058  slope +0.138  proximity range 0.021 (std, demeaned)
+  c08  original     clips  8  pairs  328  corr -0.027  slope -0.032  proximity range 0.038 (std, demeaned)
+  c08  random size  clips  8  pairs  328  corr -0.026  slope -0.070  proximity range 0.022 (std, demeaned)
+  b1   original     clips  8  pairs  328  corr -0.067  slope -0.086  proximity range 0.031 (std, demeaned)
+  b1   random size  clips  8  pairs  328  corr +0.096  slope +0.064  proximity range 0.040 (std, demeaned)

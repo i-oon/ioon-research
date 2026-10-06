@@ -49,8 +49,8 @@ def main():
             errs, prox, n_clips, n_missing = [], [], 0, 0
             for p in sorted(glob.glob(os.path.join(ROOT, d, "*.npz"))):
                 c = load(p, REGISTRY[emb], lazy_frames=True)
-                fam = str(c.get("family", c.get("behaviour", "")))
-                cond = str(c.get("condition", ""))
+                with np.load(p, allow_pickle=True) as zf:
+                    fam = str(zf["family"]) if "family" in zf.files else ""
                 if fam not in ("fwd", "bwd"):
                     continue
                 if p not in E:
