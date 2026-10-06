@@ -1,0 +1,20 @@
+=== N=22 babbling windows  base=wm/runs/round1_hexonly_s0_rr/best.pt  Tue 06 Oct 2026 05:53:15 PM +07
+motion. `moves` is predicted displacement over actual -- near 0 would be a model that
+-> results/eval/b1_babble_sweep/ckpt/adapted_n22.pt
+-> results/eval/b1_babble_sweep/ckpt/projector_n22.pt
+--- selection B1, realistic library (babbling)
+n22          w=21   direct 0.1193 (gap +0.72)  roll_fixed 0.2257 (gap +0.03)  roll_live 0.2175 (gap +0.08)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+n22          w=21   direct 0.0478 (gap +0.87)  roll_fixed 0.1233 (gap +0.46)  roll_live 0.1664 (gap +0.22)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== n22: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.18 / -0.19 / 0.36
+  FTM cf  0.17 / -0.30 / 0.23
+  direct  0.69 / -0.18 / 0.37
+--
+=== n22: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.28 / 0.37 / 0.62
+  FTM cf  0.16 / 0.55 / 0.19
+  direct  0.97 / 0.86 / 0.51

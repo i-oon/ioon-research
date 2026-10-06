@@ -211,6 +211,9 @@ def main():
                          "full-finetune run exactly.")
     ap.set_defaults(lora=True)
     ap.add_argument("--lora_rank", type=int, default=2)
+    ap.add_argument("--freeze_ftm", action="store_true",
+                    help="no LoRA on the FTM and all its weights frozen: only the ITM adapts, so the forward model keeps "
+                         "what pretraining (incl. counterfactual branches) taught it")
     # **Anchors: tie the new body's z to the pretrained space.** Plain Stage 1 only asks z to help
     # predict the new body's next frame, so the new body settles wherever that works, and Stage 4
     # then moves the Froude head to it: usable, not shared (F272). Both anchors use the new body's
@@ -265,7 +268,12 @@ def main():
     if args.lora:
         from wm.models.lora import apply_lora, merge_and_unwrap_lora
         n_itm = apply_lora(itm, rank=args.lora_rank)
-        n_ftm = apply_lora(ftm, rank=args.lora_rank)
+        if args.freeze_ftm:
+            for p in ftm.parameters():
+                p.requires_grad_(False)
+            n_ftm = 0
+        else:
+            n_ftm = apply_lora(ftm, rank=args.lora_rank)
         itm.to(device)  # apply_lora creates fresh lora_A/lora_B on CPU regardless of the
         ftm.to(device)  # wrapped module's own device; move them back before anything runs.
         print(f"LoRA rank {args.lora_rank}: wrapped {n_itm} ITM Linear layers, "
@@ -289,7 +297,7 @@ def main():
 
     if args.lora:
         n_itm = merge_and_unwrap_lora(itm)
-        n_ftm = merge_and_unwrap_lora(ftm)
+        n_ftm = 0 if args.freeze_ftm else merge_and_unwrap_lora(ftm)
         print(f"merged LoRA deltas back into plain weights ({n_itm} ITM, {n_ftm} FTM layers) -- "
              "the saved checkpoint is structurally identical to a full-finetune one")
 
