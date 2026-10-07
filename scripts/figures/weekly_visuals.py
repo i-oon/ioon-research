@@ -189,15 +189,16 @@ def physics_clip(goal_ep, tag, mech="direct"):
     cv2.imwrite(os.path.join(OUT, f"physics_{tag}{sfx}.png"), cv2.cvtColor(frames[-1], cv2.COLOR_RGB2BGR))
 
 
-def b1_physics_clip(goal_ep, tag, mech="direct"):
+def b1_physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/b1", window=11,
+                    goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz", out=None):
     """Hexapod goal (third-person) | B1 walking under its own policy in physics (third-person, re-rendered
-    from the saved MuJoCo states) | the B1's ego view the planner read, with Froude traces."""
-    base = os.path.join(ROOT, "results/wm/closed_loop/physics/FM0/b1")
-    run = np.load(f"{base}/{mech}_w11/b1_hexapod_{goal_ep}.npz", allow_pickle=True)
+    from the saved MuJoCo states) | the B1's ego view the planner read, with Froude traces.
+    base / window / goal_tp (goal third-person clip, {ep} = goal_ep) / out: defaults = the original figure."""
+    base = os.path.join(ROOT, base)
+    run = np.load(f"{base}/{mech}_w{window}/b1_hexapod_{goal_ep}.npz", allow_pickle=True)
     tp = "thirdperson" if mech == "direct" else f"thirdperson_{mech}"
     third = np.load(f"{base}/{tp}_b1_hexapod_{goal_ep}.npz", allow_pickle=True)["frames"]
-    goal = np.load(os.path.join(ROOT, f"data/allocentric/beh12_c10f10t10_flat/hexapod_{goal_ep}.npz"),
-                   allow_pickle=True)["frames"]
+    goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
     n = min(len(run["frames"]), len(third), len(goal), len(run["achieved_froude"]))
     g = run["goal_froude_t"][:n]
     frames = []
@@ -215,8 +216,9 @@ def b1_physics_clip(goal_ep, tag, mech="direct"):
         plot = cv2.resize(plot, (top.shape[1], int(plot.shape[0] * top.shape[1] / plot.shape[1])))
         frames.append(np.vstack([top, plot]))
     sfx = "" if mech == "direct" else f"_{mech}"
-    write_mp4(os.path.join(OUT, f"b1_physics_{tag}{sfx}.mp4"), frames)
-    cv2.imwrite(os.path.join(OUT, f"b1_physics_{tag}{sfx}.png"), cv2.cvtColor(frames[-1], cv2.COLOR_RGB2BGR))
+    od = os.path.join(ROOT, out) if out else OUT
+    write_mp4(os.path.join(od, f"b1_physics_{tag}{sfx}.mp4"), frames)
+    cv2.imwrite(os.path.join(od, f"b1_physics_{tag}{sfx}.png"), cv2.cvtColor(frames[-1], cv2.COLOR_RGB2BGR))
 
 
 if __name__ == "__main__":

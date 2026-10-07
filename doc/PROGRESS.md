@@ -3366,3 +3366,16 @@ baseline ที่ต้องมี: visual odometry (ทาย Froude จา�
 - **ร่างใหม่ตอน adapt:** ใช้สมอ (หัว Froude ที่แช่แข็ง และ/หรือ cosine similarity เทียบกับ bank ของ z ร่างเดิม)
 - **ผล:** pretrain ร่วม + similarity ใช้แค่ projector ได้ B1 rollout ดีสุด (+0.76 / +0.65), retrieval 0.34 ส่วน adapt + สมอได้ 0.19 เพราะ LoRA ขยับ z ได้จำกัด
 - **รอ:** คู่เทียบ jointD_sim vs jointD_nosim บน server (ปิด motion decoder ทั้งคู่) เพื่อยืนยันว่า cosine similarity คือกลไกที่ทำให้แชร์
+
+---
+
+## 2026-10-04 → 10-07: rollout ด้วยข้อมูล counterfactual, ห้องสุ่มขนาด, babbling สำหรับหุ่นใหม่
+
+- **Round 1 (F308):** แขนง counterfactual ทำให้โมเดลอ่านอนาคตของ action อื่นได้ (0.3 → 0.72–0.83) rollout ของ hexapod ดีขึ้น goal จากวิดีโอของ B1 +0.35 → +0.84
+- **yaw (F311):** ต้นเหตุคือ projector ไม่ใช่ FTM; fit projector ผ่าน FTM ช่วย c10 (0.41 → 0.61) แต่ไม่ช่วย B1; projector ที่ดูสถานะ (F312) ช่วย B1 แต่จำห้อง ไม่ใช้; head ที่อ่านเฟรม (F313) แย่กว่า ไม่ใช้
+- **ห้อง (F314):** ห้องที่ scale ตามความสูงกล้องไม่ได้ช่วยผลของ hexapod แต่ B1 อ่านวิดีโอจริงพึ่งขนาดห้องเดียว → render ข้อมูลทั้งหมดใหม่แบบห้องสุ่มขนาด + จุดเริ่มสุ่ม แล้วเทรนใหม่ (hexapod-only, joint)
+- **หุ่นใหม่ (F315–F317):** ในห้องสุ่ม B1 ที่อยู่ใน pretraining ได้ rollout +0.71 แต่ adapt จาก 2.4 นาทีได้ +0.44; babbling สุ่ม (ไม่มีความรู้งาน) direct ใช้ได้ตั้งแต่ 0.6 นาที rollout ตันประมาณ +0.4; freeze FTM / projector ผ่าน FTM / alignment ตอน adapt ไม่ปิดช่องว่าง; structured babbling (กฎเก็บข้อมูลใหม่ของพี่) แย่กว่าสุ่มที่เวลาเท่ากัน
+- **การแชร์ z (F318):** contrastive alignment ตอน pretraining น้ำหนัก 0.1 แทบไม่ได้เรียน (loss 8.10 → 7.75 เทียบ 8.32 แบบสุ่ม) ไม่แชร์ทั้ง z และ g(z)
+- **ความปลอดภัย:** RAM ล้นทำ VS Code ปิดหลายครั้ง (eval read-out, sweep 176) → read-out ทีละกลุ่ม + token cache บนดิสก์, adapt fp16, projector cache รายไฟล์, RAM guard; GPU ร้อน → จำกัด 250 W + gpu_guard + launch_guarded.sh; ไฟดับ 2 ครั้ง → save แบบ fsync
+- **ทิศทาง (STATUS "Adaptation direction"):** แปลหุ่นใหม่เข้าภาษาของ pretraining (freeze FTM, adapt ITM/projector), alignment แบบ contrastive, กฎ structured babbling; แผนสำรอง (MPC, teacher-student, RL) หลังจบ action selection
+- **ถัดไป:** physics closed loop ด้วยโค้ดเดิม (`close_loop_b1_physics_froude.py`, `weekly_visuals.py`) กับโมเดลปัจจุบันในห้องสุ่ม; alignment น้ำหนัก 1.0

@@ -1,0 +1,3 @@
+--- z-dependence (Froude-head error, z shuffled / true z, heldout pairs)
+z-dependence hexapod: head(z) error z-shuffled/true 1.952x (MSE 0.9112 -> 1.7787, 1464 pairs; ~1 = head ignores z)
+z-dependence b1: head(z) error z-shuffled/true 1.558x (MSE 0.9966 -> 1.5529, 1464 pairs; ~1 = head ignores z)

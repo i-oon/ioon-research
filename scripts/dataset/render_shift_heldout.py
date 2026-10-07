@@ -196,9 +196,18 @@ def hex_render(sim, d, scene, override=None, frames_on=True, centre=(0.0, 0.0)):
 def b1_render(sim, d, centre_pos, override=None):
     """render_b1_replay.ego_setup (box, mount, scale_floor, ground; room centred on the source clip's frame-0 base) +
     pose_and_capture on every stored frame."""
-    from render_b1_replay import settle, mount_heading, pose_and_capture, JOINT_ALIASES_SDK, SENSOR, ROOT_ALIAS
+    from render_b1_replay import pose_and_capture
+    root, joints, cam, R = b1_setup(sim, int(d["room_seed"]), centre_pos, override)
+    fr, cp = zip(*[pose_and_capture(sim, root, joints, cam, d["base_pos"][t], d["base_quat"][t], d["joint_pos"][t])
+                   for t in range(len(d["base_pos"]))])
+    return np.asarray(fr, np.uint8), np.asarray(cp, np.float64), R
+
+
+def b1_setup(sim, seed, centre_pos, override=None):
+    """b1_render's scene setup (also used live by sim/control/close_loop_b1_physics_froude.py --rr_room):
+    returns (root, joints, cam, R); frames come from render_b1_replay.pose_and_capture."""
+    from render_b1_replay import settle, mount_heading, JOINT_ALIASES_SDK, SENSOR, ROOT_ALIAS
     from ego_camera import (attach_ego, build_texture_box, randomise_ground, room_for, scale_floor, WALK_PITCH)
-    seed = int(d["room_seed"])
     settle(sim)
     sim.loadScene(B1_SCENE)
     settle(sim)
@@ -225,9 +234,7 @@ def b1_render(sim, d, centre_pos, override=None):
         R["floor_top"] = hold_floor(sim, top_src)
         R["far"] = rs_far(sim, cam, R["size"])
     sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle, float(np.deg2rad(90.0)))
-    fr, cp = zip(*[pose_and_capture(sim, root, joints, cam, d["base_pos"][t], d["base_quat"][t], d["joint_pos"][t])
-                   for t in range(len(d["base_pos"]))])
-    return np.asarray(fr, np.uint8), np.asarray(cp, np.float64), R
+    return root, joints, cam, R
 
 
 def load(p):

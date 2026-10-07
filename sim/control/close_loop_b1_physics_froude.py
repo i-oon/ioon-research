@@ -60,6 +60,13 @@ def main():
     ap.add_argument("--port", type=int, default=23000)
     ap.add_argument("--scene", default="sim/env/b1_flat.ttt")
     ap.add_argument("--out", default="results/wm/closed_loop/b1_physics_live")
+    ap.add_argument("--rr_room", default="", help="an rr B1 clip (data/counterfactual_walks/rr_b1_clips_*): build "
+                    "its random room live (render_shift_heldout.b1_setup, the rr data's room / camera mount / FOV 90), "
+                    "loop start at the clip start's offset from the room centre and turned to its start heading; "
+                    "'' = the old fixed room (counterfactual_truth_check.build_scene)")
+    ap.add_argument("--thirdperson", action="store_true", help="after the run, re-render the saved MuJoCo states "
+                    "with a chase camera in the same room (render_allo_selection.chase_poses) -> "
+                    "<out>/thirdperson[_<mech>]_b1_<goal>.npz (with --rr_room)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     dev = args.device
@@ -90,8 +97,38 @@ def main():
     walker.d.qpos[0:2] -= walker.d.qpos[0:2].copy()
 
     sim = RemoteAPIClient("localhost", port=args.port).getObject("sim")
-    pose = build_scene(sim, args.scene)
-    ref = [np.load(c["path"], allow_pickle=True)["frames"][0] for c in cands[:12]]
+    if args.rr_room:
+        sys.path.insert(0, os.path.join(ROOT, "scripts/dataset"))
+        import render_shift_heldout as RS
+        from render_b1_replay import pose_and_capture
+        from wm.data.embodiment import heading
+        rc = RS.load(os.path.join(ROOT, args.rr_room))
+        # turn the walked-in state to the clip's start heading (policy observations are yaw-invariant)
+        p0, q0, _, _ = walker.state()
+        dpsi = float(heading(np.asarray(rc["base_quat"][:1], float), "b1")[0] - heading(q0[None], "b1")[0])
+        cz, sz = np.cos(dpsi / 2), np.sin(dpsi / 2)
+        w, x, y, z = q0
+        walker.d.qpos[3:7] = [cz * w - sz * z, cz * x - sz * y, cz * y + sz * x, cz * z + sz * w]
+        Rz = np.array([[np.cos(dpsi), -np.sin(dpsi), 0], [np.sin(dpsi), np.cos(dpsi), 0], [0, 0, 1]])
+        walker.d.qvel[0:3] = Rz @ walker.d.qvel[0:3]
+        __import__("mujoco").mj_forward(walker.m, walker.d)
+        off_rr = np.asarray(rc["rr_room_offset"], float)
+        root_h, joints_h, cam_h, _ = RS.b1_setup(sim, int(rc["room_seed"]), -off_rr,
+                                                 RS.rs_room(float(rc["rr_room_size"])))
+        s0 = np.asarray(rc["base_pos"][0], float) * [1, 1, 0]   # the clip, shifted so its start is at (0, 0)
+        f0, _ = pose_and_capture(sim, root_h, joints_h, cam_h, rc["base_pos"][0] - s0, rc["base_quat"][0],
+                                 rc["joint_pos"][0])
+        mae = float(np.abs(f0.astype(int) - rc["frames"][0].astype(int)).mean())
+        print(f"  rr room: seed {int(rc['room_seed'])} size {float(rc['rr_room_size']):.2f} m offset "
+              f"{off_rr.round(2).tolist()} (from {args.rr_room}); start heading turned by {np.rad2deg(dpsi):+.1f} deg; "
+              f"stored clip frame 0 re-rendered through the live path: pixel MAE {mae:.3f} / 255")
+
+        def pose(pos, quat, jangles):
+            return pose_and_capture(sim, root_h, joints_h, cam_h, pos, quat, jangles)[0]
+        ref = [rc["frames"][0]]
+    else:
+        pose = build_scene(sim, args.scene)
+        ref = [np.load(c["path"], allow_pickle=True)["frames"][0] for c in cands[:12]]
 
     def render():
         p, q, j, _ = walker.state()
@@ -99,6 +136,13 @@ def main():
 
     frame = render()
     print(f"  ego view check: row-profile corr {check_ego_view(frame, ref, what='B1 physics frame 0'):.3f}")
+    if args.rr_room:
+        from PIL import Image
+        os.makedirs(os.path.join(ROOT, args.out), exist_ok=True)
+        Image.fromarray(np.hstack([frame, ref[0]])).save(os.path.join(
+            ROOT, args.out, f"framecheck_{args.mechanism}_{os.path.splitext(os.path.basename(args.goal))[0]}.png"))
+        print(f"  loop frame 0 vs stored rr clip frame 0 (same room, start pose): pixel MAE "
+              f"{np.abs(frame.astype(int) - ref[0].astype(int)).mean():.2f} / 255")
     rec = {k: [] for k in ("frames", "base_pos", "base_quat", "joint_pos", "joint_vel", "action",
                            "command", "foot_contact")}
     chosen, held, fell_at, acc = [], 0, None, 0.0
@@ -149,8 +193,32 @@ def main():
     err = np.linalg.norm(achieved[dec] - goal_bm[dec], axis=1)
     with np.load(out, allow_pickle=True) as d:
         saved = {k: d[k] for k in d.files}
-    np.savez_compressed(out, **saved, achieved_froude=achieved[:n].astype(np.float32),
+    np.savez_compressed(out[:-4] + ".tmp.npz", **saved, achieved_froude=achieved[:n].astype(np.float32),
                         goal_froude_t=goal_bm[:n].astype(np.float32))
+    os.replace(out[:-4] + ".tmp.npz", out)
+    if args.thirdperson and args.rr_room:
+        sys.path.insert(0, os.path.join(ROOT, "scripts/figures"))
+        from render_allo_selection import chase_poses, BODY_LEN, FOV_DEG
+        from render_b1_replay import capture
+        cp = np.asarray([pose_and_capture(sim, root_h, joints_h, cam_h, p_, q_, j_, render=False)[1]
+                         for p_, q_, j_ in zip(arrays["base_pos"], arrays["base_quat"], arrays["joint_pos"])])
+        tc = sim.copyPasteObjects([cam_h], 0)[0]
+        sim.setObjectParent(tc, -1, True)
+        sim.setObjectFloatParam(tc, sim.visionfloatparam_perspective_angle, float(np.deg2rad(FOV_DEG)))
+        sim.setObjectFloatParam(tc, sim.visionfloatparam_near_clipping, 0.02)
+        tf = []
+        for p_, q_, j_, M in zip(arrays["base_pos"], arrays["base_quat"], arrays["joint_pos"],
+                                 chase_poses(arrays["base_pos"].astype(float), cp, BODY_LEN["b1"])):
+            pose_and_capture(sim, root_h, joints_h, cam_h, p_, q_, j_, render=False)
+            sim.setObjectMatrix(tc, sim.handle_world, [float(v) for v in M])
+            tf.append(capture(sim, tc))
+        sim.removeObjects([tc])
+        tag = "thirdperson" if args.mechanism == "direct" else f"thirdperson_{args.mechanism}"
+        tp = os.path.join(ROOT, args.out, f"{tag}_{os.path.basename(out)}")
+        np.savez_compressed(tp[:-4] + ".tmp.npz", frames=np.asarray(tf, np.uint8), source=os.path.relpath(out, ROOT),
+                            fov=FOV_DEG, body_len=BODY_LEN["b1"])
+        os.replace(tp[:-4] + ".tmp.npz", tp)
+        print(f"  third-person -> {os.path.relpath(tp, ROOT)}")
     print(f"B1 physics closed loop: mean L2 error {err.mean():.4f} at {len(dec)} decision steps"
           f"{'' if fell_at is None else f' (fell at {fell_at})'} -> {os.path.relpath(out, ROOT)}")
 

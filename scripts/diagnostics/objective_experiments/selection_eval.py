@@ -68,6 +68,10 @@ def main():
     ap.add_argument("--embodiment", default="b1",
                     help="the controlled body's embodiment (candidates' action space); `hexapod` for a "
                          "held-out hexapod morphology such as c08f09t09")
+    ap.add_argument("--dump", default="",
+                    help="npz: per decision step the chosen (candidate, time index) per ckpt/window/mode/condition, "
+                         "plus the goal (recorded and, for --goal_source vision, the vision-read goal) and the "
+                         "achieved Froude; printed numbers are unchanged")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     h = args.horizon
@@ -147,6 +151,7 @@ def main():
             save_cache(emb, cache_path)
 
     results = {}
+    dump = {}
     for spec_str in args.ckpt:
         name, rest = spec_str.split("=", 1)
         path, _, avg = rest.partition("@")
@@ -212,7 +217,7 @@ def main():
                 g_std = np.stack([planner.standardize(x) for x in (vgoal[c] if vgoal else g)])
                 steps = list(range(0, len(g) - h, h))
                 for mode in args.modes:
-                    errs, prev = [], 0
+                    errs, prev, picks = [], 0, []
                     e_fixed = frame(0, 0) if mode == "roll_fixed" else None
                     for t in steps:
                         if mode == "direct":
@@ -228,8 +233,17 @@ def main():
                             if not allowed[c].all():
                                 i = int(np.argmin(np.where(allowed[c], np.asarray(sc), np.inf)))
                         errs.append(np.linalg.norm(local(i, t) - g[t]))
+                        picks.append(i)
                         prev = i
                     results[(name, w, mode, c)] = float(np.mean(errs))
+                    if args.dump:
+                        key = f"{name}|w{w}|{mode}|{c}"
+                        dump[key + "|cand"] = np.array(picks)
+                        dump[key + "|t"] = np.array(steps)
+                        dump[key + "|achieved"] = np.stack([local(i, t) for i, t in zip(picks, steps)])
+                        dump[key + "|err"] = np.array(errs)
+                        if vgoal:
+                            dump[f"{name}|{c}|vision_goal"] = vgoal[c]
             row = [f"{name:<12} w={w:<3}"]
             for mode in args.modes:
                 m = np.mean([results[(name, w, mode, c)] for c in goals])
@@ -244,6 +258,16 @@ def main():
     r = np.mean([bounds[c][1] for c in goals])
     print(f"\nlibrary bounds (mean over conditions): oracle {o:.4f}  random {r:.4f}")
     print("gap = (random - selector) / (random - oracle): 0 = random, 1 = oracle, <0 worse than random")
+    if args.dump:
+        for c in goals:
+            dump[f"goal|{c}"] = goals[c]
+            dump[f"goal_path|{c}"] = np.array(goal_paths[c])
+            dump[f"bounds|{c}"] = np.array(bounds[c])
+        dump["cand_paths"] = np.array([c["path"] for c in cands])
+        dump["goal_source"] = np.array(args.goal_source)
+        dump["horizon"] = np.array(h)
+        np.savez(os.path.join(ROOT, args.dump), **dump)
+        print(f"dump -> {args.dump}")
     print("\nper condition:")
     for c in goals:
         cells = "  ".join(f"{n}/w{w}/{m} {v:.4f}" for (n, w, m, cc), v in results.items() if cc == c)

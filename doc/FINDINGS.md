@@ -8945,3 +8945,69 @@ straight-walking heldout clips, steady part, real-future forward read): within-c
 +0.13 / +0.06 (original / random size), c08 -0.03 / -0.03, B1 -0.07 / +0.10. No sign of a "wall close = fast" shortcut, but
 the test is weak: within a 3.3 s clip the robot covers only 2-4 % of the half-room (proximity std 0.02-0.04). Random start
 positions in the new renders (`rr_*`) remove the link regardless.
+
+### F315. In random rooms, a new body adapted on a few minutes falls well short of having it in pretraining (rollout +0.44 vs +0.71); in the original rooms it did not (+0.70 vs +0.75)
+
+All data re-rendered with room size log-uniform 8-26.5 m and a random start position, shared by all bodies (`rr_*`,
+`scripts/dataset/render_random_room.py`; gate: original size + zero offset reproduces the stored frames exactly). Retrained:
+hexapod-only (`round1_hexonly_s0_rr`, val 9.52 -> 8.79) and joint (`round1_branches_s0_rr`). B1 selection with the tuned
+held-out library, goals = held-out hexapod clips, direct / rollout from the current frame (normalised score):
+
+| | pretraining | B1 data in the model | test rooms | direct / rollout |
+|---|---|---|---|---|
+| 1 | c10 + B1, original rooms | 40,704 B1 pairs (pretraining) | original | +0.94 / +0.75 |
+| 2 | c10 only, original rooms | 44 tuned clips (2.4 min), original room | original | +0.97 / +0.70 |
+| 3 | c10 + B1, random rooms | 40,704 B1 pairs (pretraining) | random | +0.94 / +0.71 |
+| 4 | c10 only, random rooms | 44 tuned clips, random rooms | random | +0.94 / +0.44 |
+
+Joint in random rooms otherwise: c10 +0.91 / +0.66, c08 +0.88 / +0.63, B1 video goal +0.58 / +0.41; read-out P=11 B1 FTM
+0.82 / 0.76 / 0.36. Reading: in the original rooms every B1 clip (adaptation and test) was in one 17.65 m room; in random rooms
+44 clips must cover all sizes -- the ~0.27 gap is the cost of adapting from little data in varied rooms.
+
+### F316. B1 adapted from random babbling (no task knowledge): direct works from 0.6 min, rollout plateaus around +0.4; freezing the FTM helps only at small budgets; adaptation-only contrastive alignment does nothing
+
+`data/counterfactual_walks/b1_babble_*` (`scripts/dataset/collect_b1_babble.py`): walking-policy commands uniform over the
+policy's own range (vx +-0.5, vy +-0.4, wz +-0.6, `base_gait3/train_config.yaml`), switching every 1-2 s, random rooms,
+192 / 24 / 96 clips; nested budgets `b1_babble_n{11..176}`; realistic library `b1_babble_lib24` (k-means on B1's own measured
+Froude, never c10 / goals). Base `round1_hexonly_s0_rr`; LoRA r8 3000 steps + projector (`scripts/run/b1_babble_sweep.sh`,
+`b1_babble_variants.sh`, `b1_babble_align.sh`, `b1_tuned_control.sh`); tuned library, direct / rollout:
+- 11 / 22 / 44 / 88 / 176 clips: +0.86 / +0.14, +0.87 / +0.22, +0.86 / +0.24, +0.88 / +0.41, +0.87 / +0.32 (realistic
+  library rollout +0.01 to +0.16; its oracle E 0.076 vs 0.023 for the tuned library).
+- reference 44 tuned clips: +0.94 / +0.44.
+- variants (44 / 88 clips, rollout): FTM frozen (`--freeze_ftm`) +0.35 / +0.39; projector fitted through the FTM +0.26 / +0.39;
+  both +0.29 / +0.44; contrastive alignment of B1 z to a hexapod bank (fresh head) +0.21 / +0.41, with FTM frozen +0.26 / +0.38;
+  sharing unchanged (body-ID 0.45-0.46).
+Reading: every adaptation variant ends near +0.4; the ceiling with B1 in pretraining is +0.71 (F315), so adaptation loses ~0.3,
+and none of these recipe changes recovers it. Memory: N=176 first ran out of RAM (30 GB: fp32 adapt embeddings + whole-dict
+projector cache) -> fp16 adapt embeddings, `fit_projector --cache_dir` (per-file cache + disk-backed rows, 6 GB peak),
+RAM guard in `gpu_guard.sh`.
+
+### F317. Structured babbling (near-same states, many futures, no resets) does worse than random babbling at equal minutes
+
+`scripts/dataset/collect_b1_sbabble.py`, `b1_sbabble_*`: 9 base behaviours from B1's own range, at a fixed gait phase a switch to
+a single-family random command for 1.5 s, back to base; 180 / 24 clips, 0 falls; at the switch, within-base spread 0.003 m/s
+forward vs 0.096 between bases (phase spread 0). Same evaluation as F316 (`scripts/run/b1_sbabble_grid.sh`), rollout tuned
+library: 44 clips +0.10 (FTM adapted) / +0.18 (frozen); 88 clips +0.29 / +0.22 (random babbling: +0.24 / +0.35, +0.41 / +0.39);
+direct 44 clips +0.77 / +0.72. Measured differences: 9 starting states in total; 16 of 24 behaviours within 0.05 Froude (random
+22); 36 of 66 frames per clip are the base. Coverage (results/deck/weekly_1008/b1_babbling_coverage_scatter.png): hexapod
+pretraining lies mostly along the pure axes plus branch transitions; structured babbling forms a cross on the axes; random
+babbling fills the 2-D plane including combinations pretraining never covers.
+
+### F318. Contrastive z-alignment in pretraining (soft InfoNCE on a projection head, weight 0.1) barely trains and shares nothing
+
+`wm/align.py`, arm J `round2_align_s0_rr` (joint, random rooms, `--lambda_align 0.1`, tau 0.1, sigma 0.25, queue 4096). Align loss
+8.10 / 7.94 / 7.75 over 3 epochs (train), val 8.24 -> 8.04, against log 4096 = 8.32 for chance. Against joint without it:
+selection unchanged (B1 +0.94 / +0.71, c10 +0.92 / +0.60 vs +0.66), B1 FTM-predicted yaw 0.36 -> 0.50; sharing on z: body-ID
+0.54 vs 0.50, mixing 0.49 both, retrieval c10 -> B1 -0.05 both; on g(z)
+(`scripts/diagnostics/cross_embodiment/shared_in_align_space.py`): body-ID 0.54, mixing 0.49, retrieval B1 0.10. Reading: the
+term is too weak / its soft targets too broad over 4,096 candidates to move z; next: weight 1.0, sigma 0.1, queue 1024.
+
+### F319. Physics closed loop in random rooms (B1 in joint pretraining): direct E 0.035, rollout 0.057, random 0.143
+
+`sim/control/close_loop_b1_physics_froude.py --rr_room` (live ego view in the goal clip's held-out random room; render-path
+check 0.000/255 against stored frames; loop frame 0 check_ego_view 0.987-0.999), `scripts/run/physics_rr_b1.sh`; model
+`round1_branches_s0_rr` + B1 projector, 24 tuned held-out candidates, window 21, decision every 2 frames, 33 decisions, no falls.
+E per goal (direct / rollout / random): turn 0.29 0.044 / 0.032 / 0.163; turn 0.56 0.035 / 0.075 / 0.144; side L0 0.015 / 0.061 /
+0.105; side R1 0.021 / 0.058 / 0.138; speed 7.1 0.036 / 0.032 / 0.138; speed 8.8 0.059 / 0.085 / 0.169. Rollout wins 2 of 6;
+in turn 0.56 it keeps speed but under-turns (yaw ~0.02 vs ~0.07), consistent with the weak predicted yaw (F311). One seed,
+one episode per goal. Figures `results/deck/weekly_1008/b1_physics_*` (weekly_visuals.b1_physics_clip).

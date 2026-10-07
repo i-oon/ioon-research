@@ -1,0 +1,12 @@
+--- selection B1, recorded goal
+round2_align_s0_rr w=21   direct 0.0341 (gap +0.94)  roll_fixed 0.0867 (gap +0.65)  roll_live 0.0766 (gap +0.71)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round2_align_s0_rr w=21   direct 0.1014 (gap +0.57)  roll_fixed 0.1356 (gap +0.39)  roll_live 0.1340 (gap +0.40)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round2_align_s0_rr w=21   direct 0.0498 (gap +0.88)  roll_fixed 0.0915 (gap +0.65)  roll_live 0.0991 (gap +0.61)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round2_align_s0_rr w=21   direct 0.0560 (gap +0.92)  roll_fixed 0.0903 (gap +0.73)  roll_live 0.1122 (gap +0.60)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197

@@ -1,0 +1,51 @@
+=== round2_align_s0_rr (joint) wm/runs/round2_align_s0_rr/best.pt Wed 07 Oct 2026 06:59:39 PM +07
+--- selection B1, recorded goal
+round2_align_s0_rr w=21   direct 0.0341 (gap +0.94)  roll_fixed 0.0867 (gap +0.65)  roll_live 0.0766 (gap +0.71)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round2_align_s0_rr w=21   direct 0.1014 (gap +0.57)  roll_fixed 0.1356 (gap +0.39)  roll_live 0.1340 (gap +0.40)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round2_align_s0_rr w=21   direct 0.0498 (gap +0.88)  roll_fixed 0.0915 (gap +0.65)  roll_live 0.0991 (gap +0.61)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round2_align_s0_rr w=21   direct 0.0560 (gap +0.92)  roll_fixed 0.0903 (gap +0.73)  roll_live 0.1122 (gap +0.60)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197
+--- shared latent
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+round2_align_s0_rr         0.54         +0.68 / +0.36 / +0.34         +0.10 / -3.99 / -0.63      0.49      0.60    -0.05
+-> results/eval/round2_align_s0_rr/shared_latent
+--- z-dependence (Froude-head error, z shuffled / true z, heldout pairs)
+z-dependence hexapod: head(z) error z-shuffled/true 1.952x (MSE 0.9112 -> 1.7787, 1464 pairs; ~1 = head ignores z)
+z-dependence b1: head(z) error z-shuffled/true 1.558x (MSE 0.9966 -> 1.5529, 1464 pairs; ~1 = head ignores z)
+--- counterfactual read-out hexapod (physics branches, heldout)
+=== round2_align_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.44 / 0.12 / 0.26
+  FTM cf  0.34 / 0.38 / 0.04
+  direct  0.89 / 0.68 / 0.49
+--
+=== round2_align_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.83 / 0.63 / 0.74
+  FTM cf  0.79 / 0.73 / 0.31
+  direct  0.97 / 0.84 / 0.77
+--- counterfactual read-out B1 (physics branches, heldout)
+=== round2_align_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.30 / -0.09 / 0.22
+  FTM cf  0.50 / 0.60 / 0.32
+  direct  0.96 / 0.94 / 0.28
+--
+=== round2_align_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.69 / 0.65 / 0.49
+  FTM cf  0.72 / 0.79 / 0.50
+  direct  0.98 / 0.97 / 0.42
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)
+=== round2_align_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.51 / 0.19 / 0.25
+  FTM cf  0.41 / 0.37 / 0.08
+  direct  0.88 / 0.64 / 0.52
+--
+=== round2_align_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.81 / 0.67 / 0.73
+  FTM cf  0.81 / 0.72 / 0.25
+  direct  0.97 / 0.80 / 0.75
+EVAL_SUITE_DONE round2_align_s0_rr
