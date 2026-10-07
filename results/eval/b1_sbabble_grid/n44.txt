@@ -1,0 +1,29 @@
+=== structured babbling N=44  base=wm/runs/round1_hexonly_s0_rr/best.pt  Wed 07 Oct 2026 12:36:19 PM +07
+-> results/eval/b1_sbabble_grid/ckpt/ad_full_n44.pt
+-> results/eval/b1_sbabble_grid/ckpt/proj_full_n44.pt
+##### FTM full
+--- selection B1, realistic library (babbling)
+sb_full_n44  w=21   direct 0.1589 (gap +0.46)  roll_fixed 0.2117 (gap +0.12)  roll_live 0.2229 (gap +0.05)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+sb_full_n44  w=21   direct 0.0654 (gap +0.77)  roll_fixed 0.2159 (gap -0.05)  roll_live 0.1890 (gap +0.10)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== sb_full_n44: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.18 / 0.36 / 0.49
+  FTM cf  0.28 / 0.43 / 0.02
+  direct  0.68 / 0.95 / 0.26
+-> results/eval/b1_sbabble_grid/ckpt/ad_frz_n44.pt
+-> results/eval/b1_sbabble_grid/ckpt/proj_frz_n44.pt
+##### FTM frz
+--- selection B1, realistic library (babbling)
+sb_frz_n44   w=21   direct 0.1568 (gap +0.48)  roll_fixed 0.2293 (gap +0.01)  roll_live 0.2239 (gap +0.04)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+sb_frz_n44   w=21   direct 0.0736 (gap +0.72)  roll_fixed 0.1723 (gap +0.19)  roll_live 0.1737 (gap +0.18)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== sb_frz_n44: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.19 / 0.35 / 0.50
+  FTM cf  0.44 / 0.32 / -0.01
+  direct  0.61 / 0.96 / 0.26

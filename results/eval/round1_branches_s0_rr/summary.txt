@@ -3,3 +3,49 @@
 round1_branches_s0_rr w=21   direct 0.0337 (gap +0.94)  roll_fixed 0.0677 (gap +0.76)  roll_live 0.0758 (gap +0.71)
 library bounds (mean over conditions): oracle 0.0230  random 0.2071
 --- selection B1, vision-read goal
+round1_branches_s0_rr w=21   direct 0.0999 (gap +0.58)  roll_fixed 0.1168 (gap +0.49)  roll_live 0.1325 (gap +0.41)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round1_branches_s0_rr w=21   direct 0.0490 (gap +0.88)  roll_fixed 0.0817 (gap +0.70)  roll_live 0.0963 (gap +0.63)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round1_branches_s0_rr w=21   direct 0.0570 (gap +0.91)  roll_fixed 0.0939 (gap +0.71)  roll_live 0.1021 (gap +0.66)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197
+--- shared latent
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+round1_branches_s0_rr         0.50         +0.65 / +0.34 / +0.39         +0.15 / -1.54 / -0.47      0.49      0.57    -0.05
+-> results/eval/round1_branches_s0_rr/shared_latent
+--- z-dependence (Froude-head error, z shuffled / true z, heldout pairs)
+z-dependence hexapod: head(z) error z-shuffled/true 1.985x (MSE 0.8970 -> 1.7810, 1464 pairs; ~1 = head ignores z)
+z-dependence b1: head(z) error z-shuffled/true 1.693x (MSE 0.9031 -> 1.5287, 1464 pairs; ~1 = head ignores z)
+--- counterfactual read-out hexapod (physics branches, heldout)
+=== round1_branches_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.39 / 0.14 / 0.29
+  FTM cf  0.32 / 0.49 / 0.06
+  direct  0.86 / 0.70 / 0.43
+--
+=== round1_branches_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.82 / 0.65 / 0.74
+  FTM cf  0.75 / 0.80 / 0.34
+  direct  0.97 / 0.85 / 0.74
+--- counterfactual read-out B1 (physics branches, heldout)
+=== round1_branches_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.30 / -0.10 / 0.25
+  FTM cf  0.58 / 0.58 / 0.28
+  direct  0.93 / 0.94 / 0.26
+--
+=== round1_branches_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.69 / 0.62 / 0.53
+  FTM cf  0.82 / 0.76 / 0.36
+  direct  0.98 / 0.96 / 0.43
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)
+=== round1_branches_s0_rr: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.44 / 0.14 / 0.23
+  FTM cf  0.32 / 0.36 / 0.03
+  direct  0.84 / 0.62 / 0.43
+--
+=== round1_branches_s0_rr: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.80 / 0.66 / 0.69
+  FTM cf  0.76 / 0.74 / 0.27
+  direct  0.96 / 0.81 / 0.73
+EVAL_SUITE_DONE round1_branches_s0_rr
