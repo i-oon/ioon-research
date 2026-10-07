@@ -12,7 +12,7 @@ BASE=${1:?base checkpoint}; shift; NS=${*:-11 22 44 88 176}
 PY=.venv/bin/python3; CW=data/counterfactual_walks; OUT=results/eval/b1_babble_sweep; mkdir -p $OUT/ckpt
 SEL=scripts/diagnostics/objective_experiments/selection_eval.py; RO=scripts/diagnostics/objective_experiments/counterfactual_readout.py
 quiet() { grep -v -i "warn\|Loading weights\|sit still"; }
-$PY -m wm.fit_projector --ckpt $BASE --hex_dir $CW/rr_c10_clips_train --b1_dir "" --cache results/wm/cache/fitproj_rr.pt \
+$PY -m wm.fit_projector --ckpt $BASE --hex_dir $CW/rr_c10_clips_train --b1_dir "" --cache_dir results/wm/cache/fitproj_files \
     --out $OUT/ckpt/projector_hex.pt 2>&1 | quiet | tail -1
 for N in $NS; do
   T=$OUT/n$N; mkdir -p $T
@@ -21,7 +21,7 @@ for N in $NS; do
   $PY -m wm.adapt --ckpt $BASE --data $CW/b1_babble_n$N --embodiment b1 --clips $N --test_clips 4 --lambda_hinge 0.5 \
       --hinge_margin 0.1 --lora_rank 8 --steps 3000 --anchor_froude 1.0 --out $OUT/ckpt/adapted_n$N.pt 2>&1 | quiet | tail -2
   $PY -m wm.fit_projector --ckpt $OUT/ckpt/adapted_n$N.pt --hex_dir $CW/rr_c10_clips_train --b1_dir $CW/b1_babble_n$N \
-      --cache results/wm/cache/fitproj_rr.pt --out $OUT/ckpt/projector_n$N.pt 2>&1 | quiet | tail -1
+      --cache_dir results/wm/cache/fitproj_files --out $OUT/ckpt/projector_n$N.pt 2>&1 | quiet | tail -1
   $PY - "$OUT/ckpt/adapted_n$N.pt" "$OUT/ckpt/projector_n$N.pt" "$OUT/ckpt/b1_n$N.pt" <<'PYEOF'
 import sys, torch
 from wm.models.action_projector import action_dims_from

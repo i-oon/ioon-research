@@ -75,6 +75,40 @@ head ignores z: validation batches were consecutive pairs of one clip, so rollin
 `wm/train.py` for future frame-head runs: fixed random val order). Use `eval_suite` step 3b (`z_dependence.py`, random batches;
 arm B: 3.0x) to judge. Eval queued after training (`results/wm/logs/queue_framehead_eval.sh`).
 
+**Shared-z alignment, built 2026-10-06, not yet run on GPU:** soft InfoNCE on a projection head of z (`wm/align.py`),
+cross-body only, soft targets from standardised Froude (tau 0.1, sigma 0.25). Pretraining `--lambda_align` (per-body
+MoCo queues; arm J of `round1_counterfactual.sh`, run `round2_align_s$SEED$RUN_TAG`); adaptation `wm.adapt --anchor_align`
+(bank = 48 rr_c10_clips_train clips through the unadapted ITM). Comparison script `scripts/run/b1_babble_align.sh` (N 44 88,
+align 1.0 vs 0, selection + read-out + shared-latent numbers). Off = byte-identical losses/gradients (checked on CPU);
+tests `tests/test_align.py`. Next: GPU smoke, then arm J on the second PC and the adaptation comparison here.
+
+## Adaptation direction (agreed 2026-10-07)
+
+**Idea: translate the new body into the pretrained body's language.** The FTM holds the action -> future knowledge learned in
+pretraining (incl. counterfactual branches). For a new body, adapt only what reads that body -- the ITM (frames -> z) and the
+projector (commands -> z) -- and keep the FTM frozen, so the old knowledge is reused unchanged. The Froude head reads z only
+(no frame), so z is the single interface; the question is whether the new body's actions, expressed as z, make the old
+knowledge predict the new body's real outcome.
+- Evidence so far: random babbling, 44 clips: rollout (upper-bound library) +0.24 with LoRA on ITM + FTM, **+0.35 with the FTM
+  frozen**; sweep levels off at +0.3-0.4 from 88 clips; tuned-clip reference +0.44 (random rooms).
+- Why: random babbling has one future per state (no same-state comparisons), so adapting the FTM pulls it toward the average
+  babbling future and erases the action structure.
+- **Shared z (contrastive alignment):** soft InfoNCE on a projection head g(z), cosine with negatives, positives = cross-body
+  transitions with close measured Froude; in pretraining (memory queue of other bodies, `--lambda_align`, arm J) and in
+  adaptation (fixed hexapod bank, `--anchor_align`). Purpose: the new body's z lands where the frozen FTM was trained.
+  Off by default (`wm/align.py`). Another insect size (c08) is NOT a sharing tool -- too similar (user).
+- **Structured babbling rule (user's idea, to collect):** walk a base behaviour until steady -> at a fixed gait phase switch
+  to a random command (one family at a time: forward / turn / sideways, random level) for ~1.5 s -> return to base -> repeat
+  with a different command. Gives near-same-state, many-futures data (branch-like) without resets, possible on a real robot.
+  Bases from the new body's OWN command range (proposal: 9 on a coarse grid), never the tuned behaviours. Same minutes as the
+  random-babbling budgets. Hypothesis: with it, adapting the FTM (learning the body's appearance dynamics) may beat freezing.
+- Test grid: {random, structured babbling} x {FTM frozen, FTM adapted} x {alignment off, on}, at 44 / 88 clips; measure
+  rollout + direct selection (realistic and upper-bound libraries), B1 read-out, shared-latent tests.
+- Known limits: a frozen FTM imagines hexapod-style view changes on the new body's frames (fine for reading motion); actions the
+  hexapod never did (strong combined turn + sideways) have no prior knowledge; near-same states are not exact.
+- **Plan B (only after action selection is done):** rollout-MPC in the physics loop; teacher-student distillation from the
+  planner; RL with a Froude reward in imagination only if multi-step rollout accuracy (1/2/4/8 steps) holds.
+
 ## Open decisions / known issues
 
 - **Truthfulness of the setup (user 2026-10-04, DEFERRED -- do not re-collect / re-render until the user decides):**

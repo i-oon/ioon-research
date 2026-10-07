@@ -1,1 +1,14 @@
 === tuned-clip control  base=wm/runs/round1_hexonly_s0_rr/best.pt  Tue 06 Oct 2026 07:53:48 PM +07
+-> results/eval/b1_tuned_control/ckpt/adapted.pt
+-> results/eval/b1_tuned_control/ckpt/projector.pt
+--- selection B1, realistic library (babbling)
+tuned44      w=21   direct 0.1222 (gap +0.70)  roll_fixed 0.2250 (gap +0.04)  roll_live 0.2101 (gap +0.13)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+tuned44      w=21   direct 0.0341 (gap +0.94)  roll_fixed 0.1107 (gap +0.52)  roll_live 0.1257 (gap +0.44)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== tuned44: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.34 / 0.39 / 0.38
+  FTM cf  0.57 / 0.77 / 0.03
+  direct  0.96 / 0.94 / 0.55

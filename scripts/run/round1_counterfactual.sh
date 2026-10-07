@@ -18,10 +18,13 @@
 #                                                      # head(e_t, z), LAC-WM's MD(x_t, z)); run round2_framehead_s$SEED;
 #                                                      # then eval_suite.sh NAME joint. Same data dirs as B.
 #   EXTRA="--body_frame_on_branches_only True" ... F  # extra wm.train flags appended (e.g. frame-head loss on branch pairs only)
+#   bash scripts/run/round1_counterfactual.sh J        # round 2: arm B + shared-z soft InfoNCE (wm/align.py,
+#                                                      # --lambda_align ${LAMBDA_ALIGN:-0.1}); run round2_align_s$SEED$RUN_TAG.
+#                                                      # Same data dirs as B; e.g. PFX=rr_ RUN_TAG=_rr ... J
 #   a longer arm B is a NEW run (new --name, fresh cosine schedule); --resume only continues an unfinished run
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ARM=${1:?usage: round1_counterfactual.sh A|B|H|F}
+ARM=${1:?usage: round1_counterfactual.sh A|B|H|F|J}
 SEED=${SEED:-0}
 PFX=${PFX:-}              # data prefix: "" = current renders; rr_ = random room size + start (rendering only)
 RUN_TAG=${RUN_TAG:-}      # appended to the run name, e.g. _rr
@@ -29,7 +32,7 @@ CW=data/counterfactual_walks
 PY=.venv/bin/python3
 $PY tests/test_froude_labels.py || { echo "label tests FAIL: wrong code here"; exit 1; }
 need=("$CW/${PFX}c10_clips_train" "$CW/${PFX}c10_clips_val" "$CW/${PFX}b1_clips_train" "$CW/${PFX}b1_clips_val")
-[ "$ARM" = B -o "$ARM" = F ] && need+=("$CW/${PFX}c10_branches_train" "$CW/${PFX}b1_branches_train")
+[ "$ARM" = B -o "$ARM" = F -o "$ARM" = J ] && need+=("$CW/${PFX}c10_branches_train" "$CW/${PFX}b1_branches_train")
 [ "$ARM" = H ] && need=("$CW/${PFX}c10_clips_train" "$CW/${PFX}c10_clips_val" "$CW/${PFX}c10_branches_train")
 for p in "${need[@]}"; do
   [ -s "$(ls $p/*.npz 2>/dev/null | head -1)" ] || { echo "MISSING/EMPTY $p"; exit 1; }
@@ -48,10 +51,13 @@ case $ARM in
   F) NAME=round2_framehead_s$SEED$RUN_TAG        # = arm B, Froude head conditioned on the current frame
      ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train b1=$CW/${PFX}b1_clips_train
            b1=$CW/${PFX}b1_branches_train --epochs 3 --checkpoint_every 1 --body_sees_frame True" ;;
+  J) NAME=round2_align_s$SEED$RUN_TAG            # = arm B + cross-body soft InfoNCE on a projection head of z
+     ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train b1=$CW/${PFX}b1_clips_train
+           b1=$CW/${PFX}b1_branches_train --epochs 3 --checkpoint_every 1 --lambda_align ${LAMBDA_ALIGN:-0.1}" ;;
   H) NAME=round1_hexonly_s$SEED$RUN_TAG          # hexapod only (B1 never seen); B1 is adapted afterwards
      ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train --epochs 6 --checkpoint_every 1"
      VAL="--val_sources hexapod=$CW/${PFX}c10_clips_val" ;;
-  *) echo "arm must be A, B, H or F"; exit 1 ;;
+  *) echo "arm must be A, B, H, F or J"; exit 1 ;;
 esac
 setsid nohup $PY -m wm.train $COMMON $VAL $ARGS ${EXTRA:-} --name $NAME >> results/wm/logs/$NAME.log 2>&1 &
 TRAIN_PID=$!

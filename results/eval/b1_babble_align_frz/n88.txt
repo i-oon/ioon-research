@@ -1,0 +1,39 @@
+=== N=88  base=wm/runs/round1_hexonly_s0_rr/best.pt  align 1.0 (tau 0.1 sigma 0.25)  projector z  freeze_ftm 1  Wed 07 Oct 2026 06:14:12 AM +07
+-> results/eval/b1_babble_align_frz/ckpt/ad_al0_n88.pt
+-> results/eval/b1_babble_align_frz/ckpt/proj_al0_n88.pt
+##### anchor_align 0
+--- selection B1, realistic library (babbling)
+al0_n88      w=21   direct 0.1551 (gap +0.49)  roll_fixed 0.2021 (gap +0.18)  roll_live 0.2000 (gap +0.20)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+al0_n88      w=21   direct 0.0461 (gap +0.87)  roll_fixed 0.1237 (gap +0.45)  roll_live 0.1382 (gap +0.37)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== al0_n88: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.51 / 0.39 / 0.62
+  FTM cf  0.68 / 0.16 / 0.51
+  direct  0.92 / 0.77 / 0.77
+--- shared latent (rr held-out: c10, c08, B1; adapted ITM)
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+al0_n88            0.45         +0.58 / +0.42 / +0.39         +0.04 / -0.17 / +0.09      0.58      0.60     0.14
+-> results/eval/b1_babble_align_frz/shared_latent_al0_n88
+anchor bank: 2928 pretrained-body transitions from 48 clips
+anchor_align: checkpoint has no projection head; a fresh one is trained during adaptation
+-> results/eval/b1_babble_align_frz/ckpt/ad_al1.0_n88.pt
+-> results/eval/b1_babble_align_frz/ckpt/proj_al1.0_n88.pt
+##### anchor_align 1.0
+--- selection B1, realistic library (babbling)
+al1.0_n88    w=21   direct 0.1761 (gap +0.35)  roll_fixed 0.2087 (gap +0.14)  roll_live 0.2150 (gap +0.10)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+al1.0_n88    w=21   direct 0.0506 (gap +0.85)  roll_fixed 0.1212 (gap +0.47)  roll_live 0.1380 (gap +0.38)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== al1.0_n88: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.50 / 0.44 / 0.63
+  FTM cf  0.56 / 0.18 / 0.61
+  direct  0.82 / 0.63 / 0.78
+--- shared latent (rr held-out: c10, c08, B1; adapted ITM)
+model       body-ID acc     c08 xfer R2 (fwd/lat/yaw)      B1 xfer R2 (fwd/lat/yaw)   kNN mix  retr c08  retr B1
+al1.0_n88          0.45         +0.59 / +0.40 / +0.36         +0.03 / -0.05 / +0.20      0.57      0.59     0.11
+-> results/eval/b1_babble_align_frz/shared_latent_al1.0_n88

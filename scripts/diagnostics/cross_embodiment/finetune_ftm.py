@@ -66,7 +66,9 @@ def embeddings_for(encoder, paths, chunk):
             # the same pairs the training Datasets use. Encoded whole, THEN sliced, so the frames
             # kept embed exactly as before; 0 (no field) returns the full sequence unchanged.
             first = int(data["first_pair"]) if "first_pair" in data.files else 0
-        out.append(encode_clip(encoder, frames, chunk).cpu()[first:])
+        # fp16 on the CPU (2026-10-06): 180 babbling windows in fp32 were ~17 GB and, with the projector fit, took the
+        # machine out of memory; every use below converts its slice back with .float()
+        out.append(encode_clip(encoder, frames, chunk).cpu()[first:].half())
     return out
 
 
@@ -82,7 +84,7 @@ def build(ckpt, pretrained, device):
 
 
 def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1,
-          stride=1, froude=None, anchor=None):
+          stride=1, froude=None, anchor=None, extra_params=()):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
     One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
@@ -108,7 +110,8 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
     """
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
-    params = list(itm.parameters()) + list(ftm.parameters())
+    # `extra_params`: modules the anchor trains alongside (wm/adapt.py's fresh --anchor_align head); empty by default
+    params = list(itm.parameters()) + list(ftm.parameters()) + list(extra_params)
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=1e-4)
     # `stride` = the checkpoint's frame_stride (`wm/data/strided.py`): pairs e_t -> e_{t+stride}.
     # 1 reproduces the original one-step spans exactly.
@@ -123,8 +126,8 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
         ci, s, t = spans[rng.integers(len(spans))]
         e_cpu = clips[ci]
         opt.zero_grad()
-        e_t = e_cpu[s:t].to(device)
-        e_next = e_cpu[s + gap:t + gap].to(device)
+        e_t = e_cpu[s:t].to(device).float()
+        e_next = e_cpu[s + gap:t + gap].to(device).float()
         z = itm(e_t, e_next)
         pred = ftm(e_t, z)
         loss = torch.nn.functional.mse_loss(pred, e_next)
@@ -161,7 +164,7 @@ def rollout(itm, ftm, clips, horizons, device, stride=1):
     # horizons count world-model steps; at stride k each step is k frames (1 = original behaviour)
     gap = max(1, int(stride))
     for e_cpu in clips:
-        e = e_cpu.to(device)
+        e = e_cpu.to(device).float()
         n = len(e)
         z = torch.cat([itm(e[i:i + 1], e[i + gap:i + gap + 1]) for i in range(n - gap)])
         for start in range(1, n - gap * max(horizons) - 1):

@@ -1,0 +1,42 @@
+=== N=88  Wed 07 Oct 2026 12:45:04 AM +07
+-> results/eval/b1_babble_variants/ckpt/ad_full_n88.pt
+-> results/eval/b1_babble_variants/ckpt/ad_frz_n88.pt
+-> results/eval/b1_babble_variants/ckpt/proj_A_n88.pt
+##### variant A (FTM full, projector rollout)
+--- selection B1, realistic library (babbling)
+A_n88        w=21   direct 0.1582 (gap +0.47)  roll_fixed 0.1874 (gap +0.28)  roll_live 0.1986 (gap +0.21)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+A_n88        w=21   direct 0.0466 (gap +0.87)  roll_fixed 0.0987 (gap +0.59)  roll_live 0.1355 (gap +0.39)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== A_n88: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.51 / 0.40 / 0.63
+  FTM cf  0.70 / 0.17 / 0.53
+  direct  0.92 / 0.77 / 0.73
+-> results/eval/b1_babble_variants/ckpt/proj_B_n88.pt
+##### variant B (FTM frz, projector z)
+--- selection B1, realistic library (babbling)
+B_n88        w=21   direct 0.1492 (gap +0.53)  roll_fixed 0.2010 (gap +0.19)  roll_live 0.1949 (gap +0.23)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+B_n88        w=21   direct 0.0454 (gap +0.88)  roll_fixed 0.1208 (gap +0.47)  roll_live 0.1344 (gap +0.39)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== B_n88: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.52 / 0.39 / 0.63
+  FTM cf  0.68 / 0.18 / 0.50
+  direct  0.92 / 0.77 / 0.79
+-> results/eval/b1_babble_variants/ckpt/proj_C_n88.pt
+##### variant C (FTM frz, projector rollout)
+--- selection B1, realistic library (babbling)
+C_n88        w=21   direct 0.1552 (gap +0.49)  roll_fixed 0.1805 (gap +0.32)  roll_live 0.1913 (gap +0.25)
+library bounds (mean over conditions): oracle 0.0759  random 0.2305
+--- selection B1, upper-bound library (tuned clips)
+C_n88        w=21   direct 0.0442 (gap +0.88)  roll_fixed 0.1019 (gap +0.57)  roll_live 0.1257 (gap +0.44)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (rr branches)
+=== C_n88: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.52 / 0.39 / 0.63
+  FTM cf  0.73 / 0.16 / 0.60
+  direct  0.89 / 0.77 / 0.77

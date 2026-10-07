@@ -12,7 +12,7 @@ echo "=== tuned-clip control  base=$BASE  $(date)"
 $PY -m wm.adapt --ckpt $BASE --data $CW/rr_b1_clips_train --embodiment b1 --clips 44 --test_clips 4 --stratify --lambda_hinge 0.5 \
     --hinge_margin 0.1 --lora_rank 8 --steps 3000 --anchor_froude 1.0 --out $OUT/ckpt/adapted.pt 2>&1 | quiet | tail -1
 $PY -m wm.fit_projector --ckpt $OUT/ckpt/adapted.pt --hex_dir $CW/rr_c10_clips_train --b1_dir $CW/rr_b1_clips_train \
-    --cache results/wm/cache/fitproj_rr.pt --out $OUT/ckpt/projector.pt 2>&1 | quiet | tail -1
+    --cache_dir results/wm/cache/fitproj_files --out $OUT/ckpt/projector.pt 2>&1 | quiet | tail -1
 $PY - <<'PYEOF'
 import torch
 from wm.models.action_projector import action_dims_from

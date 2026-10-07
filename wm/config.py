@@ -45,6 +45,7 @@ LEGACY_DEFAULTS = {
     # but they predate the field and are only loaded for evaluation, where it has no effect)
     "detach_body_z": True,
     "lambda_sim": 0.0,
+    "lambda_align": 0.0,
     "lambda_hinge": 0.0,
     "lambda_readout": 0.0,
     "lambda_ldad": 0.0,
@@ -276,6 +277,17 @@ class Config:
                                   # "rbf" = 2*exp(-|f_i-f_j|^2 / (2*sim_sigma^2)) - 1 (keeps speed magnitude)
     sim_sigma: float = 1.0
     sim_cross_only: bool = False  # True: queue pairs only from OTHER embodiments count
+    # **Shared-z alignment** (wm/align.py): soft InfoNCE on a projection head g(z) (LayerNorm -> Linear(z, 64)
+    # -> GELU -> Linear(64, 64)), anchors = this batch (one body), candidates = OTHER bodies' recent (u, Froude)
+    # from per-body FIFO queues (detached, MoCo style); soft targets softmax(-|F_i - F_j|^2 / (2 sigma^2)) on the
+    # standardised Froude the body loss uses. z gets the gradient. Skipped until the other bodies' queues hold
+    # >= align_min_queue entries. 0.0 reproduces every earlier run (the head is not even built).
+    lambda_align: float = 0.0
+    align_tau: float = 0.1
+    align_sigma: float = 0.25     # standardised Froude units
+    align_queue: int = 4096       # per body
+    align_dim: int = 64
+    align_min_queue: int = 256
     # Training-view augmentation strength (wm/data/augment.py). Defaults = every run before 2026-09-30.
     # Stronger settings follow the domain-randomisation idea of Egocentric VSM (crop 0.1-1, brightness
     # x0.1-10, blur up to 41 px) without rotation / flip, which would contradict the Froude labels.

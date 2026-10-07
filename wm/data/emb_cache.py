@@ -60,3 +60,49 @@ def save_cache(cache, path):
 
 def n_entries(cache):
     return sum(1 for k in cache if k != STAT)
+
+
+def file_cached(path, cache_dir, compute):
+    """One clip's embeddings from a per-file disk cache (2026-10-06): never loads a whole cache dict into RAM.
+
+    The entry is keyed by the real path (symlinked subsets reuse the original's entry) and stamped with the file's size +
+    mtime; a mismatch recomputes. `compute()` must return a CPU tensor; it is stored fp16 like every other cache."""
+    real = os.path.realpath(path)
+    rel = real.replace(os.sep, "__")
+    f = os.path.join(cache_dir, rel[-200:] + ".pt")
+    stamp = _stat(real)
+    if os.path.exists(f):
+        d = torch.load(f, map_location="cpu")
+        if tuple(d["stamp"]) == stamp:
+            return d["e"]
+    e = compute().cpu().half()
+    os.makedirs(cache_dir, exist_ok=True)
+    tmp = f + ".tmp"
+    with open(tmp, "wb") as fh:
+        torch.save({"e": e, "stamp": stamp}, fh)
+        fh.flush(); os.fsync(fh.fileno())
+    os.replace(tmp, f)
+    return e
+
+
+class DiskRows:
+    """A (rows, ...) fp16 array on disk (np.memmap) that indexes like a tensor and returns CPU tensors.
+    Used by fit_projector so the embeddings of hundreds of clips never sit in RAM."""
+
+    def __init__(self, path, shape):
+        import numpy as np
+        self.path = path
+        self.mm = np.lib.format.open_memmap(path, mode="w+", dtype=np.float16, shape=shape)
+
+    def __len__(self):
+        return self.mm.shape[0]
+
+    @property
+    def shape(self):
+        return self.mm.shape
+
+    def __getitem__(self, k):
+        import numpy as np
+        if torch.is_tensor(k):
+            k = k.cpu().numpy()
+        return torch.from_numpy(np.ascontiguousarray(self.mm[k]))

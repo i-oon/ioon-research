@@ -1,0 +1,4 @@
+--- selection B1, recorded goal
+round1_branches_s0_rr w=21   direct 0.0337 (gap +0.94)  roll_fixed 0.0677 (gap +0.76)  roll_live 0.0758 (gap +0.71)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal

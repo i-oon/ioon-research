@@ -36,6 +36,7 @@ from wm.data.dataset import (  # noqa: E402
 )
 from wm.data.embodiment import REGISTRY  # noqa: E402
 from wm.data.frame_store import check_frame_budget, resident_frame_bytes  # noqa: E402
+from wm.align import AlignHead, AlignQueue, soft_infonce  # noqa: E402
 from wm.losses import compute_losses  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -209,6 +210,29 @@ def froude_similarity_loss(z, f, embodiment, cfg, update_queue):
     return torch.cat(errs).mean(), n_cross
 
 
+# Per-body FIFO of detached (u, standardised Froude) for `lambda_align` (wm/align.py). Module-level like
+# SIM_QUEUE; filled only on training steps. Built lazily so its size follows cfg.align_queue.
+ALIGN_QUEUE = None
+
+
+def align_loss(models, z, f, embodiment, cfg, update_queue):
+    """`Config.lambda_align`: soft InfoNCE of this batch (one body) against the OTHER bodies' queues.
+    Returns (loss or None while the other queues hold < align_min_queue entries, n_candidates)."""
+    global ALIGN_QUEUE
+    if ALIGN_QUEUE is None or ALIGN_QUEUE.size != cfg.align_queue:
+        ALIGN_QUEUE = AlignQueue(cfg.align_queue)
+    f = f.float().flatten(1)
+    with torch.autocast("cuda", enabled=False):
+        u = models["align"](z.float())
+        uq, fq = ALIGN_QUEUE.others(embodiment)
+        loss, n = None, 0 if uq is None else len(uq)
+        if n >= cfg.align_min_queue:
+            loss = soft_infonce(u, f, uq.to(z.device), fq.to(z.device), cfg.align_tau, cfg.align_sigma)
+    if update_queue:
+        ALIGN_QUEUE.push(embodiment, u, f)
+    return loss, n
+
+
 def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     # batches are single-embodiment by construction, so one head and one offset serve the batch
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
@@ -341,6 +365,13 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         sim_loss, n_cross = froude_similarity_loss(z, batch["body_motion"].to(device), embodiment,
                                                    cfg, update_queue=torch.is_grad_enabled())
 
+    # --- shared-z alignment (see `Config.lambda_align`). Off unless set. Reads z itself (never the
+    # detached body_z), so z receives the gradient whatever `detach_body_z` says.
+    al_loss = None
+    if cfg.lambda_align > 0 and "body_motion" in batch and "align" in models:
+        al_loss, n_al = align_loss(models, z, batch["body_motion"].to(device), embodiment, cfg,
+                                   update_queue=torch.is_grad_enabled())
+
     adv_logits = probe_logits = morph_id = None
     if "morph_id" in batch:
         morph_id = batch["morph_id"].to(device)
@@ -383,6 +414,11 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         parts["sim"] = float(sim_loss.detach())
         parts["sim_xbody_pairs"] = float(n_cross)
         parts["total"] = float(loss.detach())
+    if al_loss is not None:
+        loss = loss + cfg.lambda_align * al_loss
+        parts["align"] = float(al_loss.detach())
+        parts["align_cands"] = float(n_al)
+        parts["total"] = float(loss.detach())
     return loss, parts
 
 
@@ -392,7 +428,7 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
     for model in models.values():
         model.train(training)
 
-    totals, count, smoke_times = {}, 0, []
+    totals, counts, count, smoke_times = {}, {}, 0, []
     # profiling only: WM_SMOKE_STEPS=N stops the process after N training steps and prints the
     # step times and peak RSS (unset in every real run)
     smoke = int(os.environ.get("WM_SMOKE_STEPS", "0") or 0) if training else 0
@@ -413,6 +449,7 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
 
         for key, value in parts.items():
             totals[key] = totals.get(key, 0.0) + value
+            counts[key] = counts.get(key, 0) + 1
         count += 1
         if smoke:
             now = time.perf_counter()
@@ -427,7 +464,9 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
                       flush=True)
             if count >= smoke:
                 raise SystemExit("WM_SMOKE_STEPS reached")
-    return {key: value / max(count, 1) for key, value in totals.items()}
+    # per key: `align` is absent while the other bodies' queues fill; every key present on every step
+    # divides by the same count as before
+    return {key: value / max(counts[key], 1) for key, value in totals.items()}
 
 
 @torch.no_grad()
@@ -520,6 +559,8 @@ def build_models(cfg, device, heads=None, n_bodies=0):
              for name, dim in heads_spec.items()}).to(device)
         for head in models["readout"].values():
             head.out_dim = head.net[-1].out_features
+    if cfg.lambda_align > 0:
+        models["align"] = AlignHead(cfg.z_dim * max(1, cfg.z_tokens), cfg.align_dim).to(device)
     if cfg.lambda_ldad > 0:
         from wm.models.ldad import LatentDifferenceDecoder
         models["ldad"] = LatentDifferenceDecoder(
@@ -923,6 +964,8 @@ def main():
                if "rollout" in train_metrics else "")
             + (f" | sim {train_metrics['sim']:.4f} (x-body pairs/step {train_metrics['sim_xbody_pairs']:.0f})"
                if "sim" in train_metrics else "")
+            + (f" | align {train_metrics['align']:.4f}/{val_metrics.get('align', float('nan')):.4f} "
+               f"(cands {train_metrics['align_cands']:.0f})" if "align" in train_metrics else "")
             + (f" | adv {train_metrics['adv_accuracy']:.3f} (x{scale:.2f})"
                if "adv_accuracy" in train_metrics else "")
             + (f" probe {train_metrics['probe_accuracy']:.3f}"

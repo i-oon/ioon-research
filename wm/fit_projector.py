@@ -37,7 +37,7 @@ from vjepa2_encoder import VJEPA2FrameEncoder  # noqa: E402
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.data.emb_cache import load_cache, n_entries, note, save_cache  # noqa: E402
+from wm.data.emb_cache import DiskRows, file_cached, load_cache, n_entries, note, save_cache  # noqa: E402
 from wm.data.strided import action_chunks, first_pair_of, pair_latents, stride_of  # noqa: E402
 from wm.evaluate import encode_clip, offset_for, upgrade_decoder_state  # noqa: E402
 from wm.models.action_projector import ActionProjector  # noqa: E402
@@ -45,7 +45,7 @@ from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 
 
-def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=(), k=1):
+def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exclude=(), k=1, disk=None):
     """Per clip: the frozen latent, the action that caused it, and the current embedding.
 
     **Embeddings come back on the CPU in half precision.** One clip is 65 x 256 x 1408 floats,
@@ -64,10 +64,13 @@ def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exc
             skipped += 1
             continue
         clip = load(path, REGISTRY[name])
-        if path not in cache:
-            cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu().half()
-            note(cache, path)
-        e = cache[path].float().to(device)
+        if isinstance(cache, str):            # per-file disk cache: nothing accumulates in RAM
+            e = file_cached(path, cache, lambda: encode_clip(encoder, clip["frames"], chunk)).float().to(device)
+        else:
+            if path not in cache:
+                cache[path] = encode_clip(encoder, clip["frames"], chunk).cpu().half()
+                note(cache, path)
+            e = cache[path].float().to(device)
         off = offset_for(checkpoint, name)
         if off is not None:
             e = e - off.to(device)
@@ -84,7 +87,13 @@ def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exc
         z = pair_latents(itm, e, k, n, start=s0)
         actions = torch.as_tensor(action_chunks(clip["actions"], lag, k, n, start=s0),
                                   dtype=torch.float32, device=device)
-        E.append(e[s0:s0 + n].cpu().half()); Z.append(z); A.append(actions)
+        if disk:                                 # spill this clip's rows to disk, keep only the file name
+            fn = os.path.join(disk, f"{name}_{len(E):05d}.npy")
+            np.save(fn, e[s0:s0 + n].cpu().half().numpy())
+            E.append(fn)
+        else:
+            E.append(e[s0:s0 + n].cpu().half())
+        Z.append(z); A.append(actions)
         C.append(torch.full((n,), len(C), dtype=torch.long))
         P.append(path)
         del e
@@ -93,6 +102,17 @@ def gather(name, paths, encoder, itm, checkpoint, cache, chunk, lag, device, exc
         print(f"{name}: excluded {skipped} clips matching {list(exclude)}")
     if not E:
         raise SystemExit(f"no clips left after excluding {list(exclude)}")
+    if disk:                                     # one disk-backed (rows, 256, 1408) array, filled clip by clip
+        parts = [np.load(fn, mmap_mode="r") for fn in E]
+        rows = DiskRows(os.path.join(disk, f"{name}_rows.npy"), (sum(len(p) for p in parts),) + parts[0].shape[1:])
+        i = 0
+        for fn, p in zip(E, parts):
+            rows.mm[i:i + len(p)] = p
+            i += len(p)
+            del p
+            os.remove(fn)
+        rows.mm.flush()
+        return rows, torch.cat(Z), torch.cat(A), torch.cat(C), P
     return torch.cat(E), torch.cat(Z), torch.cat(A), torch.cat(C), P
 
 
@@ -172,6 +192,9 @@ def main():
                          "meant to be blind to**, and the held-out claim quietly becomes a "
                          "few-shot one.")
     ap.add_argument("--cache", default="results/wm/cache/beh12_embeddings.pt")
+    ap.add_argument("--cache_dir", default="",
+                    help="per-file embedding cache directory (bounded RAM; replaces --cache) -- and the embeddings are then "
+                         "kept in a disk-backed array instead of RAM (2026-10-06: the dict cache + in-RAM rows took 30 GB)")
     ap.add_argument("--chunk", type=int, default=2)
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--lr", type=float, default=1e-3)
@@ -204,8 +227,14 @@ def main():
         p.requires_grad_(False)
 
     cache_path = os.path.join(ROOT, args.cache)
-    cache = load_cache(cache_path)
-    before = n_entries(cache)
+    disk = None
+    if args.cache_dir:
+        cache, before = os.path.join(ROOT, args.cache_dir), 0
+        import tempfile
+        disk = tempfile.mkdtemp(prefix="fitproj_rows_", dir=os.path.join(ROOT, "results/wm/cache"))
+    else:
+        cache = load_cache(cache_path)
+        before = n_entries(cache)
     encoder = VJEPA2FrameEncoder(dtype=torch.float32)
     lag = max(1, cfg.action_lag)
     k = stride_of(cfg)
@@ -227,10 +256,10 @@ def main():
             continue
         print(f"{name}: {len(paths)} files ({d or '-'}: {n or 'all'}, {xd or '-'}: {xn if xd else 0})")
         data[name] = gather(name, paths, encoder, itm, checkpoint,
-                            cache, args.chunk, lag, device, tuple(args.exclude), k=k)
+                            cache, args.chunk, lag, device, tuple(args.exclude), k=k, disk=disk)
     if not data:
         raise SystemExit("no source directories given")
-    if n_entries(cache) > before:
+    if not isinstance(cache, str) and n_entries(cache) > before:
         save_cache(cache, cache_path)
     # 300M frozen parameters that nothing below uses; on an 11 GB card that is the difference
     # between the rollout batching fitting and not
@@ -307,6 +336,10 @@ def main():
                 "stride": k},
                out)
     print(f"-> {os.path.relpath(out, ROOT)}")
+    if disk:
+        import shutil
+        del data
+        shutil.rmtree(disk, ignore_errors=True)
 
 
 if __name__ == "__main__":

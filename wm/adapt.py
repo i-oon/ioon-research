@@ -105,14 +105,17 @@ def bank_latents(itm, bank, k, checkpoint, device):
         n = len(e) - k
         for s in range(0, n, 16):
             t = min(s + 16, n)
-            Z.append(itm(e[s:t].to(device), e[s + k:t + k].to(device)).float().flatten(1).cpu())
+            Z.append(itm(e[s:t].to(device).float(), e[s + k:t + k].to(device).float()).float().flatten(1).cpu())
         Fr.append(_froude_std(p, "hexapod", k, n, checkpoint["body_stats"]))
     print(f"anchor bank: {sum(len(z) for z in Z)} pretrained-body transitions from {len(paths)} clips")
     return torch.cat(Z), torch.cat(Fr)
 
 
-def build_anchor(args, cfg, checkpoint, train, train_e, bank, k, device):
-    """Per-clip standardised Froude of the new body, and the anchor loss on its z."""
+def build_anchor(args, cfg, checkpoint, train, train_e, bank, k, device, align_bank=None):
+    """Per-clip standardised Froude of the new body, and the anchor loss on its z.
+
+    Returns (froude, anchor, extra_params): `extra_params` are trained with ITM/FTM (a fresh
+    --anchor_align head when the checkpoint has none; empty otherwise)."""
     import torch.nn.functional as F
     froude = [_froude_std(p, args.embodiment, k, len(e) - k, checkpoint["body_stats"])
               for p, e in zip(train, train_e)]
@@ -143,8 +146,37 @@ def build_anchor(args, cfg, checkpoint, train, train_e, bank, k, device):
             s_a = F.normalize(f, dim=1) @ bfn.T
             loss = loss + args.anchor_sim * ((s_z - s_a) ** 2).mean()
         return loss
-    print(f"anchors: froude-head {args.anchor_froude}, similarity {args.anchor_sim}")
-    return froude, anchor
+    # --- shared-z alignment (wm/align.py): soft InfoNCE of the new body's u = g(z) against the fixed
+    # bank of pretrained-body (z, Froude). g = the checkpoint's pretraining head, frozen, if it has one;
+    # else a fresh head trained here, with the bank's u recomputed through it every step.
+    align_head, extra = None, []
+    if getattr(args, "anchor_align", 0) > 0:
+        from wm.align import AlignHead, soft_infonce
+        az, af = (x.to(device) for x in align_bank)
+        align_head = AlignHead(az.shape[1], getattr(cfg, "align_dim", 64)).to(device)
+        if "align" in checkpoint:
+            align_head.load_state_dict(checkpoint["align"])
+            align_head.eval()
+            for p in align_head.parameters():
+                p.requires_grad_(False)
+            with torch.no_grad():
+                bank_u = align_head(az)
+            print("anchor_align: projection head from the checkpoint (frozen)")
+        else:
+            bank_u = None
+            extra = list(align_head.parameters())
+            print("anchor_align: checkpoint has no projection head; a fresh one is trained during adaptation")
+    base = anchor
+
+    def anchor_with_align(z, f, e_t=None):
+        loss = base(z, f, e_t)
+        u = align_head(z)
+        uc = bank_u if bank_u is not None else align_head(az)
+        return loss + args.anchor_align * soft_infonce(u, f, uc, af, args.align_tau, args.align_sigma)
+
+    print(f"anchors: froude-head {args.anchor_froude}, similarity {args.anchor_sim}, "
+          f"align {getattr(args, 'anchor_align', 0)}")
+    return froude, (anchor_with_align if align_head is not None else anchor), extra
 
 
 def main():
@@ -228,6 +260,16 @@ def main():
                     help="clips of the pretrained body for the --anchor_sim bank (encoded by the "
                          "pretrained ITM before adaptation, then held fixed)")
     ap.add_argument("--anchor_bank_clips", type=int, default=12)
+    ap.add_argument("--anchor_align", type=float, default=0.0,
+                    help="weight of the shared-z soft InfoNCE (wm/align.py) between the new body's z and a fixed "
+                         "bank of pretrained-body (z, Froude) from the UNADAPTED ITM; uses the checkpoint's "
+                         "projection head (frozen) if it was pretrained with --lambda_align, else trains a fresh one")
+    ap.add_argument("--align_tau", type=float, default=0.1)
+    ap.add_argument("--align_sigma", type=float, default=0.25, help="standardised Froude units")
+    ap.add_argument("--align_bank_data", default="data/counterfactual_walks/rr_c10_clips_train",
+                    help="pretrained-body clips for the --anchor_align bank (48 rr clips x 61 pairs at stride 5 "
+                         "~ 2,900 transitions)")
+    ap.add_argument("--align_bank_clips", type=int, default=48)
     args = ap.parse_args()
 
     device = torch.device(args.device)
@@ -254,6 +296,12 @@ def main():
     test_e = embeddings_for(encoder, test, args.chunk)
     bank_paths = sorted(glob.glob(os.path.join(ROOT, args.anchor_bank_data, "*.npz")))[:args.anchor_bank_clips]
     bank_e = (embeddings_for(encoder, bank_paths, args.chunk), bank_paths) if args.anchor_sim > 0 else None
+    align_e = None
+    if args.anchor_align > 0:
+        align_paths = sorted(glob.glob(os.path.join(ROOT, args.align_bank_data, "*.npz")))[:args.align_bank_clips]
+        if not align_paths:
+            raise SystemExit(f"--anchor_align: no clips in {args.align_bank_data}")
+        align_e = (embeddings_for(encoder, align_paths, args.chunk), align_paths)
     del encoder
     torch.cuda.empty_cache()
 
@@ -264,6 +312,10 @@ def main():
     if bank_e is not None:
         # the bank is the PRETRAINED space: encoded now, before any adaptation, then held fixed
         bank_e = bank_latents(itm, bank_e, stride_of(cfg), checkpoint, device)
+    if align_e is not None:
+        align_e = bank_latents(itm, align_e, stride_of(cfg), checkpoint, device)
+        if len(align_e[0]) < 2000:
+            print(f"WARNING: --anchor_align bank has only {len(align_e[0])} transitions (< 2,000)")
 
     if args.lora:
         from wm.models.lora import apply_lora, merge_and_unwrap_lora
@@ -286,13 +338,14 @@ def main():
     # adapt at the spacing the checkpoint was pretrained at (`wm/data/strided.py`)
     k = stride_of(cfg)
     print(f"stride {k}: pairs e_t -> e_t+{k}, horizons in world-model steps of {k} frames")
-    froude, anchor = None, None
-    if args.anchor_froude > 0 or args.anchor_sim > 0:
-        froude, anchor = build_anchor(args, cfg, checkpoint, train, train_e, bank_e, k, device)
+    froude, anchor, extra = None, None, []
+    if args.anchor_froude > 0 or args.anchor_sim > 0 or args.anchor_align > 0:
+        froude, anchor, extra = build_anchor(args, cfg, checkpoint, train, train_e, bank_e, k, device,
+                                             align_bank=align_e)
     before, _ = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
     loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device,
                 lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin, stride=k,
-                froude=froude, anchor=anchor)
+                froude=froude, anchor=anchor, extra_params=extra)
     after, moved = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
 
     if args.lora:
@@ -320,7 +373,9 @@ def main():
                          "anchor_froude": args.anchor_froude, "anchor_sim": args.anchor_sim,
                          "steps": args.steps, "source": args.ckpt, "stride": k,
                          "train_paths": [os.path.basename(p) for p in train]}}
-    for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets"):
+    if args.anchor_align > 0:          # recorded only when on, so an anchor-free checkpoint is unchanged
+        saved["adapted"]["anchor_align"] = args.anchor_align
+    for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets", "align"):
         if key in checkpoint:
             saved[key] = checkpoint[key]
     torch.save(saved, out)

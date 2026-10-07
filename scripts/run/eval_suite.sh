@@ -45,17 +45,17 @@ PYEOF
 echo "=== $NAME ($MODE) $PT $(date)" | tee $OUT/summary.txt
 
 # 1. checkpoints
-$PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir "" --cache results/wm/cache/fitproj_v4.pt --out $CK/projector_hex.pt 2>&1 | quiet | tail -1
+$PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir "" --cache_dir results/wm/cache/fitproj_files --out $CK/projector_hex.pt 2>&1 | quiet | tail -1
 merge $PT $CK/projector_hex.pt $CK/hex.pt
 if [ "$MODE" = joint ]; then
-  $PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir $B1 --cache results/wm/cache/fitproj_v4.pt \
+  $PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir $B1 --cache_dir results/wm/cache/fitproj_files \
       --out $CK/projector_b1.pt 2>&1 | quiet | tail -1
   merge $PT $CK/projector_b1.pt $CK/b1.pt
   ITM_B1=$PT
 else
   $PY -m wm.adapt --ckpt $PT --data $B1 --embodiment b1 --clips 44 --test_clips 4 --stratify --lambda_hinge 0.5 \
       --hinge_margin 0.1 --lora_rank 8 --steps 3000 --anchor_froude 1.0 --out $CK/adapted_b1.pt 2>&1 | quiet | tail -1
-  $PY -m wm.fit_projector --ckpt $CK/adapted_b1.pt --hex_dir $HEX --b1_dir $B1 --cache results/wm/cache/fitproj_v4.pt \
+  $PY -m wm.fit_projector --ckpt $CK/adapted_b1.pt --hex_dir $HEX --b1_dir $B1 --cache_dir results/wm/cache/fitproj_files \
       --out $CK/projector_b1.pt 2>&1 | quiet | tail -1
   merge $CK/adapted_b1.pt $CK/projector_b1.pt $CK/b1.pt
   ITM_B1=$CK/adapted_b1.pt

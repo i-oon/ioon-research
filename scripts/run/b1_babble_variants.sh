@@ -38,7 +38,7 @@ for N in $NS; do
   for v in "A full rollout" "B frz z" "C frz rollout"; do
     set -- $v; tag=$1; ad=$2; obj=$3
     $PY -m wm.fit_projector --ckpt $OUT/ckpt/ad_${ad}_n$N.pt --hex_dir $CW/rr_c10_clips_train --b1_dir $D \
-        --cache results/wm/cache/fitproj_rr.pt --objective $obj --out $OUT/ckpt/proj_${tag}_n$N.pt 2>&1 | quiet | tail -1
+        --cache_dir results/wm/cache/fitproj_files --objective $obj --out $OUT/ckpt/proj_${tag}_n$N.pt 2>&1 | quiet | tail -1
     merge $OUT/ckpt/ad_${ad}_n$N.pt $OUT/ckpt/proj_${tag}_n$N.pt $OUT/ckpt/b1_${tag}_n$N.pt
     echo "##### variant $tag (FTM ${ad}, projector ${obj})"
     evalb1 ${tag}_n$N $OUT/ckpt/b1_${tag}_n$N.pt
