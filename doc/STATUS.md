@@ -25,7 +25,8 @@ Every file: `com_pos` (Froude at the centre of mass), `cam_pose`; branches also 
 
 | job | where | notes |
 |---|---|---|
-| (none) | | |
+| multi-version render, last stage v3_b1 (v2 both + v3_c10 done, gate_a exact) | local, 6 CoppeliaSim 25500-25510, pid in results/check/multiversion/render.pid | then `render_multiversion.py sheet` + `verify`; show contact sheet to user before training |
+| c10 physics loop, random-room model (`scripts/run/physics_rr_c10.sh`), queued after render (`results/wm/logs/c10_after_render.sh`) | local, 1 CoppeliaSim 25600 | candidates = rr c10 TRAINING clips; adds c10 reference to the physics page |
 
 ## Done (2026-10-01 / 02)
 
@@ -119,6 +120,23 @@ version sampled per item. Success fixed in advance (held-out random rooms): (a) 
 +0.84 / +0.63); (c) alignment head on frozen z: test loss below chance (now 8.05 vs 6.44); (d) rollout selection within ~0.05
 (B1 +0.71, c10 +0.66). Decide: (a)+(b) up and (d) holds -> multi-version for all data, then retry alignment; (a) up, (c) fails ->
 drop alignment; nothing changes -> stop.
+
+## Agreed 2026-10-08 (meeting prep)
+
+- Slide `report/weekly_update.md` (2026-10-08 section) order: data rebuilt -> Result 1, Result 2 (ORIGINAL-room models, no
+  branches vs with branches = the controlled claim) -> room check (incl. 3 vs 4 table, random-room setup) -> z transfer ->
+  physics loop (RANDOM-room model, own page) -> babbling -> Next (1. data randomised properly, 2. shared z). No cross-week claims.
+  Alignment results removed from the slide (not tested well). Structured babbling not on the slide.
+- Reading agreed: rollout limit on a new body follows the room setup, not the babbling: 44 tuned clips +0.70 original rooms vs
+  +0.44 random rooms; babbling 88 = +0.41. Cause: rr = one room per clip -> room identifies clip/behaviour (shortcut);
+  adaptation clips worst. Babbling in the original room is NOT measured yet.
+- Mistake to avoid: babbling was tested in random rooms before controlling the room (two variables at once). Next tests change
+  one variable at a time: (A) babbling adaptation in the original room; (B) projector-only adaptation (ITM+FTM frozen); (C)
+  proper randomisation (behaviour in several rooms, lighting/texture/colour, babble with many commands per room, colour aug
+  during adaptation - adaptation currently uses cached embeddings, no augmentation; pretraining aug_hue/aug_saturation = 0).
+- c08 physics (random-room model): rollout does not track forward speed on turn / speed goals (picks sideways / slow
+  candidates); cause unknown; c10 run will tell whether it is c08 or rollout. c08 third-person (allocentric) render still to do
+  (link poses are in the run npz; scene medauroidea_c08f09t09.ttt).
 
 ## Open decisions / known issues
 
