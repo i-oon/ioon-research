@@ -561,66 +561,82 @@ Clips: turn [direct](../results/deck/weekly_1008/physics_turn.mp4), [rollout](..
 
 ---
 
-## Babbling: adapting a new robot from its own random walking
+## B1 adapted from random commands: do random candidates still work?
 
-**Test setup**
-- **Model:** pretrained on the six-legged hexapod only (clips + branches, i.e. counterfactual data), B1 never seen.
-- **Adaptation data:** B1's own **random babbling**: walking commands drawn from its policy's range (forward ±0.5, sideways ±0.4,
-  turn ±0.6), switching every 1–2 s, 3.3 s per clip; labels = measured motion; no knowledge of the task or the goals.
-  11 to 176 clips (0.6 to 9.7 min).
-- **Adaptation:** low-rank update (LoRA) of the ITM and FTM + a new action projector for B1.
-- **Rooms:** pretraining, babbling and test all in random rooms, one room per clip (as on the previous page).
-- **Test:** goals = held-out hexapod clips; candidates = 24 B1 clips tuned to the hexapod's behaviours (upper bound for the
-  library); same score as Result 2.
+**Question.** So far B1's candidates were 24 clips tuned to the hexapod's behaviours: an upper bound that only tests whether the
+model picks the right one. A new robot has no such clips. If its candidates are random clips that only cover the motion
+(Froude) range, does selection still work?
 
-**Does random babbling cover what pretraining and the goals need?**
+**Setup.** Pretrained on the hexapod only (clips + branches), B1 never seen. B1 adapted (LoRA on ITM + FTM, new projector) from
+random velocity commands to its trained walking policy (no task knowledge), 0.6 to 9.7 min, random rooms. Candidates: 24 of
+these random clips, picked by clustering B1's own motion (never by the goals). Goals: held-out hexapod clips.
 
-![Measured motion (CoM Froude) of the hexapod's pretraining data (grey), of B1's random babbling (orange), structured babbling (purple) and the tuned B1 clips (blue)](../results/deck/weekly_1008/b1_babbling_coverage_scatter.png)
+![Measured motion (CoM Froude) of the hexapod's pretraining data (grey), B1's random-command data (orange) and the tuned B1 clips (blue)](../results/deck/weekly_1008/b1_babbling_coverage_scatter.png)
 
-- The hexapod's pretraining data lies mostly along the pure forward / sideways / turn axes (plus branch transitions); random
-  babbling covers that range and also the combinations, so the motions the goals ask for are in the adaptation data.
+- The random-command data covers the hexapod's motion range and the combinations in between.
 
-**Result**
+Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random candidate, 1 = best candidate in
+hindsight).
 
-Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random candidate, 1 = best in hindsight).
+| minutes of random commands (clips) | 0.6 (11) | 1.2 (22) | 2.4 (44) | 4.8 (88) | 9.7 (176) |
+|---|---|---|---|---|---|
+| random candidates: direct | +0.61 | **+0.72** | +0.56 | +0.50 | +0.47 |
+| random candidates: rollout | +0.01 | +0.08 | +0.12 | +0.16 | +0.16 |
+| tuned candidates (upper bound): direct | +0.86 | +0.87 | +0.86 | +0.88 | +0.87 |
+| tuned candidates (upper bound): rollout | +0.14 | +0.22 | +0.24 | +0.41 | +0.32 |
 
-![B1 adapted from random babbling: direct and rollout against the minutes of babbling; dotted = B1 in pretraining](../results/deck/weekly_1008/b1_babbling_budget.png)
+![Score against minutes of random commands, tuned candidates (left) and random candidates (right); dotted = B1 in pretraining](../results/deck/weekly_1008/b1_babbling_budget.png)
 
-| minutes of babbling (clips) | 0.6 (11) | 1.2 (22) | 2.4 (44) | 4.8 (88) | 9.7 (176) | 2.4 min tuned clips | B1 in pretraining |
-|---|---|---|---|---|---|---|---|
-| direct | +0.86 | +0.87 | +0.86 | +0.88 | +0.87 | +0.94 | +0.94 |
-| rollout | +0.14 | +0.22 | +0.24 | +0.41 | +0.32 | +0.44 | +0.71 |
-
-- **Rollout** improves with more babbling (+0.14 → +0.41), then levels off around +0.4.
-- **Direct** needs little data: +0.86 from 0.6 min, then flat, slightly below the +0.94 of the tuned clips.
-- Changes to the adaptation recipe (FTM frozen, projector fitted through the FTM) also end near +0.4.
-- **The rollout limit follows the rooms, not the babbling:** in random rooms, adapting on the 44 tuned clips also gives +0.44
-  (+0.70 in the original rooms, previous page), the same level as babbling (+0.41). Babbling in the original rooms is not yet
-  measured.
+- **Direct works with random candidates** from about 1 min of data (+0.72); the best random candidate is further from the goals
+  than the best tuned clip (error 0.076 vs 0.023), so the scale is harder.
+- **Rollout fails with random candidates** (+0.01 to +0.16, close to random). Even with tuned candidates it reaches only +0.41;
+  tuned clips as adaptation data give the same +0.44 in random rooms (+0.70 in the original rooms), so the room setup limits
+  rollout first. Random candidates switch command inside the clip and lie close together in motion, which rollout must separate
+  through the predicted future.
 
 ---
 
-## Next: driving a new robot from its own babbling
+## Next: what the training data still lacks, and the plan
 
-Goal of the project: a robot never seen in pretraining, adapted only from its own babbling, selects actions by rollout close to
-a robot that was in pretraining (+0.71 now) and follows the goals in the physics loop. Two parts.
+**1. Rooms per behaviour.** In the random-room data each clip, with its branches, has its own room, so the room identifies the
+clip and its behaviour: the model can recognise the room instead of reading the motion. Adapting B1 on the same 44 tuned clips
+gives rollout +0.70 in the original rooms and +0.44 in random rooms; random commands give +0.41 there. Planned last week
+("rooms per start state: several"); this week only one room per clip was built.
 
-**1. Data: randomise properly, so the model reads motion instead of recognising the scene**
-
-| change | what it removes | measured by |
+| | now | should be |
 |---|---|---|
-| every behaviour (with its branches) rendered in several rooms (two extra rooms per training clip: rendering) | room → behaviour shortcut | behaviour decodable from z in new rooms ≈ chance |
-| lighting, textures and colour randomised; colour augmentation also during adaptation | colour / light cues | the same selection score across rooms |
-| babbling with many commands per room, rooms shared across clips | room → clip shortcut in the adaptation data | adaptation rollout in random rooms vs +0.71 |
-| babbling adaptation first in a fixed room, then in random rooms | mixing of room effect and data quality | the gap between the two |
+| rooms per behaviour / start state | one | several (the same motion rendered in 3 rooms) |
+| adaptation clips per room | one | many commands per room, rooms shared across clips |
+| room effect vs data quality | measured together | random commands first adapted in the original rooms, then in random rooms |
 
-**2. A shared z: same motion, same z, whatever the body**
+**2. View randomisation (Egocentric VSM).** Planned last week, not yet applied: training still uses crop 85–100 % and
+brightness ±20 %, and adaptation uses no image augmentation.
 
-| step | why | measured by |
+| | now | should be (Egocentric VSM) |
 |---|---|---|
-| retrain on the randomised data, then measure sharing again | room and clip information in z keeps bodies apart | body identity from z → chance; cross-body motion R² > 0 |
-| re-test contrastive alignment (z of different bodies with the same measured motion pulled together) on that model | alignment did not take while z carried the room | the same, plus rollout unchanged or better |
-| adapt only the action projector into the shared z | a new body then reuses the pretrained ITM and FTM unchanged | babbling-adapted rollout vs +0.71 |
+| crop | 85–100% | 10–100% |
+| brightness | ±20% | ×0.1–10 |
+| blur, colour, noise | none | yes |
+| ground textures | random per room | several, the same set for every body |
+| lighting | fixed | varied |
+| augmentation during adaptation | none | the same as pretraining |
 
-**Then:** B1 from babbling in the physics loop, and a second new body (four-legged hexapod, hind legs removed) from babbling only.
+**3. A shared z across bodies.** z still tells the bodies apart (body identity from z 0.50–0.55, B1 hexapod-only 0.40), so a
+new body's adapted z does not land where the hexapod's FTM knowledge is.
 
+| | now | should be |
+|---|---|---|
+| room / clip information in z | present | removed by 1 and 2, then measured again |
+| alignment of the same motion across bodies | not yet effective | re-tested on the multi-room model |
+| what a new body adapts | ITM + FTM (LoRA) + projector | the projector only, into the shared z |
+
+**4. A robot with no prior knowledge.** B1 is adapted through its trained walking policy (no task knowledge, but it already
+walks). The test of the project's claim is a body with no controller.
+
+| | now | should be |
+|---|---|---|
+| new robot | B1, walking policy | four-legged hexapod (hind legs removed), CPG babbling only |
+| test | offline selection | offline selection and the physics loop |
+
+☐ multi-room rendering: hexapod done, B1 rendering  ☐ random commands in the original rooms: next  ☐ view randomisation: planned
+☐ shared z re-test: after 1–2  ☐ four-legged hexapod: babbling feasibility done
