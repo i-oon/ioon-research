@@ -1,0 +1,86 @@
+[
+ {
+  "file": "data/counterfactual_walks/rr_c10_clips_train/hexapod_ep40000.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_c10_clips_train/hexapod_ep40120.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_c10_clips_train/hexapod_ep40232.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_c10_branches_train/hexapod_ep400001300.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_c10_branches_train/hexapod_ep401201100.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_c10_branches_train/hexapod_ep402323523.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_clips_train/b1_ep50000.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_clips_train/b1_ep50120.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_clips_train/b1_ep50232.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_branches_train/b1_ep500001100.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_branches_train/b1_ep501201000.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ },
+ {
+  "file": "data/counterfactual_walks/rr_b1_branches_train/b1_ep502322523.npz",
+  "max": 0,
+  "mae": 0.0,
+  "cam": 0.0,
+  "exact": true
+ }
+]

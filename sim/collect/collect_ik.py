@@ -629,7 +629,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
                      cam_fov=0.0,
                      cmd_noise=0.0, noise_tau=5.0, noise_seed=0,
                      active_legs=None, remove_legs=None, yaw=0.0, heading=None, policy=None,
-                     state_out=None, capture_frames=True, state_from=0, reuse=None):
+                     state_out=None, capture_frames=True, state_from=0, reuse=None,
+                     ego_room=None, build_room=None, after_start=None):
     """Drive cmds with the FIXED camera; returns frames/actions/forces/head.
 
     **`heading` closes the loop on body direction, and exists to remove an asymmetry we created.**
@@ -662,6 +663,11 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
     across runs; the first run loads the scene and builds the ego camera / floor / room as usual and sets
     `reuse["built"] = True`; later runs skip `loadScene` and that build and only stop/start the simulation on
     the already-built scene. After ~8-10 such runs Bullet repeats a run bit for bit (FINDINGS F305).
+
+    **Random-room hooks (default None = unchanged)**, for live loops in an rr clip's room
+    (`close_loop_hexapod_froude.py --rr_room`): `ego_room` (dict) updates the room parameters (size, height,
+    ground_uv) before the floor is scaled; `build_room(sim, cam, R, here)` replaces the box build at the
+    respawned head position; `after_start(sim, cam)` runs after startSimulation and the FOV set.
     """
     _reused = reuse is not None and reuse.get("built", False)
     if not _reused:
@@ -702,6 +708,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         R = room_for(sim.getObjectPosition(track, sim.handle_world)[2])
         if ego_box > 0:
             R["size"] = ego_box
+        if ego_room:
+            R.update(ego_room)
         if not _reused:
             scale_floor(sim, R["size"])            # the floor must reach past the walls
             randomise_ground(sim, seed=ego_seed, uv=R["ground_uv"])
@@ -752,8 +760,11 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         # and the view read as far more zoomed than the B1's. **The room has to follow the spawn,
         # not the scene's authored pose.**
         here = np.array(sim.getObjectPosition(track, sim.handle_world))
-        build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"],
-                          seed=ego_seed, centre=(float(here[0]), float(here[1])))
+        if build_room is not None:
+            build_room(sim, cam, R, here)
+        else:
+            build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"],
+                              seed=ego_seed, centre=(float(here[0]), float(here[1])))
 
     sim.setStepping(True)
     sim.startSimulation()
@@ -771,6 +782,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
         if abs(got - cam_fov) > 1.0:
             raise SystemExit(f"the sensor kept {got:.1f} deg instead of {cam_fov:.0f}; "
                              "an egocentric clip at the authored lens is not the experiment")
+    if after_start is not None:
+        after_start(sim, cam)
     # settle holding the first pose
     for _ in range(warmup):
         for h, v in zip(joints, cmds[0]):

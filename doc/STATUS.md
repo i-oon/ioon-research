@@ -109,6 +109,17 @@ knowledge predict the new body's real outcome.
 - **Plan B (only after action selection is done):** rollout-MPC in the physics loop; teacher-student distillation from the
   planner; RL with a Froude reward in imagination only if multi-step rollout accuracy (1/2/4/8 steps) holds.
 
+## Multi-version rendering test (started 2026-10-07, F320)
+
+Hypothesis: z mixes room and motion because each training clip has one room; the same motion in several rooms makes z ignore
+the room. Data: 2 extra room versions of the rr TRAINING clips + branches, both bodies (`rrv2_*`, `rrv3_*`, seeds 1000-1047 /
+1100-1147), physics unchanged; val / held-out untouched. Train: joint (c10 + B1), SAME steps as `round1_branches_s0_rr`, room
+version sampled per item. Success fixed in advance (held-out random rooms): (a) window-mean z -> Froude ridge R2 in new rooms up
+(now c10 0.64 / 0.25 / 0.43, B1 0.36 / 0.15 / 0.00); (b) B1 goal read from video up (now +0.58 / +0.41, original-room level
++0.84 / +0.63); (c) alignment head on frozen z: test loss below chance (now 8.05 vs 6.44); (d) rollout selection within ~0.05
+(B1 +0.71, c10 +0.66). Decide: (a)+(b) up and (d) holds -> multi-version for all data, then retry alignment; (a) up, (c) fails ->
+drop alignment; nothing changes -> stop.
+
 ## Open decisions / known issues
 
 - **Truthfulness of the setup (user 2026-10-04, DEFERRED -- do not re-collect / re-render until the user decides):**

@@ -391,9 +391,9 @@ per channel forward / lateral / yaw (higher is better, 1 = perfect ranking).
 | read | hexapod c10 | hexapod c08 (never trained) | B1 |
 |---|---|---|---|
 | direct from the action | 0.97 / 0.85 / 0.78 | 0.97 / 0.81 / 0.76 | 0.98 / 0.98 / 0.47 |
-| **real** future, clips only | 0.32 / 0.34 / 0.16 | 0.36 / 0.40 / 0.11 | 0.26 / 0.48 / 0.23 |
+| **real** future, no branches | 0.32 / 0.34 / 0.16 | 0.36 / 0.40 / 0.11 | 0.26 / 0.48 / 0.23 |
 | **real** future, with branches | **0.90 / 0.68 / 0.86** | **0.91 / 0.69 / 0.84** | **0.86 / 0.73 / 0.64** |
-| **predicted** future, clips only | 0.57 / 0.57 / 0.26 | 0.65 / 0.56 / 0.22 | 0.54 / 0.76 / 0.34 |
+| **predicted** future, no branches | 0.57 / 0.57 / 0.26 | 0.65 / 0.56 / 0.22 | 0.54 / 0.76 / 0.34 |
 | **predicted** future, with branches | **0.85 / 0.80 / 0.41** | **0.85 / 0.76 / 0.34** | **0.83 / 0.85 / 0.42** |
 
 - The read of another action's real future goes from 0.1–0.5 to 0.64–0.91, including the never-trained hexapod.
@@ -410,7 +410,7 @@ Metric: normalised score from error E, the mean L2 between achieved and goal Fro
 (E_random − E) / (E_random − E_oracle); 0 = random candidate, 1 = best candidate in hindsight (higher is better). The
 decision span is now 21 frames (1 s, the length of the label) instead of last week's 11.
 
-| test | clips only | branches, S0 / S1 | hexapod-only, B1 adapted |
+| test | no branches | branches, S0 / S1 | hexapod-only, B1 adapted |
 |---|---|---|---|
 | c10 direct | +0.94 | +0.92 / +0.92 | +0.93 |
 | c10 rollout (robot's current frame) | +0.59 | +0.71 / +0.68 | +0.69 |
@@ -425,25 +425,27 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 
 | pretraining | recorded goal: direct / rollout | goal read from video: direct / rollout |
 |---|---|---|
-| joint, clips only | +0.97 / +0.72 | +0.35 / +0.24 |
+| joint, no branches | +0.97 / +0.72 | +0.35 / +0.24 |
 | joint, with branches | +0.94 / +0.75 | **+0.84 / +0.63** |
 | joint, with branches, random rooms | +0.94 / +0.71 | +0.58 / +0.41 |
 
-**Physics closed loop, B1.** B1 walks under its own policy in physics; every 2 frames the planner picks a command from the
-24 tuned clips, by direct or by rollout from its live camera view. Joint pretraining with branches; pretraining, goals and the
-live view in random rooms; goals = held-out hexapod clips; 33 decisions per run, no falls.
+**Physics closed loop, B1 and shorter-legged hexapod.** Every 2 frames the planner picks a candidate by direct or by rollout
+from the robot's live camera view. B1 walks under its own policy in MuJoCo; candidates = its 24 tuned clips; B1 was in joint
+pretraining (with branches). Shorter-legged hexapod: never trained, joint commands in CoppeliaSim; candidates = its 24 held-out
+clips; hexapod projector, zero-shot. Pretraining, goals and live view in random rooms; goals = held-out hexapod clips; 33
+decisions per run, no falls; one seed, one episode per goal.
 
 Metric: error E, mean L2 between achieved and goal Froude (lower is better).
 
-| goal | direct | rollout | random candidate |
-|---|---|---|---|
-| turn 0.29 | 0.044 | **0.032** | 0.163 |
-| turn 0.56 | **0.035** | 0.075 | 0.144 |
-| sideways left 0 | **0.015** | 0.061 | 0.105 |
-| sideways right 1 | **0.021** | 0.058 | 0.138 |
-| speed 7.1 | 0.036 | **0.032** | 0.138 |
-| speed 8.8 | **0.059** | 0.085 | 0.169 |
-| **mean** | **0.035** | **0.057** | **0.143** |
+| goal | B1 direct | B1 rollout | B1 random candidate | hexapod direct | hexapod rollout | hexapod random candidate |
+|---|---|---|---|---|---|---|
+| turn 0.29 | 0.044 | **0.032** | 0.163 | **0.068** | 0.168 | 0.189 |
+| turn 0.56 | **0.035** | 0.075 | 0.144 | **0.029** | 0.169 | 0.195 |
+| sideways left 0 | **0.015** | 0.061 | 0.105 | **0.042** | 0.049 | 0.124 |
+| sideways right 1 | **0.021** | 0.058 | 0.138 | **0.035** | 0.045 | 0.149 |
+| speed 7.1 | 0.036 | **0.032** | 0.138 | **0.079** | 0.126 | 0.193 |
+| speed 8.8 | **0.059** | 0.085 | 0.169 | 0.195 | **0.171** | 0.175 |
+| **mean** | **0.035** | **0.057** | **0.143** | **0.075** | **0.121** | **0.171** |
 
 ![B1 in physics, turn goal, rollout: goal hexapod (third person) | B1 in physics (third person) | B1 ego view the planner reads; forward and yaw Froude of the goal (black) and of B1 (orange)](../results/deck/weekly_1008/b1_physics_turn_rollout.png)
 
@@ -454,7 +456,15 @@ Clips: turn [direct](../results/deck/weekly_1008/b1_physics_turn.mp4), [rollout]
   speed 7.1. One seed, one episode per goal.
 - In the turn 0.56 run, rollout keeps forward speed but turns too little (yaw ≈ 0.02 against ≈ 0.07).
 
-- Rollout's gap to direct shrinks from about 0.45 (last week, B1) to about 0.2.
+![Shorter-legged hexapod in physics, turn goal, direct: goal hexapod (third person) | goal ego view | its own ego view in physics; forward and yaw Froude of the goal (black) and of the robot (orange)](../results/deck/weekly_1008/physics_turn.png)
+
+Clips: turn [direct](../results/deck/weekly_1008/physics_turn.mp4), [rollout](../results/deck/weekly_1008/physics_turn_rollout.mp4); forward [direct](../results/deck/weekly_1008/physics_forward.mp4),
+[rollout](../results/deck/weekly_1008/physics_forward_rollout.mp4).
+
+- Direct follows 5 of 6 goals well below random; rollout's error is mostly in forward speed (0.12–0.16 on turns and speed 7.1).
+- Motion is measured at the centre of mass, like the goals (last week's numbers for this body were measured at the head).
+
+- Same setup, no branches vs with branches: rollout from the current frame c10 +0.59 → +0.71 / +0.68, c08 +0.58 → +0.68 / +0.64; B1 +0.72 → +0.75 / +0.73.
 - Reading the goal from video improves most (B1 +0.35 → +0.84).
 - A body absent from pretraining (hexapod-only, B1 adapted) is close to joint pretraining.
 - Rollout is not expected to beat direct on this test: goals and candidates are steady walking, where one command has one
@@ -475,7 +485,7 @@ Same tests as last week, on held-out clips:
 | pretraining | body-ID probe (chance 0.33, lower = more shared) | cross-body R² c10 → c08 (fwd / lat / yaw) | cross-body R² c10 → B1 (fwd / lat / yaw) | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
 |---|---|---|---|---|---|---|
 | last week: hexapod only, B1 adapted | 0.68 | +0.70 / +0.34 / +0.17 | −0.73 / +0.11 / −0.04 | 0.47 | 0.38 | 0.25 |
-| joint, clips only | 0.48 | +0.59 / +0.43 / +0.34 | +0.09 / −0.28 / −0.90 | 0.50 | 0.52 | 0.04 |
+| joint, no branches | 0.48 | +0.59 / +0.43 / +0.34 | +0.09 / −0.28 / −0.90 | 0.50 | 0.52 | 0.04 |
 | joint, with branches (S0 / S1) | 0.55 / 0.53 | +0.76 / +0.52 / +0.47 · +0.77 / +0.43 / +0.49 | −0.63 / +0.14 / +0.04 · −0.27 / +0.53 / −0.34 | 0.46 / 0.46 | 0.63 / 0.66 | 0.25 / 0.30 |
 | hexapod only with branches, B1 adapted (44 tuned clips) | **0.40** | +0.74 / +0.42 / +0.53 | **+0.27 / +0.17 / +0.15** | **0.62** | 0.63 | 0.30 |
 | hexapod only, random rooms, B1 adapted from 88 babbling clips | 0.46 | +0.56 / +0.42 / +0.37 | −0.06 / −0.11 / +0.08 | 0.58 | 0.58 | 0.12 |
@@ -520,6 +530,23 @@ Metric: normalised score from E (as in Result 2); Pearson r for the real-future 
 Result 2's selection does not depend on the room scaling; its B1 video-reading numbers partly do (B1 had seen one room size).
 From here on, pretraining, adaptation and test all use random rooms.
 
+**Room size and a new robot.** B1 absent from pretraining (hexapod only), adapted on 44 tuned clips, against B1 in joint pretraining.
+
+Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random, 1 = best in hindsight).
+
+| | pretraining (bodies, rooms) | B1 data in the model | test rooms | direct | rollout |
+|---|---|---|---|---|---|
+| 1 | hexapod + B1, original rooms | 40,704 B1 pairs (in pretraining) | original | +0.94 | +0.75 |
+| 2 | hexapod only, original rooms | 44 tuned clips (2.4 min), original room | original | +0.97 | +0.70 |
+| 3 | hexapod + B1, random rooms | 40,704 B1 pairs (in pretraining) | random | +0.94 | **+0.71** |
+| 4 | hexapod only, random rooms | 44 tuned clips (2.4 min), random rooms | random | +0.94 | +0.44 |
+
+(B1 adapted on 44 tuned clips, no babbling; tuned library; direct / rollout from the robot's current frame)
+
+- **1 vs 2:** in the original rooms, adapting on 2.4 min comes within 0.05 of having B1 in pretraining.
+- **3 vs 4:** in random rooms, pretraining keeps +0.71; adapting on 2.4 min reaches +0.44 (44 clips, each in a different room
+  size).
+
 ![The same moment of one held-out clip in its original room and in 8 / 14.6 / 26.5 m rooms, hexapod and B1](../results/deck/weekly_1008/room_sizes.png)
 
 ---
@@ -532,21 +559,6 @@ From here on, pretraining, adaptation and test all use random rooms.
   commands were tuned to the hexapod's behaviours.
 - **Goals:** held-out hexapod clips. Pretraining, adaptation and test in random rooms unless stated.
 
-Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random, 1 = best in hindsight).
-
-| | pretraining (bodies, rooms) | B1 data in the model | test rooms | direct | rollout |
-|---|---|---|---|---|---|
-| 1 | hexapod + B1, original rooms | 40,704 B1 pairs (in pretraining) | original | +0.94 | +0.75 |
-| 2 | hexapod only, original rooms | 44 tuned clips (2.4 min), original room | original | +0.97 | +0.70 |
-| 3 | hexapod + B1, random rooms | 40,704 B1 pairs (in pretraining) | random | +0.94 | **+0.71** |
-| 4 | hexapod only, random rooms | 44 tuned clips (2.4 min), random rooms | random | +0.94 | +0.44 |
-
-(tuned library; direct / rollout from the robot's current frame)
-
-- **1 vs 2:** in the original rooms, adapting on 2.4 min comes within 0.05 of having B1 in pretraining.
-- **3 vs 4:** in random rooms, pretraining keeps +0.71; adapting on 2.4 min reaches +0.44 (44 clips, each in a different room
-  size).
-
 ![B1 adapted from babbling: direct and rollout against the minutes of babbling, with the tuned library (left) and the babbling library (right); dotted = B1 in pretraining; extra markers = other adaptation variants at 2.4 and 4.8 min](../results/deck/weekly_1008/b1_babbling_budget.png)
 
 - Direct selection: about +0.86 from 0.6 min of babbling (tuned library).
@@ -554,6 +566,8 @@ Metric: normalised score from error E, mean L2 between achieved and goal Froude 
 - With the babbling library, the best achievable error is 0.076 (tuned library 0.023); rollout +0.01 to +0.16.
 
 **How B1 is adapted** (random rooms, hexapod-only pretraining, tuned candidates, rollout):
+
+Metric: normalised score of rollout selection from the robot's current frame: (E_random − E) / (E_random − E_best), E = mean L2 between achieved and goal Froude over the held-out hexapod goals; candidates = the 24 tuned B1 clips (0 = random, 1 = best in hindsight).
 
 | adaptation of the world model | 44 babbling clips | 88 babbling clips |
 |---|---|---|

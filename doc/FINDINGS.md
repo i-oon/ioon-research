@@ -9011,3 +9011,44 @@ E per goal (direct / rollout / random): turn 0.29 0.044 / 0.032 / 0.163; turn 0.
 0.105; side R1 0.021 / 0.058 / 0.138; speed 7.1 0.036 / 0.032 / 0.138; speed 8.8 0.059 / 0.085 / 0.169. Rollout wins 2 of 6;
 in turn 0.56 it keeps speed but under-turns (yaw ~0.02 vs ~0.07), consistent with the weak predicted yaw (F311). One seed,
 one episode per goal. Figures `results/deck/weekly_1008/b1_physics_*` (weekly_visuals.b1_physics_clip).
+
+### F320. Why the alignment cannot share z: in random rooms z carries the room / clip more than the motion; an alignment head memorises training clips and is worse than chance on new ones
+
+Frozen arm J z (`round2_align_s0_rr`), c10 vs B1. (a) Head-only soft InfoNCE on single z, half of the held-out clips vs the
+other half (`scripts/diagnostics/cross_embodiment/align_head_only.py`): train loss reaches near its floor (3.77 at sigma 0.25,
+2.53 at 0.1) while test loss rises from ~7.0 to 8.8-8.9 against chance 5.9. (b) Window-mean z (mean over 11 stride-5 pairs
+inside one command segment; `align_window_mean.py`): it keeps and sharpens the motion -- ridge z -> Froude fitted on train,
+held-out R2 c10 +0.45 / -0.05 / +0.14 -> +0.64 / +0.25 / +0.43, B1 +0.12 / +0.11 / -0.14 -> +0.36 / +0.15 / -0.00 -- but a
+head-only alignment on it still memorises: train 5.74 -> 4.66, test 6.83 -> 8.05 against chance 6.44 (floor 3.89).
+Reading: averaging is safe (behaviour and Froude intact) but does not fix sharing; with every training clip in its own random
+room, z mixes room appearance and motion, and a cross-body cosine latches onto rooms. Alignment on hold; candidate data fix:
+render each clip in several rooms (multi-version rendering) so z must ignore the room, then retry alignment. Selection does
+not depend on z being shared (it goes through the shared Froude head).
+
+### F321. The hexapod physics loop graded c08 at the head while every goal and candidate is labelled at the centre of mass -- lateral sign flipped on turns; fixed, c08 rerun
+
+`sim/control/close_loop_hexapod_froude.py` saved no `com_pos`, so the loader labelled the loop's motion at the head (0.246 m in
+front of the CoM): on a turn, yaw x 0.246 / h appears as lateral and flips its sign (turn_s0.56: head +0.064 vs CoM -0.069;
+stored label -0.069). Affects every c08 physics number from this script, including the archived pre-10-03 runs; the B1 loop is
+not affected (CoM 0.019 m from the base; lateral matched). Fix: the loop records the link poses and computes
+`com_pos = wm.data.com.hex_com(..., morph="c08f09t09")` as the data back-fill does; `--replay_clip` replays a stored clip open
+loop through the same measurement path. Check (mean fwd / lat / yaw): ep60110 turn_s0.56 stored 0.145 / -0.069 / 0.075, CoM
+replay 0.151 / -0.065 / 0.075, head 0.134 / +0.057 / 0.084; ep60101 and ep60030 likewise (signs match at the CoM).
+Corrected c08 loop (joint random rooms, `hex.pt`, window 21, 33 decisions, no falls), E direct / rollout / random:
+turn 0.29 0.068 / 0.168 / 0.189; turn 0.56 0.029 / 0.169 / 0.195; side L0 0.042 / 0.049 / 0.124; side R1 0.035 / 0.045 / 0.149;
+speed 7.1 0.079 / 0.126 / 0.193; speed 8.8 0.195 / 0.171 / 0.175; mean 0.075 / 0.121 / 0.171. Rollout's error is mostly forward
+(0.12-0.16 on turns and speed): it picks candidates at the wrong speed. Superseded lines kept in
+`summary_c08_headlabel_bug.txt`.
+
+### F322. Controlled before/after in physics (turn 0.56, everything identical but the model): last week's and this week's hexapod-only models tie on direct (0.0354) and nearly tie on rollout (0.079 vs 0.075)
+
+Both checkpoints adapted to B1 identically (wm.adapt on 44 `rr_b1_clips_train`, LoRA r8 3000 steps, anchor_froude 1.0 +
+projector), B1 physics loop on `ep40110` in its paired random room, window 21, 33 decisions, 3 episodes each (deterministic,
+spread 0); `scripts/run/controlled_turn056_{adapt,loop}.sh`, `results/wm/closed_loop_rr/physics/controlled_turn056/table_E.txt`.
+OLD = `_kept_for_weekly_slide/fmd_beh24_s0` (pre-fix data, last week's pipeline), NEW = `round1_hexonly_s0_rr`.
+E: direct old 0.0354 = new 0.0354 (both pick the same candidate at all 33 decisions; same as F319 joint); rollout old 0.0791
+(fwd -0.063, lat +0.032, yaw -0.025: too slow, under-turns) vs new 0.0753 (fwd -0.010, lat +0.051, yaw -0.040: keeps speed,
+under-turns more, occasionally picks speed / side candidates -- weak predicted yaw, F311); random 0.144. Reading: on this goal
+direct is saturated and cannot separate models; rollout differs in kind, not clearly in size. The cross-week "improvement" of
+the physics numbers (F319 vs last week) is therefore not established; within-week comparisons stand. Decision (user): keep the
+current tables, no improvement claim.

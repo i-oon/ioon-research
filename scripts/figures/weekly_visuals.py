@@ -157,17 +157,18 @@ def physics_summary():
     plt.close(fig)
 
 
-YLIM = {0: (-0.05, 0.25), 2: (-0.05, 0.12)}   # same axes in every physics clip (forward, yaw Froude)
+YLIM = {0: (-0.05, 0.30), 2: (-0.05, 0.12)}   # same axes in every physics clip (forward, yaw Froude)
 
 
-def physics_clip(goal_ep, tag, mech="direct"):
-    """Hexapod goal (third-person) | c08 in physics, current pipeline (ego), with Froude traces."""
-    base = os.path.join(ROOT, "results/wm/closed_loop/physics")
-    run = np.load(f"{base}/FM0/c08/{mech}_w11/c08f09t09_hexapod_{goal_ep}.npz", allow_pickle=True)
-    goal = np.load(os.path.join(ROOT, f"data/allocentric/beh12_c10f10t10_flat/hexapod_{goal_ep}.npz"),
-                   allow_pickle=True)["frames"]
-    goal_ego = np.load(os.path.join(ROOT, f"data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{goal_ep}.npz"),
-                       allow_pickle=True)["frames"]
+def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/c08", window=11,
+                 goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz",
+                 goal_ego="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{ep}.npz", out=None):
+    """Hexapod goal (third-person) | c08 in physics, current pipeline (ego), with Froude traces.
+    base / window / goal_tp / goal_ego ({ep} = goal_ep) / out: defaults = the original figure."""
+    base = os.path.join(ROOT, base)
+    run = np.load(f"{base}/{mech}_w{window}/c08f09t09_hexapod_{goal_ep}.npz", allow_pickle=True)
+    goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
+    goal_ego = np.load(os.path.join(ROOT, goal_ego.format(ep=goal_ep)), allow_pickle=True)["frames"]
     n = min(len(run["frames"]), len(goal), len(run["achieved_froude"]))
     g = run["goal_froude_t"][:n]
     frames = []
@@ -185,8 +186,9 @@ def physics_clip(goal_ep, tag, mech="direct"):
         plot = cv2.resize(plot, (top.shape[1], int(plot.shape[0] * top.shape[1] / plot.shape[1])))
         frames.append(np.vstack([top, plot]))
     sfx = "" if mech == "direct" else f"_{mech}"
-    write_mp4(os.path.join(OUT, f"physics_{tag}{sfx}.mp4"), frames)
-    cv2.imwrite(os.path.join(OUT, f"physics_{tag}{sfx}.png"), cv2.cvtColor(frames[-1], cv2.COLOR_RGB2BGR))
+    od = os.path.join(ROOT, out) if out else OUT
+    write_mp4(os.path.join(od, f"physics_{tag}{sfx}.mp4"), frames)
+    cv2.imwrite(os.path.join(od, f"physics_{tag}{sfx}.png"), cv2.cvtColor(frames[-1], cv2.COLOR_RGB2BGR))
 
 
 def b1_physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/b1", window=11,
