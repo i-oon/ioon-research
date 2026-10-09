@@ -1,0 +1,2 @@
+checkpoint trained on grayscale frames: encoder switched to grayscale (VJEPA_GRAY=1)
+c10 (pretrain): 24 of 24 clips in data/counterfactual_walks/c10_clips_heldout have no current embedding in results/wm/cache/test_v4_hex_heldout.pt; build it first (selection_eval.py with the same dir and --cache)

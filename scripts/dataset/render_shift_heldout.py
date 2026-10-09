@@ -47,6 +47,9 @@ CHK = os.path.join(ROOT, "results/check/render_shift")
 PIDS = os.path.join(CHK, "pids.json")
 GROUPS_JSON = os.path.join(CW, "rs_branch_groups_heldout.json")
 BODIES = ("c10", "b1", "c08")
+# Optional callable(sim, d) run after the room is built and before any frame is captured (render_shared_rooms.py:
+# lighting). None = every earlier render, unchanged.
+SCENE_HOOK = None
 HEX_SCENE = {"c10": "medauroidea_c10f10t10.ttt", "c08": "medauroidea_c08f09t09.ttt"}
 B1_SCENE = os.path.join(ROOT, "sim/env/b1_flat.ttt")
 COPPELIA = os.path.expanduser("~/CoppeliaSim")
@@ -181,6 +184,8 @@ def hex_render(sim, d, scene, override=None, frames_on=True, centre=(0.0, 0.0)):
         build_texture_box(sim, size=R["size"], height=R["height"], tile=R["tile"], seed=seed,
                           centre=(float(centre[0]), float(centre[1])))
     sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle, float(np.deg2rad(EGO_FOV)))
+    if SCENE_HOOK is not None:
+        SCENE_HOOK(sim, d)
     lh = [sim.getObject(str(n)) for n in d["state_link_names"]]
     lp = np.asarray(d["state_link_pose"], float)
     fr, cp = [], []
@@ -198,6 +203,8 @@ def b1_render(sim, d, centre_pos, override=None):
     pose_and_capture on every stored frame."""
     from render_b1_replay import pose_and_capture
     root, joints, cam, R = b1_setup(sim, int(d["room_seed"]), centre_pos, override)
+    if SCENE_HOOK is not None:
+        SCENE_HOOK(sim, d)
     fr, cp = zip(*[pose_and_capture(sim, root, joints, cam, d["base_pos"][t], d["base_quat"][t], d["joint_pos"][t])
                    for t in range(len(d["base_pos"]))])
     return np.asarray(fr, np.uint8), np.asarray(cp, np.float64), R

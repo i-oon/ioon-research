@@ -1,6 +1,6 @@
 # Data — what is current, which split, made by which script
 
-> Updated 2026-10-03. Plan and design: `doc/DATA_PLAN.md`. Facts and checks: FINDINGS F293-F306. Label conventions:
+> Updated 2026-10-09 (random-size-room data `rr_*`, `rrv2_*`, `rrv3_*` deleted; dropped direction). Plan and design: `doc/DATA_PLAN.md`. Facts and checks: FINDINGS F293-F306. Label conventions:
 > memory `project_timescale_conventions` (0.05 s frames; 1 s Froude at the centre of mass; smoothing and differencing never
 > cross a command switch; read-out window 21). Everything under `data/` is git-ignored; copy to the server with `rsync -aL`.
 
@@ -31,6 +31,21 @@ Branches use their source clip's room. **Training pairs per body** (stride 5, ro
 
 **Use:** pretraining = `*_clips_train` (+ `*_branches_train` for counterfactual arms); checkpoint selection = `*_val`; every reported
 number = `*_heldout` and `c08_*` via `scripts/run/eval_suite.sh`.
+
+## Added 2026-10-09
+
+| dir | what | made by |
+|---|---|---|
+| `srbal_{c10,b1}_{clips,branches}_train` | the training clips + branches re-rendered in 4 SHARED room looks (appearance seeds 2000-2003, same for every clip; one look per file, balanced so every behaviour appears in all 4 looks; a branch group shares one look), lighting randomised per clip / group (`sr_light_gain`, `sr_light_on`); size and start position as the original renders; every non-frame field identical to the source. Val / held-out keep their original renders. | `scripts/dataset/render_shared_rooms.py render_balanced` (gate: original seed reproduces stored frames, 8/8 exact) |
+| `data/wall_pilot/b1/` | 24 windows of B1's own forward walks, rotated to face +x, front wall 1-6 m ahead at the last frame; rooms 400-423, original recipe; `wall_dist` per frame | `scripts/diagnostics/wall_pilot/b1_wall_pilot.py` |
+
+Grayscale models (`cfg.grayscale`, e.g. `round1_branches_s0_gray`): the frozen encoder converts frames to luminance
+(`scripts/vjepa2_encoder.py`, env `VJEPA_GRAY`, switched on automatically when such a checkpoint is loaded); embedding caches
+for them live in separate `*_gray` files / dirs. Never load a colour and a grayscale model in one process (it refuses).
+
+Deleted 2026-10-09: `rr_*` (random room size 8-26.5 m + random start, F314-F319), `rrv2_*` / `rrv3_*` (2 more random rooms per
+training clip). Room draws kept in `rr_rooms.json`, `rr_v2_rooms.json`, `rr_v3_rooms.json`; re-render with
+`scripts/dataset/render_random_room.py` / `render_multiversion.py` if ever needed.
 
 ## Superseded (kept, do not use)
 

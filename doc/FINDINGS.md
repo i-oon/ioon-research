@@ -9052,3 +9052,265 @@ under-turns more, occasionally picks speed / side candidates -- weak predicted y
 direct is saturated and cannot separate models; rollout differs in kind, not clearly in size. The cross-week "improvement" of
 the physics numbers (F319 vs last week) is therefore not established; within-week comparisons stand. Decision (user): keep the
 current tables, no improvement claim.
+
+### F323. The hexapod physics loop breaks the gait at every candidate switch (new clip started at index t, no phase continuity); this, not the model, explains most of c10's / c08's physics errors, and hits rollout (many switches) far more than direct
+
+2026-10-08. c10 physics loop with the random-room joint model (`scripts/run/physics_rr_c10.sh`, candidates = 48
+`rr_c10_clips_train`, goals = the same 6 `rr_c10_clips_heldout` as c08, `results/wm/closed_loop_rr/physics/joint_rr/summary_c10.txt`):
+mean E direct 0.091 / rollout 0.129 / random 0.167 -- worse than never-trained c08 (0.075 / 0.121 / 0.171). Diagnosis:
+- Correct choices, wrong motion: turn 0.56 direct picks `turn_s0.56` at 66/66 steps, yet achieved lateral +0.016 vs goal -0.073
+  (recorded turn clips: -0.073 / -0.081); speed 8.8 direct picks speed clips, achieved forward 0.09 vs recorded 0.22-0.23.
+- Single-clip replay through the loop (`--replay_clip`, rr room) reproduces the recording: E 0.038 (turn 0.56), 0.071
+  (speed 8.8) (`results/check/loop_replay/`). Physics and grading are fine; the switching is not.
+- Cause: `close_loop_hexapod_froude.py` plays `cands[i]["actions"][t + off]` with off = 0 unless `--phase_match`; a switch
+  jumps the legs to another clip's gait phase. c10 has 2 clips per behaviour (different phases), so even direct flips
+  between them; c08's candidate set has 1 per behaviour. Earlier weeks' scripts ran with and without `--phase_match`
+  (`scripts/run/_archive/physics_*.sh`); this week's `physics_rr_c08.sh` / `physics_rr_c10.sh` / `physics_rr_b1.sh` did not.
+- `--phase_match` (`results/check/loop_phase/c10/`): turn 0.56 direct E 0.100 -> **0.048**, lateral back to -0.054, 0 switches;
+  speed 8.8 direct 0.165 -> 0.170 (12 switches between speed clips: different gait frequency, no matching phase exists);
+  rollout turn 0.56 0.185 -> 0.169 (still picks `side_R` 48/66: a selection problem, separate), speed 8.8 0.213 -> 0.164.
+- Switches per episode: direct 0-12, rollout 11-23 -> rollout is the mechanism most damaged by the loop.
+Fix (not yet implemented): drive the hexapod in the loop from its CPG recipe on ONE continuous gait clock, and on a switch
+cross-fade to the new candidate's recipe exactly as the branches were collected (`collect_ik.cpg_commands(xfade=...)`; every
+clip stores `plan_pace/spin/strafe/lead/a0-a2/ft_phase/sym` and `cpg_phase`). Then rerun c10 + c08. B1 is unaffected (its
+walking policy takes the new velocity command continuously). Offline results (Results 1-2, selection) are unaffected.
+All hexapod physics numbers of this week (F321 c08, c10 above) are under this bug and are not the model's ability.
+
+### F324. Original and random-size rooms both put each training clip in its own colour room; the variable behind B1's +0.70 -> +0.44 adaptation drop is room SIZE and start position, not a room -> behaviour shortcut (corrected 2026-10-09)
+
+**Correction (2026-10-09).** The first version of this finding (2026-10-08) said one room per clip in the random-room data
+(`render_random_room.py`, `rr_*`) lets the room identify the clip and its behaviour, and that this caused the drop below. That
+explanation is wrong. Checked in the data: the ORIGINAL rooms also give every clip its own room seed (own wall / floor colours
+and texture; `c10_clips_train` and `b1_clips_train` room_seed 0, 1, 3, 2, ... per clip, the same order in `rr_c10_clips_train`).
+`rr_*` keeps exactly these per-clip seeds and changes only (a) the room size, log-uniform 8-26.5 m instead of sized to the body
+(hexapods 8 m, B1 17.65 m), and (b) a random start position in the room. So the colour room -> behaviour link exists in BOTH
+conditions and cannot explain a difference between them.
+
+The measured drop (F315): B1 adapted on the SAME 44 tuned clips (commands tuned to the hexapod's behaviours) to hexapod-only
+pretraining, rollout from the current frame +0.70 in rooms sized to the body vs +0.44 in random-size rooms; with B1 in joint
+pretraining (40,704 pairs incl. branches) random-size rooms keep +0.71. The variable is size + start position. Candidate
+mechanism (NOT measured): the image motion produced by a given body speed depends on the distance to the walls, so 44 clips,
+each at a different size, are too few to learn image motion -> speed across sizes (consistent with F314: reading B1's real video
+drops in random sizes because B1 had only seen 17.65 m rooms).
+
+What remains true: in both room setups each training room holds one behaviour (main clip; branch rooms also hold the 24
+post-switch commands), so a room -> behaviour cue is available to the model (F307: one still frame reads the motion in seen
+rooms, not in unseen ones; F320: z carries room / clip in random-size rooms). It is worth removing, but it is not the measured
+cause above.
+
+Multi-version rendering (`scripts/dataset/render_multiversion.py`): every rr TRAINING clip + its branches rendered in 2 more
+random-size rooms, both bodies (`rrv2_*` seeds 1000 + s, `rrv3_*` 1100 + s; new colours, size and start position per version;
+physics, labels and every other field bit-for-bit from `rr_*`), 3,504 files per body per version, 0 render errors, gate_a exact,
+`verify` 0 problems (2026-10-09). Each new room still holds one behaviour, so this weakens the colour cue (3 rooms per
+behaviour) but does not remove it; it adds size variety per motion, which addresses the size explanation. Test of the size
+explanation at adaptation time: `scripts/run/b1_rooms_adapt.sh` (same 44 clips in 1 room / 3 rooms / 1 of 3 at random).
+
+**Room variety at adaptation does not close the gap (2026-10-09, `scripts/run/b1_rooms_adapt.sh`,
+`results/eval/b1_rooms_adapt/*/summary.txt`).** Base `round1_hexonly_s0_rr` (hexapod only, branches, random-size rooms); B1
+adapted on the SAME 44 tuned clips (stratified, seed 0), LoRA r8 3000 steps (equal updates), projector on `rr_b1_clips_train`;
+tuned held-out library, random-size rooms, w = 21; normalised score direct / rollout from the current frame; B1 read-out P = 11
+on `rr_b1_branches_heldout`, fwd / lat / yaw:
+
+| adaptation rooms | direct / rollout | real future | FTM-predicted | direct read |
+|---|---|---|---|---|
+| 1 room per clip (`rr`; reference, reproduces F315's +0.44) | +0.94 / +0.44 | 0.36 / 0.39 / 0.39 | 0.54 / 0.78 / 0.09 | 0.96 / 0.94 / 0.62 |
+| 3 rooms per clip (`rr` + `rrv2` + `rrv3`, 132 files) | +0.92 / +0.48 | 0.35 / 0.33 / 0.52 | 0.50 / 0.84 / -0.04 | 0.86 / 0.96 / 0.54 |
+| 1 of the 3 rooms at random (frames as reference) | +0.91 / +0.47 | 0.27 / 0.23 / 0.43 | 0.29 / 0.79 / -0.04 | 0.54 / 0.92 / 0.53 |
+
+Reading: +0.44 -> +0.47-0.48, within one-seed noise; the ceiling with B1 in pretraining is +0.71. Room-size variety in the 44
+adaptation clips alone does not fix it; predicted B1 yaw stays ~0 (as F310 / F311). The size explanation is not refuted --
+pretraining-side variety (`round3_multiroom_s0`) and A (random commands at the body's room size) are the next tests. One seed.
+
+Also still at defaults (not the planned Egocentric VSM strength): crop 0.85-1, brightness/contrast +-0.2, hue / saturation /
+blur / noise 0, lighting fixed; adaptation (`wm/adapt.py` -> `finetune_ftm.py`) uses cached embeddings, i.e. NO augmentation.
+
+### F325. B1 "babbling" is random commands to B1's trained walking policy: no task knowledge, but not no prior knowledge
+
+`collect_b1_babble.py` sends uniform velocity commands (vx +-0.5, vy +-0.4, wz +-0.6) to the trained MuJoCo walking policy
+(DATA_PLAN 10 as written 2026-10-04). The policy already walks, balances and tracks velocity, so F316's B1 rows test "no task
+knowledge", not the project claim. Earlier findings define the claim line as generic CPG + exploration noise without a trained
+policy (FINDINGS ~line 5419, F200; line ~5459: only B1 has an expert library, not the target scenario). The no-prior-knowledge
+test is the four-legged hexapod with 12-D CPG babbling (STATUS item 7). Slide wording fixed 2026-10-08.
+
+### F326. Separating adaptation data from candidates (F316 re-read): random commands as adaptation data match the tuned clips in random rooms; random candidates work for direct only
+
+Hexapod-only rr base, LoRA ITM+FTM + projector, `results/eval/b1_babble_sweep/n*/summary.txt`, normalised score, live rollout.
+- Same tuned candidates, different adaptation data (random rooms): 44 tuned clips +0.94 / +0.44 vs random commands 88 clips
+  +0.88 / +0.41 (44 clips: +0.86 / +0.24). Ceiling (B1 in joint rr pretraining) +0.94 / +0.71.
+- Random-command candidates (k-means 24 on B1's own Froude; oracle E 0.076 vs 0.023 tuned), 11/22/44/88/176 clips:
+  direct +0.61 / **+0.72** / +0.56 / +0.50 / +0.47 (falls with more data, unexplained); rollout +0.01 / +0.08 / +0.12 / +0.16 / +0.16
+  (fails, ~random).
+Reading: the rollout limit follows the room setup (room size + start position, F324 corrected), not the adaptation data; random commands in the ORIGINAL rooms are
+not measured yet (the controlled test to run first). Mistake recorded: babbling was first tested in random rooms, two
+variables at once.
+
+### F327. Physics closed loop in the original rooms (model `round1_branches_s0`, joint c10 + B1, with branches, rooms sized to the body), hexapods with the F323 fix: direct follows the goal on every body; rollout is better than random on B1 and c10, equal to random on c08
+
+2026-10-09. Same loop scripts and settings as the weekly update (window 21, decision every 2 frames, 33 decisions, 6 held-out
+hexapod goals from `c10_clips_heldout`); `--orig_room` rebuilds the paired clip's original room (frame 0 re-rendered through the
+live path: pixel MAE 0.000 B1, 0.001 hexapod); hexapods driven with `--cpg_clock` (`sim/control/cpg_clock.py`: one CPG clock,
+4-frame recipe cross-fade at switches as the branches; rebuilds all 24 c10 / c08 held-out clips' actions exactly). Candidates:
+B1 24 tuned held-out clips, c10 48 training clips, c08 24 held-out clips (zero-shot). Scripts `scripts/run/physics_orig_b1.sh`,
+`physics_orig_hex.sh`; `results/wm/closed_loop_orig/physics/joint_branches/summary{,_c10,_c08}.txt`. No falls. Mean E (L2 to goal
+Froude, lower is better), direct / rollout / random:
+
+| body | direct | rollout | random | goals |
+|---|---|---|---|---|
+| B1 | 0.038 | 0.074 | 0.143 | 6 |
+| c10 | 0.044 | 0.097 | 0.141 | 6 |
+| c08 | 0.043 | 0.128 | 0.128 | 5 (speed 7.1 stopped by the ego-view check: frame 0 corr 0.968 < 0.97, start pose slightly off) |
+
+Fix check (c10, direct, same picks): turn 0.56 E 0.083 -> 0.033 (single-clip replay 0.032); speed 8.8 0.154 -> 0.084, forward
+0.118 -> 0.227 vs goal 0.228 (the rest is lateral: the goal clip drifts +0.074). Rollout switches 1-26 times per episode
+(direct 0-24) and loses most on turn 0.56 and side L0 (c10 0.165 / 0.103, c08 0.168 / 0.205): it picks candidates whose
+predicted future reads right but whose real motion does not (weak predicted yaw, F311). On flat open walking the outcome of a
+command does not depend on the view, so direct is optimal by construction (memory week-goal 2026-09-26); this table is the
+flat-ground reference for the wall test. Not comparable to the random-room numbers (F319 / F321 / F323: other model, rooms, loop).
+
+**Why physics rollout looks worse than the offline +0.71 (2026-10-09): nothing broke; the offline average hid per-goal failures
+and the physics random reference is easier.** Absolute rollout error is the same offline and in physics (mean E c10 0.094 vs
+0.097, B1 0.069 vs 0.074); per goal on c10 (offline, live-frame rollout, same model / candidates / goals, `selection_eval.py`
+per-condition output) vs physics: turn 0.56 0.176 vs 0.165 (random 0.196), turn 0.29 0.123 vs 0.103, side L0 0.112 vs 0.103,
+side R1 0.045 vs 0.035, speed 8.8 0.126 vs 0.125. The offline +0.71 averages 24 goals where rollout is good on some and near
+random on the turns. The physics "random candidate" switches every 2 frames, its motion averages toward slow walking and lies
+closer to many goals (mean E 0.141 vs 0.220 offline), so the same rollout error gives a lower normalised score. Achieved motion
+on the turn goals (c10 / c08): forward 0.00 vs goal 0.15, yaw 0.01 vs 0.06, lateral matched (-0.07): the rollout score
+reads the lateral part of the imagined future but not forward / yaw (F311: the plain z-fit projector puts yaw on a z direction
+the FTM does not read). Test of the F311 fix in selection and physics (projector fitted through the frozen FTM + ITM + head,
+`ckpt/both_rollout.pt`): `results/wm/logs/queue_rollproj.sh` -> `results/wm/closed_loop_orig/physics/joint_branches_rollproj/offline_c10.txt`. Result
+(offline, c10, live-frame rollout, z-fit -> rollout-fit projector): mean 0.094 -> 0.086; turn 0.56 0.176 -> 0.172, turn 0.29
+0.123 -> 0.122, side L0 0.112 -> 0.137, side R1 0.045 -> 0.043, speed 8.8 0.126 -> 0.127. Not the fix; physics part stopped.
+**Decision span** (offline, c10, model `round1_branches_s0`, z-fit projector, `results/check/rollout_horizon/`; CORRECTED
+2026-10-09: `selection_eval --horizon` sets how many steps each decision is held and graded, NOT how far rollout imagines --
+rollout always imagines ceil(window 21 / stride 5) = 5 steps and averages all of them), live-frame rollout E with decisions held
+2 / 4 / 8 steps (0.5 / 1 / 2 s): mean 0.094 / 0.082 / 0.077; turn 0.29 0.123 / 0.083 / 0.077; speed 8.8
+0.126 / 0.117 / 0.093; side R1 0.045 / 0.056 / 0.049; side L0 0.112 / 0.109 / 0.105; **turn 0.56 0.176 / 0.171 / 0.169**
+(random 0.196, direct 0.028-0.033). Holding each decision longer (fewer switches) helps the mild turn and speed goals but not the strongest turn or
+side L0. Open: which channel the rollout
+score misreads for the turn-0.56 candidate from these states (per-candidate read vs true Froude at the decision states).
+
+### F328. Wall pilot (B1, original 17.65 m rooms): the frozen V-JEPA2 embedding reads the distance to the wall ahead (R2 0.96); the current FTM keeps it over 2 s but does not beat "copy the current frame" on straight walking
+
+2026-10-09, `scripts/diagnostics/wall_pilot/b1_wall_pilot.py` (render / sheet / probe), `data/wall_pilot/b1/` (24 windows of
+B1's own forward walks `b1_walks/speed_*`, rotated to face +x, front wall placed 1 / 2 / 4 / 6 m ahead of the camera at the
+last frame; rooms 400-423, room recipe sized to the body; B1 covers only 0.45-0.67 m per 3.3 s clip). Below 1 m the wall fills
+the 90 deg view (uniform frame), so the pilot starts at 1 m. Sheet / video: `results/check/wall_pilot/`. Probe: ridge on
+mean-pooled embeddings -> camera-to-wall distance, 4 folds grouped by clip (test rooms unseen), model `round1_branches_s0`
+(B1 projector ckpt); FTM rolled h steps with the real transition's ITM z:
+
+| horizon | copy frame t (persistence) | FTM, probe fit on real embeddings | FTM, probe fit on FTM outputs |
+|---|---|---|---|
+| 0 | R2 0.961, MAE 0.30 m | | |
+| 1 step (0.25 s) | 0.959 / 0.31 | 0.211 / 1.46 | 0.964 / 0.27 |
+| 2 (0.5 s) | 0.956 / 0.31 | 0.238 / 1.44 | 0.947 / 0.28 |
+| 4 (1 s) | 0.946 / 0.34 | 0.197 / 1.48 | 0.933 / 0.35 |
+| 8 (2 s) | 0.911 / 0.44 | 0.137 / 1.50 | 0.898 / 0.42 |
+
+Reading: (1) wall distance is in the frozen embedding. (2) FTM outputs live in a shifted region of embedding space (a probe
+fitted on real frames fails on them, R2 0.2), but the distance is still linearly readable from them (refit: 0.90-0.96). (3) On
+straight walking at B1's speed the distance changes too little for prediction to beat persistence: the FTM is not better than
+copying the current frame at any horizon. This pilot therefore cannot show predictive value; the wall test needs (a) actions
+whose futures differ in wall distance (turn vs straight near a wall, branch-style), (b) a probe fitted on predicted embeddings
+or a trained wall head, and (c) horizons where the robot moves a meaningful fraction of the distance (B1 ~0.2 m/s: 2 s = 0.4 m).
+
+### F329. Every rollout read is shrunk: across the 24 commands from one state, the Froude read of the predicted future spans only 0.2-0.4 of the true differences on all three channels (forward, lateral, yaw); the read of the REAL future is shrunk too, so the shrink comes first from reading a just-switched transition
+
+2026-10-09, `counterfactual_readout.py --dump` + `scripts/diagnostics/objective_experiments/readout_channels.py`
+(`results/check/rollout_channels/analysis.txt`), model `round1_branches_s0` (joint, branches, original rooms), held-out branches
+(72 start states x 24 commands). Per state: slope of read on truth across the 24 commands (1 = right size), Pearson r, and a
+within-state selection test (each command's true motion as the goal, pick the command whose read is nearest; E = L2 of the
+pick's truth to the goal; picking at random 0.137). Window = 11 pairs (the planner's):
+
+| c10 | slope fwd / lat / yaw | r fwd / lat / yaw | select E |
+|---|---|---|---|
+| direct | 1.13 / 1.14 / 0.80 | 0.97 / 0.85 / 0.78 | 0.043 |
+| real future | 0.54 / 0.27 / 0.42 | 0.90 / 0.68 / 0.86 | 0.049 |
+| predicted future (rollout) | 0.42 / 0.39 / 0.18 | 0.85 / 0.80 / 0.41 | 0.053 |
+
+B1: direct 0.98 / 0.66 / 0.76 (E 0.035), real 0.34 / 0.27 / 0.31 (0.050), predicted 0.40 / 0.41 / 0.27 (0.051). One pair
+(P = 1, 0.25 s) is worse: c10 predicted 0.32 / 0.26 / 0.05, real 0.29 / 0.05 / 0.13.
+Reading: the ranking survives (r high on forward / lateral) but the size of the differences does not, on every channel, and
+already in the read of the real future -- a z of the first frames after a switch reports a motion between the old and the new
+command, while the label is the new command's 1 s motion from the switch on. Selection compares absolute Froude with the goal,
+so goals at the edge of the range (strong turn yaw 0.064 against a within-state yaw spread of 0.020) cannot be reached by any
+shrunk read and the L2 pick drifts along the other channels (F327 turn goals). A per-channel linear calibration of the read
+(3x3 + bias, fitted on half of the states, tested on the other half) raises the slopes (c10 0.42 / 0.39 / 0.18 -> 0.65 / 0.61 /
+0.13) but not selection (E 0.053 -> 0.053; B1 0.051 -> 0.047): the shrink is not a fixed scale. (F327's "horizon" test held decisions longer; it did
+not change how far rollout imagines -- corrected there.) Inside one state rollout is not far from direct
+(E 0.053 vs 0.043); the physics failures come from goals far from where the reads can reach.
+
+**F329 test: imagining further ahead / dropping the first imagined steps makes rollout WORSE (2026-10-09).** `RolloutFroudePlanner`
+`read_skip` (new, default 0 = unchanged) + `selection_eval.py --roll_window W --read_skip S`, offline c10, model
+`round1_branches_s0`, 48 c10 training clips as candidates, held-out goals, live-frame rollout (`results/check/rollout_skip/`).
+Rollout E (window frames, imagined steps dropped):
+
+| window / skip | mean | turn 0.56 | turn 0.29 | side L0 | side R1 | speed 7.1 | speed 8.8 |
+|---|---|---|---|---|---|---|---|
+| 21 / 0 (current) | 0.086 | 0.176 | 0.123 | 0.112 | 0.045 | 0.091 | 0.126 |
+| 21 / 2 | 0.092 | 0.178 | 0.116 | 0.111 | 0.046 | 0.108 | 0.126 |
+| 41 / 0 | 0.105 | 0.179 | 0.158 | 0.124 | 0.055 | 0.120 | 0.151 |
+| 41 / 4 | 0.119 | 0.184 | 0.159 | 0.120 | 0.053 | 0.147 | 0.164 |
+| 61 / 6 | 0.142 | 0.199 | 0.198 | 0.117 | 0.043 | 0.158 | 0.192 |
+
+Decision rule written before the result (turn 0.56 >= 0.05 lower, mean >= 0.01 lower): not met; every longer / later read is
+worse. The forward model's multi-step imagination degrades faster than the post-switch transition settles, so reading later
+imagined steps adds more error than it removes. The limit is the imagination itself (FTM trained on 1-step targets + a 2-step
+rollout loss); the fix has to be on the training side (multi-step rollout training, or labels matched to the visible window).
+
+### F330. Why the Froude reads are shrunk, re-measured (2026-10-09): not the command switch, not the previous motion; the read from REAL frames is shrunk on steady clips too, most in unseen rooms; feeding rollout gait-phase-matched commands helps (mean 0.086 -> 0.071)
+
+Model `round1_branches_s0`. (1) Branch read-outs (F329 dump) regressed on the new command's true motion AND the source state's
+own motion: weight on the source motion ~0 (c10 real future 0.05 / -0.02 / 0.04), on the true motion 0.25-0.53 -> the reads are
+pulled toward one middle value, not toward the previous behaviour. (2) Steady main clips, no switch (11-pair windows, slope of the
+read across windows / r), real-frame read head(ITM(e_t, e_t+5)) vs direct head(proj(a)) (scratch scripts atten.py / atten2.py):
+
+| | real-frame read slope fwd / lat / yaw (r) | direct slope |
+|---|---|---|
+| c10 train rooms | 0.70 / 0.43 / 0.70 (0.98 / 0.68 / 0.94) | 0.77 / 0.40 / 0.69 |
+| c10 held-out rooms | 0.61 / 0.33 / 0.50 (0.94 / 0.78 / 0.84) | 0.80 / 0.76 / 0.73 |
+| B1 train rooms | 0.66 / 0.44 / 0.93 (0.99 / 0.75 / 0.99) | 0.69 / 0.42 / 0.74 |
+| B1 held-out rooms | 0.46 / 0.45 / 0.30 (0.83 / 0.92 / 0.58) | 0.71 / 0.52 / 0.80 |
+
+Reading: the Froude head regresses toward the mean (MSE on a z that carries more than the motion: room, gait phase, sway);
+stronger in unseen rooms (B1 yaw 0.93 -> 0.30). Label standardisation train vs eval checked: same `body_stats` (no bug).
+F329's "post-switch transition" explanation is withdrawn as the main cause.
+(3) Gait-phase mismatch at selection: rollout imagines from the robot's current frame but feeds each candidate's commands at
+index t, i.e. that clip's own gait phase -- an input pairing training never shows (branches keep one gait clock). Offline c10
+with each candidate read from the frame whose `cpg_phase` matches the current state (`selection_eval.py --phase_align`,
+`RolloutFroudePlanner.cand_start`; `results/check/rollout_phase/c10_phase.txt`): rollout E mean 0.086 -> 0.071; speed 7.1 0.091 ->
+0.045, speed 8.8 0.126 -> 0.099, turn 0.29 0.123 -> 0.108, turn 0.56 0.176 -> 0.165, side L0 0.112 -> 0.092, side R1 0.045 -> 0.078.
+A real contributor, unique to rollout (direct ignores the frame); not the whole gap (direct ~0.042). Also checked: direct reads a
+centred window and rollout a forward one (default `window_align`): differs, small for steady goals / candidates.
+Next (agreed direction, Ajan Go): view randomisation (strong augmentation, then lighting / texture) so z stops carrying the room;
+gait-phase-consistent candidate commands in the planner.
+
+### F331. Grayscale input + photometric augmentation (Egocentric-VSM style): reading motion from real video improves and is less room-bound; selection is equal or better; but the forward model's imagined TURNING gets worse
+
+2026-10-09/10. `round1_branches_s0_gray` = `round1_branches_s0` (joint c10 + B1, branches, original rooms, 30,528 steps, seed 0)
++ `--grayscale True` (frozen encoder sees luminance; `scripts/vjepa2_encoder.py`, separate `*_gray` caches) + augmentation
+bright x1/3-3, contrast 0.4, blur sigma <= 2.6, noise 0.03, each with prob 0.5, 25 % clean, crop kept 0.85 (zoom would change
+apparent speed and wall distance). `eval_suite.sh ... joint` (`results/eval/round1_branches_s0_gray/summary.txt`) vs
+`round1_branches_s0` (colour, default augmentation). One seed each.
+
+| | colour (`round1_branches_s0`) | grayscale + aug |
+|---|---|---|
+| B1 selection direct / rollout (normalised score) | +0.94 / +0.75 | +0.95 / +0.76 |
+| B1, goal read from video, direct / rollout | +0.84 / +0.63 | **+0.89 / +0.68** |
+| c10 direct / rollout | +0.92 / +0.71 | +0.92 / +0.69 |
+| c08 zero-shot direct / rollout | +0.90 / +0.68 | +0.89 / +0.69 |
+| real-future read P11, c10 fwd / lat / yaw | 0.90 / 0.68 / 0.86 | 0.92 / 0.72 / 0.89 |
+| real-future read P11, B1 | 0.86 / 0.73 / 0.64 | **0.90 / 0.80 / 0.68** |
+| **predicted**-future read P11, c10 | 0.85 / 0.80 / 0.41 | 0.82 / 0.79 / **0.31** |
+| **predicted**-future read P11, B1 | 0.83 / 0.85 / 0.42 | 0.91 / 0.84 / **0.23** |
+| predicted-future read P11, c08 | 0.85 / 0.76 / 0.34 | 0.82 / 0.76 / 0.25 |
+| z-dependence (head error z shuffled / true) | 3.0x (hexapod) | 3.9x / 4.0x |
+
+Read shrink (F330 check, real-frame read on steady main clips, slope across windows fwd / lat / yaw; scratch atten2_gray.py):
+c10 held-out rooms 0.61 / 0.33 / 0.50 -> 0.70 / 0.43 / 0.49; B1 held-out 0.46 / 0.45 / 0.30 -> 0.62 / 0.50 / 0.42 (r 0.83 / 0.92 /
+0.58 -> 0.92 / 0.95 / 0.82); training rooms about unchanged (B1 0.66 / 0.44 / 0.93 -> 0.72 / 0.58 / 0.88).
+Reading: (1) the room bound shrinks: unseen-room reads move toward trained-room ones (B1 yaw 0.30 -> 0.42 against 0.88), and
+reading the goal from video gains +0.05; (2) direct and rollout selection hold; (3) the FTM imagines turning WORSE (predicted
+yaw r 0.41 -> 0.31 c10, 0.42 -> 0.23 B1) -- the rollout limit is now clearly the imagination of yaw, not the reading.
+Pre-set criteria: (1) partly met (gap narrower, not closed), (2) met for direct, rollout mean unchanged, (3) met. Shared-latent
+step failed (needs grayscale goal-clip embeddings built first; not a model result). Next: shared-room renders (`srbal_*`,
+other PC) with the same recipe; then the imagination of turning (multi-step / imagined-read training, F329 lessons).

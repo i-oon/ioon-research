@@ -199,6 +199,17 @@ kept out of the `diagnostics/` package (no cross-imports touch them).
 | `render_lock_check.py` | Is the camera and scene identical across bodies? |
 | `write_run_log.py`, `recover_config_yaml.py` | Reconstruct a run's record after the fact. |
 
+## Added 2026-10-09 (current pipeline)
+
+| | |
+|---|---|
+| `dataset/render_shared_rooms.py` | Re-render the TRAINING clips + branches in 4 shared room looks (one look per file, balanced so every behaviour is in every look: `render_balanced` -> `srbal_*`), lighting randomised; `gate` (original seed == stored frames, must be 8/8 exact), `sheet`, `verify`. Physics / labels copied bit-for-bit. |
+| `diagnostics/wall_pilot/b1_wall_pilot.py` | B1 walking straight at a wall (original rooms): render, contact sheet, probe of wall distance from real and FTM-predicted embeddings vs "copy the current frame" (F328). |
+| `diagnostics/objective_experiments/readout_channels.py` | Per-channel slope / offset / r / within-state selection of the reads in a `counterfactual_readout.py --dump` (F329). |
+| `diagnostics/objective_experiments/selection_eval.py --roll_window --read_skip --phase_align` | Rollout read-out window, dropped first imagined steps (F329: worse), gait-phase-matched candidate commands (F330: better). |
+| `run/physics_orig_b1.sh`, `run/physics_orig_hex.sh` | Physics loops in the ORIGINAL rooms (`--orig_room`); hexapod with `--cpg_clock` (one CPG gait clock, 4-frame cross-fade, F323 fix; rollout reads candidates at the matching gait phase, F330). Env `CK`, `OUT`, `MECHS`. |
+| `run/_archive/` | Scripts of directions dropped 2026-10-09: random-size rooms (`physics_rr_*`), babbling (`b1_babble_*`, `b1_sbabble_grid`), old augmentation pilot, one-off checks (`controlled_turn056_*`, `b1_rooms_adapt`, `b1_tuned_control`). Kept for the FINDINGS they produced; their `rr_*` data is deleted. |
+
 ## figures/
 
 Every one of these reads its numbers from disk. **None of them holds a measured value as a

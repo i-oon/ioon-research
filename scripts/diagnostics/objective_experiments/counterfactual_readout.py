@@ -56,7 +56,8 @@ def tokens(path, clip, bp, n, encoder):
     stays bounded. Stamped with the source file's size + mtime and the frame range; a mismatch re-encodes."""
     real = os.path.realpath(path)      # a symlinked copy (e.g. a subset folder) reuses the original's entry
     rel = os.path.relpath(real, ROOT).replace(os.sep, "__")
-    f = os.path.join(CACHE, rel + ".pt")
+    from vjepa2_encoder import gray_tag
+    f = os.path.join(gray_tag(CACHE), rel + ".pt")
     st = os.stat(real)
     stamp = (st.st_size, st.st_mtime_ns, bp, n)
     if os.path.exists(f):
@@ -64,7 +65,7 @@ def tokens(path, clip, bp, n, encoder):
         if tuple(d["stamp"]) == stamp:
             return d["e"]
     e = encode_clip(encoder(), np.asarray(clip["frames"][bp:bp + n]), 8).half().cpu()
-    os.makedirs(CACHE, exist_ok=True)
+    os.makedirs(os.path.dirname(f), exist_ok=True)
     tmp = f + ".tmp"
     torch.save({"e": e, "stamp": stamp}, tmp)
     os.replace(tmp, f)
@@ -79,6 +80,8 @@ def main():
     ap.add_argument("--ckpt", action="append", required=True, help="name=path")
     ap.add_argument("--pairs", type=int, nargs="+", default=[1, 11])
     ap.add_argument("--cache", default="", help="ignored (kept so old command lines still parse)")
+    ap.add_argument("--dump", default="", help="npz path: per group the 24 branches' truth and the three reads (Froude units, "
+                    "each P), for scale / bias / absolute-error analysis; '' = off")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     dev, emb_name = args.device, args.embodiment
@@ -111,7 +114,8 @@ def main():
         del ck
         off = None if m.offset is None else m.offset.float().to(dev)
         runs.append(dict(name=name, m=m, mean=mean, std=std, off=off,
-                         R={P: {k: [] for k in ("real cf", "FTM cf", "direct")} for P in args.pairs}))
+                         R={P: {k: [] for k in ("real cf", "FTM cf", "direct")} for P in args.pairs},
+                         D={P: {k: [] for k in ("truth", "real cf", "FTM cf", "direct")} for P in args.pairs}))
     K_max = max(r["m"].stride for r in runs)
 
     for gi, (key, paths) in enumerate(sorted(G.items())):
@@ -138,6 +142,10 @@ def main():
                     reads["FTM cf"].append(rd(e0, m.itm(e0, m.ftm_step(e0, z))).mean(0))
                     reads["direct"].append(rd(e0, z).mean(0))
                 truth = np.stack(truth)
+                if args.dump and len(truth) == 24:
+                    r["D"][P]["truth"].append(truth)
+                    for k in reads:
+                        r["D"][P][k].append(np.stack(reads[k]))
                 for k in reads:
                     f = np.stack(reads[k])
                     r["R"][P][k].append([corr(f[:, j], truth[:, j]) for j in range(3)])
@@ -154,6 +162,12 @@ def main():
                   f"r fwd / lat / yaw", flush=True)
             for k, v in r["R"][P].items():
                 print(f"  {k:<8}" + " / ".join(f"{x:.2f}" for x in np.nanmean(np.asarray(v), 0)), flush=True)
+
+    if args.dump:
+        out = {f"{r['name']}|P{P}|{k}": np.stack(v) for r in runs for P in args.pairs for k, v in r["D"][P].items() if v}
+        np.savez(os.path.join(ROOT, args.dump), groups=np.array([f"{k[0]}|{k[1]}" for k in sorted(G)]), **out)
+        print(f"dump -> {args.dump}")
+
 
 if __name__ == "__main__":
     main()

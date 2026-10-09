@@ -1,0 +1,27 @@
+R            w=21   direct 0.0418 (gap +0.90)  roll_fixed 0.0836 (gap +0.68)  roll_live 0.0862 (gap +0.66)
+library bounds (mean over conditions): oracle 0.0227  random 0.2118
+gap = (random - selector) / (random - oracle): 0 = random, 1 = oracle, <0 worse than random
+  speed_c5.8   oracle 0.0181 random 0.1612 | R/w21/direct 0.0306  R/w21/roll_fixed 0.0660  R/w21/roll_live 0.0747
+  speed_c7.1   oracle 0.0203 random 0.1726 | R/w21/direct 0.0438  R/w21/roll_fixed 0.0811  R/w21/roll_live 0.0843
+  speed_c8.15  oracle 0.0224 random 0.2035 | R/w21/direct 0.0666  R/w21/roll_fixed 0.1082  R/w21/roll_live 0.1201
+  speed_c8.8   oracle 0.0353 random 0.2177 | R/w21/direct 0.0677  R/w21/roll_fixed 0.1190  R/w21/roll_live 0.1269
+  speed_c5.8_bwd oracle 0.0288 random 0.2676 | R/w21/direct 0.0544  R/w21/roll_fixed 0.0644  R/w21/roll_live 0.1156
+  speed_c7.1_bwd oracle 0.0331 random 0.2779 | R/w21/direct 0.0625  R/w21/roll_fixed 0.0714  R/w21/roll_live 0.0921
+  speed_c8.15_bwd oracle 0.0349 random 0.3054 | R/w21/direct 0.0558  R/w21/roll_fixed 0.1025  R/w21/roll_live 0.1163
+  speed_c8.8_bwd oracle 0.0303 random 0.3068 | R/w21/direct 0.0415  R/w21/roll_fixed 0.0939  R/w21/roll_live 0.0852
+  turn_s0.05   oracle 0.0147 random 0.1638 | R/w21/direct 0.0272  R/w21/roll_fixed 0.0658  R/w21/roll_live 0.0770
+  turn_s0.15   oracle 0.0157 random 0.1656 | R/w21/direct 0.0303  R/w21/roll_fixed 0.0792  R/w21/roll_live 0.0844
+  turn_s0.29   oracle 0.0198 random 0.1697 | R/w21/direct 0.0444  R/w21/roll_fixed 0.1080  R/w21/roll_live 0.1216
+  turn_s0.56   oracle 0.0287 random 0.1961 | R/w21/direct 0.0332  R/w21/roll_fixed 0.1557  R/w21/roll_live 0.1722
+  turn_s0.05_neg oracle 0.0104 random 0.1622 | R/w21/direct 0.0271  R/w21/roll_fixed 0.0638  R/w21/roll_live 0.0570
+  turn_s0.15_neg oracle 0.0159 random 0.1623 | R/w21/direct 0.0287  R/w21/roll_fixed 0.0497  R/w21/roll_live 0.0841
+  turn_s0.29_neg oracle 0.0244 random 0.1730 | R/w21/direct 0.0370  R/w21/roll_fixed 0.0734  R/w21/roll_live 0.0849
+  turn_s0.56_neg oracle 0.0275 random 0.2043 | R/w21/direct 0.0311  R/w21/roll_fixed 0.0545  R/w21/roll_live 0.0621
+  side_L_lvl0  oracle 0.0131 random 0.1918 | R/w21/direct 0.0218  R/w21/roll_fixed 0.0735  R/w21/roll_live 0.1372
+  side_L_lvl1  oracle 0.0238 random 0.2217 | R/w21/direct 0.0533  R/w21/roll_fixed 0.0513  R/w21/roll_live 0.0527
+  side_L_lvl2  oracle 0.0273 random 0.2199 | R/w21/direct 0.0459  R/w21/roll_fixed 0.0528  R/w21/roll_live 0.0548
+  side_L_lvl3  oracle 0.0267 random 0.2701 | R/w21/direct 0.0487  R/w21/roll_fixed 0.0680  R/w21/roll_live 0.0605
+  side_R_lvl0  oracle 0.0120 random 0.1868 | R/w21/direct 0.0273  R/w21/roll_fixed 0.0365  R/w21/roll_live 0.0406
+  side_R_lvl1  oracle 0.0163 random 0.2026 | R/w21/direct 0.0300  R/w21/roll_fixed 0.0947  R/w21/roll_live 0.0433
+  side_R_lvl2  oracle 0.0248 random 0.2287 | R/w21/direct 0.0488  R/w21/roll_fixed 0.1215  R/w21/roll_live 0.0523
+  side_R_lvl3  oracle 0.0215 random 0.2531 | R/w21/direct 0.0465  R/w21/roll_fixed 0.1523  R/w21/roll_live 0.0678

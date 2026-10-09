@@ -67,6 +67,13 @@ def main():
                     "room seed / size / offset, floor tiles, wall skirts, visible floor at the source level, far clip; "
                     "same ego camera mount + FOV 90), body turned to the clip's start heading, head spawned at the clip "
                     "start (0, 0); frame 0 checked against the clip's frame 0. '' = the old 8 m room (unchanged)")
+    ap.add_argument("--orig_room", default="", help="an ORIGINAL-room clip of the controlled body "
+                    "(data/counterfactual_walks/{c10,c08}_clips_*): the collector's own room (8 m, sized to the body) with "
+                    "the clip's room seed, body turned to the clip's start heading; frame 0 checked against the clip's")
+    ap.add_argument("--cpg_clock", action="store_true",
+                    help="F323 fix: drive the body from the chosen candidate's CPG recipe (plan_*) on ONE continuous gait "
+                         "clock, cross-fading 4 frames at a switch exactly as the branches were collected "
+                         "(sim/control/cpg_clock.py), instead of playing the candidate's recorded actions[t]")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     emb, dev = "hexapod", args.device
@@ -118,6 +125,26 @@ def main():
         ref_frames = [rc["frames"][0]]
         print(f"  rr room: seed {seed} size {S:.2f} m offset {o.round(2).tolist()} (from {args.rr_room}); "
               f"start heading turned by {np.rad2deg(dpsi):+.1f} deg", flush=True)
+    if args.orig_room:
+        from collect_ik import ENV, settle, ROBOT_ROOT
+        from wm.data.embodiment import heading
+        sys.path.insert(0, os.path.join(ROOT, "scripts/dataset"))
+        import render_shift_heldout as RS
+        rc = RS.load(os.path.join(ROOT, args.orig_room))
+        settle(sim); sim.loadScene(os.path.join(ENV, scene)); settle(sim)
+        q_auth = np.asarray(sim.getObjectQuaternion(sim.getObject(ROBOT_ROOT), sim.handle_world), float)
+        dpsi = float(heading(np.asarray(rc["body_quat"][:1], float), "hexapod")[0] - heading(q_auth[None], "hexapod")[0])
+        dpsi = float(np.arctan2(np.sin(dpsi), np.cos(dpsi)))
+        rr_kw = dict(yaw=float(np.rad2deg(dpsi)))
+        args.ego_seed = int(rc["room_seed"])
+        ref_frames = [rc["frames"][0]]
+        print(f"  original room: seed {args.ego_seed} (from {args.orig_room}); start heading turned by "
+              f"{np.rad2deg(dpsi):+.1f} deg", flush=True)
+    clock = {"k": None}
+    if args.cpg_clock:
+        from cpg_clock import Clock, centre_of, recipe
+        centre = centre_of(name)
+        cand_np = [np.load(c["path"], allow_pickle=True) for c in cands]
     steps = min(len(goal_bm), min(len(c["actions"]) for c in cands))
     seed_cmds = np.asarray(cands[0]["actions"], np.float32)[:steps]      # warmup pose + clip length
 
@@ -151,6 +178,17 @@ def main():
                     e_t = encode_clip(encoder, np.asarray(frame)[None], 1).float()
                     if off is not None:
                         e_t = e_t - off.to(e_t.device)
+                    if args.cpg_clock:
+                        # F330: imagine each candidate from the frame of its clip whose gait phase matches the robot's
+                        # current one (the clock's phase), not from index t (another phase: a pairing training never shows)
+                        k_ = clock["k"]
+                        ph = (k_.c % 1.0) if k_ is not None else float(cand_np[held["i"]]["cpg_phase"][0])
+                        st = []
+                        for cn in cand_np:
+                            cp = np.asarray(cn["cpg_phase"], float)[:len(cn["actions"]) - 26]
+                            d_ = np.abs(cp - ph); d_ = np.minimum(d_, 1 - d_)
+                            st.append(int(np.argmin(d_ + 1e-3 * np.abs(np.arange(len(cp)) - t))))
+                        rp.cand_start = st
                     _, i, _ = rp.act(e_t, g, t)
             if i != held["i"] and args.phase_match and held["last"] is not None:
                 acts = np.asarray(cands[i]["actions"])
@@ -159,6 +197,15 @@ def main():
             elif i != held["i"]:
                 held["off"] = 0
             held["i"] = i
+        if args.cpg_clock and not args.replay_clip:
+            if clock["k"] is None:     # start on the first choice's own phase and recipe (= its actions[0])
+                clock["k"] = Clock(cand_np[held["i"]]["cpg_cycles_total"][0], recipe(cand_np[held["i"]]), centre)
+            else:
+                clock["k"].choose(recipe(cand_np[held["i"]]))
+            chosen.append(cands[held["i"]]["condition"])
+            cmd = clock["k"].step()
+            held["last"] = cmd
+            return cmd
         if args.replay_clip:
             a = np.load(os.path.join(ROOT, args.replay_clip), allow_pickle=True)["actions"]
             chosen.append("replay")
@@ -184,7 +231,8 @@ def main():
         from render_hex_replay import capture
         cam = sim.getObject("/vjepa_cam")
         sim.setObjectFloatParam(cam, sim.visionfloatparam_perspective_angle, float(np.deg2rad(EGO_FOV_DEG)))
-        RS.rs_far(sim, cam, float(rc["rr_room_size"]))
+        if not args.orig_room:
+            RS.rs_far(sim, cam, float(rc["rr_room_size"]))
         for h, p in zip([sim.getObject(str(n)) for n in rc["state_link_names"]], np.asarray(rc["state_link_pose"][0], float)):
             sim.setObjectPose(h, sim.handle_world, [float(v) for v in p])
         f0 = capture(sim, cam)
@@ -192,7 +240,7 @@ def main():
               f"{np.abs(f0.astype(int) - rc['frames'][0].astype(int)).mean():.3f} / 255", flush=True)
 
     out_dir = os.path.join(ROOT, args.out, ("replay" if args.replay_clip else f"{args.mechanism}_w{args.window}")
-                           + ("_phase" if args.phase_match else ""))
+                           + ("_phase" if args.phase_match else "") + ("_cpg" if args.cpg_clock else ""))
     os.makedirs(out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(goal_path))[0]
     out = os.path.join(out_dir, f"{name}_{stem}.npz")
@@ -210,6 +258,8 @@ def main():
     np.savez_compressed(out[:-4] + ".tmp.npz", **saved, achieved_froude=achieved[:n].astype(np.float32),
                         goal_froude_t=goal_bm[:n].astype(np.float32))
     os.replace(out[:-4] + ".tmp.npz", out)
+    if clock["k"] is not None:
+        print(f"  cpg clock: {clock['k'].switches} recipe switches (4-frame cross-fade each)")
     print(f"physics closed loop: mean L2 error {err.mean():.4f} at {len(dec)} decision steps -> "
           f"{os.path.relpath(out, ROOT)}")
 

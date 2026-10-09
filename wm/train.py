@@ -238,6 +238,8 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     embodiment = batch["embodiment"][0] if "embodiment" in batch else "default"
     offset = offsets.get(embodiment) if offsets else None
     extra = ROLLOUT_VIEW_KEYS if (cfg.lambda_rollout > 0 and "view1_next2" in batch) else ()
+    if cfg.lambda_imread > 0 and "imread_y" in batch:
+        extra = tuple(dict.fromkeys(extra + tuple(f"view1_next{k}" for k in range(2, cfg.imread_k + 1))))
     views = encode_batch(encoder, batch, offset, extra_keys=extra)
     action = batch["action"].to(device)
 
@@ -343,6 +345,26 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
         pred_next2 = models["ftm"](pred_next, z2, embodiment)
         rollout_loss = F.mse_loss(pred_next2, views["view2_next2"])
 
+    # --- imagined-read loss (see `Config.lambda_imread`). Off unless set. The FTM is rolled from the real frame with the
+    # real transitions' z (detached); every imagined transition is read through the ITM and the Froude head with their
+    # weights detached, so only the FTM learns to imagine futures whose motion reads right (the planner's own read).
+    imread_loss = None
+    if cfg.lambda_imread > 0 and "imread_y" in batch:
+        itm, head = models["itm"], models["md"].body_head
+        itm_w = {**{k: v.detach() for k, v in itm.named_parameters()}, **dict(itm.named_buffers())}
+        head_w = {**{k: v.detach() for k, v in head.named_parameters()}, **dict(head.named_buffers())}
+        real = [views["view1_t"], views["view1_next"]] + [views[f"view1_next{k}"] for k in range(2, cfg.imread_k + 1)]
+        y, m = batch["imread_y"].to(device), batch["imread_m"].to(device)
+        e_prev, terms = views["view2_t"], []
+        for k in range(cfg.imread_k):
+            with torch.no_grad():
+                zk = itm(real[k], real[k + 1])
+            e_next = pred_next if k == 0 else models["ftm"](e_prev, zk, embodiment)
+            r = torch.func.functional_call(head, head_w, (torch.func.functional_call(itm, itm_w, (e_prev, e_next)),))
+            terms.append((((r.float() - y[:, k]) ** 2).mean(-1) * m[:, k]).sum() / m[:, k].sum().clamp(min=1))
+            e_prev = e_next
+        imread_loss = torch.stack(terms).mean()
+
     # --- counterfactual cycle (see `Config.lambda_cycle`). Off unless set, so every earlier run
     # reproduces unchanged. z is shuffled across the batch (a batch is one embodiment, different
     # clips and times), so the FTM sees a latent that disagrees with the frame it starts from -- the
@@ -404,6 +426,10 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
     if rollout_loss is not None:
         loss = loss + cfg.lambda_rollout * rollout_loss
         parts["rollout"] = float(rollout_loss.detach())
+        parts["total"] = float(loss.detach())
+    if imread_loss is not None:
+        loss = loss + cfg.lambda_imread * imread_loss
+        parts["imread"] = float(imread_loss.detach())
         parts["total"] = float(loss.detach())
     if cycle_loss is not None:
         loss = loss + cfg.lambda_cycle * cycle_loss
@@ -594,10 +620,11 @@ def build_cross_embodiment(cfg, root):
                                                       heldout_bodies=tuple(cfg.heldout_bodies),
                                                       clips_per_body=tuple(cfg.clips_per_body))
     rollout_k = 2 if cfg.lambda_rollout > 0 else 1
+    read_k = cfg.imread_k if cfg.lambda_imread > 0 else 0
     train_set = MultiEmbodimentPairs(train_sources, seed=cfg.seed,
                                      cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                      body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k,
+                                     action_chunk=chunk_of(cfg), rollout_k=rollout_k, read_k=read_k,
                                      lazy_frames=cfg.lazy_frames,
                                      max_frame_ram_gb=cfg.max_frame_ram_gb)
     # body_stats too, not only the action stats: a validation split that centres body motion on
@@ -606,7 +633,7 @@ def build_cross_embodiment(cfg, root):
                                    cross_augment=cfg.cross_augment, action_lag=cfg.action_lag,
                                    body_stats=train_set.body_stats,
                                    body_channels=_channels(cfg), frame_stride=cfg.frame_stride,
-                                   action_chunk=chunk_of(cfg), rollout_k=rollout_k,
+                                   action_chunk=chunk_of(cfg), rollout_k=rollout_k, read_k=read_k,
                                      lazy_frames=cfg.lazy_frames,
                                      max_frame_ram_gb=cfg.max_frame_ram_gb)
     heads = {name: REGISTRY[name].action_dim for name, _ in specs}
@@ -679,6 +706,9 @@ def main():
     np.random.seed(cfg.seed)
     from wm.data import augment as _augment          # training-view augmentation strength (cfg.aug_*)
     _augment.configure(cfg)
+    if cfg.grayscale:                                # Egocentric VSM grayscale: the frozen encoder sees luminance only
+        os.environ["VJEPA_GRAY"] = "1"
+        print("grayscale input: VJEPA_GRAY=1")
     device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
 
     data_dir = cfg.data_dir if os.path.isabs(cfg.data_dir) else os.path.join(ROOT, cfg.data_dir)
@@ -948,6 +978,8 @@ def main():
                if "hinge" in train_metrics else "")
             + (f" | readout {train_metrics['readout']:.4f}"
                if "readout" in train_metrics else "")
+            + (f" | imread {train_metrics['imread']:.4f}/{val_metrics.get('imread', float('nan')):.4f}"
+               if "imread" in train_metrics else "")
             # **The rule two lines below, obeyed.** `lambda_ldad` was added without this and the
             # first arm ran eleven epochs before the arithmetic -- total minus recon, motion and
             # body landing on zero to four decimals -- showed the term was contributing nothing.

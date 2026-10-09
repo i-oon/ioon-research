@@ -13,7 +13,12 @@ discarded whole (it cannot be verified).
 """
 import os
 
+import sys
+
 import torch
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts"))
+from vjepa2_encoder import gray_tag  # noqa: E402
 
 STAT = "__stat__"
 
@@ -24,6 +29,7 @@ def _stat(p):
 
 
 def load_cache(path):
+    path = gray_tag(path)       # grayscale embeddings never share a file with colour ones
     if not os.path.exists(path):
         return {STAT: {}}
     raw = torch.load(path, map_location="cpu")
@@ -52,6 +58,7 @@ def note(cache, p):
 
 
 def save_cache(cache, path):
+    path = gray_tag(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
     torch.save(cache, tmp)
@@ -67,6 +74,7 @@ def file_cached(path, cache_dir, compute):
 
     The entry is keyed by the real path (symlinked subsets reuse the original's entry) and stamped with the file's size +
     mtime; a mismatch recomputes. `compute()` must return a CPU tensor; it is stored fp16 like every other cache."""
+    cache_dir = gray_tag(cache_dir)
     real = os.path.realpath(path)
     rel = real.replace(os.sep, "__")
     f = os.path.join(cache_dir, rel[-200:] + ".pt")

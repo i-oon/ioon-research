@@ -1,0 +1,13 @@
+=== row mixed  base=wm/runs/round1_hexonly_s0_rr/best.pt  Thu 08 Oct 2026 05:01:40 PM +07
+adapt clips 44 (27 distinct motions), test clips 4
+adapted on 44 clips of b1, 3000 updates, final loss 4.3309
+-> results/eval/b1_rooms_adapt/mixed/adapted.pt
+-> results/eval/b1_rooms_adapt/mixed/projector.pt
+--- selection B1, tuned held-out library (random-size rooms)
+mixed        w=21   direct 0.0404 (gap +0.91)  roll_fixed 0.1193 (gap +0.48)  roll_live 0.1212 (gap +0.47)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (random-size-room held-out branches)
+=== mixed: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.27 / 0.23 / 0.43
+  FTM cf  0.29 / 0.79 / -0.04
+  direct  0.54 / 0.92 / 0.53

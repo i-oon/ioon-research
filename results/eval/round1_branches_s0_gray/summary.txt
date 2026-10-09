@@ -1,0 +1,50 @@
+=== round1_branches_s0_gray (joint) wm/runs/round1_branches_s0_gray/best.pt Fri 09 Oct 2026 09:41:15 AM +07
+--- selection B1, recorded goal
+round1_branches_s0_gray w=21   direct 0.0314 (gap +0.95)  roll_fixed 0.0858 (gap +0.66)  roll_live 0.0670 (gap +0.76)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round1_branches_s0_gray w=21   direct 0.0424 (gap +0.89)  roll_fixed 0.1022 (gap +0.57)  roll_live 0.0819 (gap +0.68)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot
+round1_branches_s0_gray w=21   direct 0.0480 (gap +0.89)  roll_fixed 0.0904 (gap +0.66)  roll_live 0.0845 (gap +0.69)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round1_branches_s0_gray w=21   direct 0.0564 (gap +0.92)  roll_fixed 0.0899 (gap +0.73)  roll_live 0.0964 (gap +0.69)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197
+--- shared latent
+checkpoint trained on grayscale frames: encoder switched to grayscale (VJEPA_GRAY=1)
+c10 (pretrain): 24 of 24 clips in data/counterfactual_walks/c10_clips_heldout have no current embedding in results/wm/cache/test_v4_hex_heldout.pt; build it first (selection_eval.py with the same dir and --cache)
+--- z-dependence (Froude-head error, z shuffled / true z, heldout pairs)
+z-dependence hexapod: head(z) error z-shuffled/true 3.903x (MSE 0.4796 -> 1.8717, 1464 pairs; ~1 = head ignores z)
+z-dependence b1: head(z) error z-shuffled/true 3.998x (MSE 0.4115 -> 1.6453, 1464 pairs; ~1 = head ignores z)
+--- counterfactual read-out hexapod (physics branches, heldout)
+=== round1_branches_s0_gray: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.59 / 0.19 / 0.37
+  FTM cf  0.35 / 0.40 / 0.01
+  direct  0.87 / 0.73 / 0.48
+--
+=== round1_branches_s0_gray: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.72 / 0.89
+  FTM cf  0.82 / 0.79 / 0.31
+  direct  0.97 / 0.85 / 0.78
+--- counterfactual read-out B1 (physics branches, heldout)
+=== round1_branches_s0_gray: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.54 / 0.08 / 0.51
+  FTM cf  0.74 / 0.69 / 0.13
+  direct  0.96 / 0.96 / 0.24
+--
+=== round1_branches_s0_gray: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.90 / 0.80 / 0.68
+  FTM cf  0.91 / 0.84 / 0.23
+  direct  0.98 / 0.98 / 0.44
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)
+=== round1_branches_s0_gray: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.59 / 0.28 / 0.36
+  FTM cf  0.32 / 0.32 / 0.08
+  direct  0.87 / 0.65 / 0.55
+--
+=== round1_branches_s0_gray: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.91 / 0.77 / 0.87
+  FTM cf  0.82 / 0.76 / 0.25
+  direct  0.97 / 0.81 / 0.77
+EVAL_SUITE_DONE round1_branches_s0_gray

@@ -24,7 +24,7 @@
 #   a longer arm B is a NEW run (new --name, fresh cosine schedule); --resume only continues an unfinished run
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ARM=${1:?usage: round1_counterfactual.sh A|B|H|F|J}
+ARM=${1:?usage: round1_counterfactual.sh A|B|H|F|J|M|S}
 SEED=${SEED:-0}
 PFX=${PFX:-}              # data prefix: "" = current renders; rr_ = random room size + start (rendering only)
 RUN_TAG=${RUN_TAG:-}      # appended to the run name, e.g. _rr
@@ -34,6 +34,7 @@ $PY tests/test_froude_labels.py || { echo "label tests FAIL: wrong code here"; e
 need=("$CW/${PFX}c10_clips_train" "$CW/${PFX}c10_clips_val" "$CW/${PFX}b1_clips_train" "$CW/${PFX}b1_clips_val")
 [ "$ARM" = B -o "$ARM" = F -o "$ARM" = J ] && need+=("$CW/${PFX}c10_branches_train" "$CW/${PFX}b1_branches_train")
 [ "$ARM" = H ] && need=("$CW/${PFX}c10_clips_train" "$CW/${PFX}c10_clips_val" "$CW/${PFX}c10_branches_train")
+[ "$ARM" = S ] && need=("$CW/c10_clips_val" "$CW/b1_clips_val")
 for p in "${need[@]}"; do
   [ -s "$(ls $p/*.npz 2>/dev/null | head -1)" ] || { echo "MISSING/EMPTY $p"; exit 1; }
 done
@@ -54,10 +55,27 @@ case $ARM in
   J) NAME=round2_align_s$SEED$RUN_TAG            # = arm B + cross-body soft InfoNCE on a projection head of z
      ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train b1=$CW/${PFX}b1_clips_train
            b1=$CW/${PFX}b1_branches_train --epochs 3 --checkpoint_every 1 --lambda_align ${LAMBDA_ALIGN:-0.1}" ;;
+  M) NAME=round3_multiroom_s$SEED                # = arm B on rr_ + rrv2_ + rrv3_ (every training clip + branches in
+                                                 # 3 rooms, F324); 1 epoch over 3 versions = 30,528 steps = arm B's budget
+     for v in rr_ rrv2_ rrv3_; do for d in c10_clips_train c10_branches_train b1_clips_train b1_branches_train; do
+       [ -s "$(ls $CW/$v$d/*.npz 2>/dev/null | head -1)" ] || { echo "MISSING/EMPTY $CW/$v$d"; exit 1; }; done; done
+     ARGS="--sources hexapod=$CW/rr_c10_clips_train hexapod=$CW/rr_c10_branches_train b1=$CW/rr_b1_clips_train
+           b1=$CW/rr_b1_branches_train hexapod=$CW/rrv2_c10_clips_train hexapod=$CW/rrv2_c10_branches_train
+           b1=$CW/rrv2_b1_clips_train b1=$CW/rrv2_b1_branches_train hexapod=$CW/rrv3_c10_clips_train
+           hexapod=$CW/rrv3_c10_branches_train b1=$CW/rrv3_b1_clips_train b1=$CW/rrv3_b1_branches_train
+           --epochs 1 --checkpoint_every 1"
+     VAL="--val_sources hexapod=$CW/rr_c10_clips_val b1=$CW/rr_b1_clips_val" ;;
+  S) NAME=round1_branches_s${SEED}_srbal$RUN_TAG   # = arm B on the SHARED-room renders (srbal_*, 2026-10-09: 4 room looks,
+                                                 # every behaviour in every look); validation on the ORIGINAL val renders
+     for d in c10_clips_train c10_branches_train b1_clips_train b1_branches_train; do
+       [ -s "$(ls $CW/srbal_$d/*.npz 2>/dev/null | head -1)" ] || { echo "MISSING/EMPTY $CW/srbal_$d"; exit 1; }; done
+     ARGS="--sources hexapod=$CW/srbal_c10_clips_train hexapod=$CW/srbal_c10_branches_train b1=$CW/srbal_b1_clips_train
+           b1=$CW/srbal_b1_branches_train --epochs 3 --checkpoint_every 1"
+     VAL="--val_sources hexapod=$CW/c10_clips_val b1=$CW/b1_clips_val" ;;
   H) NAME=round1_hexonly_s$SEED$RUN_TAG          # hexapod only (B1 never seen); B1 is adapted afterwards
      ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train --epochs 6 --checkpoint_every 1"
      VAL="--val_sources hexapod=$CW/${PFX}c10_clips_val" ;;
-  *) echo "arm must be A, B, H, F or J"; exit 1 ;;
+  *) echo "arm must be A, B, H, F, J, M or S"; exit 1 ;;
 esac
 setsid nohup $PY -m wm.train $COMMON $VAL $ARGS ${EXTRA:-} --name $NAME >> results/wm/logs/$NAME.log 2>&1 &
 TRAIN_PID=$!

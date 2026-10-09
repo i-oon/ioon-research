@@ -28,6 +28,14 @@ def from_checkpoint(saved):
         if name not in saved:
             setattr(cfg, name, before)
     cfg.train_morphs = tuple(cfg.train_morphs)
+    import os
+    gray_env = os.environ.get("VJEPA_GRAY", "0") == "1"
+    if cfg.grayscale and not gray_env:
+        os.environ["VJEPA_GRAY"] = "1"
+        print("checkpoint trained on grayscale frames: encoder switched to grayscale (VJEPA_GRAY=1)")
+    elif gray_env and not cfg.grayscale:
+        raise SystemExit("VJEPA_GRAY=1 (a grayscale model is loaded in this process) but this checkpoint was trained "
+                         "on colour frames: do not mix colour and grayscale models in one process")
     return cfg
 
 
@@ -90,6 +98,11 @@ class Config:
     # thorax-coxa; see action_stats in wm/data/dataset.py. False reproduces runs recorded
     # before 2026-08-08.
     within_body_std: bool = True
+
+    # Grayscale input (Egocentric VSM, 2026-10-09): frames -> luminance before the frozen encoder, in training AND
+    # everywhere the checkpoint is used (from_checkpoint switches the encoder's process-wide VJEPA_GRAY on).
+    # Removes room colour as a cue tied to clips / behaviours. False = every earlier run.
+    grayscale: bool = False
 
     # Cross-embodiment mode. Empty keeps the single-morphology path above; otherwise give
     # "name=dir" per embodiment, e.g. hexapod=data/ik_walk_100 b1=data/b1. Batches are drawn
@@ -327,6 +340,13 @@ class Config:
     # the ITM -- frozen for this term, so it cannot learn to read an FTM artefact -- to recover the
     # shuffled z from ITM(e_t, FTM(e_t, z_shuffled)). 0.0 reproduces every run before 2026-09-25.
     lambda_cycle: float = 0.0
+    # **Imagined-read loss (2026-10-10, F329-F331).** Roll the FTM `imread_k` steps from the real frame with the real
+    # transitions' z (ITM of real frames, detached), read Froude from every imagined transition through the FROZEN ITM and
+    # Froude head (exactly the planner's rollout read), and match the true label of that step. Gradient reaches the FTM
+    # only (F253: letting it reshape z broke the read-out). Steps whose real frames are past the clip end are masked, so
+    # the set of training pairs is unchanged. 0.0 = every earlier run.
+    lambda_imread: float = 0.0
+    imread_k: int = 4
     # Modules held fixed during training (names from the model dict, e.g. `itm`). Measured need
     # (F253): with the ITM trainable, `lambda_cycle` made the FTM use z but also reshaped z itself
     # -- recon's gradient reaches z harder once the FTM depends on it -- and z's read-out as Froude

@@ -1,0 +1,13 @@
+=== row three  base=wm/runs/round1_hexonly_s0_rr/best.pt  Thu 08 Oct 2026 04:32:13 PM +07
+adapt clips 132 (27 distinct motions), test clips 4
+adapted on 132 clips of b1, 3000 updates, final loss 3.9388
+-> results/eval/b1_rooms_adapt/three/adapted.pt
+-> results/eval/b1_rooms_adapt/three/projector.pt
+--- selection B1, tuned held-out library (random-size rooms)
+three        w=21   direct 0.0384 (gap +0.92)  roll_fixed 0.1081 (gap +0.54)  roll_live 0.1185 (gap +0.48)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- read-out B1 (random-size-room held-out branches)
+=== three: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.35 / 0.33 / 0.52
+  FTM cf  0.50 / 0.84 / -0.04
+  direct  0.86 / 0.96 / 0.54

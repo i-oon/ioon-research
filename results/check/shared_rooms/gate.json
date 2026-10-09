@@ -1,0 +1,42 @@
+[
+ {
+  "file": "data/counterfactual_walks/c10_clips_train/hexapod_ep40000.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/c10_clips_train/hexapod_ep40032.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/c10_branches_train/hexapod_ep400001307.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/c10_branches_train/hexapod_ep400001300.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/b1_clips_train/b1_ep50000.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/b1_clips_train/b1_ep50032.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/b1_branches_train/b1_ep500001107.npz",
+  "mae": 0.0,
+  "max": 0
+ },
+ {
+  "file": "data/counterfactual_walks/b1_branches_train/b1_ep500001100.npz",
+  "mae": 0.0,
+  "max": 0
+ }
+]

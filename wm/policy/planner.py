@@ -564,13 +564,22 @@ class RolloutFroudePlanner:
             n_cand = len(self.candidates)
             e = e_t.expand(n_cand, -1, -1)
             zs = []
+            # `cand_start` (default None = t for every candidate): per-candidate start index of its command chunk, so
+            # a candidate can be read from the frame whose gait phase matches the robot's current one (diagnostic)
+            cs = getattr(self, "cand_start", None)
+            starts = [t] * n_cand if cs is None else [int(x) for x in cs]
             for i in range(steps):
-                a = np.stack([action_chunk_at(c["actions"], t + self.action_lag + i * k, k)
-                              for c in self.candidates])
+                a = np.stack([action_chunk_at(c["actions"], s0 + self.action_lag + i * k, k)
+                              for c, s0 in zip(self.candidates, starts)])
                 e_next = self.ftm(e, self.proj(torch.as_tensor(a, device=self.device), self.embodiment))
                 zs.append(self.itm(e, e_next))
                 e = e_next
             zs = torch.stack(zs, dim=1)
+            # `read_skip` (default 0 = unchanged): drop the first imagined steps from the read. Right after a command
+            # switch the imagined transition is still between the old and the new command, and its read is shrunk
+            # toward the current motion (F329); the later steps carry the new command's motion.
+            sk = min(int(getattr(self, "read_skip", 0)), steps - 1)
+            zs, steps = zs[:, sk:], steps - sk
             if getattr(self, "window_average", "pred") == "z":
                 pred = self.md.body(e_t, zs.mean(1))
             else:

@@ -1,0 +1,27 @@
+B            w=21   direct 0.0414 (gap +0.90)  roll_live 0.0822 (gap +0.68)
+library bounds (mean over conditions): oracle 0.0219  random 0.2115
+gap = (random - selector) / (random - oracle): 0 = random, 1 = oracle, <0 worse than random
+  speed_c5.8   oracle 0.0164 random 0.1605 | B/w21/direct 0.0253  B/w21/roll_live 0.0858
+  speed_c7.1   oracle 0.0198 random 0.1716 | B/w21/direct 0.0374  B/w21/roll_live 0.0821
+  speed_c8.15  oracle 0.0250 random 0.2043 | B/w21/direct 0.0622  B/w21/roll_live 0.1020
+  speed_c8.8   oracle 0.0337 random 0.2173 | B/w21/direct 0.0654  B/w21/roll_live 0.1168
+  speed_c5.8_bwd oracle 0.0300 random 0.2678 | B/w21/direct 0.0547  B/w21/roll_live 0.0776
+  speed_c7.1_bwd oracle 0.0327 random 0.2779 | B/w21/direct 0.0680  B/w21/roll_live 0.0811
+  speed_c8.15_bwd oracle 0.0356 random 0.3049 | B/w21/direct 0.0549  B/w21/roll_live 0.1205
+  speed_c8.8_bwd oracle 0.0274 random 0.3067 | B/w21/direct 0.0503  B/w21/roll_live 0.1048
+  turn_s0.05   oracle 0.0144 random 0.1635 | B/w21/direct 0.0249  B/w21/roll_live 0.0971
+  turn_s0.15   oracle 0.0142 random 0.1650 | B/w21/direct 0.0325  B/w21/roll_live 0.0906
+  turn_s0.29   oracle 0.0179 random 0.1695 | B/w21/direct 0.0440  B/w21/roll_live 0.0833
+  turn_s0.56   oracle 0.0271 random 0.1963 | B/w21/direct 0.0300  B/w21/roll_live 0.1705
+  turn_s0.05_neg oracle 0.0096 random 0.1617 | B/w21/direct 0.0268  B/w21/roll_live 0.0653
+  turn_s0.15_neg oracle 0.0142 random 0.1620 | B/w21/direct 0.0301  B/w21/roll_live 0.0653
+  turn_s0.29_neg oracle 0.0228 random 0.1730 | B/w21/direct 0.0491  B/w21/roll_live 0.0883
+  turn_s0.56_neg oracle 0.0249 random 0.2046 | B/w21/direct 0.0271  B/w21/roll_live 0.0629
+  side_L_lvl0  oracle 0.0117 random 0.1913 | B/w21/direct 0.0217  B/w21/roll_live 0.1089
+  side_L_lvl1  oracle 0.0224 random 0.2212 | B/w21/direct 0.0537  B/w21/roll_live 0.0612
+  side_L_lvl2  oracle 0.0275 random 0.2194 | B/w21/direct 0.0440  B/w21/roll_live 0.0579
+  side_L_lvl3  oracle 0.0252 random 0.2695 | B/w21/direct 0.0448  B/w21/roll_live 0.0566
+  side_R_lvl0  oracle 0.0098 random 0.1868 | B/w21/direct 0.0244  B/w21/roll_live 0.0278
+  side_R_lvl1  oracle 0.0177 random 0.2020 | B/w21/direct 0.0281  B/w21/roll_live 0.0557
+  side_R_lvl2  oracle 0.0238 random 0.2278 | B/w21/direct 0.0528  B/w21/roll_live 0.0490
+  side_R_lvl3  oracle 0.0217 random 0.2522 | B/w21/direct 0.0425  B/w21/roll_live 0.0626

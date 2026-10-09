@@ -51,6 +51,10 @@ def main():
                     help="goal conditions; `all` = every condition in --goal_dir (one clip each)")
     ap.add_argument("--windows", type=int, nargs="+", default=[0, 21])
     ap.add_argument("--horizon", type=int, default=2)
+    ap.add_argument("--roll_window", type=int, default=0, help="rollout read-out window in frames (0 = same as --windows)")
+    ap.add_argument("--phase_align", action="store_true", help="rollout (hexapod): read every candidate from the frame "
+                    "whose CPG phase matches the current state's (cpg_phase of the clip the current frame comes from)")
+    ap.add_argument("--read_skip", type=int, default=0, help="rollout: imagined steps dropped from the start of the read (F329)")
     ap.add_argument("--modes", nargs="+", default=["direct", "roll_fixed", "roll_live"])
     ap.add_argument("--cache", default="results/wm/cache/selection_eval_cands.pt")
     ap.add_argument("--goal_source", choices=("physics", "vision"), default="physics",
@@ -209,10 +213,13 @@ def main():
                 e = (e - off.to(e.device)).reshape(e.shape[-2:])
             return e.to(args.device)
 
+        cph = [np.asarray(np.load(c["path"], allow_pickle=True)["cpg_phase"], float) for c in cands] \
+            if args.phase_align else None
         for w in args.windows:
             planner.window = w
             if rp is not None:
-                rp.window = w
+                rp.window = args.roll_window or w
+                rp.read_skip = args.read_skip
             for c, g in goals.items():
                 g_std = np.stack([planner.standardize(x) for x in (vgoal[c] if vgoal else g)])
                 steps = list(range(0, len(g) - h, h))
@@ -229,6 +236,10 @@ def main():
                         else:
                             e_t = e_fixed if mode == "roll_fixed" else frame(prev, t)
                             gt = torch.as_tensor(g_std[t], dtype=torch.float32)
+                            if args.phase_align:
+                                ph = cph[prev][min(t, len(cph[prev]) - 1)]
+                                rp.cand_start = [int(np.argmin(np.minimum(abs(cp[:len(cp) - 26] - ph), 1 - abs(cp[:len(cp) - 26] - ph))
+                                                          + 1e-3 * abs(np.arange(len(cp) - 26) - t))) for cp in cph]
                             _, i, sc = rp.act(e_t, gt, t)
                             if not allowed[c].all():
                                 i = int(np.argmin(np.where(allowed[c], np.asarray(sc), np.inf)))

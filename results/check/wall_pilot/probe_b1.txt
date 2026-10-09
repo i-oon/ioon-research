@@ -1,0 +1,15 @@
+ckpt results/eval/round1_branches_s0/ckpt/b1.pt; ridge on mean-pooled frozen V-JEPA2 embeddings -> camera-to-front-wall distance; 4 folds grouped by clip; horizon h = FTM rolled h steps with the real transition's ITM z
+copy = frame t's own embedding used for t+h (persistence); ftm = FTM rolled h steps with the real ITM z; 'fit on ftm' = probe refit on FTM-predicted embeddings of the training folds
+h=0 (0.00 s) copy probe fit on real: R2 +0.961 MAE 0.30 m, MAE within 2 m 0.28 m, n 1584
+h=1 (0.25 s) copy probe fit on real: R2 +0.959 MAE 0.31 m, MAE within 2 m 0.27 m, n 1464
+h=1 (0.25 s) ftm  probe fit on real: R2 +0.211 MAE 1.46 m, MAE within 2 m 2.03 m, n 1464
+h=1 (0.25 s) ftm  probe fit on ftm : R2 +0.964 MAE 0.27 m, MAE within 2 m 0.24 m, n 1464
+h=2 (0.50 s) copy probe fit on real: R2 +0.956 MAE 0.31 m, MAE within 2 m 0.28 m, n 1344
+h=2 (0.50 s) ftm  probe fit on real: R2 +0.238 MAE 1.44 m, MAE within 2 m 1.89 m, n 1344
+h=2 (0.50 s) ftm  probe fit on ftm : R2 +0.947 MAE 0.28 m, MAE within 2 m 0.30 m, n 1344
+h=4 (1.00 s) copy probe fit on real: R2 +0.946 MAE 0.34 m, MAE within 2 m 0.31 m, n 1104
+h=4 (1.00 s) ftm  probe fit on real: R2 +0.197 MAE 1.48 m, MAE within 2 m 1.98 m, n 1104
+h=4 (1.00 s) ftm  probe fit on ftm : R2 +0.933 MAE 0.35 m, MAE within 2 m 0.37 m, n 1104
+h=8 (2.00 s) copy probe fit on real: R2 +0.911 MAE 0.44 m, MAE within 2 m 0.45 m, n 624
+h=8 (2.00 s) ftm  probe fit on real: R2 +0.137 MAE 1.50 m, MAE within 2 m 2.17 m, n 624
+h=8 (2.00 s) ftm  probe fit on ftm : R2 +0.898 MAE 0.42 m, MAE within 2 m 0.44 m, n 624

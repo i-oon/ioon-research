@@ -341,7 +341,7 @@ class MultiEmbodimentPairs(Dataset):
 
     def __init__(self, sources, stats=None, seed=0, cross_augment=True, action_lag=1,
                  body_stats=None, body_channels=BODY_CHANNELS, frame_stride=1, action_chunk=1,
-                 rollout_k=1, lazy_frames=True, max_frame_ram_gb=8.0):
+                 rollout_k=1, lazy_frames=True, max_frame_ram_gb=8.0, read_k=0):
         # **RAM guard.** Frames are read on demand by default (wm/data/frame_store.py); eager
         # loading is refused up front, from the .npz headers, if it would exceed the limit --
         # round-1 arm B's branches are ~42 GB of frames on a 31 GB machine.
@@ -415,6 +415,7 @@ class MultiEmbodimentPairs(Dataset):
         # existed. `rollout_k=2` needs a frame at t+2*frame_stride to exist for the auto-regressive
         # 2-step term (`lambda_rollout`, wm/train.py).
         self.rollout_k = max(1, int(rollout_k))
+        self.read_k = int(read_k)          # imagined-read loss steps (0 = off; never changes `reach` / the index)
         reach = max(self.rollout_k * self.frame_stride, action_lag + self.action_chunk - 1)
         self.index = [
             (i, t)
@@ -494,6 +495,22 @@ class MultiEmbodimentPairs(Dataset):
             frame_next2 = clip["frames"][t + 2 * self.frame_stride]
             sample["view1_next2"] = apply(frame_next2, a1)
             sample["view2_next2"] = apply(frame_next2, a2)
+        if self.read_k >= 2 and self.body_stats is not None:
+            # imagined-read loss (Config.lambda_imread): real frames t+k*s (view1 family, for the detached real z_k) and the
+            # true label of each step; a step past the clip end repeats the last frame and is masked out
+            n, s = len(clip["frames"]), self.frame_stride
+            bm = clip["body_motion"]
+            ys, ms = [], []
+            for k in range(1, self.read_k + 1):
+                ok = t + k * s < n and t + k * s <= len(bm)
+                if k >= 2:
+                    fk = clip["frames"][min(t + k * s, n - 1)]
+                    sample[f"view1_next{k}"] = apply(fk, a1)
+                a, b = t + (k - 1) * s, min(t + k * s, len(bm))
+                y = bm[a:b, list(self.body_channels)].mean(0) if b > a else np.zeros(len(self.body_channels))
+                ys.append((y - self.body_stats[0]) / self.body_stats[1]); ms.append(float(ok or k == 1))
+            sample["imread_y"] = np.asarray(ys, np.float32)
+            sample["imread_m"] = np.asarray(ms, np.float32)
         return sample
 
 

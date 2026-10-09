@@ -64,6 +64,9 @@ def main():
                     "its random room live (render_shift_heldout.b1_setup, the rr data's room / camera mount / FOV 90), "
                     "loop start at the clip start's offset from the room centre and turned to its start heading; "
                     "'' = the old fixed room (counterfactual_truth_check.build_scene)")
+    ap.add_argument("--orig_room", action="store_true", help="--rr_room is an ORIGINAL-room clip "
+                    "(data/counterfactual_walks/b1_clips_*): its room seed in the room sized to the body (17.65 m, "
+                    "render_shift_heldout.b1_setup without override), centred on the clip start, as the stored frames")
     ap.add_argument("--thirdperson", action="store_true", help="after the run, re-render the saved MuJoCo states "
                     "with a chase camera in the same room (render_allo_selection.chase_poses) -> "
                     "<out>/thirdperson[_<mech>]_b1_<goal>.npz (with --rr_room)")
@@ -112,9 +115,14 @@ def main():
         Rz = np.array([[np.cos(dpsi), -np.sin(dpsi), 0], [np.sin(dpsi), np.cos(dpsi), 0], [0, 0, 1]])
         walker.d.qvel[0:3] = Rz @ walker.d.qvel[0:3]
         __import__("mujoco").mj_forward(walker.m, walker.d)
-        off_rr = np.asarray(rc["rr_room_offset"], float)
-        root_h, joints_h, cam_h, _ = RS.b1_setup(sim, int(rc["room_seed"]), -off_rr,
-                                                 RS.rs_room(float(rc["rr_room_size"])))
+        if args.orig_room:
+            off_rr = np.zeros(2)
+            root_h, joints_h, cam_h, R0 = RS.b1_setup(sim, int(rc["room_seed"]), -off_rr)
+            rc = dict(rc, rr_room_size=np.float64(R0["size"]))
+        else:
+            off_rr = np.asarray(rc["rr_room_offset"], float)
+            root_h, joints_h, cam_h, _ = RS.b1_setup(sim, int(rc["room_seed"]), -off_rr,
+                                                     RS.rs_room(float(rc["rr_room_size"])))
         s0 = np.asarray(rc["base_pos"][0], float) * [1, 1, 0]   # the clip, shifted so its start is at (0, 0)
         f0, _ = pose_and_capture(sim, root_h, joints_h, cam_h, rc["base_pos"][0] - s0, rc["base_quat"][0],
                                  rc["joint_pos"][0])

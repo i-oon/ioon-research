@@ -275,3 +275,35 @@ Froude (knowledge of the task), so they cannot be the adaptation data for that c
 B1 babbling: random walking-policy commands (vx, vy, wz) with switches every 1-2 s over the policy's safe range, exact
 MuJoCo, same window length (66 frames), budget and room seeds as the 4-leg babble (9.1). The hexapod expert CSV stays
 banned; "expert" here means only B1's own tuned walking-policy clips.
+
+**Correction 2026-10-08 (F325):** these "babbling" commands go through B1's TRAINED walking policy, so the B1 rows are
+"no task knowledge", not "no prior knowledge". The claim test is the four-legged hexapod with CPG babbling (section 9).
+
+
+## 11. Corrections and next data plan (2026-10-08, F323-F326)
+
+**What was wrong**
+1. **One room per clip, in every room setup** (original rooms sized to the body and `render_random_room.py` random-size
+   rooms alike): each room holds one behaviour, a cue the model can use. Section 3's "several rooms per start state" was never
+   built. Corrected 2026-10-09 (F324): this is NOT what separates B1's +0.70 (rooms sized to the body) from +0.44 (random-size
+   rooms) -- both have one colour room per clip; only room size and start position differ.
+2. **View randomisation** (Egocentric VSM strength, planned 2026-10-01) never applied: pretraining still crop 0.85-1,
+   brightness/contrast +-0.2, no hue / saturation / blur / noise, lighting fixed; adaptation has no augmentation at all.
+3. **B1 babbling** uses the trained walking policy (F325).
+4. **Hexapod physics loop** switches candidates without gait continuity (F323) - execution, not data, but it invalidates this
+   week's hexapod physics numbers.
+
+**Plan (one variable at a time)**
+
+| step | change | question |
+|---|---|---|
+| A | B1 random-command adaptation in the ORIGINAL rooms (render babble at the body's room size, no rr) | with room size fixed, does it reach the tuned-clip level (+0.70)? |
+| B | projector-only adaptation (ITM + FTM frozen) | is the adapted ITM what learns the room? (skipped by agreement 2026-10-08) |
+| A2 | same 44 tuned clips, adaptation in 3 random-size rooms each (rr + rrv2 + rrv3), control 1 of 3 at random (`b1_rooms_adapt.sh`) | does room-size variety at adaptation close +0.44 -> +0.71? |
+| C | multi-version rooms: v2 / v3 of every training clip + branches (rendered 2026-10-08), joint retrain, same steps | does z drop the room (STATUS criteria a-d)? |
+| D | adaptation data with many commands per room, rooms shared across clips; colour augmentation during adaptation | does adaptation in random rooms approach +0.71? |
+| E | lighting / texture sets / Egocentric VSM augmentation strength | does selection hold in unseen scenes? |
+| F | four-legged hexapod, CPG babbling only (no policy), test library from its own babble (k-means), never from c10 / goals | the no-prior-knowledge claim |
+
+Physics loop fix first for any hexapod physics number: CPG recipe on one gait clock + cross-fade at switches, as the branches
+(`collect_ik.cpg_commands(xfade=...)`), verified by single-clip replay and c10 direct on turn / speed goals.
