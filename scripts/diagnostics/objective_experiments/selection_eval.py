@@ -119,6 +119,17 @@ def main():
     need_frames = need_frames or any(
         torch.load(os.path.join(ROOT, s.split("=", 1)[1].partition("@")[0]), map_location="cpu",
                    weights_only=False)["config"].get("body_sees_frame", False) for s in args.ckpt)
+    # **Grayscale mode BEFORE any frame is loaded or encoded (bug found 2026-10-12).** The checkpoint switches the
+    # encoder to grayscale only when it is loaded (`from_checkpoint`), which used to happen AFTER the embedding cache
+    # was read / filled below -- so a grayscale model's rollout and vision-goal scores were computed on COLOUR frames
+    # (the colour cache). Read every checkpoint's `grayscale` flag first, set the mode, refuse a mix.
+    grays = {bool(torch.load(os.path.join(ROOT, s.split("=", 1)[1].partition("@")[0]), map_location="cpu",
+                             weights_only=False)["config"].get("grayscale", False)) for s in args.ckpt}
+    if len(grays) > 1:
+        raise SystemExit("selection_eval: colour and grayscale checkpoints in one call -- run them separately")
+    if grays.pop():
+        os.environ["VJEPA_GRAY"] = "1"
+        print("grayscale checkpoint(s): encoder and embedding caches in grayscale mode (VJEPA_GRAY=1)")
     goal_paths = {}
     for p in sorted(glob.glob(os.path.join(ROOT, args.goal_dir, "*.npz"))):
         with np.load(p, allow_pickle=True) as d:

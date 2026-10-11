@@ -9314,3 +9314,307 @@ yaw r 0.41 -> 0.31 c10, 0.42 -> 0.23 B1) -- the rollout limit is now clearly the
 Pre-set criteria: (1) partly met (gap narrower, not closed), (2) met for direct, rollout mean unchanged, (3) met. Shared-latent
 step failed (needs grayscale goal-clip embeddings built first; not a model result). Next: shared-room renders (`srbal_*`,
 other PC) with the same recipe; then the imagination of turning (multi-step / imagined-read training, F329 lessons).
+
+### F332. B1 virtual-boundary feasibility pilot (CPU, MuJoCo, true futures, no model): a footprint time-to-boundary rule avoids every wall / corner start; the one-action true-future oracle keeps more forward progress, mostly by stepping sideways along the wall
+
+2026-10-09, `scripts/diagnostics/wall_pilot/b1_wall_feasibility.py`; v1 `results/check/wall_feasibility/`, v2
+`results/check/wall_feasibility_v2/summary.txt`. A FILTER, not evidence for the world model. Original B1 room (walls at
++-8.8 m), no physical walls (virtual boundary), footprint 1.0 x 0.5 m; same 24 tuned commands, heading-PI runtime, a
+decision every 0.1 s (command held in between), 10 s episodes, stop at a crossing; 48 paired starts each for val / test
+(wall or corner x front distance 1 / 1.5 / 2 / 3 m x heading 0 / 30 / 60 deg x goal forward level 1 / 3; test jittered).
+Oracle = ONE-ACTION receding-horizon oracle (every command simulated held for H from the exact state; v2: the goal command
+if its true future keeps footprint clearance >= 0.15 m over H, else the safe command with the highest forward speed).
+Score = 0 if crossed, else mean forward speed / goal speed. Thresholds tuned on val only.
+
+| test, 48 starts | crossed | score | median min clearance |
+|---|---|---|---|
+| direct (goal command) | 0.96 | 0.04 | -0.00 |
+| v1 TTC (distance along the heading / speed; tau 6 s, back-up 1 m) | 0.12 | 0.67 | +0.24 |
+| v2 TTC (footprint signed clearance / closing rate; tau 2 s, back-up 0.2 m) | **0.00** | 0.51 | +0.13 |
+| oracle 0.5 s (v2) | 0.00 | **0.61** | +0.15 |
+| oracle 1 s (v2) | 0.00 | 0.58 | +0.21 |
+| oracle 2 s (v2) | 0.00 | 0.57 | +0.33 |
+
+Reading: (1) v1's safety gap (6 / 48 crossings, all oblique 30-60 deg approaches at 1-1.5 m) was the baseline's fault (distance
+along the heading misses a corner of the footprint); the footprint-based rule removes it -> no safety advantage left for
+prediction in these scenes. (2) A progress gap remains (0.51 vs 0.58-0.61): on the 6 former failure starts the rule turns /
+backs up (backward command 40-50 % of decisions, progress 0.00-0.47) while the oracle keeps the goal command longer and slides
+along the wall with the sideways commands (indices 18-21; progress 0.50-0.87). This is a richer use of the library, which a
+rule with a lateral escape option could also produce -- not yet shown to need prediction. (3) Horizon: 0.5 s is as good as 2 s
+here (decisions every 0.1 s on the true state). Not tested: a rule with sideways escape; scenes with occlusion, obstacles or
+narrow passages where the current view cannot tell which side is free.
+
+### F333. The imagined-read loss fixes most of rollout's weakness: predicted-future reads (turning above all) and rollout selection rise on every body, direct stays
+
+2026-10-10. `round1_branches_s0_gray_imread` = the control `round1_branches_s0_gray` (F331: joint c10 + B1, branches, original
+rooms, grayscale + photometric augmentation, 30,528 steps, seed 0) + `--lambda_imread 1.0 --imread_k 4` (`Config.lambda_imread`,
+`wm/train.py`): the FTM is rolled 4 steps from the real frame with the real transitions' z (detached), Froude is read from every
+imagined transition through the ITM and the Froude head with their weights DETACHED (F253 lesson: z must not be reshaped by
+it), and matched to that step's true label; steps past a clip's end are masked, so the 81,408 training pairs are unchanged.
+Training: imread val 0.67 / 0.45 / 0.30 over epochs 1-3; recon val 3.75 vs control 3.67, body 0.40 vs 0.38 (2-5 % behind).
+`eval_suite.sh ... joint`, `results/eval/round1_branches_s0_gray_imread/summary.txt`; one seed each.
+
+| | control `_gray` | + imagined-read loss |
+|---|---|---|
+| c10 selection direct / rollout (normalised score) | +0.92 / +0.69 | +0.92 / **+0.82** |
+| c08 zero-shot | +0.89 / +0.69 | +0.89 / **+0.81** |
+| B1 | +0.95 / +0.76 | +0.93 / **+0.87** |
+| B1, goal read from video | +0.89 / +0.68 | +0.84 / +0.72 |
+| predicted-future read P11, c10 fwd / lat / yaw | 0.82 / 0.79 / 0.31 | **0.93 / 0.83 / 0.52** |
+| predicted-future read P11, B1 | 0.91 / 0.84 / 0.23 | **0.95 / 0.92 / 0.37** |
+| predicted-future read P11, c08 | 0.82 / 0.76 / 0.25 | **0.93 / 0.80 / 0.50** |
+| real-future read P11, c10 / B1 | 0.92 / 0.72 / 0.89, 0.90 / 0.80 / 0.68 | 0.93 / 0.72 / 0.85, 0.87 / 0.75 / 0.61 |
+| z-dependence hexapod / B1 | 3.9x / 4.0x | 3.3x / 3.0x |
+
+Reading slope on steady main clips (F330 check): c10 held-out 0.70 / 0.43 / 0.49 -> 0.71 / 0.36 / 0.44, B1 held-out 0.62 / 0.50 /
+0.42 -> 0.55 / 0.45 / 0.33 -- reading REAL video is not improved (slightly lower); the gain is in the imagined futures.
+Reading: rollout closes most of its gap to direct on every body, including the never-trained c08 (rollout +0.81 vs direct
++0.89), because the imagined futures now carry the commands' motion -- turning above all (predicted yaw roughly x1.6-2). The
+cost: the goal read from B1's video drops (direct +0.89 -> +0.84) and real-video slopes dip slightly; one seed. This is the
+training-side fix F329 / F330 pointed to (the planner-side fixes -- calibration, longer / later reads -- did not work).
+
+**F333 follow-up (2026-10-10, queue2).** Offline per-goal selection, c10, live-frame rollout with gait-phase-matched candidate
+commands (`selection_eval.py --phase_align`, `results/check/rollout_phase/c10_phase_*.txt`), E direct / rollout:
+| goal | `_gray` | `_gray_imread` |
+|---|---|---|
+| turn 0.56 | 0.032 / 0.131 | 0.035 / **0.043** |
+| turn 0.29 | 0.048 / 0.072 | 0.052 / **0.050** |
+| side L0 | 0.022 / 0.117 | 0.021 / **0.027** |
+| side R1 | 0.034 / 0.076 | 0.046 / 0.053 |
+| speed 8.8 | 0.073 / 0.092 | 0.078 / 0.083 |
+| mean (24 goals) | 0.045 / 0.069 | 0.045 / **0.053** |
+The goals where rollout failed (strong turn, side L0; F327, F329) are now close to direct. Per-channel slope of the predicted-
+future read across the 24 commands of a state (`readout_channels.py`, `analysis_gray_vs_imread.txt`): c10 0.39 / 0.48 / 0.17 ->
+0.68 / 0.57 / 0.33, B1 0.50 / 0.42 / 0.17 -> 0.66 / 0.51 / 0.33 (real-future read 0.61 / 0.30 / 0.42 and 0.36 / 0.25 / 0.33:
+the imagined reads now spread MORE than the real-frame reads); within-state selection E c10 0.053 -> 0.041 (direct 0.043), B1
+0.043 -> 0.035 (direct 0.032).
+
+### F334. Wall prediction check (B1, constant command held, protocol locked 2026-10-09): imagined clearance does not beat a command-only baseline; in this state set the commands' clearance ranking barely depends on the state
+
+2026-10-10, `scripts/diagnostics/wall_pilot/b1_wall_predcheck.py` (data `b1_wall_predcheck_data.py`: 48 fit / 48 test start
+states x 24 commands held 2 s; fit / test differ in start state, episode and unseen room look; ranking = within-state
+Spearman across the 24 commands of the true footprint clearance at t; `results/check/wall_predcheck/predcheck_*.txt`).
+Readouts fitted on the fit set only: R_real (real frames) applied unchanged to imagined embeddings; R_imag fitted on imagined
+embeddings. Controls: copy e_0 (one value for all commands, cannot rank), command-only (current distance from e_0 + the fit
+set's mean clearance change of that command; no image beyond the current distance).
+
+| Spearman (MAE m) | 0.25 s | 0.5 s | 1 s | 2 s (beyond trained chain) |
+|---|---|---|---|---|
+| real future, R_real | 0.19 (0.18) | 0.56 (0.18) | 0.76 (0.19) | 0.83 (0.20) |
+| `_gray` imagined, R_real | 0.38 (0.65) | 0.43 (0.73) | 0.51 (0.85) | 0.49 (1.05) |
+| `_gray` imagined, R_imag | 0.35 (0.24) | 0.36 (0.24) | 0.58 (0.25) | 0.65 (0.35) |
+| `_gray_imread` imagined, R_real | 0.61 (0.85) | 0.52 (1.05) | 0.30 (1.07) | -0.01 (1.33) |
+| `_gray_imread` imagined, R_imag | 0.10 (0.23) | 0.25 (0.22) | 0.46 (0.28) | 0.55 (0.42) |
+| command-only (e_0 distance + mean change) | **0.66** (0.18) | **0.71** (0.18) | **0.75** (0.20) | 0.76 (0.27) |
+
+Unsafe recall: no command came within 0.15 m of the boundary within 1 s from these starts (all >= 1 m); at 2 s 45 unsafe cases:
+real future 0.47 / 0.53 (recall / precision), `_gray` R_imag 0.27 / 0.32, `_gray_imread` R_imag 0.80 / 0.40, command-only 0.22 / 0.62.
+Reading: (1) per the protocol the check is NOT passed: imagined clearance ranks the commands worse than knowing only which
+command it is plus the current distance, at every horizon <= 1 s. (2) Even the TRUE future's frames rank no better than the
+command-only control (0.76 vs 0.75 at 1 s): in this state set the ordering of the 24 commands by clearance hardly depends on the
+state -- a design flaw of the set, not only a model limit: every start heads toward +y (theta 0 / 30 / 60 deg, corner always
+on the left), so "which side is free" never flips. (3) R_real applied to imagined embeddings is far off in metres (MAE
+0.65-1.33): the imagined embeddings are not in the real-frame embedding range (as F328). (4) The imagined-read loss (F333) does
+not help here: it was trained on Froude, not on wall distance, and no training data has walls near. A state set where the
+best command depends on the state (mirrored headings / corners on both sides, obstacles) is needed before any conclusion
+about scene understanding; closed-loop wall claims stay off until a check of that kind passes.
+
+### F335. Physics loop with the imagined-read model: B1 rollout improves, the hexapods do not -- on live physics frames the rollout scores are far less certain than on stored clip frames (open)
+
+2026-10-10, `results/wm/logs/queue4.sh` (same scripts, goals and settings as F327; original rooms; hexapods `--cpg_clock` +
+gait-phase-matched rollout; B1 without phase match), `results/wm/closed_loop_orig/physics/<run>/summary*.txt`. Mean E over the
+goals (lower is better), direct / rollout; one episode per goal:
+| | control `_gray` | `_gray_imread` |
+|---|---|---|
+| B1 (6 goals) | 0.036 / 0.062 | 0.038 / **0.048** |
+| c10 (6) | 0.044 / 0.065 | 0.050 / 0.062 |
+| c08 (5) | 0.050 / 0.066 | 0.049 / **0.088** |
+On the hexapods' turn goals the imread model's rollout picks the fast forward clips (c10 turn 0.56: achieved fwd / lat / yaw
+0.21 / +0.03 / 0.02 vs goal 0.15 / -0.07 / 0.06; c08 the same), although offline the same goal is near direct (F333 follow-up:
+0.043 vs 0.035). Scoring the c10 candidates on the run's own live frames vs a stored training clip's frames (scratch
+`live_vs_stored.py`, goal turn 0.56): live frames give best scores 0.66-1.00 with the order flipping between frames (t = 10:
+speed_c8.8 first; t = 30 / 50: turn_s0.56 first), stored frames 0.07-0.27 with turn_s0.56 first throughout. So the rollout read
+is much less certain on the loop's live frames. Candidates (not yet tested): the live gait is not the steady gait of the
+training clips (the robot switches commands every 0.1 s with 4-frame cross-fades, so its body pose / sway differs), or a live
+render difference (frame-0 pixel MAE 5-10 vs the stored clip at the same start, attributed so far to the start pose). Offline
+selection (F333) uses stored steady-gait frames, so it over-states rollout in the loop for the hexapod. Next: score the same
+state from (a) a live frame and (b) a replay render of that exact live pose (separates render from gait), and hold each choice
+longer in the loop (fewer switches) as a check.
+
+### F336. Root cause of the hexapod physics gap (F335): a turn command's first ~0.75 s reads (real and imagined) almost no yaw, so from a non-turning state rollout never imagines a turn and locks onto forward commands
+
+2026-10-10, model `round1_branches_s0_gray_imread`, c10, goal turn 0.56 (scratch `t0_score.py`, `live_steady.py`).
+1. Not the render: the stored clip's frame 0 re-rendered through the live loop scene matches at pixel MAE 0.001 (F321 / F323
+   check), and live frames of a STEADY turn walk (direct run, 0 switches) score like training frames (turn_s0.56 first, best
+   score 0.17-0.33 vs 0.07-0.27 on stored frames).
+2. Not the switching frequency alone: deciding every 10 frames still gives rollout E 0.138 on turn 0.56 with 3 switches; the
+   rollout run picks speed_c8.15 / c8.8 from t = 0 and keeps them (achieved fwd 0.21-0.27, yaw ~0).
+3. Imagined reads (mean of the 5 imagined steps, gait-phase-matched candidate commands), fwd / lat / yaw:
+| current state (live frame) | turn_s0.56 | speed_c8.15 | goal |
+|---|---|---|---|
+| loop start, robot standing (t = 0) | 0.118 / -0.011 / **-0.001** | 0.121 / 0.009 / 0.020 | 0.189 / -0.077 / 0.077 |
+| walking straight (rollout run, t = 10 / 30) | 0.152 / 0.009 / **-0.008**; 0.152 / 0.016 / -0.005 | 0.155 / 0.010 / 0.011; 0.162 / 0.002 / 0.018 | |
+| already turning (direct run, t = 20 / 30) | 0.104 / 0.037 / **0.046**; 0.107 / -0.012 / 0.045 | 0.166 / 0.031 / -0.009; 0.146 / 0.032 / -0.017 | |
+| offline start (training clip side_L, t = 0) | 0.158 / -0.009 / 0.018 | 0.144 / 0.028 / -0.036 | |
+4. Held-out branches, command turn_s0.56, read over the first 11 pairs after the switch (P11), by the source behaviour:
+| source | true yaw | real-frame read | imagined, `_gray` | imagined, `_gray_imread` |
+|---|---|---|---|---|
+| side | 0.057 | 0.018 / 0.017 | -0.009 | 0.007 |
+| speed (straight) | 0.032 | 0.006 / 0.003 | -0.000 | 0.014 |
+| turn | 0.044 | 0.015 / 0.013 | -0.002 | 0.016 |
+Reading: right after a switch to a turn, the turn has not developed in the frames (the hexapod's yaw ramps up over ~1 s, STATUS
+open issue "branch length 20 frames"), while the label is the 1 s average from the switch on; a z-only head reading the first
+transitions cannot know the turn is coming, so both real and imagined reads of a turn ONSET are ~0.3x the true yaw. Rollout
+scores every candidate as a switch from the current state: continuing a turn reads correctly, starting one does not. In the
+loop the robot starts standing, takes a forward command, and never imagines a turn again. Offline selection hides this: its
+current frame comes from the previously chosen candidate's clip, already walking that behaviour, so once the first choice is
+right every later frame keeps it right (the c10 offline start happened to be a side_L frame from which the turn reads 0.018).
+F329's "timing" explanation, withdrawn in F330 for the general shrink, holds for yaw at a command onset.
+Fix candidates (not yet tested): (a) score the imagined trajectory against the goal's own onset profile, i.e. what switching to
+the goal behaviour looks like from a comparable state, not its steady 1 s average; (b) labels that match what the frames show
+after a switch (onset-aware), so the head is not asked for the future part; (c) longer imagined horizons trained with the
+imagined-read loss (k = 8) so the read reaches the developed turn; (d) start the loop from a walking state (fairness of the
+benchmark, not a fix).
+Decision-frequency test (`queue5.sh`, `--replan_every` 10 / 20 with `--grade_every 2`, model `_gray_imread`, physics, original
+rooms), mean E direct / rollout -- c10: every 2 frames 0.050 / 0.062, 10: 0.049 / 0.062, 20: 0.056 / 0.063; c08: 0.049 / 0.088,
+0.050 / 0.075, 0.054 / 0.074. Turn 0.56 rollout stays failed at every frequency (c10 0.136 / 0.138 / 0.161, c08 0.161 / 0.142 /
+0.133): fewer switches help c08's mild goals a little, not the turn onset -- consistent with F336's cause.
+
+### F337. F336 confirmation test (start state varied): the start state matters for the strong turn, but rollout fails it even when it starts already turning; the mild turn works from every start
+
+2026-10-10, `results/wm/logs/queue6.sh`, `results/check/loop_prewalk/c10/summary.txt`. Hexapod loop option `--prewalk COND
+--prewalk_frames P --grade_from 10` (`close_loop_hexapod_froude.py`): the body walks a candidate's recipe on the CPG clock for P
+frames, then the planner takes over; goal and grading start at the hand-over (graded from 10 frames after it). Model
+`round1_branches_s0_gray_imread`, c10, original rooms, decisions every 2 frames; 5 hand-over times P = 20-36 frames (gait phase
+and heading differ) per walking start, 1 run standing. Mean E (min-max):
+| goal | start | direct | rollout |
+|---|---|---|---|
+| turn 0.56 | standing (n 1) | 0.032 | 0.081 |
+| turn 0.56 | walking straight speed_c7.1 (n 5) | 0.027 (0.016-0.038) | **0.158** (0.139-0.168) |
+| turn 0.56 | already turning turn_s0.56 (n 5) | 0.024 (0.013-0.036) | 0.102 (0.084-0.113) |
+| turn 0.29 | standing (n 1) | 0.043 | 0.029 |
+| turn 0.29 | walking straight (n 5) | 0.038 (0.027-0.048) | 0.043 (0.025-0.061) |
+| turn 0.29 | already turning (n 5) | 0.044 (0.036-0.053) | 0.048 (0.032-0.102) |
+Reading: (1) F336's onset effect is real but partial: on the strong turn, starting straight is clearly worse than starting
+turned (0.158 vs 0.102, every episode). (2) It is not the whole cause: starting already turning, rollout still fails the strong
+turn (0.102 vs direct 0.024) -- in the trial run it held turn_s0.56 for ~1 s, then went back to the fast forward commands
+(scratch frames: at the switch the view is a plain wall without a corner). (3) The mild turn (0.29) is fine from every start
+(rollout 0.029-0.048 ~ direct). The failure is specific to the strongest turn: its goal (fwd 0.15, yaw 0.064) is matched in
+forward speed by the fast straight commands, and the imagined yaw (~0.3x at onset, ~0.7x while turning, F336 / F333 slopes) is
+too small for the yaw channel to outweigh that. Open: whether yaw read from the view weakens when no corner / edge is visible.
+F337 open question answered (2026-10-10, `scripts/diagnostics/egocentric_view/yaw_vs_corner.py`, model `_gray_imread`, c10
+held-out TURN clips, steady, real-frame read per 5-frame pair): corner / edge visible vs plain wall (split at each clip's median
+of a vertical-edge score in the wall band): |read| / |true| yaw 0.49 vs 0.53, r(read, true) +0.80 vs +0.80 (n 248 / 240). No
+effect: yaw is read at about half its size whatever the view; the strong turn loses to forward speed because yaw is shrunk in
+general (and more at a turn onset, F336), not because of plain-wall views.
+
+### F338. Wall prediction check v2 (mirrored starts): the test now separates state from command, and the imagination still does not beat the command-only control -- the current models do not predict state-dependent wall outcomes
+
+2026-10-10, data `scripts/diagnostics/wall_pilot/b1_wall_predcheck_data_v2.py` (72 fit / 72 test start states x 24 commands
+held 2 s; wall / corner LEFT / corner RIGHT x headings -45 / 0 / +45 deg x front distance 1-3 m; unseen looks 3200 / 3300 + i),
+check `b1_wall_predcheck.py --set v2`, `results/check/wall_predcheck_v2/predcheck_*.txt`. Within-state Spearman across the 24
+commands (MAE m); 2 s is beyond every trained chain:
+| | 0.25 s | 0.5 s | 1 s | 2 s |
+|---|---|---|---|---|
+| real future, R_real (ceiling of reading) | -0.00 (0.22) | 0.43 (0.22) | **0.58** (0.22) | **0.71** (0.26) |
+| command-only (e_0 distance + mean change) | 0.45 (0.21) | 0.47 (0.21) | 0.51 (0.24) | 0.56 (0.36) |
+| `_gray` imagined, R_imag | -0.02 (0.25) | 0.30 (0.27) | 0.44 (0.30) | 0.55 (0.40) |
+| `_gray_imread` imagined, R_imag | 0.15 (0.25) | 0.32 (0.25) | 0.41 (0.29) | 0.50 (0.44) |
+| imagined, R_real (pipeline as is) | 0.26-0.27 (1.0-1.6) | 0.36 (1.1-1.5) | 0.32-0.33 (1.3) | 0.27-0.29 (1.5) |
+Unsafe at 2 s (39 cases), recall / precision: real future 0.69 / 0.42, `_gray` 0.51 / 0.29, `_gray_imread` 0.74 / 0.27,
+command-only 0.18 / 0.88. Reading: (1) the mirrored set works as a test -- command-only drops from 0.66-0.76 (v1, F334) to
+0.45-0.56, and the true future's frames now rank better than command-only at 1-2 s (0.58 / 0.71 vs 0.51 / 0.56): there IS
+state-dependent information to predict. (2) Neither model's imagination reaches command-only at <= 1 s (0.41-0.44 vs 0.51), nor
+the real-future ceiling: per the protocol, the prediction check is NOT passed; no closed-loop wall claim. (3) Expected: no
+training data has the robot near a wall (every clip starts at the room centre); the imagination has never seen a wall approach.
+The next step for the wall line is wall data in training (DATA_PLAN 12, built in the shared / varied looks), re-checked with this
+v2 protocol; the imagined-read loss trained on Froude does not transfer to wall clearance by itself.
+
+### F339. Timing audit of every component (2026-10-10): what each part sees and what it is compared with; the 4-vs-5 imagined-step mismatch is not a cause
+
+Frames 0.05 s. From the code (`wm/data/embodiment.smooth`, `wm/data/dataset.py`, `wm/train.py`, `wm/policy/planner.py`):
+| part | frames covered | note |
+|---|---|---|
+| Froude label at frame t | mean of frames t-9 .. t+10 (20 frames, `smooth` "same" centring), cut at a command switch | 1 s, as the conventions |
+| z = ITM(e_t, e_t+5) | sees frames t, t+5; command chunk t+1 .. t+5 (action_lag 1, chunk 5) | 0.25 s |
+| training target of z (Froude head) | mean of the labels t .. t+4 = frames t-9 .. t+14 | **1.2 s for a 0.25 s view: 0.45 s beyond what the pair shows** (onset under-read, F336) |
+| `lambda_rollout` | 2 imagined steps, frames t .. t+10, embedding MSE only | |
+| imagined-read loss (`imread_k` 4) | 4 imagined steps, frames t .. t+20 | |
+| planner rollout (window 21) | ceil(21 / 5) = 5 imagined steps, frames t .. t+25; reads averaged | step 5 never trained by imread |
+| goal at decision t | goal label at t = goal frames t-9 .. t+10 | **rollout's imagined window is centred ~t+12, the goal at t: ~0.6 s apart**; harmless for the steady goals used so far, not for time-varying goals (walls) |
+| direct (window 21, centred) | command chunks centred at t+2 | aligned with the goal |
+| decision / grading | every 2 frames | |
+Test of the 4-vs-5 mismatch (rollout reads 4 imagined steps, `--roll_window 20`, = imread_k; model `_gray_imread`): offline c10
+per-goal rollout mean E 0.054 (4 steps) vs 0.053 (5 steps); turn 0.56 0.043 both; side L0 0.051 vs 0.027. Physics, strong turn
+from walking straight (5 hand-over times, as F337): 0.163 mean (0.141-0.188) vs 0.158 with 5 steps. Not a cause; 5 steps kept.
+Remaining real mismatches: (a) z sees 0.25 s but is trained toward a 1.2 s label (design choice: the 1 s label removes the gait
+sway, F295); (b) rollout scores the imagined future against the goal at the decision time, ~0.6 s earlier than the imagined
+window's centre -- to fix before any time-varying goal.
+
+### F340. z carries no more motion than the Froude head reads: the "shrink" is the MSE-optimal regression to the mean of an imperfect predictor (slope ~ r^2), so it is an information limit, not a head bug
+
+2026-10-10, `scripts/diagnostics/objective_experiments/z_yaw_probe.py`, model `_gray_imread` (merged hex.pt). Linear ridge z ->
+standardised Froude target fitted on 6,128 training pairs (c10 clips train + 200 branches train), real-frame z; slope of the
+read on the truth (Pearson r):
+| test | read | forward | lateral | yaw |
+|---|---|---|---|---|
+| held-out clips (steady, 1,464 pairs) | Froude head | 0.69 (0.89) | 0.35 (0.71) | 0.43 (0.67) |
+| | linear probe on z | 0.72 (0.88) | 0.46 (0.77) | 0.49 (0.69) |
+| held-out branches, P11 after a switch (3,300) | Froude head | 0.63 (0.75) | 0.30 (0.51) | 0.42 (0.60) |
+| | linear probe on z | 0.66 (0.74) | 0.36 (0.52) | 0.43 (0.56) |
+Reading: (1) the head reads z about as well as a linear probe trained for it -- no head-side fix. (2) For an MSE-trained
+predictor the slope of its output on the truth equals var(pred) / var(true) = R^2 when it is calibrated in-distribution; on new
+rooms r ~0.6-0.7 gives slopes ~0.4-0.5 -- the "shrink" of F329 / F330 / F337 is this, not a separate failure. Raising it needs
+more information in z on unseen views (view randomisation helped a little, F331), or labels whose timing matches the view (F339).
+(3) Selection compares reads with the goal in ABSOLUTE units, so a known shrink can be undone for scoring: per-channel
+de-shrink fitted on validation rooms only. F329's calibration test measured within-state ranking (unchanged by scaling), not
+goal matching -- the physics strong-turn failure is goal matching, so it is worth testing there.
+
+### F341. A per-channel de-shrink of the rollout read (fitted on validation rooms) fixes only the strong turn from straight walking and makes almost everything else worse: the shrink is not a scale error that scoring can undo
+
+2026-10-11, queue9 (`results/wm/logs/queue9.sh`), model `round1_branches_s0_gray_imread` (joint c10 + B1, counterfactual
+branches, original rooms, grayscale + photometric aug, imagined-read loss k 4). Calibration (`fit_rollout_calib.py`, F340 (3)):
+per channel, f_cal = (f - m_read) / slope + m_true, fitted on the VALIDATION branches only (72 states per body, `--pairs 11`),
+applied inside `RolloutFroudePlanner._score_window` (`--calib`). Fitted slopes (read on truth) forward / lateral / yaw:
+c10 0.70 / 0.56 / 0.29, B1 0.68 / 0.52 / 0.33 -- i.e. yaw is stretched ~3.4x. Physics loop, rollout only, original rooms,
+`--cpg_clock`, same scripts and settings as the uncalibrated runs (queue4 / queue6):
+| test (E = mean L2 achieved vs goal Froude, lower better) | before | calibrated |
+|---|---|---|
+| c10 strong turn 0.56, from straight walking (5 hand-over times, F337) | 0.158 | **0.107** |
+| c10 strong turn 0.56, already turning | 0.102 | 0.102 |
+| c10 mild turn, from straight walking | 0.045 | 0.068 |
+| c10 mild turn, already turning | 0.048 | 0.052 |
+| c10, mean of 6 goals | 0.062 | 0.076 |
+| c08 (unseen body), mean of 5 goals (speed 7.1 excluded: camera check) | 0.088 | 0.088 |
+| B1, mean of 6 goals | 0.048 | 0.063 (turn 0.56 0.035 -> 0.080) |
+Side goals get worse on every body (c10 side L 0.027 -> 0.060, c08 side R 0.052 -> 0.085).
+Reading: stretching the read stretches its noise by the same factor; with yaw r ~0.55 on imagined branches (F333) the noise
+dominates once multiplied by 3.4. What this refutes: a GLOBAL multiplicative rescale of the score. It does not show that every
+score correction is impossible, and it does not by itself locate the cause in the forward model -- yaw at turn onset is read
+low even from REAL transitions (F336), so the timing of what z sees vs the label stays a candidate (F339 (a)). Rollout stays
+uncalibrated (`--calib` not used).
+
+### F342. Aligning the rollout's goal with the labels its imagined window was trained on (removing the ~0.6 s offset, F339 (b)) gives a small gain on every body and breaks nothing badly; it does not fix the strong-turn onset
+
+2026-10-11, queue10, same model / scripts / settings as F341, no calibration. `--goal_align imagined`
+(`close_loop_hexapod_froude.py`, `close_loop_b1_physics_froude.py`, env `GA` in `physics_orig_*.sh`): rollout compares its
+read with mean(goal_bm[t : t + 5 * ceil(W / 5)]) = labels t..t+24 for W 21 -- exactly the labels the 5 imagined z were
+trained toward (pair at t' -> mean of labels t'..t'+4) -- instead of goal_bm[t]. Direct unchanged. Output dirs `_ga`.
+| test | before | goal-aligned |
+|---|---|---|
+| c10 strong turn 0.56, from straight walking | 0.158 | 0.141 |
+| c10 strong turn 0.56, already turning | 0.102 | 0.107 |
+| c10 mild turn, from straight walking | 0.045 | **0.030** |
+| c10 mild turn, already turning | 0.048 | 0.062 (one run 0.111; others 0.029-0.085) |
+| c10, mean of 6 goals | 0.062 | 0.058 (turn 0.56 0.136 -> 0.108, speed 8.8 0.088 -> 0.073; turn 0.29 0.035 -> 0.048) |
+| c08, mean of 5 goals | 0.088 | 0.082 (side R 0.052 -> 0.039, speed 8.8 0.085 -> 0.073) |
+| B1, mean of 6 goals | 0.048 | 0.044 (speed 7.1 0.053 -> 0.037; turns unchanged) |
+Reading: the offset is real and fixing it is correct (and needed before any time-varying goal, e.g. the wall test), but the
+gains are within run-to-run spread, and the strong turn from straight walking stays ~0.14 against direct ~0.03. The offset is
+not the main cause of the onset failure. Kept as the rollout setting from here on.
+
+Seed check of the imagined-read model (other PC, `round1_branches_s1_gray_imread`, same config, seed 1; eval suite):
+selection E direct / live rollout -- B1 recorded goal 0.035 / 0.049 (seed 0: 0.035 / 0.047), B1 vision goal 0.053 / 0.085
+(0.052 / 0.074), c08 0.045 / 0.062 (0.048 / 0.062), c10 0.056 / 0.075 (0.056 / 0.073); z-dependence hexapod 3.53x (3.31x),
+B1 3.08x (2.98x); imagined-branch yaw r (P11) c10 0.55, B1 0.33, c08 0.53 vs direct 0.78 / 0.39 / 0.78. F333 and the yaw
+weakness (F336 / F340) reproduce across seeds.

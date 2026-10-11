@@ -1,0 +1,27 @@
+round1_branches_s0_gray w=21   direct 0.0445 (gap +0.89)  roll_live 0.0691 (gap +0.75)
+library bounds (mean over conditions): oracle 0.0227  random 0.2118
+gap = (random - selector) / (random - oracle): 0 = random, 1 = oracle, <0 worse than random
+  speed_c5.8   oracle 0.0181 random 0.1612 | round1_branches_s0_gray/w21/direct 0.0305  round1_branches_s0_gray/w21/roll_live 0.0546
+  speed_c7.1   oracle 0.0203 random 0.1726 | round1_branches_s0_gray/w21/direct 0.0419  round1_branches_s0_gray/w21/roll_live 0.0468
+  speed_c8.15  oracle 0.0224 random 0.2035 | round1_branches_s0_gray/w21/direct 0.0648  round1_branches_s0_gray/w21/roll_live 0.0714
+  speed_c8.8   oracle 0.0353 random 0.2177 | round1_branches_s0_gray/w21/direct 0.0730  round1_branches_s0_gray/w21/roll_live 0.0922
+  speed_c5.8_bwd oracle 0.0288 random 0.2676 | round1_branches_s0_gray/w21/direct 0.0681  round1_branches_s0_gray/w21/roll_live 0.0668
+  speed_c7.1_bwd oracle 0.0331 random 0.2779 | round1_branches_s0_gray/w21/direct 0.0642  round1_branches_s0_gray/w21/roll_live 0.0714
+  speed_c8.15_bwd oracle 0.0349 random 0.3054 | round1_branches_s0_gray/w21/direct 0.0622  round1_branches_s0_gray/w21/roll_live 0.0806
+  speed_c8.8_bwd oracle 0.0303 random 0.3068 | round1_branches_s0_gray/w21/direct 0.0497  round1_branches_s0_gray/w21/roll_live 0.0842
+  turn_s0.05   oracle 0.0147 random 0.1638 | round1_branches_s0_gray/w21/direct 0.0247  round1_branches_s0_gray/w21/roll_live 0.0409
+  turn_s0.15   oracle 0.0157 random 0.1656 | round1_branches_s0_gray/w21/direct 0.0291  round1_branches_s0_gray/w21/roll_live 0.0521
+  turn_s0.29   oracle 0.0198 random 0.1697 | round1_branches_s0_gray/w21/direct 0.0483  round1_branches_s0_gray/w21/roll_live 0.0722
+  turn_s0.56   oracle 0.0287 random 0.1961 | round1_branches_s0_gray/w21/direct 0.0324  round1_branches_s0_gray/w21/roll_live 0.1309
+  turn_s0.05_neg oracle 0.0104 random 0.1622 | round1_branches_s0_gray/w21/direct 0.0336  round1_branches_s0_gray/w21/roll_live 0.0362
+  turn_s0.15_neg oracle 0.0159 random 0.1623 | round1_branches_s0_gray/w21/direct 0.0417  round1_branches_s0_gray/w21/roll_live 0.0697
+  turn_s0.29_neg oracle 0.0244 random 0.1730 | round1_branches_s0_gray/w21/direct 0.0525  round1_branches_s0_gray/w21/roll_live 0.0687
+  turn_s0.56_neg oracle 0.0275 random 0.2043 | round1_branches_s0_gray/w21/direct 0.0349  round1_branches_s0_gray/w21/roll_live 0.0763
+  side_L_lvl0  oracle 0.0131 random 0.1918 | round1_branches_s0_gray/w21/direct 0.0224  round1_branches_s0_gray/w21/roll_live 0.1169
+  side_L_lvl1  oracle 0.0238 random 0.2217 | round1_branches_s0_gray/w21/direct 0.0433  round1_branches_s0_gray/w21/roll_live 0.0434
+  side_L_lvl2  oracle 0.0273 random 0.2199 | round1_branches_s0_gray/w21/direct 0.0497  round1_branches_s0_gray/w21/roll_live 0.0423
+  side_L_lvl3  oracle 0.0267 random 0.2701 | round1_branches_s0_gray/w21/direct 0.0459  round1_branches_s0_gray/w21/roll_live 0.0543
+  side_R_lvl0  oracle 0.0120 random 0.1868 | round1_branches_s0_gray/w21/direct 0.0239  round1_branches_s0_gray/w21/roll_live 0.0645
+  side_R_lvl1  oracle 0.0163 random 0.2026 | round1_branches_s0_gray/w21/direct 0.0338  round1_branches_s0_gray/w21/roll_live 0.0759
+  side_R_lvl2  oracle 0.0248 random 0.2287 | round1_branches_s0_gray/w21/direct 0.0502  round1_branches_s0_gray/w21/roll_live 0.0699
+  side_R_lvl3  oracle 0.0215 random 0.2531 | round1_branches_s0_gray/w21/direct 0.0468  round1_branches_s0_gray/w21/roll_live 0.0766

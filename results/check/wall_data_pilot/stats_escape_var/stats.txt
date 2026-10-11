@@ -1,0 +1,92 @@
+state | start clearance m | crossing within 0.5 / 1 / 1.25 / 3 s | no crossing under the held command (3 s) | no-crossing families | crossing families
+ep7100_b0 | 0.92 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7100_b1 | 0.47 | 0 / 3 / 9 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7100_b2 | 0.81 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'side_L': 2}
+ep7101_b0 | 1.00 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'side_L': 2}
+ep7101_b1 | 0.68 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2}
+ep7101_b2 | 0.60 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'side_L': 3}
+ep7102_b0 | 0.83 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7102_b1 | 0.44 | 0 / 5 / 12 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7102_b2 | 0.84 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 2, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 2}
+ep7103_b0 | 0.97 | 0 / 0 / 0 / 10 | 18 | {'bwd': 4, 'turn_left': 2, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 2, 'turn_right': 4}
+ep7103_b1 | 0.64 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7103_b2 | 0.92 | 0 / 0 / 0 / 0 | 28 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {}
+ep7103_b3 | 0.64 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7104_b0 | 1.13 | 0 / 0 / 0 / 2 | 26 | {'fwd': 2, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 2}
+ep7104_b1 | 0.48 | 0 / 1 / 3 / 15 | 13 | {'bwd': 4, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 3}
+ep7104_b2 | 0.62 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'side_R': 3}
+ep7104_b3 | 0.58 | 0 / 0 / 0 / 7 | 21 | {'fwd': 2, 'bwd': 4, 'turn_left': 4, 'turn_right': 2, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 2, 'turn_right': 2, 'side_R': 3}
+ep7105_b0 | 1.06 | 0 / 0 / 0 / 3 | 25 | {'fwd': 1, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3}
+ep7105_b1 | 0.75 | 0 / 0 / 0 / 11 | 17 | {'bwd': 4, 'turn_right': 1, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 3}
+ep7105_b2 | 0.90 | 0 / 0 / 0 / 6 | 22 | {'fwd': 1, 'bwd': 4, 'turn_left': 2, 'turn_right': 3, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_left': 2, 'turn_right': 1}
+ep7105_b3 | 0.54 | 0 / 0 / 1 / 15 | 13 | {'bwd': 4, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 3}
+ep7106_b0 | 1.07 | 0 / 0 / 0 / 11 | 17 | {'bwd': 4, 'turn_left': 1, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 3, 'turn_right': 4}
+ep7106_b1 | 0.61 | 0 / 0 / 2 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7106_b2 | 1.11 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 2, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 2}
+ep7106_b3 | 0.57 | 0 / 0 / 0 / 4 | 24 | {'fwd': 3, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 1, 'side_L': 3}
+ep7106_b4 | 0.80 | 0 / 0 / 0 / 4 | 24 | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 4}
+ep7107_b0 | 0.84 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7107_b1 | 0.74 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7107_b2 | 0.87 | 0 / 0 / 0 / 7 | 21 | {'fwd': 1, 'bwd': 4, 'turn_left': 1, 'turn_right': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_left': 3, 'side_L': 1}
+ep7107_b3 | 0.66 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2}
+ep7107_b4 | 0.70 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 2, 'spin_left': 2, 'spin_right': 2} | {'side_R': 2}
+ep7108_b0 | 1.06 | 0 / 0 / 0 / 9 | 19 | {'fwd': 1, 'bwd': 4, 'turn_left': 1, 'turn_right': 1, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_left': 3, 'turn_right': 3}
+ep7108_b1 | 0.72 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7109_b0 | 0.94 | 0 / 0 / 0 / 6 | 22 | {'fwd': 1, 'bwd': 4, 'turn_left': 4, 'turn_right': 3, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_right': 1, 'side_L': 2}
+ep7109_b1 | 0.65 | 0 / 0 / 0 / 17 | 11 | {'bwd': 4, 'side_L': 2, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2, 'side_R': 3}
+ep7109_b2 | 0.58 | 0 / 0 / 0 / 5 | 23 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 2, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'turn_right': 2, 'side_R': 3}
+ep7109_b3 | 0.52 | 0 / 0 / 0 / 5 | 23 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 2, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'turn_right': 2, 'side_R': 3}
+ep7109_b4 | 0.47 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'side_R': 3}
+ep7110_b0 | 1.16 | 0 / 0 / 0 / 3 | 25 | {'fwd': 1, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3}
+ep7110_b1 | 0.49 | 0 / 1 / 4 / 13 | 15 | {'bwd': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 1}
+ep7110_b2 | 1.11 | 0 / 0 / 0 / 0 | 28 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {}
+ep7110_b3 | 0.65 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2}
+ep7111_b0 | 0.93 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7111_b1 | 0.61 | 0 / 0 / 1 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7111_b2 | 0.88 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 2, 'turn_left': 4, 'turn_right': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 2, 'side_L': 1}
+ep7111_b3 | 0.60 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'turn_right': 1, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 3, 'side_L': 3}
+ep7112_b0 | 0.93 | 0 / 0 / 0 / 4 | 24 | {'fwd': 2, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 2, 'spin_left': 2, 'spin_right': 2} | {'fwd': 2, 'side_R': 2}
+ep7112_b1 | 0.65 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'turn_left': 1, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 3, 'turn_right': 4, 'side_R': 3}
+ep7112_b2 | 0.94 | 0 / 0 / 0 / 4 | 24 | {'fwd': 4, 'bwd': 2, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 2, 'spin_left': 2, 'spin_right': 2} | {'bwd': 2, 'side_R': 2}
+ep7112_b3 | 0.40 | 0 / 0 / 2 / 16 | 12 | {'bwd': 4, 'side_L': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_R': 4}
+ep7112_b4 | 0.65 | 0 / 0 / 0 / 4 | 24 | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 4}
+ep7113_b0 | 1.15 | 0 / 0 / 0 / 1 | 27 | {'fwd': 3, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 1}
+ep7113_b1 | 0.60 | 0 / 0 / 0 / 11 | 17 | {'fwd': 1, 'bwd': 4, 'turn_right': 3, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_left': 4, 'turn_right': 1, 'side_L': 3}
+ep7113_b2 | 0.79 | 0 / 0 / 0 / 3 | 25 | {'fwd': 3, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 1, 'side_L': 2}
+ep7113_b3 | 0.73 | 0 / 0 / 0 / 4 | 24 | {'fwd': 3, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 1, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 1, 'side_L': 3}
+ep7114_b0 | 0.96 | 0 / 0 / 0 / 1 | 27 | {'fwd': 3, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 1}
+ep7114_b1 | 0.64 | 0 / 0 / 0 / 14 | 14 | {'bwd': 4, 'turn_left': 1, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 3, 'turn_right': 4, 'side_R': 3}
+ep7114_b2 | 0.94 | 0 / 0 / 0 / 0 | 28 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {}
+ep7114_b3 | 0.40 | 0 / 4 / 12 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7115_b0 | 1.11 | 0 / 0 / 0 / 6 | 22 | {'fwd': 1, 'bwd': 4, 'turn_left': 4, 'turn_right': 1, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_right': 3}
+ep7115_b1 | 0.63 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7115_b2 | 0.64 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'side_R': 3}
+ep7115_b3 | 0.76 | 0 / 0 / 0 / 3 | 25 | {'fwd': 4, 'bwd': 2, 'turn_left': 4, 'turn_right': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 2, 'side_L': 1}
+ep7116_b0 | 1.02 | 0 / 0 / 0 / 3 | 25 | {'fwd': 2, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 2, 'side_L': 1}
+ep7116_b1 | 0.72 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'turn_right': 2, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 2, 'side_L': 2}
+ep7116_b2 | 0.85 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'side_L': 2}
+ep7116_b3 | 0.66 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7117_b0 | 0.91 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7117_b1 | 0.48 | 0 / 2 / 6 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7117_b2 | 0.58 | 0 / 0 / 0 / 4 | 24 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'spin_left': 2, 'spin_right': 2} | {'side_R': 4}
+ep7117_b3 | 0.44 | 0 / 0 / 2 / 8 | 20 | {'fwd': 4, 'bwd': 4, 'turn_left': 3, 'turn_right': 2, 'side_L': 4, 'spin_left': 1, 'spin_right': 2} | {'turn_left': 1, 'turn_right': 2, 'side_R': 4, 'spin_left': 1}
+ep7117_b4 | 0.61 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 2, 'spin_left': 2, 'spin_right': 2} | {'side_R': 2}
+ep7117_b5 | 0.56 | 0 / 0 / 2 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7118_b0 | 0.90 | 0 / 0 / 0 / 6 | 22 | {'fwd': 1, 'bwd': 4, 'turn_left': 4, 'turn_right': 3, 'side_L': 2, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 3, 'turn_right': 1, 'side_L': 2}
+ep7118_b1 | 0.51 | 0 / 0 / 0 / 18 | 10 | {'bwd': 4, 'side_L': 1, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 3, 'side_R': 3}
+ep7118_b2 | 0.55 | 0 / 0 / 0 / 6 | 22 | {'fwd': 4, 'bwd': 3, 'turn_left': 4, 'turn_right': 2, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'bwd': 1, 'turn_right': 2, 'side_R': 3}
+ep7118_b3 | 0.76 | 0 / 0 / 0 / 2 | 26 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 2, 'spin_left': 2, 'spin_right': 2} | {'side_R': 2}
+ep7119_b0 | 0.93 | 0 / 0 / 0 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7119_b1 | 0.56 | 0 / 0 / 3 / 12 | 16 | {'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4}
+ep7119_b2 | 0.99 | 0 / 0 / 0 / 1 | 27 | {'fwd': 4, 'bwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'side_L': 1}
+ep7119_b3 | 0.50 | 0 / 1 / 4 / 13 | 15 | {'bwd': 4, 'side_L': 3, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 1}
+ep7119_b4 | 0.68 | 0 / 0 / 0 / 4 | 24 | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2} | {'bwd': 4}
+ep7119_b5 | 0.45 | 0 / 0 / 0 / 15 | 13 | {'bwd': 4, 'side_L': 4, 'side_R': 1, 'spin_left': 2, 'spin_right': 2} | {'fwd': 4, 'turn_left': 4, 'turn_right': 4, 'side_R': 3}
+
+state dependence: 42 distinct no-crossing-family sets over 83 states; the most common ({'bwd': 4, 'side_L': 4, 'side_R': 4, 'spin_left': 2, 'spin_right': 2}) in 20 -- a command-only rule is right on those
+per start-clearance band: 0.4-0.8: 51 states, mean no-crossing 18.5/28, mean crossings(3 s) 9.5/28, all-cross states 0; 0.8-1.2: 32 states, mean no-crossing 22.8/28, mean crossings(3 s) 5.2/28, all-cross states 0; >1.2: 0 states, mean no-crossing 0.0/28, mean crossings(3 s) 0.0/28, all-cross states 0
+
+COMPLETE ESCAPES (episodes): 39 escapes started, 6 still running at the episode end (excluded); of 33 finished: (1) no crossing 33, (2) reached facing open space (within 10 deg of its target heading, > 4 m free ahead) 33, (3) walked out 1-2.5 s never facing back into the escaped wall and never closer to any wall 26; ALL THREE 26/33 = 0.79
+turn per escape: {'medium': 9, 'sharp': 14, 'small': 3}; amount median 124 deg, 10-90% 55-169, min 41 max 180; end of walk-out -> next escape: median 5.2 s
+time from escape start to facing open space: median 5.6 s (range 1.8-9.0); to the end of the walk-out: median 7.4 s
+not complete: ep7104@4.5s(into wall +0.02, closer 0.05 m), ep7105@3.8s(into wall -0.17, closer 0.08 m), ep7108@4.4s(into wall +0.01, closer 0.06 m), ep7115@5.8s(into wall -0.04, closer 0.07 m), ep7116@5.4s(into wall +0.15, closer 0.05 m), ep7117@3.5s(into wall -0.03, closer 0.05 m), ep7119@3.2s(into wall -0.02, closer 0.09 m)

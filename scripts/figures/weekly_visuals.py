@@ -162,11 +162,13 @@ YLIM = {0: (-0.05, 0.30), 2: (-0.05, 0.12)}   # same axes in every physics clip 
 
 def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/c08", window=11,
                  goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz",
-                 goal_ego="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{ep}.npz", out=None):
+                 goal_ego="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{ep}.npz", out=None,
+                 morph="c08f09t09", body="c08"):
     """Hexapod goal (third-person) | c08 in physics, current pipeline (ego), with Froude traces.
-    base / window / goal_tp / goal_ego ({ep} = goal_ep) / out: defaults = the original figure."""
+    base / window / goal_tp / goal_ego ({ep} = goal_ep) / out: defaults = the original figure. morph / body: the run's
+    file prefix and label (default c08; c10 = "c10f10t10" / "c10", 2026-10-12)."""
     base = os.path.join(ROOT, base)
-    run = np.load(f"{base}/{mech}_w{window}/c08f09t09_hexapod_{goal_ep}.npz", allow_pickle=True)
+    run = np.load(f"{base}/{mech}_w{window}/{morph}_hexapod_{goal_ep}.npz", allow_pickle=True)
     goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
     goal_ego = np.load(os.path.join(ROOT, goal_ego.format(ep=goal_ep)), allow_pickle=True)["frames"]
     n = min(len(run["frames"]), len(goal), len(run["achieved_froude"]))
@@ -176,13 +178,13 @@ def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physi
         fig, axes = plt.subplots(1, 2, figsize=(7.68, 2.2), dpi=100)
         for ax, ch, nm in zip(axes, (0, 2), ("forward", "yaw")):
             ax.plot(g[:, ch], color="black", lw=2, label="goal (hexapod c10)")
-            ax.plot(run["achieved_froude"][:t + 1, ch], color=SHAPES, lw=2, label="c08 in physics")
+            ax.plot(run["achieved_froude"][:t + 1, ch], color=SHAPES, lw=2, label=f"{body} in physics")
             ax.set_xlim(0, 65); ax.set_ylim(*YLIM[ch]); ax.set_title(f"{nm} Froude", fontsize=9)
         axes[0].legend(fontsize=7, frameon=False)
         fig.tight_layout(); fig.canvas.draw()
         plot = np.asarray(fig.canvas.buffer_rgba())[..., :3]; plt.close(fig)
         top = np.hstack([label(goal[t], "goal: hexapod c10"), label(goal_ego[t], "goal: its ego view"),
-                         label(run["frames"][t], f"c08 in physics (ego), {mech}")])
+                         label(run["frames"][t], f"{body} in physics (ego), {mech}")])
         plot = cv2.resize(plot, (top.shape[1], int(plot.shape[0] * top.shape[1] / plot.shape[1])))
         frames.append(np.vstack([top, plot]))
     sfx = "" if mech == "direct" else f"_{mech}"

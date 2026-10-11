@@ -1,1 +1,0 @@
-=== fmd_s1 (hexonly) wm/runs/fmd_beh24_s1/best.pt Thu 01 Oct 2026 04:58:57 PM +07

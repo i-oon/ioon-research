@@ -1,0 +1,11 @@
+split escape_far: 115 states, 3220 branches, horizon 0.5 s, label = crosses within 3 s (base rate 0.21)
+NOTE: features are the TRUE state at the horizon (physics) -- an upper bound on what an imagined future could carry, NOT evidence that the FTM predicts it
+band 0.4-0.8 m: 45 states; crossings within 3 s per state mean 10.1/28 (states with none: 0); within-state AUC of clearance at h for crossing within 3 s: 0.974 (min 0.80, 45 states with both outcomes)
+band 0.8-1.2 m: 47 states; crossings within 3 s per state mean 4.5/28 (states with none: 6); within-state AUC of clearance at h for crossing within 3 s: 0.977 (min 0.58, 41 states with both outcomes)
+band 1.2-2.0 m: 22 states; crossings within 3 s per state mean 0.5/28 (states with none: 16); within-state AUC of clearance at h for crossing within 3 s: 0.991 (min 0.96, 6 states with both outcomes)
+within-state AUC, clearance at h      : 0.977 (min 0.58, 93 states)
+within-state AUC, closing rate at h   : 0.977 (min 0.56, 93 states)
+within-state AUC, front distance at h : 0.810 (min 0.19, 93 states)
+pick the command with the safest state at h (LOEO logistic on clearance, rate): truly safe for 3 s in 0.99 of states
+best fixed command (LOEO, by escape rate on other episodes): safe in 0.98 of states; over all data the best is side_R0 (escapes in 1.00 of states)
+escape rate per command over all states: spin_left0 1.00, spin_left1 1.00, spin_right2 1.00, spin_right3 1.00, side_R0 1.00, bwd0 0.99, side_L0 0.99, bwd1 0.98, side_L1 0.92, side_R1 0.90, bwd3 0.90, bwd2 0.89, side_L2 0.84, side_R2 0.82, side_R3 0.81, side_L3 0.79, turn_left2 0.65, turn_left1 0.64, turn_left3 0.64, turn_left0 0.63, fwd0 0.63, turn_right0 0.62, turn_right1 0.61, turn_right2 0.61, turn_right3 0.60, fwd1 0.58, fwd2 0.50, fwd3 0.46

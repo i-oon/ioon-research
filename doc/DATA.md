@@ -36,7 +36,7 @@ number = `*_heldout` and `c08_*` via `scripts/run/eval_suite.sh`.
 
 | dir | what | made by |
 |---|---|---|
-| `srbal_{c10,b1}_{clips,branches}_train` | the training clips + branches re-rendered in 4 SHARED room looks (appearance seeds 2000-2003, same for every clip; one look per file, balanced so every behaviour appears in all 4 looks; a branch group shares one look), lighting randomised per clip / group (`sr_light_gain`, `sr_light_on`); size and start position as the original renders; every non-frame field identical to the source. Val / held-out keep their original renders. | `scripts/dataset/render_shared_rooms.py render_balanced` (gate: original seed reproduces stored frames, 8/8 exact) |
+| ~~`srbal_{c10,b1}_{clips,branches}_train`~~ | DELETED 2026-10-12 (shared-room-look variant, not pursued, F331 note). Also deleted then: `rs_*` / `orig24_*` (room-size / shifted-room held-out test), `b1_babble_*`, `b1_sbabble_*` (babbling), `data/wall_predcheck` v1. Their numbers stay in FINDINGS; scripts in `scripts/_archive/`. | -- |
 | `data/wall_pilot/b1/` | 24 windows of B1's own forward walks, rotated to face +x, front wall 1-6 m ahead at the last frame; rooms 400-423, original recipe; `wall_dist` per frame | `scripts/diagnostics/wall_pilot/b1_wall_pilot.py` |
 
 Grayscale models (`cfg.grayscale`, e.g. `round1_branches_s0_gray`): the frozen encoder converts frames to luminance

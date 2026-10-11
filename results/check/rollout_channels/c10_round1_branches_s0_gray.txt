@@ -1,0 +1,14 @@
+72 groups; branches per group: {24: 72}
+checkpoint trained on grayscale frames: encoder switched to grayscale (VJEPA_GRAY=1)
+  12/72 groups
+  24/72 groups
+  36/72 groups
+  48/72 groups
+  60/72 groups
+  72/72 groups
+
+=== B: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.72 / 0.89
+  FTM cf  0.82 / 0.79 / 0.31
+  direct  0.97 / 0.85 / 0.78
+dump -> results/check/rollout_channels/c10_round1_branches_s0_gray.npz

@@ -1,0 +1,8 @@
+--- selection B1, recorded goal
+grayscale checkpoint(s): encoder and embedding caches in grayscale mode (VJEPA_GRAY=1)
+round1_branches_s0_gray_imread w=21   direct 0.0354 (gap +0.93)  roll_fixed 0.0577 (gap +0.81)  roll_live 0.0462 (gap +0.87)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection B1, vision-read goal
+round1_branches_s0_gray_imread w=21   direct 0.0508 (gap +0.85)  roll_fixed 0.0816 (gap +0.68)  roll_live 0.0700 (gap +0.74)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- selection c08 zero-shot

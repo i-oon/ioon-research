@@ -40,6 +40,14 @@ from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.policy.planner import RolloutFroudePlanner  # noqa: E402
 
 
+
+def goal_for(goal_bm, t, args):
+    """goal Froude the planner compares with at decision t (F339: rollout's read covers labels t..t+5*ceil(W/5)-1)"""
+    if args.goal_align == "imagined" and args.mechanism == "rollout":
+        n = 5 * -(-args.window // 5)
+        return goal_bm[min(t, len(goal_bm) - 1):min(t + n, len(goal_bm))].mean(0)
+    return goal_bm[min(t, len(goal_bm) - 1)]
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mechanism", choices=("direct", "rollout", "random"), default="rollout",
@@ -51,6 +59,16 @@ def main():
     ap.add_argument("--morph", required=True, help="NAME=SCENE of the controlled body")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--replan_every", type=int, default=2)
+    ap.add_argument("--roll_window", type=int, default=0, help="rollout read-out window in frames (0 = --window); "
+                    "20 = 4 imagined steps, the length the imagined-read loss trains (imread_k 4)")
+    ap.add_argument("--goal_align", default="centre", choices=("centre", "imagined"),
+                    help="rollout only. 'imagined' = THE DOCUMENTED ROLLOUT SETTING from 2026-10-11 (F342): compare the read "
+                         "with the mean goal label over t..t+5*steps-1 (the labels the imagined z were trained on, F339) "
+                         "instead of goal_bm[t]; 'centre' (default) reproduces runs before 2026-10-11; direct unchanged")
+    ap.add_argument("--calib", default="", help="REJECTED (F341), off by default -- do not use: json with a per-body de-shrink of the rollout read "
+                         "(fit_rollout_calib.py); it made everything but the strong-turn onset worse")
+    ap.add_argument("--grade_every", type=int, default=2, help="frames between graded steps, independent of "
+                    "--replan_every (2026-10-10), so changing how often the planner decides does not change the grading")
     ap.add_argument("--window", type=int, default=21)
     ap.add_argument("--phase_match", action="store_true",
                     help="execution only: on a switch, continue the new candidate from the frame whose "
@@ -70,6 +88,11 @@ def main():
     ap.add_argument("--orig_room", default="", help="an ORIGINAL-room clip of the controlled body "
                     "(data/counterfactual_walks/{c10,c08}_clips_*): the collector's own room (8 m, sized to the body) with "
                     "the clip's room seed, body turned to the clip's start heading; frame 0 checked against the clip's")
+    ap.add_argument("--prewalk", default="", help="F336 test: before the planner takes over, walk this candidate "
+                    "condition (e.g. speed_c7.1, turn_s0.56) for --prewalk_frames frames on the CPG clock (needs --cpg_clock); the "
+                    "planner then starts from a walking state; the goal and the grading start at the handover")
+    ap.add_argument("--prewalk_frames", type=int, default=0)
+    ap.add_argument("--grade_from", type=int, default=0, help="first graded frame after the handover")
     ap.add_argument("--cpg_clock", action="store_true",
                     help="F323 fix: drive the body from the chosen candidate's CPG recipe (plan_*) on ONE continuous gait "
                          "clock, cross-fading 4 frames at a switch exactly as the branches were collected "
@@ -85,7 +108,13 @@ def main():
     if args.mechanism == "rollout":
         rp = RolloutFroudePlanner.from_checkpoint(ckpt, cdir, embodiment=emb, horizon=args.horizon,
                                                   per_condition=999, device=dev)
-        rp.window = args.window
+        rp.window = args.roll_window or args.window
+        if args.calib:                          # per-channel de-shrink of the rollout read, fitted on validation (F340)
+            import json as _json
+            _c = _json.load(open(os.path.join(ROOT, args.calib)))["hexapod"]
+            rp.calib = {k: torch.as_tensor(_c[k], dtype=torch.float32, device=dev if "hexapod" == "hexapod" else args.device)
+                        for k in ("slope", "m_read", "m_true")}
+            print(f"  rollout read calibrated: slope {_c['slope']}", flush=True)
         from vjepa2_encoder import VJEPA2FrameEncoder
         encoder = VJEPA2FrameEncoder(dtype=torch.float32)
         off = offset_for(torch.load(ckpt, map_location="cpu", weights_only=False), emb)
@@ -147,12 +176,19 @@ def main():
         cand_np = [np.load(c["path"], allow_pickle=True) for c in cands]
     steps = min(len(goal_bm), min(len(c["actions"]) for c in cands))
     seed_cmds = np.asarray(cands[0]["actions"], np.float32)[:steps]      # warmup pose + clip length
+    P = int(args.prewalk_frames) if args.prewalk else 0
+    pre_i = None
+    if P:
+        assert args.cpg_clock, "--prewalk needs --cpg_clock"
+        pre_i = next(i for i, c in enumerate(cands) if str(c["condition"]) == args.prewalk)
+        seed_cmds = np.concatenate([np.repeat(seed_cmds[:1], P, axis=0), seed_cmds])    # episode = P + steps frames
 
     held = {"i": 0, "off": 0, "last": None}
     rnd = np.random.default_rng(__import__("zlib").crc32(os.path.basename(goal_path).encode()))
     chosen, checked = [], {"done": False}
 
-    def policy(frame, t):
+    def policy(frame, t_abs):
+        t = t_abs - P                              # planner / goal time; t < 0 = the pre-walk
         if not checked["done"]:
             if rc is not None:
                 from PIL import Image
@@ -167,8 +203,14 @@ def main():
                                what="hexapod closed-loop ego frame 0")
             print(f"  ego view check: row-profile corr {r:.3f}", flush=True)
             checked["done"] = True
+        if t < 0:
+            if clock["k"] is None:
+                clock["k"] = Clock(cand_np[pre_i]["cpg_cycles_total"][0], recipe(cand_np[pre_i]), centre)
+                held["i"] = pre_i
+            chosen.append("prewalk")
+            return clock["k"].step()
         if t % args.replan_every == 0:
-            g = torch.as_tensor(planner.standardize(goal_bm[min(t, len(goal_bm) - 1)]), dtype=torch.float32)
+            g = torch.as_tensor(planner.standardize(goal_for(goal_bm, t, args)), dtype=torch.float32)
             with torch.no_grad():
                 if args.mechanism == "random":
                     i = int(rnd.integers(len(cands)))
@@ -240,7 +282,11 @@ def main():
               f"{np.abs(f0.astype(int) - rc['frames'][0].astype(int)).mean():.3f} / 255", flush=True)
 
     out_dir = os.path.join(ROOT, args.out, ("replay" if args.replay_clip else f"{args.mechanism}_w{args.window}")
-                           + ("_phase" if args.phase_match else "") + ("_cpg" if args.cpg_clock else ""))
+                           + ("_phase" if args.phase_match else "") + ("_cpg" if args.cpg_clock else "")
+                           + (f"_r{args.replan_every}" if args.replan_every != 2 else "")
+                           + (f"_pre_{args.prewalk}_{P}" if P else "")
+                           + (f"_rw{args.roll_window}" if args.roll_window else "")
+                           + ("_cal" if args.calib else "") + ("_ga" if args.goal_align == "imagined" else ""))
     os.makedirs(out_dir, exist_ok=True)
     stem = os.path.splitext(os.path.basename(goal_path))[0]
     out = os.path.join(out_dir, f"{name}_{stem}.npz")
@@ -249,9 +295,9 @@ def main():
                         embodiment=emb, morph=name, chosen=np.asarray(chosen), goal=os.path.basename(goal_path),
                         mechanism=args.mechanism, window=args.window, dt=np.float32(0.05),
                         expert_episode=-1, condition="closed_loop", behaviour="closed_loop", level=-1)
-    achieved = np.asarray(load(out, REGISTRY[emb])["body_motion"])[:, :3]
+    achieved = np.asarray(load(out, REGISTRY[emb])["body_motion"])[P:, :3]       # from the handover on
     n = min(len(achieved), len(goal_bm))
-    dec = np.arange(0, n, args.replan_every)
+    dec = np.arange(args.grade_from, n, args.grade_every)
     err = np.linalg.norm(achieved[dec] - goal_bm[dec], axis=1)
     with np.load(out, allow_pickle=True) as d:
         saved = {k: d[k] for k in d.files}

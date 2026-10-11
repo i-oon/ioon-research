@@ -1,0 +1,5 @@
+R2 per channel fwd / lat / yaw (mean); ridge on frozen V-JEPA2 features of ONE frame -> 1 s CoM Froude
+c10  mean-pooled 1408-d     seen rooms +0.60 / +0.51 / +0.31 (+0.47)   unseen rooms +0.21 / -0.05 / +0.05 (+0.07)   alpha 10000/100000
+c10  2x2 quadrants 5632-d   seen rooms +0.73 / +0.71 / +0.45 (+0.63)   unseen rooms +0.31 / -0.02 / +0.00 (+0.10)   alpha 10000/100000
+b1   mean-pooled 1408-d     seen rooms +0.73 / +0.62 / +0.51 (+0.62)   unseen rooms +0.14 / +0.20 / -0.17 (+0.06)   alpha 10000/10000
+b1   2x2 quadrants 5632-d   seen rooms +0.61 / +0.55 / +0.41 (+0.53)   unseen rooms +0.18 / +0.31 / -0.09 (+0.13)   alpha 100000/100000

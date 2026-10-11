@@ -37,6 +37,14 @@ from wm.evaluate import encode_clip, offset_for  # noqa: E402
 from wm.policy.planner import RolloutFroudePlanner  # noqa: E402
 
 
+
+def goal_for(goal_bm, t, args):
+    """goal Froude the planner compares with at decision t (F339: rollout's read covers labels t..t+5*ceil(W/5)-1)"""
+    if args.goal_align == "imagined" and args.mechanism == "rollout":
+        n = 5 * -(-args.window // 5)
+        return goal_bm[min(t, len(goal_bm) - 1):min(t + n, len(goal_bm))].mean(0)
+    return goal_bm[min(t, len(goal_bm) - 1)]
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mechanism", choices=("direct", "rollout", "random"), default="rollout",
@@ -48,6 +56,14 @@ def main():
     ap.add_argument("--candidates_dir", default="data/egocentric/beh12_b1_ego_flat_cleantrain")
     ap.add_argument("--horizon", type=int, default=2)
     ap.add_argument("--replan_every", type=int, default=2)
+    ap.add_argument("--goal_align", default="centre", choices=("centre", "imagined"),
+                    help="rollout only. 'imagined' = THE DOCUMENTED ROLLOUT SETTING from 2026-10-11 (F342): compare the read "
+                         "with the mean goal label over t..t+5*steps-1 (the labels the imagined z were trained on, F339) "
+                         "instead of goal_bm[t]; 'centre' (default) reproduces runs before 2026-10-11; direct unchanged")
+    ap.add_argument("--calib", default="", help="REJECTED (F341), off by default -- do not use: json with a per-body de-shrink of the rollout read "
+                         "(fit_rollout_calib.py); it made everything but the strong-turn onset worse")
+    ap.add_argument("--grade_every", type=int, default=2, help="frames between graded steps, independent of "
+                    "--replan_every (2026-10-10), so changing how often the planner decides does not change the grading")
     ap.add_argument("--window", type=int, default=21)
     ap.add_argument("--policy_warmup", type=int, default=45, help="policy steps walking the first "
                     "candidate's command before recording, as the collector crops the spawn transient")
@@ -82,6 +98,12 @@ def main():
         rp = RolloutFroudePlanner.from_checkpoint(ckpt, cdir, embodiment="b1", horizon=args.horizon,
                                                   per_condition=999, device=dev)
         rp.window = args.window
+        if args.calib:                          # per-channel de-shrink of the rollout read, fitted on validation (F340)
+            import json as _json
+            _c = _json.load(open(os.path.join(ROOT, args.calib)))["b1"]
+            rp.calib = {k: torch.as_tensor(_c[k], dtype=torch.float32, device=dev if "b1" == "hexapod" else args.device)
+                        for k in ("slope", "m_read", "m_true")}
+            print(f"  rollout read calibrated: slope {_c['slope']}", flush=True)
         from vjepa2_encoder import VJEPA2FrameEncoder
         encoder = VJEPA2FrameEncoder(dtype=torch.float32)
         off = offset_for(torch.load(ckpt, map_location="cpu", weights_only=False), "b1")
@@ -157,7 +179,7 @@ def main():
     rnd = np.random.default_rng(__import__("zlib").crc32(os.path.basename(goal_path).encode()))
     for t in range(steps):
         if t % args.replan_every == 0:
-            g = planner.standardize(goal_bm[min(t, len(goal_bm) - 1)])
+            g = planner.standardize(goal_for(goal_bm, t, args))
             with torch.no_grad():
                 if args.mechanism == "random":
                     held = int(rnd.integers(len(cands)))
@@ -185,7 +207,7 @@ def main():
             print(f"  FELL at step {t}")
             break
 
-    out_dir = os.path.join(ROOT, args.out, f"{args.mechanism}_w{args.window}")
+    out_dir = os.path.join(ROOT, args.out, f"{args.mechanism}_w{args.window}" + (f"_r{args.replan_every}" if args.replan_every != 2 else "") + ("_cal" if args.calib else "") + ("_ga" if args.goal_align == "imagined" else ""))
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, f"b1_{os.path.splitext(os.path.basename(goal_path))[0]}.npz")
     arrays = {k: np.asarray(v, np.uint8 if k == "frames" else np.float32) for k, v in rec.items()}
@@ -197,7 +219,7 @@ def main():
                         **{f"body_{k}": np.array(v) for k, v in walker.settings().items()})
     achieved = np.asarray(load(out, REGISTRY["b1"])["body_motion"])[:, :3]
     n = min(len(achieved), len(goal_bm))
-    dec = np.arange(0, n, args.replan_every)
+    dec = np.arange(0, n, args.grade_every)
     err = np.linalg.norm(achieved[dec] - goal_bm[dec], axis=1)
     with np.load(out, allow_pickle=True) as d:
         saved = {k: d[k] for k in d.files}

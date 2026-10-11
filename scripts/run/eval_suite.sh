@@ -46,10 +46,12 @@ echo "=== $NAME ($MODE) $PT $(date)" | tee $OUT/summary.txt
 
 # 1. checkpoints
 $PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir "" --cache_dir results/wm/cache/fitproj_files --out $CK/projector_hex.pt 2>&1 | quiet | tail -1
+[ -s $CK/projector_hex.pt ] || { echo "STOP: projector_hex.pt was not written (run wm.fit_projector by hand to see the error)"; exit 1; }
 merge $PT $CK/projector_hex.pt $CK/hex.pt
 if [ "$MODE" = joint ]; then
   $PY -m wm.fit_projector --ckpt $PT --hex_dir $HEX --b1_dir $B1 --cache_dir results/wm/cache/fitproj_files \
       --out $CK/projector_b1.pt 2>&1 | quiet | tail -1
+  [ -s $CK/projector_b1.pt ] || { echo "STOP: projector_b1.pt was not written (run wm.fit_projector by hand to see the error)"; exit 1; }
   merge $PT $CK/projector_b1.pt $CK/b1.pt
   ITM_B1=$PT
 else

@@ -584,6 +584,14 @@ class RolloutFroudePlanner:
                 pred = self.md.body(e_t, zs.mean(1))
             else:
                 pred = self.md.body(e_t, zs.reshape(n_cand * steps, -1)).reshape(n_cand, steps, -1).mean(1)
+            cal = getattr(self, "calib", None)
+            if cal is not None:
+                # de-shrink (F340, 2026-10-10): per channel, in Froude units, read' = (read - m_read) / slope + m_true, with
+                # slope / means fitted on VALIDATION branches (`fit_rollout_calib.py`); None = unchanged
+                ms, ss = (torch.as_tensor(np.asarray(v, np.float32), device=pred.device) for v in (self.mean_s, self.std_s))
+                f = pred.float() * ss + ms
+                f = (f - cal["m_read"]) / cal["slope"] + cal["m_true"]
+                pred = (f - ms) / ss
             return ((pred - goal.reshape(1, -1)) ** 2).mean(-1).cpu().numpy()
         windows = []
         for cand in self.candidates:

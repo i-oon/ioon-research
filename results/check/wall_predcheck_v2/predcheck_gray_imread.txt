@@ -1,0 +1,30 @@
+gray_imread (results/eval/round1_branches_s0_gray_imread/ckpt/b1.pt); B1 wall prediction check, constant command held, 72 fit / 72 test start states x 24 commands; horizons in FTM steps (0.25 s each); 8 = beyond every trained chain
+row: readout | within-state Spearman (mean over states) | MAE m | unsafe recall / precision (unsafe = true min clearance over [0, t] < 0.15 m)
+--- horizon 1 step(s) = 0.25 s
+  real future (R_real on the true frame)     | -0.00 | 0.22 | n/a (no unsafe case)
+  imagined, R_real (pipeline as is)          | +0.27 | 1.63 | n/a (no unsafe case)
+  imagined, R_imag (refit on imagined)       | +0.15 | 0.25 | n/a (no unsafe case)
+  copy e_0 (no prediction, distance only)    |   n/a | 0.22 | n/a (no unsafe case)
+  command-only: e_0 distance + mean change   | +0.45 | 0.21 | n/a (no unsafe case)
+  command-only, TRUE start clearance + mean  | +0.45 | 0.04 | n/a (no unsafe case)
+--- horizon 2 step(s) = 0.50 s
+  real future (R_real on the true frame)     | +0.43 | 0.22 | n/a (no unsafe case)
+  imagined, R_real (pipeline as is)          | +0.36 | 1.47 | n/a (no unsafe case)
+  imagined, R_imag (refit on imagined)       | +0.32 | 0.25 | n/a (no unsafe case)
+  copy e_0 (no prediction, distance only)    |   n/a | 0.23 | n/a (no unsafe case)
+  command-only: e_0 distance + mean change   | +0.47 | 0.21 | n/a (no unsafe case)
+  command-only, TRUE start clearance + mean  | +0.47 | 0.07 | n/a (no unsafe case)
+--- horizon 4 step(s) = 1.00 s
+  real future (R_real on the true frame)     | +0.58 | 0.22 | n/a (no unsafe case)
+  imagined, R_real (pipeline as is)          | +0.33 | 1.29 | n/a (no unsafe case)
+  imagined, R_imag (refit on imagined)       | +0.41 | 0.29 | n/a (no unsafe case)
+  copy e_0 (no prediction, distance only)    |   n/a | 0.29 | n/a (no unsafe case)
+  command-only: e_0 distance + mean change   | +0.51 | 0.24 | n/a (no unsafe case)
+  command-only, TRUE start clearance + mean  | +0.51 | 0.15 | n/a (no unsafe case)
+--- horizon 8 step(s) = 2.00 s  [beyond trained chain]
+  real future (R_real on the true frame)     | +0.71 | 0.26 | 0.69 / 0.42 (n unsafe 39)
+  imagined, R_real (pipeline as is)          | +0.29 | 1.50 | 0.00 / 0.00 (n unsafe 39)
+  imagined, R_imag (refit on imagined)       | +0.50 | 0.44 | 0.74 / 0.27 (n unsafe 39)
+  copy e_0 (no prediction, distance only)    |   n/a | 0.50 | 0.00 / 0.00 (n unsafe 39)
+  command-only: e_0 distance + mean change   | +0.56 | 0.36 | 0.18 / 0.88 (n unsafe 39)
+  command-only, TRUE start clearance + mean  | +0.56 | 0.31 | 0.05 / 1.00 (n unsafe 39)

@@ -307,3 +307,131 @@ banned; "expert" here means only B1's own tuned walking-policy clips.
 
 Physics loop fix first for any hexapod physics number: CPG recipe on one gait clock + cross-fade at switches, as the branches
 (`collect_ik.cpg_commands(xfade=...)`), verified by single-clip replay and c10 direct on turn / speed goals.
+
+
+## 12. Wall test data (predictive vs reactive), plan 2026-10-09 -- for review before anything is generated
+
+**Question (advisor, week 19).** Does rollout (imagining the next ~1-2 s from the camera) avoid a wall that a controller
+without prediction hits, with the same candidate commands? Direct cannot see the wall by construction, so this is a test
+rollout can win in principle (memory week-goal 2026-09-26). B1 first (MuJoCo, exact restore, fast on CPU); hexapod after.
+
+**World.** The ORIGINAL B1 room (17.65 m, sized to the body), rendered in the 4 shared looks (`render_shared_rooms.py`,
+appearance seeds 2000-2003) for training and in unseen looks (room seeds 200+) for test. The room is FIXED in the world
+(walls at +-8.8 m around the origin), not re-centred on each clip, so wall distance is real geometry. MuJoCo has no walls:
+the body would walk through them; "contact" is computed from the camera / body position against the wall planes.
+
+**Episodes (reactive controller, the data source and a baseline).** Spawn at a random position and heading with the wall
+ahead at 2-8 m (front distance along the heading, ray to the nearest wall face). Controller over B1's 24 tuned commands:
+1. walk forward at a random speed level (one of the 8 forward / backward-free speed commands);
+2. when the front distance < d_turn (random per episode, 1.0-3.0 m): turn toward the more open side (the side wall farther
+   away; 20 % the other side, so both turns occur near walls) at a random turn level, until the front distance > d_clear
+   (d_turn + 1.5 m), then back to 1;
+3. episode ends at contact (camera within 0.3 m of a wall) or after 40 s; nothing after a contact is used.
+Recorded as the B1 walks are (`base_pos`, `base_quat`, `joint_pos`, `action`, `command`, `foot_contact`, `com_pos`), plus per
+frame `wall_front` (front distance), `wall_min` (closest wall), `contact`, `controller_state`.
+
+**Branches near walls (the counterfactual part).** At states sampled from the episodes with front distance 1-4 m (all
+headings relative to the wall), exact MuJoCo snapshot -> run all 24 commands for 30 frames (1.5 s) after 10 shared frames
+(`B1Walker.snapshot/restore`, as `build_branches.py` B1). The futures then differ in wall distance as well as in motion;
+labels per frame as above. Same file layout as the current branches (`first_pair` = 10, `segment`, `cf_*`), 30 instead of 20
+post-switch frames so 1-2 s imagined horizons have targets.
+
+**Amounts (first version, B1).** Train: 48 episodes (windows of 66 frames cut like the main clips) + 48 branch states x 24
+commands = 1,152 branch files; val 24 + 576; heldout 24 + 576 (different spawn seeds and unseen looks). Rendering ~1 h CPU,
+physics minutes. Mixed into pretraining with the current clips + branches at the same step budget (one variable: wall data
+in / out).
+
+**Reading the wall in imagination.** A small wall-distance head on z or on the imagined embedding, trained on the wall data
+labels through the frozen encoder (like the Froude head; F328: the frozen embedding reads wall distance at R2 0.96).
+
+**Test (physics loop, B1).** Start facing a wall at 3-6 m (unseen looks), goal = walk forward at a given speed for 10 s;
+decision every 2 frames as now. Rows, same 24 candidates:
+| row | uses the view? | predicts? |
+|---|---|---|
+| direct (Froude only) | no | no |
+| reactive rule (the data controller, threshold swept) | distance sensor | no |
+| current frame, no prediction (wall head on e_t + Froude) | yes | no |
+| rollout (Froude + wall distance read from the imagined steps) | yes | yes |
+Metrics: collision rate, closest distance to the wall, forward progress (Froude error of the non-avoidance part), and the
+distance at which the turn starts. Several starts per row (e.g. 12), one seed first.
+
+**Checks before use.** Episodes: no contact inside a kept window; wall labels against a render (distance shown on frames);
+branches: start bit-identical across the 24 (exact restore); contact sheet + video shown to the user before training.
+
+**Order.** (1) collector + controller (B1), contact sheet / video -> review; (2) branches near walls; (3) render in shared /
+unseen looks; (4) wall head + pretraining mix; (5) physics test with the 4 rows. Hexapod (CPG clock, `--cpg_clock`) after B1.
+
+## 13. Wall data plan, revised 2026-10-11 (user + Codex) -- supersedes the collection parts of section 12
+
+Generator: `scripts/dataset/collect_b1_wall_data.py` (B1; c10 version to build). Physics-only checks: `stats`, `sep`
+modes -> `results/check/wall_data_pilot/stats_<split>/`. Review renders: `review_<split>/`.
+
+**Rooms.** Each body keeps its original room (B1 17.65 m; hexapod 8 m). Clearance (signed distance of the rotated
+footprint to the inner wall face; B1 footprint 1.13 x 0.47 m) is reported in metres AND body lengths. Performance is
+compared within each body first; no cross-body wall claim before the c10 (and c08 test) results exist.
+
+**Commands.** 28 per body: the 24 tuned + 4 turns on the spot (B1 wz +-0.30 / +-0.45; c10 matched CPG recipes,
+memory `project_wall_library_spins`). Comparisons with older checkpoints are ALSO reported on the common 24.
+
+**Episodes** (30 s): approach a wall / corner (mostly angled) -> make room -> turn on the spot by a random amount
+(small 20-60 / medium 60-120 / sharp 120-180 deg) until facing open space -> walk out 1-2.5 s -> next nearby wall. Only
+successful escapes in the episodes (pilot `escape_var`: 33/33 complete = no crossing, facing open space > 4 m, walk-out
+never facing into the escaped wall nor > 0.10 m closer to any wall [gait sway tolerance]). Failures are in the branches.
+
+**Branches.** At each approach, the exact state at ~1.0 m and ~0.6 m (near bands); every command held 3 s, cut at the
+crossing frame (`crossed`, `cross_frame`, per-frame `clearance`). Labelled "no crossing under a held command" -- never
+"escape" (a complete escape is a multi-command episode behaviour).
+Per-frame label (`status` in every file; user + Codex 2026-10-11), margin FIXED before any test result: 0.15 m = 0.13
+B1 body lengths (hexapod: 0.13 of its body length). 0 SAFE (clearance >= margin); 1 NEAR = margin violation (0 <=
+clearance < margin; nothing touches in MuJoCo -- clearance 0 = touching the virtual boundary); 2 CROSSED (< 0, the
+terminal frame). Unsafe (for selection) = near or crossed, but near and crossed are REPORTED SEPARATELY (shows over-
+caution). Every unsafe label carries its time window (`first_near_frame`, `cross_frame`): "within 3 s of the branch" and
+"within the predicted 1.25 s" are separate quantities, never interchanged.
+Far band 1.2-2.0 m: PILOT ONLY (physics + render) before any collection. With 3 s branches it gave 0.5/28 crossings per
+state (16/22 states none). Check first whether clearance within the model's ~1.25 s horizon ranks the commands that
+later cross; a 5 s crossing label is not a 1.25 s predicted clearance.
+Far-band pilot DONE 2026-10-12 (physics, `far5`, 20 episodes, far states held 5 s = 100 frames, near states 3 s): far band
+1.2-2.0 m 22 states, crossings within 5 s 6.3/28 per state (no state without; 3 s gave 0.5/28, 16/22 none), unsafe
+(near or crossed) 8.3/28; TRUE clearance at h = 1.25 s ranks the commands crossing within 5 s at within-state AUC 0.977
+(min 0.92) -- upper bound only. Decision: far band kept, with 5 s branches (`FAR_FROM`, `BRANCH_F_FAR`); the label used is
+"crosses within 5 s", the model's predicted quantity stays clearance at <= 1.25 s.
+
+**Accounting = independent start states, not files.** Pilot: 4.2 start states per episode (near bands), 5.8 with the
+far band; coverage (escape_var, 83 states): bands 0.4-0.8 / 0.8-1.2 = 50 / 32; approach angle < 30 / 30-60 / >= 60 deg =
+32 / 18 / 33; corner 16; approach speed median 0.44 m/s (0.36-0.53); one room look per episode.
+Size proposal, matched in FRAMES to `b1_branches_train` (~107 k): train ~22 episodes x 4.2 = ~92 start states with a
+STRATIFIED 14 of 28 commands per state (2 per family: fwd / bwd / turn L / turn R / side L / side R / spin; physics of
+all 28 runs first (cheap), the subset is resampled until it holds >= 3 crossing AND >= 3 non-crossing commands where the
+state has them; only the chosen ones are rendered) (~1,290 files, ~90 k frames); val 4 episodes and test 8 episodes with ALL 28 commands
+per state (~17 and ~34 states). Coverage table (distance band x angle x corner x speed x look) reported per split. Every split reports THREE counts: start states, episodes and room looks (states of one episode are correlated; the
+independent units are episodes / looks).
+Episodes and room looks disjoint across splits (train 8000-, val 8500-, test 8800-).
+
+**c10 before retraining.** Same design in the hexapod room (geometry-rule controller: no MuJoCo look-ahead; branches
+with the deterministic scene-reuse procedure), sized to `c10_branches_train`; pilot + review first. c08: test set only.
+
+**Training (two runs, same everything else as `round1_branches_s0_gray_imread`):**
+1. data only: + B1 and c10 wall train sets;
+2. data + clearance supervision: a clearance head on the frame embedding, trained on real frames, and an imagined-
+   clearance term like `lambda_imread`, each target aligned with the predicted time: k = 1-5 imagined steps = 0.25 /
+   0.5 / 0.75 / 1.0 / 1.25 s -- the planner's rollout imagines 5 steps (window 21), so the selector, the prediction
+   check and the clearance targets all use 1.25 s. (The existing Froude imagined-read trains k = 4; the planner's 5th
+   Froude read is past it, as in every current rollout -- unchanged, stated in the write-up.)
+   No 1.25 s head on a 3-5 s crossing label. Physics clearance is a training label only, never an inference input.
+
+**Baselines for wall risk (same data, candidates, horizon, test starts):**
+(a) head fitted on REAL future embeddings, applied to imagined ones; (b) head trained to read clearance from IMAGINED
+embeddings (run 2); (c) DIRECT action-conditioned risk: current embedding + candidate command -> future clearance /
+risk, no FTM (BADGR-style; Deep Visual MPC is the predict-the-view-then-score analogue of a / b).
+
+**Evaluation.** Prediction check on held-out starts, by horizon (0.25 / 0.5 / 0.75 / 1.0 / 1.25 s = what the selector uses; 2 s separate, beyond training): per-state candidate
+ranking, unsafe-command detection, calibrated clearance error; per distance band and approach group (head-on / oblique /
+corner). Then closed loop on paired starts: crossings, forward progress, Froude tracking, complete escapes; vs vision-
+blind direct, current-image reactive, direct risk prediction (c), visual rollout, true-future oracle (TTC rule as
+privileged reference). Planner objective must be checked for allowing a temporary retreat.
+
+**Not evidence (do not cite as such):** the true-future AUC 0.99 (upper-bound feasibility only); the +0.002 AUC from
+adding measured approach speed to a physics classifier (does not show one camera frame contains speed).
+
+**Order:** user reviews the 10 B1 videos (`review_escape_var_r10`) -> far-band pilot -> c10 procedure pilot + review ->
+collect B1 + c10 -> two training runs -> prediction check -> closed loop.

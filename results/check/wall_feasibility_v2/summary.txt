@@ -1,0 +1,138 @@
+TTC (tau s | back-up m) tuned on 48 val starts: 2.0|0.2; report on 48 test starts
+per scenario (test): kind d theta goal | held-safe /24 | crossed: direct ttc oracle0.5/1/2 | progress same | min clearance same
+corner d=1.0 th=   0 v1 |  4 | X . . . . | 0.00 0.51 0.36 0.34 0.31 | -0.00 +0.09 +0.15 +0.18 +0.18
+corner d=1.0 th=   0 v3 |  3 | X . . . . | 0.00 0.37 0.17 0.17 0.11 | -0.00 +0.14 +0.15 +0.15 +0.17
+corner d=1.0 th=  30 v1 |  5 | X . . . . | 0.00 0.44 0.40 0.39 0.33 | -0.01 +0.13 +0.16 +0.19 +0.31
+corner d=1.0 th=  30 v3 |  4 | X . . . . | 0.00 0.45 0.35 0.32 0.26 | -0.00 +0.12 +0.17 +0.19 +0.33
+corner d=1.0 th=  60 v1 |  4 | X . . . . | 0.00 0.00 0.35 0.34 0.25 | -0.00 +0.07 +0.16 +0.20 +0.29
+corner d=1.0 th=  60 v3 |  5 | X . . . . | 0.00 0.05 0.35 0.33 0.21 | -0.00 +0.09 +0.17 +0.23 +0.40
+corner d=1.5 th=   0 v1 |  4 | X . . . . | 0.00 0.68 0.60 0.56 0.46 | -0.00 +0.15 +0.15 +0.15 +0.20
+corner d=1.5 th=   0 v3 |  4 | X . . . . | 0.00 0.52 0.33 0.32 0.30 | -0.01 +0.14 +0.15 +0.15 +0.15
+corner d=1.5 th=  30 v1 |  6 | X . . . . | 0.00 0.53 0.49 0.49 0.42 | -0.00 +0.15 +0.15 +0.18 +0.29
+corner d=1.5 th=  30 v3 |  7 | X . . . . | 0.00 0.54 0.46 0.46 0.40 | -0.01 +0.14 +0.15 +0.15 +0.24
+corner d=1.5 th=  60 v1 |  5 | X . . . . | 0.00 0.35 0.45 0.42 0.31 | -0.00 +0.15 +0.17 +0.22 +0.35
+corner d=1.5 th=  60 v3 |  4 | X . . . . | 0.00 0.20 0.27 0.25 0.22 | -0.01 +0.15 +0.16 +0.19 +0.25
+corner d=2.0 th=   0 v1 |  5 | X . . . . | 0.00 0.57 0.53 0.51 0.49 | -0.00 +0.14 +0.15 +0.19 +0.22
+corner d=2.0 th=   0 v3 |  5 | X . . . . | 0.00 0.52 0.43 0.43 0.41 | -0.01 +0.15 +0.15 +0.15 +0.22
+corner d=2.0 th=  30 v1 |  8 | X . . . . | 0.00 0.62 0.61 0.60 0.56 | -0.01 +0.16 +0.15 +0.17 +0.23
+corner d=2.0 th=  30 v3 |  7 | X . . . . | 0.00 0.57 0.55 0.52 0.46 | -0.00 +0.08 +0.15 +0.20 +0.37
+corner d=2.0 th=  60 v1 |  7 | X . . . . | 0.00 0.82 0.68 0.63 0.53 | -0.00 +0.16 +0.18 +0.24 +0.33
+corner d=2.0 th=  60 v3 |  7 | X . . . . | 0.00 0.46 0.55 0.52 0.44 | -0.00 +0.14 +0.17 +0.21 +0.40
+corner d=3.0 th=   0 v1 |  6 | X . . . . | 0.00 0.77 0.78 0.79 0.76 | -0.00 +0.11 +0.20 +0.22 +0.31
+corner d=3.0 th=   0 v3 |  6 | X . . . . | 0.00 0.69 0.66 0.63 0.61 | -0.00 +0.17 +0.16 +0.24 +0.25
+corner d=3.0 th=  30 v1 |  9 | X . . . . | 0.00 0.91 0.96 0.94 0.88 | -0.00 +0.10 +0.15 +0.21 +0.32
+corner d=3.0 th=  30 v3 | 10 | X . . . . | 0.00 0.82 0.82 0.83 0.77 | -0.01 +0.14 +0.15 +0.16 +0.30
+corner d=3.0 th=  60 v1 | 10 | X . . . . | 0.00 0.94 0.67 0.67 0.56 | -0.00 +0.16 +0.19 +0.28 +0.40
+corner d=3.0 th=  60 v3 |  9 | X . . . . | 0.00 0.88 0.67 0.61 0.76 | -0.01 +0.14 +0.19 +0.27 +0.23
+wall   d=1.0 th=   0 v1 | 12 | X . . . . | 0.00 0.47 0.34 0.18 0.24 | -0.00 +0.11 +0.15 +0.16 +0.16
+wall   d=1.0 th=   0 v3 | 12 | X . . . . | 0.00 0.16 0.23 0.24 0.27 | -0.01 +0.11 +0.15 +0.15 +0.16
+wall   d=1.0 th=  30 v1 |  8 | X . . . . | 0.00 0.15 0.60 0.54 0.60 | -0.00 +0.12 +0.18 +0.29 +0.39
+wall   d=1.0 th=  30 v3 |  8 | X . . . . | 0.00 0.06 0.45 0.44 0.34 | -0.01 +0.12 +0.15 +0.24 +0.51
+wall   d=1.0 th=  60 v1 | 11 | X . . . . | 0.00 0.29 0.86 0.87 1.08 | -0.00 +0.12 +0.17 +0.30 +0.34
+wall   d=1.0 th=  60 v3 | 10 | X . . . . | 0.00 0.00 0.71 0.77 0.99 | -0.01 +0.03 +0.19 +0.26 +0.36
+wall   d=1.5 th=   0 v1 | 12 | X . . . . | 0.00 0.40 0.58 0.57 0.53 | -0.00 +0.13 +0.15 +0.20 +0.18
+wall   d=1.5 th=   0 v3 | 12 | X . . . . | 0.00 0.64 0.45 0.42 0.40 | -0.00 +0.13 +0.15 +0.15 +0.16
+wall   d=1.5 th=  30 v1 | 10 | X . . . . | 0.00 0.25 0.64 0.67 0.60 | -0.00 +0.13 +0.15 +0.26 +0.44
+wall   d=1.5 th=  30 v3 | 10 | X . . . . | 0.00 0.19 0.53 0.50 0.41 | -0.01 +0.13 +0.15 +0.25 +0.46
+wall   d=1.5 th=  60 v1 | 13 | X . . . . | 0.00 0.55 0.95 0.93 1.00 | -0.00 +0.13 +0.20 +0.30 +0.37
+wall   d=1.5 th=  60 v3 | 12 | X . . . . | 0.00 0.47 0.81 0.74 1.00 | -0.00 +0.04 +0.19 +0.30 +0.34
+wall   d=2.0 th=   0 v1 | 14 | X . . . . | 0.00 0.52 0.66 0.62 0.58 | -0.00 +0.14 +0.15 +0.20 +0.18
+wall   d=2.0 th=   0 v3 | 13 | X . . . . | 0.00 0.62 0.53 0.51 0.49 | -0.00 +0.14 +0.15 +0.15 +0.15
+wall   d=2.0 th=  30 v1 | 12 | X . . . . | 0.00 0.37 0.67 0.65 0.65 | -0.00 +0.13 +0.17 +0.25 +0.45
+wall   d=2.0 th=  30 v3 | 13 | X . . . . | 0.00 0.39 0.62 0.55 0.54 | -0.01 +0.12 +0.15 +0.21 +0.41
+wall   d=2.0 th=  60 v1 | 13 | X . . . . | 0.00 0.67 0.96 0.95 1.03 | -0.00 +0.14 +0.21 +0.32 +0.37
+wall   d=2.0 th=  60 v3 | 13 | X . . . . | 0.00 0.38 0.73 0.74 0.86 | -0.00 +0.05 +0.19 +0.30 +0.34
+wall   d=3.0 th=   0 v1 | 16 | X . . . . | 0.00 0.84 0.89 0.85 0.81 | -0.00 +0.10 +0.17 +0.27 +0.37
+wall   d=3.0 th=   0 v3 | 15 | X . . . . | 0.00 0.72 0.80 0.78 0.74 | -0.00 +0.14 +0.15 +0.19 +0.23
+wall   d=3.0 th=  30 v1 | 16 | X . . . . | 0.00 0.70 0.86 0.84 0.80 | -0.00 +0.12 +0.15 +0.26 +0.40
+wall   d=3.0 th=  30 v3 | 16 | X . . . . | 0.00 0.58 0.71 0.69 0.64 | -0.00 +0.12 +0.15 +0.23 +0.37
+wall   d=3.0 th=  60 v1 | 20 | . . . . . | 0.89 0.89 0.89 0.89 0.89 | +0.57 +0.57 +0.57 +0.57 +0.62
+wall   d=3.0 th=  60 v3 | 23 | . . . . . | 1.09 1.06 1.08 1.06 0.98 | +0.22 +0.29 +0.23 +0.35 +0.59
+TOTAL direct         crossed 0.96  score 0.04  min clearance -0.00
+TOTAL ttc(2.0|0.2)   crossed 0.00  score 0.51  min clearance +0.13
+TOTAL oracle(0.5s)   crossed 0.00  score 0.61  min clearance +0.15
+TOTAL oracle(1.0s)   crossed 0.00  score 0.58  min clearance +0.21
+TOTAL oracle(2.0s)   crossed 0.00  score 0.57  min clearance +0.33
+
+oracle v2 = ONE-ACTION receding-horizon oracle: each decision simulates every command HELD for H from the exact
+state, safe = footprint min clearance >= 0.15 m over H; the goal command if safe, else the safe command with the
+highest mean forward speed, else the largest min clearance; not the optimal 10 s sequence. TTC v2 = time to the
+boundary from the footprint's signed clearance and its closing rate. Score: crossed = 0, else progress =
+mean forward speed / goal, floored at 0 (backing away is safe but scores ~0).
+
+TTC vs oracle(1 s), test, per scenario: first decision where they choose differently (time, front distance
+in each run), share of differing decisions over the shorter run, outcome (crossed, score) TTC -> oracle
+corner d=1.0 th=   0 v1 | first differ t= 0.9s dfront ttc 0.79 / oracle 0.79 m | differ 0.91 | crossed 0->0 score 0.51->0.34
+corner d=1.0 th=   0 v3 | first differ t= 0.0s dfront ttc 0.72 / oracle 0.72 m | differ 0.99 | crossed 0->0 score 0.37->0.17
+corner d=1.0 th=  30 v1 | first differ t= 1.7s dfront ttc 0.89 / oracle 0.89 m | differ 0.82 | crossed 0->0 score 0.44->0.39
+corner d=1.0 th=  30 v3 | first differ t= 1.1s dfront ttc 0.91 / oracle 0.91 m | differ 0.87 | crossed 0->0 score 0.45->0.32
+corner d=1.0 th=  60 v1 | first differ t= 1.8s dfront ttc 0.89 / oracle 0.89 m | differ 0.81 | crossed 0->0 score 0.00->0.34
+corner d=1.0 th=  60 v3 | first differ t= 1.9s dfront ttc 0.88 / oracle 0.88 m | differ 0.79 | crossed 0->0 score 0.05->0.33
+corner d=1.5 th=   0 v1 | first differ t= 2.4s dfront ttc 0.88 / oracle 0.88 m | differ 0.76 | crossed 0->0 score 0.68->0.56
+corner d=1.5 th=   0 v3 | first differ t= 1.0s dfront ttc 0.93 / oracle 0.93 m | differ 0.90 | crossed 0->0 score 0.52->0.32
+corner d=1.5 th=  30 v1 | first differ t= 2.3s dfront ttc 0.87 / oracle 0.87 m | differ 0.77 | crossed 0->0 score 0.53->0.49
+corner d=1.5 th=  30 v3 | first differ t= 2.1s dfront ttc 1.01 / oracle 1.01 m | differ 0.74 | crossed 0->0 score 0.54->0.46
+corner d=1.5 th=  60 v1 | first differ t= 0.9s dfront ttc 0.94 / oracle 0.94 m | differ 0.88 | crossed 0->0 score 0.35->0.42
+corner d=1.5 th=  60 v3 | first differ t= 0.5s dfront ttc 1.01 / oracle 1.01 m | differ 0.90 | crossed 0->0 score 0.20->0.25
+corner d=2.0 th=   0 v1 | first differ t= 3.4s dfront ttc 0.69 / oracle 0.69 m | differ 0.66 | crossed 0->0 score 0.57->0.51
+corner d=2.0 th=   0 v3 | first differ t= 2.5s dfront ttc 0.95 / oracle 0.95 m | differ 0.75 | crossed 0->0 score 0.52->0.43
+corner d=2.0 th=  30 v1 | first differ t= 4.9s dfront ttc 0.62 / oracle 0.62 m | differ 0.50 | crossed 0->0 score 0.62->0.60
+corner d=2.0 th=  30 v3 | first differ t= 3.1s dfront ttc 0.87 / oracle 0.87 m | differ 0.67 | crossed 0->0 score 0.57->0.52
+corner d=2.0 th=  60 v1 | first differ t= 2.9s dfront ttc 0.89 / oracle 0.89 m | differ 0.66 | crossed 0->0 score 0.82->0.63
+corner d=2.0 th=  60 v3 | first differ t= 2.4s dfront ttc 0.99 / oracle 0.99 m | differ 0.74 | crossed 0->0 score 0.46->0.52
+corner d=3.0 th=   0 v1 | first differ t= 6.5s dfront ttc 0.85 / oracle 0.85 m | differ 0.35 | crossed 0->0 score 0.77->0.79
+corner d=3.0 th=   0 v3 | first differ t= 5.0s dfront ttc 0.97 / oracle 0.97 m | differ 0.50 | crossed 0->0 score 0.69->0.63
+corner d=3.0 th=  30 v1 | first differ t= 6.6s dfront ttc 0.82 / oracle 0.82 m | differ 0.33 | crossed 0->0 score 0.91->0.94
+corner d=3.0 th=  30 v3 | first differ t= 6.8s dfront ttc 0.54 / oracle 0.54 m | differ 0.32 | crossed 0->0 score 0.82->0.83
+corner d=3.0 th=  60 v1 | first differ t= 2.3s dfront ttc 0.87 / oracle 0.87 m | differ 0.67 | crossed 0->0 score 0.94->0.67
+corner d=3.0 th=  60 v3 | first differ t= 1.9s dfront ttc 1.04 / oracle 1.04 m | differ 0.71 | crossed 0->0 score 0.88->0.61
+wall   d=1.0 th=   0 v1 | first differ t= 0.1s dfront ttc 0.69 / oracle 0.69 m | differ 0.98 | crossed 0->0 score 0.47->0.18
+wall   d=1.0 th=   0 v3 | first differ t= 0.5s dfront ttc 1.00 / oracle 1.00 m | differ 0.92 | crossed 0->0 score 0.16->0.24
+wall   d=1.0 th=  30 v1 | first differ t= 1.1s dfront ttc 0.84 / oracle 0.84 m | differ 0.87 | crossed 0->0 score 0.15->0.54
+wall   d=1.0 th=  30 v3 | first differ t= 0.3s dfront ttc 1.05 / oracle 1.05 m | differ 0.96 | crossed 0->0 score 0.06->0.44
+wall   d=1.0 th=  60 v1 | first differ t= 3.6s dfront ttc 1.08 / oracle 1.08 m | differ 0.60 | crossed 0->0 score 0.29->0.87
+wall   d=1.0 th=  60 v3 | first differ t= 1.1s dfront ttc 1.45 / oracle 1.45 m | differ 0.86 | crossed 0->0 score 0.00->0.77
+wall   d=1.5 th=   0 v1 | first differ t= 2.3s dfront ttc 0.83 / oracle 0.83 m | differ 0.77 | crossed 0->0 score 0.40->0.57
+wall   d=1.5 th=   0 v3 | first differ t= 1.4s dfront ttc 0.88 / oracle 0.88 m | differ 0.86 | crossed 0->0 score 0.64->0.42
+wall   d=1.5 th=  30 v1 | first differ t= 2.1s dfront ttc 0.86 / oracle 0.86 m | differ 0.74 | crossed 0->0 score 0.25->0.67
+wall   d=1.5 th=  30 v3 | first differ t= 1.3s dfront ttc 1.03 / oracle 1.03 m | differ 0.87 | crossed 0->0 score 0.19->0.50
+wall   d=1.5 th=  60 v1 | first differ t= 5.7s dfront ttc 1.11 / oracle 1.11 m | differ 0.41 | crossed 0->0 score 0.55->0.93
+wall   d=1.5 th=  60 v3 | first differ t= 3.8s dfront ttc 1.29 / oracle 1.29 m | differ 0.60 | crossed 0->0 score 0.47->0.74
+wall   d=2.0 th=   0 v1 | first differ t= 3.8s dfront ttc 0.75 / oracle 0.75 m | differ 0.61 | crossed 0->0 score 0.52->0.62
+wall   d=2.0 th=   0 v3 | first differ t= 2.4s dfront ttc 0.89 / oracle 0.89 m | differ 0.76 | crossed 0->0 score 0.62->0.51
+wall   d=2.0 th=  30 v1 | first differ t= 3.0s dfront ttc 0.84 / oracle 0.84 m | differ 0.69 | crossed 0->0 score 0.37->0.65
+wall   d=2.0 th=  30 v3 | first differ t= 3.2s dfront ttc 0.95 / oracle 0.95 m | differ 0.68 | crossed 0->0 score 0.39->0.55
+wall   d=2.0 th=  60 v1 | first differ t= 6.2s dfront ttc 1.15 / oracle 1.15 m | differ 0.38 | crossed 0->0 score 0.67->0.95
+wall   d=2.0 th=  60 v3 | first differ t= 4.3s dfront ttc 1.42 / oracle 1.42 m | differ 0.53 | crossed 0->0 score 0.38->0.74
+wall   d=3.0 th=   0 v1 | first differ t= 6.8s dfront ttc 0.81 / oracle 0.81 m | differ 0.32 | crossed 0->0 score 0.84->0.85
+wall   d=3.0 th=   0 v3 | first differ t= 4.9s dfront ttc 1.03 / oracle 1.03 m | differ 0.49 | crossed 0->0 score 0.72->0.78
+wall   d=3.0 th=  30 v1 | first differ t= 6.1s dfront ttc 0.78 / oracle 0.78 m | differ 0.39 | crossed 0->0 score 0.70->0.84
+wall   d=3.0 th=  30 v3 | first differ t= 5.4s dfront ttc 0.93 / oracle 0.93 m | differ 0.46 | crossed 0->0 score 0.58->0.69
+wall   d=3.0 th=  60 v1 | first differ t= 9.8s dfront ttc 1.07 / oracle 1.07 m | differ 0.02 | crossed 0->0 score 0.89->0.89
+wall   d=3.0 th=  60 v3 | first differ t= 8.6s dfront ttc 1.19 / oracle 1.19 m | differ 0.14 | crossed 0->0 score 1.06->1.06
+
+paired cases (the 6 test starts TTC v1 crossed): controller | turn starts (first non-goal command) | commands used (index: share) | min clearance | progress | crossed
+wall d=1.0 th=30.0 v1 (goal command 0)
+   ttc v2      | turn 1.1 s | 4: 0.46, 0: 0.36, 11: 0.18 | +0.12 | 0.15 | 0
+   oracle 0.5s | turn 2.1 s | 0: 0.31, 18: 0.21, 19: 0.20, 20: 0.18 | +0.18 | 0.60 | 0
+   oracle 1s   | turn 1.6 s | 18: 0.39, 0: 0.26, 21: 0.10, 20: 0.09 | +0.29 | 0.54 | 0
+wall d=1.0 th=60.0 v1 (goal command 0)
+   ttc v2      | turn 3.6 s | 0: 0.47, 4: 0.37, 11: 0.16 | +0.12 | 0.29 | 0
+   oracle 0.5s | turn 4.4 s | 0: 0.66, 19: 0.11, 18: 0.10, 20: 0.06 | +0.17 | 0.86 | 0
+   oracle 1s   | turn 3.9 s | 0: 0.66, 18: 0.17, 15: 0.05, 19: 0.05 | +0.30 | 0.87 | 0
+wall d=1.0 th=60.0 v3 (goal command 1)
+   ttc v2      | turn 1.1 s | 4: 0.53, 1: 0.26, 11: 0.21 | +0.03 | 0.00 | 0
+   oracle 0.5s | turn 2.2 s | 1: 0.42, 3: 0.15, 18: 0.12, 19: 0.09 | +0.19 | 0.71 | 0
+   oracle 1s   | turn 1.7 s | 1: 0.33, 3: 0.31, 18: 0.17, 20: 0.11 | +0.26 | 0.77 | 0
+wall d=1.5 th=30.0 v1 (goal command 0)
+   ttc v2      | turn 2.1 s | 4: 0.40, 0: 0.37, 11: 0.23 | +0.13 | 0.25 | 0
+   oracle 0.5s | turn 3.2 s | 0: 0.44, 18: 0.21, 19: 0.16, 20: 0.09 | +0.15 | 0.64 | 0
+   oracle 1s   | turn 2.7 s | 0: 0.38, 18: 0.36, 19: 0.07, 20: 0.06 | +0.26 | 0.67 | 0
+wall d=1.5 th=30.0 v3 (goal command 1)
+   ttc v2      | turn 1.3 s | 4: 0.44, 1: 0.30, 11: 0.26 | +0.13 | 0.19 | 0
+   oracle 0.5s | turn 2.6 s | 1: 0.39, 18: 0.18, 20: 0.16, 19: 0.11 | +0.15 | 0.53 | 0
+   oracle 1s   | turn 2.1 s | 18: 0.46, 1: 0.21, 21: 0.13, 15: 0.08 | +0.25 | 0.50 | 0
+wall d=1.5 th=60.0 v3 (goal command 1)
+   ttc v2      | turn 3.8 s | 1: 0.47, 4: 0.31, 11: 0.22 | +0.04 | 0.47 | 0
+   oracle 0.5s | turn 4.9 s | 1: 0.71, 18: 0.11, 3: 0.07, 20: 0.03 | +0.19 | 0.81 | 0
+   oracle 1s   | turn 4.4 s | 1: 0.53, 15: 0.15, 18: 0.12, 20: 0.11 | +0.30 | 0.74 | 0

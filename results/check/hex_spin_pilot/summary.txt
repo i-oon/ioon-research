@@ -1,0 +1,23 @@
+recipe (turn_s0.56 recipe with a0 / spin / pace changed) | Froude forward / lateral / yaw (mean over frames 20-65) | std
+a0 0 spin +0.3 cycles 6 | -0.065 +0.011 -0.041 | 0.012 0.021 0.004
+a0 0 spin +0.5 cycles 6 | -0.063 +0.002 -0.073 | 0.010 0.016 0.004
+a0 0 spin +0.8 cycles 6 | -0.059 +0.003 -0.109 | 0.008 0.013 0.004
+a0 0 spin -0.5 cycles 6 | -0.030 +0.004 +0.046 | 0.006 0.019 0.004
+a0 0 spin +0.3 cycles 8.8 | -0.054 -0.049 -0.048 | 0.005 0.022 0.008
+a0 0 spin +0.5 cycles 8.8 | -0.065 -0.083 -0.077 | 0.011 0.015 0.005
+a0 0 spin +0.8 cycles 8.8 | -0.061 -0.083 -0.129 | 0.016 0.013 0.008
+a0 0 spin -0.5 cycles 8.8 | -0.029 -0.015 +0.099 | 0.008 0.017 0.003
+recipe (turn_s0.56 recipe with a0 / spin / pace changed) | Froude forward / lateral / yaw (mean over frames 20-65) | std
+a0 0.05 spin +0.5 cycles 6 | -0.006 +0.005 -0.071 | 0.007 0.012 0.006
+a0 0.05 spin +0.8 cycles 6 | -0.019 +0.029 -0.114 | 0.009 0.011 0.004
+a0 0.05 spin -0.5 cycles 6 | +0.004 -0.008 +0.055 | 0.010 0.012 0.004
+a0 0.05 spin -0.8 cycles 6 | +0.002 -0.038 +0.092 | 0.010 0.011 0.004
+a0 0.05 spin -0.95 cycles 6 | +0.009 -0.034 +0.110 | 0.006 0.018 0.007
+a0 0.1 spin +0.5 cycles 6 | +0.028 +0.013 -0.065 | 0.006 0.015 0.007
+a0 0.1 spin +0.8 cycles 6 | +0.033 +0.044 -0.114 | 0.008 0.010 0.005
+a0 0.1 spin -0.5 cycles 6 | +0.034 -0.009 +0.054 | 0.007 0.013 0.006
+a0 0.1 spin -0.8 cycles 6 | +0.038 -0.055 +0.095 | 0.012 0.012 0.005
+a0 0.1 spin -0.95 cycles 6 | +0.044 -0.066 +0.117 | 0.009 0.017 0.008
+recipe (turn_s0.56 recipe with a0 / spin / pace changed) | Froude forward / lateral / yaw (mean over frames 20-65) | std
+a0 0.05 spin -0.67 cycles 6 | +0.017 -0.018 +0.075 | 0.008 0.013 0.004
+a0 0.05 spin +0.9 cycles 6 | -0.017 +0.032 -0.125 | 0.009 0.011 0.003

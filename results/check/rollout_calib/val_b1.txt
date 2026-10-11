@@ -1,0 +1,16 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+72 groups; branches per group: {24: 72}
+checkpoint trained on grayscale frames: encoder switched to grayscale (VJEPA_GRAY=1)
+Loading weights:   0%|          | 0/843 [00:00<?, ?it/s]Loading weights: 100%|██████████| 843/843 [00:00<00:00, 16600.30it/s]
+  12/72 groups
+  24/72 groups
+  36/72 groups
+  48/72 groups
+  60/72 groups
+  72/72 groups
+
+=== B: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.87 / 0.77 / 0.62
+  FTM cf  0.95 / 0.92 / 0.43
+  direct  0.98 / 0.98 / 0.44
+dump -> results/check/rollout_calib/val_b1.npz

@@ -1,5 +1,8 @@
 # scripts
 
+> 2026-10-12: 27 scripts of dropped directions (babbling, random rooms, beh24-era builders, 4-leg, alignment) were MOVED
+> to `scripts/_archive/` (same relative paths; list + reason in `scripts/_archive/README.md`). Nothing was deleted.
+
 Every file here has a docstring stating the question it answers and, where it matters, the
 measurement trap it exists to avoid. Read that before running one — several of these exist because
 an earlier, more obvious version of the same measurement gave a confidently wrong answer.
@@ -117,7 +120,7 @@ exception, and says so in the file: the broken bodies are its subject.
 |---|---|
 | `fit_4leg_head.py` | Fit a new output head on a held-out embodiment with the backbone frozen. |
 | `fit_b1_head.py` | The same on the B1, using a Stage 1 checkpoint so the quadruped is genuinely held out. `--stratify` matches velocities across the split; `--z_modes` ablates the latent, which is what showed the transfer travels entirely through `z` (F43). |
-| `sweep_4leg_fewshot.py` | The same, swept over how many clips the new head gets. |
+| `sweep_4leg_fewshot.py` (ARCHIVED -> `_archive/diagnostics/cross_embodiment/`) | The same, swept over how many clips the new head gets. |
 | `finetune_ftm.py` | Adapts the forward model to a target robot with a few clips; the source of the few-shot adaptation curve (F45). |
 
 **`objective_experiments/`** — is the action channel necessary, and can the model recover it at all,
@@ -207,8 +210,27 @@ kept out of the `diagnostics/` package (no cross-imports touch them).
 | `diagnostics/wall_pilot/b1_wall_pilot.py` | B1 walking straight at a wall (original rooms): render, contact sheet, probe of wall distance from real and FTM-predicted embeddings vs "copy the current frame" (F328). |
 | `diagnostics/objective_experiments/readout_channels.py` | Per-channel slope / offset / r / within-state selection of the reads in a `counterfactual_readout.py --dump` (F329). |
 | `diagnostics/objective_experiments/selection_eval.py --roll_window --read_skip --phase_align` | Rollout read-out window, dropped first imagined steps (F329: worse), gait-phase-matched candidate commands (F330: better). |
-| `run/physics_orig_b1.sh`, `run/physics_orig_hex.sh` | Physics loops in the ORIGINAL rooms (`--orig_room`); hexapod with `--cpg_clock` (one CPG gait clock, 4-frame cross-fade, F323 fix; rollout reads candidates at the matching gait phase, F330). Env `CK`, `OUT`, `MECHS`. |
+| `run/physics_orig_b1.sh`, `run/physics_orig_hex.sh` | Physics loops in the ORIGINAL rooms (`--orig_room`); hexapod with `--cpg_clock` (one CPG gait clock, 4-frame cross-fade, F323 fix; rollout reads candidates at the matching gait phase, F330). Env `CK`, `OUT`, `MECHS`, `REPLAN`; **`GA=imagined` is the documented rollout setting from 2026-10-11** (`--goal_align imagined`, F342: rollout compares its read with the goal over the labels its imagined window was trained on; default `centre` = older runs). `CALIB` / `--calib` = **REJECTED (F341), off by default; do not use**. |
 | `run/_archive/` | Scripts of directions dropped 2026-10-09: random-size rooms (`physics_rr_*`), babbling (`b1_babble_*`, `b1_sbabble_grid`), old augmentation pilot, one-off checks (`controlled_turn056_*`, `b1_rooms_adapt`, `b1_tuned_control`). Kept for the FINDINGS they produced; their `rr_*` data is deleted. |
+
+## Added 2026-10-11 / 12
+
+**Status legend:** CURRENT = part of the pipeline; DIAGNOSTIC = one-off measurement behind a FINDINGS entry; REJECTED =
+behind a rejected experiment, kept for the record, never used in the pipeline.
+
+| script | status | purpose | modes / inputs -> outputs |
+|---|---|---|---|
+| `dataset/collect_b1_wall_data.py` | CURRENT (data design approved 2026-10-12; full collection not run) | B1 wall data, `doc/DATA_PLAN.md` section 13: APPROACH-ESCAPE episodes (approach wall / corner -> make room -> turn on the spot by a random small / medium / sharp amount -> walk out -> next nearby wall; episodes hold only complete escapes) + BRANCHES (exact MuJoCo state at ~1.0 / ~0.6 m, every command held 3 s, cut at the boundary crossing). 28 commands = 24 tuned + 4 spins (`SPINS`, `commands28`). Original B1 room (17.65 m), virtual boundary, footprint 1.13 x 0.47 m; per-frame `clearance`, `status` 0 SAFE / 1 NEAR (< 0.15 m = 0.13 body lengths) / 2 CROSSED, `first_near_frame`, `cross_frame`; episodes also `phase`, `escapes` log | `physics --split S --n N --ep0 E --look0 L` -> `data/wall_b1/_physics/S/` (no frames, CPU); `render --split S --ports P..` -> `data/wall_b1/S/` (own CoppeliaSim); `review`, `branchgrid`, `allo` (allocentric top-down cross-check) -> `results/check/wall_data_pilot/review_S/`; `stats`, `sep --h H` (physics-only: crossings / escapes / coverage; true-future separability = UPPER BOUND, not model evidence) -> `results/check/wall_data_pilot/stats_S/`. `pilot` and `episode()` = superseded first controller (24 commands), kept for the record |
+| `diagnostics/wall_pilot/hex_spin_pilot.py` | DIAGNOSTIC (feeds the c10 wall collector, not built yet) | can the c10 CPG turn on the spot at B1's spin Froude? Sweeps the turn recipe's `a0` / `spin` / pace, runs `collect_ik.py --plan --record_state`, measures Froude with the training label code | `--port P --a0 .. --spin .. --pace ..` -> `results/check/hex_spin_pilot/summary.txt` (matched: a0 0.05, 6 cycles, spin -0.67 / -0.95 / +0.50 / +0.80) |
+| `diagnostics/wall_pilot/b1_wall_feasibility.py` | CURRENT library + DIAGNOSTIC (F332) | geometry used by the wall collector (`clearance`, `front_dist`, `footprint`, `commands`, `start_state`, constants `H`, `FOOT_L/W`); its own main = TTC rule vs one-action oracle feasibility pilot | imported; standalone -> `results/check/wall_feasibility*/` |
+| `diagnostics/wall_pilot/b1_wall_predcheck.py`, `b1_wall_predcheck_data.py`, `b1_wall_predcheck_data_v2.py` | DIAGNOSTIC (F334, F338) | first wall prediction check (constant command held 2 s; readouts R_real / R_imag vs copy and command-only); the protocol is reused for the new data, the code will need the 28-command / per-frame-label update | `data/wall_predcheck*/` -> `results/check/wall_predcheck*/` |
+| `diagnostics/objective_experiments/fit_rollout_calib.py` | REJECTED (F341) | fits a per-channel de-shrink of the rollout read on validation branches (`--calib` JSON) -- made everything but the strong-turn onset worse | `val dump .npz body out.json` |
+| `diagnostics/objective_experiments/z_yaw_probe.py` | DIAGNOSTIC (F340) | linear probe z -> Froude vs the Froude head: the read "shrink" is MSE regression to the mean (slope ~ r^2) | checkpoint -> printed table |
+| `diagnostics/egocentric_view/yaw_vs_corner.py` | DIAGNOSTIC (F336 era) | does yaw read depend on corners / room geometry in view | -> printed table |
+
+**Not built yet** (the wall pipeline is NOT runnable end to end): wall-data loader into training (28 commands), clearance
+head + imagined-clearance loss, c10 wall collector, stratified 14-of-28 train selection + per-split start-state / episode
+/ look report, current-image selector and direct risk predictor baselines, planner score with wall risk.
 
 ## figures/
 
@@ -219,11 +241,11 @@ literal**, so a figure cannot drift away from the run it describes.
 |---|---|
 | `plot_adapt_objective.py` | The adaptation-objective result: MSE on chance, InfoNCE well above it, one point per recorded goal clip (F103). |
 | `plot_ftm_fewshot.py` | How many clips of a new robot adapt the forward model, and to what horizon. |
-| `plot_4leg_fewshot_and_ablation.py` | The 4-leg head fit against clip count, with the latent ablated. |
+| `plot_4leg_fewshot_and_ablation.py` (ARCHIVED -> `_archive/figures/`) | The 4-leg head fit against clip count, with the latent ablated. |
 | `plot_body_head_design.py`, `plot_cross_loss_effect.py` | What each added loss term buys and costs. |
 | `plot_morphology_evidence.py`, `plot_z_umap.py` | The encoder's morphology readout, and the latent's layout. |
 | `plot_obs_format.py`, `plot_ik_intuition.py` | Explanatory, not measurements. |
-| `make_track_figures.py`, `make_stage2_diagram.py` | Pipeline diagrams. |
+| `make_track_figures.py`, `make_stage2_diagram.py` (ARCHIVED -> `_archive/figures/`) | Pipeline diagrams. |
 
 ## dataset/, continued
 
@@ -251,8 +273,8 @@ itself. Not part of any current workflow.
 `test_vjepa2_encoder.py`, `test_vjepa2_frame_isolation.py`, `step0_macro_f1.py`,
 `temporal_similarity.py`, `plot_sanity_check.py`, `plot_step_minus1.py`,
 `inspect_b1_coppelia_scene.py`, `state_head_ceiling.py`, `per_channel_goal_read.py`,
-`sweep_b1_coppelia_babble.py`, `clip_budget_curve.py`, `offset_fix_check.py`,
-`train_froude_head.py`, `refit_b1_babble_projector.py` (this second group moved from
+`sweep_b1_coppelia_babble.py` (ARCHIVED), `clip_budget_curve.py`, `offset_fix_check.py`,
+`train_froude_head.py`, `refit_b1_babble_projector.py` (ARCHIVED) (this second group moved from
 `diagnostics/objective_experiments/` on 2026-09-23: each was grep-checked against `doc/FINDINGS.md`,
 every other script, and every `run/*.sh` first, and matched nothing).
 

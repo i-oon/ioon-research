@@ -623,3 +623,146 @@ instead: brightness, texture and lighting.
 **4. Later:** a robot with no controller (four-legged hexapod, CPG babbling), random candidates.
 
 ☐ rollout on the strongest turn: per-candidate read  ☐ wall data: design  ☐ view randomisation: planned  ☐ paper outline (IROS, 8 pages)
+
+---
+---
+
+# Weekly Update: 2026-10-15 (draft)
+
+Period: 2026-10-09 to 2026-10-15. Every model below: joint pretraining (six-legged hexapod + B1) with branches, original
+rooms, the same number of steps; one seed unless marked.
+
+## This week's question
+
+- Last week: rollout came close to direct on average, but in the physics loop it failed the turn goals.
+- This week: (1) why the imagined futures lose the turn, (2) make the model read the view less by room, (3) can a world model
+  avoid a wall that a blind controller hits?
+
+---
+
+## Rollout failed because the imagined motion was shrunk
+
+From one state, the 24 commands lead to different motions. The motion read from each command's imagined future spread only
+part of the true differences.
+
+Metric: slope of the read against the true motion across the 24 commands of one state (1 = right size), held-out branches,
+six-legged hexapod.
+
+| read of | forward | lateral | yaw |
+|---|---|---|---|
+| the command (direct) | 1.13 | 1.14 | 0.80 |
+| the real future | 0.54 | 0.27 | 0.42 |
+| the imagined future (rollout) | 0.42 | 0.39 | 0.18 |
+
+- Goals at the edge of the range (strong turn) cannot be reached by shrunk reads; rollout then picks commands that match
+  another channel (fast forward walking).
+- Re-scaling the read, imagining further ahead or reading later imagined steps did not help.
+
+---
+
+## View randomisation (grayscale + image augmentation, as Egocentric VSM)
+
+Training frames converted to grayscale; random brightness ×1/3–3, contrast ±40 %, blur and noise; crop kept small (85–100 %),
+since zoom changes the apparent speed. Same data, same steps.
+
+Metric: normalised score (0 = random candidate, 1 = best candidate in hindsight); Pearson r of the read across the 24 commands.
+
+| | colour | grayscale + augmentation |
+|---|---|---|
+| B1 goal read from video, direct / rollout | +0.84 / +0.63 | +0.89 / +0.68 |
+| B1 real-future read (forward / lateral / yaw) | 0.86 / 0.73 / 0.64 | 0.90 / 0.80 / 0.68 |
+| B1 imagined-future read, yaw | 0.42 | 0.23 |
+
+- Reading the real video improves and depends less on the room.
+- The imagined turning gets worse: the imagination, not the reading, now limits rollout.
+- Rendering every clip in 4 shared room looks instead of one room each (behaviour not tied to the room) was slightly worse
+  (fewer room looks): not pursued.
+
+---
+
+## Training the imagination to carry the motion
+
+New training term: roll the forward model 4 steps (1 s) from the real frame and require the motion read from every imagined
+step to match the true motion of that step. Only the forward model learns from it (the reader is held fixed), so the action
+latent keeps its meaning.
+
+Metric: normalised score, rollout from the robot's current frame; Pearson r of the imagined-future read (forward / lateral / yaw).
+
+| | without | with the imagination term |
+|---|---|---|
+| six-legged hexapod, direct / rollout | +0.92 / +0.69 | +0.92 / **+0.82** |
+| shorter-legged hexapod (never trained), direct / rollout | +0.89 / +0.69 | +0.89 / **+0.81** |
+| B1, direct / rollout | +0.95 / +0.76 | +0.93 / **+0.87** |
+| imagined-future read, six-legged hexapod | 0.82 / 0.79 / 0.31 | 0.93 / 0.83 / 0.52 |
+| imagined-future read, B1 | 0.91 / 0.84 / 0.23 | 0.95 / 0.92 / 0.37 |
+
+Per goal, six-legged hexapod, rollout, error E (mean L2 between achieved and goal Froude, lower is better):
+
+| goal | without | with | direct |
+|---|---|---|---|
+| strong turn | 0.131 | **0.043** | 0.035 |
+| sideways left | 0.117 | **0.027** | 0.021 |
+| mild turn | 0.072 | 0.050 | 0.052 |
+
+---
+
+## Physics closed loop
+
+Every 2 frames the planner picks one of the body's library clips; hexapods driven by their gait generator on one continuous
+gait clock. Metric: error E (lower is better), mean over the goals.
+
+| body | direct | rollout, without | rollout, with the imagination term |
+|---|---|---|---|
+| B1 | 0.038 | 0.062 | **0.048** |
+| six-legged hexapod | 0.050 | 0.065 | 0.062 |
+| shorter-legged hexapod | 0.049 | 0.066 | 0.088 |
+
+Strong-turn goal, six-legged hexapod, 5 starts each (error E):
+
+| start | direct | rollout |
+|---|---|---|
+| walking straight | 0.027 | 0.158 |
+| already turning | 0.024 | 0.102 |
+| mild turn goal, any start | 0.038–0.044 | 0.029–0.048 |
+
+- Rollout follows the mild turn, sideways and speed goals in physics; the strong turn on the hexapods still fails.
+- Yaw read from the frames is about half its true size (about 0.3× right after a command change), so for the strong turn the
+  fast forward commands match the goal's forward speed better than the turn matches its yaw.
+
+---
+
+## Wall avoidance: does the task need prediction?
+
+Feasibility in simulation, B1, 48 paired starts near a wall or a corner, the same 24 commands, decision every 0.1 s.
+Metric: crossing rate; progress = mean forward speed / goal speed (0 if crossed).
+
+| controller | crossings | progress |
+|---|---|---|
+| direct (no view) | 0.96 | 0.04 |
+| distance + closing-speed rule (simulator distance) | 0.00 | 0.51 |
+| true-future oracle, 0.5 / 1 / 2 s look-ahead | 0.00 | 0.61 / 0.58 / 0.57 |
+
+- A blind controller crashes; a rule that knows the distance avoids every wall here. The true future keeps more progress,
+  mostly by stepping sideways along the wall.
+Prediction check, held-out starts where the safe side changes (wall, corner left / right, headings -45 / 0 / +45 deg).
+Metric: rank correlation across the 24 commands between the clearance read from each command's future and the true clearance.
+
+| clearance read from | 0.5 s | 1 s | 2 s |
+|---|---|---|---|
+| the real future frames | 0.43 | 0.58 | 0.71 |
+| knowing only which command it is + the current distance | 0.47 | 0.51 | 0.56 |
+| the imagined future | 0.30–0.32 | 0.41–0.44 | 0.50–0.55 |
+
+- The real future carries information about the wall beyond the command; the imagined future does not reach it yet. The
+  training data never has the robot near a wall.
+
+---
+
+## Next
+
+| | question |
+|---|---|
+| second seed of the imagination term | does the rollout gain hold? |
+| imagination over 2 s (8 steps) | does the strong turn's yaw reach its size? |
+| wall data in training (robot approaching walls, several commands per state) | does the imagination learn which side is free? |
+| wall closed loop | only after the prediction check passes |
