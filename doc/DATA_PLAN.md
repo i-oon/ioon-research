@@ -419,6 +419,12 @@ with the deterministic scene-reuse procedure), sized to `c10_branches_train`; pi
    Froude read is past it, as in every current rollout -- unchanged, stated in the write-up.)
    No 1.25 s head on a 3-5 s crossing label. Physics clearance is a training label only, never an inference input.
 
+3. ABLATION (user 2026-10-12): episodes only (complete escapes, NO branches): does a world model that never sees the
+   failing commands still tell them apart? Expected no (it predicts the usual good outcome for every command, as before
+   branches, Result 1) -> evidence that counterfactual data WITH failures is what makes rollout useful at the wall.
+   Design decision: world model = consequences of every command (good and bad, method A); the planner judges good / bad
+   (Froude goal + clearance). Uncertainty-based avoidance (ensembles) = future work.
+
 **Baselines for wall risk (same data, candidates, horizon, test starts):**
 (a) head fitted on REAL future embeddings, applied to imagined ones; (b) head trained to read clearance from IMAGINED
 embeddings (run 2); (c) DIRECT action-conditioned risk: current embedding + candidate command -> future clearance /

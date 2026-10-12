@@ -479,6 +479,20 @@ def _arr(recs, f, dtype=np.float32):
 # selection); every unsafe label states its time window (first_near_frame / cross_frame -> "within 3 s of the branch"
 # vs "within the predicted 1.25 s" are computed separately, never interchanged).
 MARGIN = 0.15
+# Distance unit of the shared report / stats / review code: B1 metres x DIST_SCALE (= 1 for B1; the c10 collector sets
+# 0.82 / 1.13 so bands and the corner rule are the same in BODY LENGTHS). CORNER_M: second wall within this (x scale)
+# + half the footprint = corner state.
+DIST_SCALE = 1.0
+CORNER_M = 1.5
+
+
+def band_of(sc):
+    k = DIST_SCALE
+    return "0.4-0.8" if sc < 0.8 * k else "0.8-1.2" if sc < 1.2 * k else "1.2-2.0"
+
+
+def is_corner(dw_sorted):
+    return dw_sorted[1] < CORNER_M * DIST_SCALE + F.FOOT_L / 2
 MARGIN_BODY_LENGTHS = 0.13
 STATUS_NAMES = ("safe", "near", "crossed")
 
@@ -721,7 +735,7 @@ def do_stats(a):
                 cr.append((int(x["cross_frame"]) - PREFIX + 1) * 0.05 if bool(x["crossed"]) else np.inf)
             x0 = np.load(fs[0], allow_pickle=True); sc = float(x0["start_clearance"]); j0 = int(x0["branch_frame"])
             cr = np.array(cr); esc = int((cr == np.inf).sum())
-            band = "0.4-0.8" if sc < 0.8 else "0.8-1.2" if sc < 1.2 else "1.2-2.0"
+            band = band_of(sc)
             tot[(band, "states")] += 1; tot[(band, "no escape")] += int(esc == 0); tot[(band, "escapes")] += esc
             tot[(band, "crossings 3s")] += len(cr) - esc
             fe = collections.Counter(fam[i] for i in range(len(cr)) if cr[i] == np.inf)
@@ -803,7 +817,7 @@ def do_sep(a):
          f"(base rate {y.mean():.2f})",
          "NOTE: features are the TRUE state at the horizon (physics) -- an upper bound on what an imagined future could "
          "carry, NOT evidence that the FTM predicts it"]
-    for lo, hi in ((0.4, 0.8), (0.8, 1.2), (1.2, 2.0)):
+    for lo, hi in ((0.4 * DIST_SCALE, 0.8 * DIST_SCALE), (0.8 * DIST_SCALE, 1.2 * DIST_SCALE), (1.2 * DIST_SCALE, 2.0 * DIST_SCALE)):
         m_ = (sc0 >= lo) & (sc0 < hi); S_ = sorted(set(st[m_]))
         if not S_:
             continue
@@ -858,7 +872,7 @@ def do_branchgrid(a):
         x = np.load(f, allow_pickle=True); bp = x["base_pos"][PREFIX - 1]; yw = F.yaw_of(x["base_quat"][PREFIX - 1])
         dw = [F.H - bp[0], F.H + bp[0], F.H - bp[1], F.H + bp[1]]; w = int(np.argmin(dw))
         ang = abs(np.degrees(np.angle(np.exp(1j * (yw - (0, np.pi, np.pi / 2, -np.pi / 2)[w])))))
-        info[f[:-8]] = (float(x["start_clearance"]), ang, sorted(dw)[1] < 1.5 + F.FOOT_L / 2)
+        info[f[:-8]] = (float(x["start_clearance"]), ang, is_corner(sorted(dw)))
     if not info:
         print("no branch files"); return
     pick = {"head-on, close": min((k for k in info if info[k][1] < 30), key=lambda k: info[k][0], default=None),
@@ -946,7 +960,7 @@ def do_allo(a):
         x = np.load(f, allow_pickle=True); bp = x["base_pos"][PREFIX - 1]; y0 = F.yaw_of(x["base_quat"][PREFIX - 1])
         dw = [F.H - bp[0], F.H + bp[0], F.H - bp[1], F.H + bp[1]]; w = int(np.argmin(dw))
         ang = abs(np.degrees(np.angle(np.exp(1j * (y0 - (0, np.pi, np.pi / 2, -np.pi / 2)[w])))))
-        info[f[:-8]] = (float(x["start_clearance"]), ang, sorted(dw)[1] < 1.5 + F.FOOT_L / 2)
+        info[f[:-8]] = (float(x["start_clearance"]), ang, is_corner(sorted(dw)))
     pick = {"head-on_close": min((k for k in info if info[k][1] < 30), key=lambda k: info[k][0], default=None),
             "back_to_wall": max(info, key=lambda k: info[k][1]) if info else None,
             "corner": min((k for k in info if info[k][2]), key=lambda k: info[k][0], default=None)}
@@ -1052,8 +1066,8 @@ def do_report(a):
             x = np.load(f, allow_pickle=True); bp = x["base_pos"]; yw = F.yaw_of(x["base_quat"][PREFIX - 1]); p0 = bp[PREFIX - 1, :2]
             dw = [F.H - p0[0], F.H + p0[0], F.H - p0[1], F.H + p0[1]]; w = int(np.argmin(dw))
             ang = abs(np.degrees(np.angle(np.exp(1j * (yw - (0, np.pi, np.pi / 2, -np.pi / 2)[w])))))
-            grp = "corner" if sorted(dw)[1] < 1.5 + F.FOOT_L / 2 else ("head-on" if ang < 30 else "oblique")
-            sc = float(x["start_clearance"]); band = "0.4-0.8" if sc < 0.8 else "0.8-1.2" if sc < 1.2 else "1.2-2.0"
+            grp = "corner" if is_corner(sorted(dw)) else ("head-on" if ang < 30 else "oblique")
+            sc = float(x["start_clearance"]); band = band_of(sc)
             cov[(band, grp)] += 1; speeds.append(float(np.linalg.norm(bp[PREFIX - 1, :2] - bp[PREFIX - 6, :2]) / 0.25))
             stem = f[:-8]; files = sorted(glob.glob(stem + "_c*.npz"))
             if keep is not None:

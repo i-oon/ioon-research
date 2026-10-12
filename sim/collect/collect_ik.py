@@ -884,7 +884,8 @@ def drive_and_record(sim, scene, cmds, travel, warmup, cam_dx=0.0, cam_dy=0.0, s
             if ego:
                 _st["cam_pose"].append(sim.getObjectPose(cam, sim.handle_world))
         if policy is not None:
-            observation = frames[-1]
+            # a pose-driven policy on a physics-only run (capture_frames=False) gets no image (2026-10-12, wall collector)
+            observation = frames[-1] if frames else None
         actions.append(step_cmd[active_cols].copy())
         forces.append(read_forces(sim, force_h))
         heads.append(p)

@@ -9641,3 +9641,41 @@ Seed 1 (`round1_branches_s1_gray_imread`, other PC) rerun with the fix 2026-10-1
 direct / rollout B1 recorded +0.93 / +0.86, B1 vision +0.86 / +0.70, c08 +0.90 / +0.82, c10 +0.92 / +0.83 -- vs seed 0
 (corrected) +0.93 / +0.87, +0.85 / +0.74, +0.89 / +0.81, +0.92 / +0.82: the imagination-term result reproduces across
 seeds (largest gap 0.04, B1 vision rollout). Supersedes F342's seed-1 selection numbers.
+
+### F344. Why lateral / yaw z read-outs transfer badly from the hexapod to B1: a per-body constant OFFSET in z, not missing information or a scrambled direction; per-body centring of z (no training) recovers most of it
+
+2026-10-12, `scripts/diagnostics/cross_embodiment/z_channel_transfer.py` (z exactly as `shared_latent_figure.py`: held-out
+clips, ITM z of real frame pairs, label = mean Froude over the pair), model `round1_branches_s0_gray_imread`; result
+`results/eval/round1_branches_s0_gray_imread/z_channel_transfer.txt`. Label spread matches across bodies (std c10 0.138 /
+0.098 / 0.028, B1 0.138 / 0.088 / 0.026), so the gap is not a variance artefact.
+| B1, forward / lateral / yaw | value |
+|---|---|
+| B1's OWN read-out R2 (5-fold by clip) | +0.77 / +0.63 / +0.50 (c10 own: +0.67 / +0.49 / +0.23) |
+| c10 read-out on B1: R2 | +0.64 / +0.19 / -0.31 |
+| c10 read-out on B1: correlation r | +0.88 / +0.74 / +0.61 |
+| c10 read-out on B1: offset (Froude) / slope | -0.014 / +0.041 / -0.026 ; 0.57 / 0.83 / 0.39 |
+| **per-body centred z** (each body's own mean z subtracted), c10 read-out on B1: R2 | **+0.72 / +0.41 / +0.38** |
+| same for c08 (as is -> centred) | +0.81 / +0.48 / +0.52 -> +0.81 / +0.48 / +0.51 |
+Reading: B1's z carries lateral and yaw (better than c10's own); the c10 read-out ranks them (r 0.74 / 0.61); a constant
+per-body shift (yaw offset ~ one std of B1's yaw) drives R2 below zero. Centring each body's z removes most of it
+(yaw -0.31 -> +0.38); hexapod -> hexapod unchanged (no offset between same-kind bodies). Valid here because both bodies'
+held-out clips cover the 24 behaviours equally (same mean motion). Selection is unaffected by a per-body constant (it
+compares candidates of one body), hence B1 direct / rollout +0.93 / +0.87. Earlier: Froude is already the per-body label
+normalisation (F49, F301); `center_embeddings` (per-body centring of the INPUT frame embeddings) exists, was tested in the
+stage-2 era (identity probe unchanged; "an offset wrecks linear read-outs" noted) and was never enabled since (F247) --
+this is the z-level version. Weight-vector cosines between bodies' read-outs (0.20-0.68) are not conclusive (64 correlated
+dims).
+GAIT-AVERAGED z (same script, (5): z and label averaged within each clip over 1 s = 10 samples, ~ one gait cycle, the
+label's own length -- removing the gait sway from z as the 1 s label removes it from the motion, F61), c10 read-out R2
+fwd / lat / yaw: on c08 +0.91 / +0.71 / +0.87 (raw +0.81 / +0.48 / +0.52), + centring +0.93 / +0.71 / +0.87; on B1
++0.77 / -0.80 / -2.40, + centring **+0.77 / -0.79 / +0.56**. Reading: averaging the sway out of z helps hexapod ->
+hexapod strongly; for B1 it shrinks the true variation while the per-body offset stays, so it only pays together with
+centring (yaw -0.31 -> +0.56); B1 LATERAL stays negative either way -- after the sway is removed what remains of lateral is
+each gait's own sideways drift (a body signature, F61's AUC 0.83), not shared behaviour. Forward and yaw are shareable
+between hexapod and B1; lateral is not (with this averaging).
+GAIT-SHAKE REMOVAL, the F155 method (the user's early egocentric-era idea: per clip, sin / cos at the stride frequency +
+2 harmonics fitted and subtracted, clip mean and slow changes kept; (6) in the script): c10 read-out on c08 +0.84 / +0.52
+/ +0.58; on B1 +0.61 / +0.15 / -0.32 alone, **+0.72 / +0.42 / +0.48 with per-body centring**. Modest, as in F155 (fwd
+0.45 -> 0.47, lat 0.38 -> 0.46, yaw 0.57 -> 0.61 then), but no channel is hurt -- unlike 1 s averaging, which removes real
+changes too and makes B1 lateral negative. Best balanced: gait-shake removal + per-body centring (B1 +0.64 / +0.19 / -0.31
+-> +0.72 / +0.42 / +0.48). No training. Not yet tested: either inside training or in the shared head.

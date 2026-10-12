@@ -396,31 +396,34 @@ per channel forward / lateral / yaw (higher is better, 1 = perfect ranking).
 | **real** future, with branches | **0.90 / 0.68 / 0.86** | **0.91 / 0.69 / 0.84** | **0.86 / 0.73 / 0.64** |
 | **predicted** future, no branches | 0.57 / 0.57 / 0.26 | 0.65 / 0.56 / 0.22 | 0.54 / 0.76 / 0.34 |
 | **predicted** future, with branches | **0.85 / 0.80 / 0.41** | **0.85 / 0.76 / 0.34** | **0.83 / 0.85 / 0.42** |
+| *current model* (with branches + grayscale + imagination term): **real** future | 0.93 / 0.72 / 0.85 | 0.92 / 0.75 / 0.84 | 0.87 / 0.75 / 0.61 |
+| *current model*: **predicted** future | 0.93 / 0.83 / 0.52 | 0.93 / 0.80 / 0.50 | 0.95 / 0.92 / 0.37 |
 
 - The read of another action's real future goes from 0.1–0.5 to 0.64–0.91, including the never-trained hexapod.
-- Predicted yaw stays the weakest channel (0.34–0.42). The action projector places yaw on a direction the forward model does
-  not read; fitting the projector through the forward model raises hexapod yaw to 0.61.
+- Predicted yaw stays the weakest channel (0.34–0.42); the current model (last two rows, two later changes on top of the
+  branches, see "Randomising the view and training the imagination") raises it to 0.37–0.52.
 
 ---
 
 ## Result 2: rollout now comes close to direct
 
-Columns: joint pretraining without / with branches (two seeds); hexapod-only pretraining with B1 adapted on 44 clips.
+Columns: joint pretraining without / with branches (two seeds); the current model (with branches + grayscale + imagination
+term, two seeds agree) for reference.
 
 Metric: normalised score from error E, the mean L2 between achieved and goal Froude over the decision steps:
 (E_random − E) / (E_random − E_oracle); 0 = random candidate, 1 = best candidate in hindsight (higher is better). The
 decision span is now 21 frames (1 s, the length of the label) instead of last week's 11.
 
-| test | no branches | branches, S0 / S1 | hexapod-only, B1 adapted |
+| test | no branches | branches, S0 / S1 | current model |
 |---|---|---|---|
-| c10 direct | +0.94 | +0.92 / +0.92 | +0.93 |
-| c10 rollout (robot's current frame) | +0.59 | +0.71 / +0.68 | +0.69 |
-| c08 direct (zero-shot) | +0.91 | +0.90 / +0.90 | +0.91 |
-| c08 rollout (current frame) | +0.58 | +0.68 / +0.64 | +0.67 |
-| B1 direct | +0.97 | +0.94 / +0.94 | +0.97 |
-| B1 rollout (current frame) | +0.72 | +0.75 / +0.73 | +0.70 |
-| B1 direct, goal read from video | +0.35 | +0.84 / +0.83 | +0.83 |
-| B1 rollout, goal read from video | +0.24 | +0.63 / +0.62 | +0.57 |
+| c10 direct | +0.94 | +0.92 / +0.92 | +0.92 |
+| c10 rollout (robot's current frame) | +0.59 | +0.71 / +0.68 | **+0.82** |
+| c08 direct (zero-shot) | +0.91 | +0.90 / +0.90 | +0.89 |
+| c08 rollout (current frame) | +0.58 | +0.68 / +0.64 | **+0.81** |
+| B1 direct | +0.97 | +0.94 / +0.94 | +0.93 |
+| B1 rollout (current frame) | +0.72 | +0.75 / +0.73 | **+0.87** |
+| B1 direct, goal read from video | +0.35 | +0.84 / +0.83 | +0.85 |
+| B1 rollout, goal read from video | +0.24 | +0.63 / +0.62 | +0.74 |
 
 **Goal from the recorded motion (proprioceptive) vs goal read from the goal video**, B1, same metric:
 
@@ -431,7 +434,7 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 
 - Same setup, no branches vs with branches: rollout from the current frame c10 +0.59 → +0.71 / +0.68, c08 +0.58 → +0.68 / +0.64; B1 +0.72 → +0.75 / +0.73.
 - Reading the goal from video improves most (B1 +0.35 → +0.84).
-- A body absent from pretraining (hexapod-only, B1 adapted) is close to joint pretraining.
+- Current model (last column): rollout +0.81–0.87 on all three bodies; direct unchanged.
 - Rollout is not expected to beat direct on this test: goals and candidates are steady walking, where one command has one
   outcome.
 
