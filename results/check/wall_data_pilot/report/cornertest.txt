@@ -1,0 +1,4 @@
+=== cornertest: 12 episodes, 12 room looks, 24 independent start states, 672 branch files; approach speed median 0.50 m/s
+  0.4-0.8 m: {'head-on': 0, 'oblique': 0, 'corner': 10} | share of commands crossing 0.50, near only 0.08
+  0.8-1.2 m: {'head-on': 0, 'oblique': 0, 'corner': 13} | share of commands crossing 0.18, near only 0.11
+  1.2-2.0 m: {'head-on': 0, 'oblique': 0, 'corner': 1} | share of commands crossing 0.46, near only 0.04

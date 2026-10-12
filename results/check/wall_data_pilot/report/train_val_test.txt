@@ -1,0 +1,12 @@
+=== train: 35 episodes, 35 room looks, 157 independent start states, 2198 branch files (rendered subset); approach speed median 0.45 m/s
+  0.4-0.8 m: {'head-on': 16, 'oblique': 33, 'corner': 16} | share of commands crossing 0.39, near only 0.05
+  0.8-1.2 m: {'head-on': 14, 'oblique': 40, 'corner': 11} | share of commands crossing 0.19, near only 0.06
+  1.2-2.0 m: {'head-on': 9, 'oblique': 16, 'corner': 2} | share of commands crossing 0.25, near only 0.08
+=== val: 7 episodes, 7 room looks, 30 independent start states, 840 branch files; approach speed median 0.47 m/s
+  0.4-0.8 m: {'head-on': 4, 'oblique': 6, 'corner': 2} | share of commands crossing 0.38, near only 0.06
+  0.8-1.2 m: {'head-on': 4, 'oblique': 6, 'corner': 4} | share of commands crossing 0.12, near only 0.07
+  1.2-2.0 m: {'head-on': 2, 'oblique': 2, 'corner': 0} | share of commands crossing 0.19, near only 0.12
+=== test: 12 episodes, 12 room looks, 57 independent start states, 1596 branch files; approach speed median 0.44 m/s
+  0.4-0.8 m: {'head-on': 7, 'oblique': 13, 'corner': 5} | share of commands crossing 0.36, near only 0.04
+  0.8-1.2 m: {'head-on': 6, 'oblique': 10, 'corner': 6} | share of commands crossing 0.17, near only 0.07
+  1.2-2.0 m: {'head-on': 6, 'oblique': 3, 'corner': 1} | share of commands crossing 0.25, near only 0.06

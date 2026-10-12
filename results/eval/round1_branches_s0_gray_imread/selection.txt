@@ -6,3 +6,8 @@ library bounds (mean over conditions): oracle 0.0230  random 0.2071
 round1_branches_s0_gray_imread w=21   direct 0.0508 (gap +0.85)  roll_fixed 0.0816 (gap +0.68)  roll_live 0.0700 (gap +0.74)
 library bounds (mean over conditions): oracle 0.0230  random 0.2071
 --- selection c08 zero-shot
+round1_branches_s0_gray_imread w=21   direct 0.0479 (gap +0.89)  roll_fixed 0.0632 (gap +0.80)  roll_live 0.0625 (gap +0.81)
+library bounds (mean over conditions): oracle 0.0269  random 0.2126
+--- selection c10 same body
+round1_branches_s0_gray_imread w=21   direct 0.0561 (gap +0.92)  roll_fixed 0.0662 (gap +0.86)  roll_live 0.0729 (gap +0.82)
+library bounds (mean over conditions): oracle 0.0415  random 0.2197

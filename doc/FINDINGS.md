@@ -9618,3 +9618,26 @@ selection E direct / live rollout -- B1 recorded goal 0.035 / 0.049 (seed 0: 0.0
 (0.052 / 0.074), c08 0.045 / 0.062 (0.048 / 0.062), c10 0.056 / 0.075 (0.056 / 0.073); z-dependence hexapod 3.53x (3.31x),
 B1 3.08x (2.98x); imagined-branch yaw r (P11) c10 0.55, B1 0.33, c08 0.53 vs direct 0.78 / 0.39 / 0.78. F333 and the yaw
 weakness (F336 / F340) reproduce across seeds.
+
+### F343. Correction to F331 / F333 / F342: grayscale models' OFFLINE SELECTION rollout and vision-goal scores had been computed on colour frames; rerun with the fix, every conclusion holds (changes <= 0.03)
+
+2026-10-12. `selection_eval.py` read / filled the embedding cache BEFORE loading the checkpoint, and a grayscale checkpoint
+switches the encoder to grayscale only when it is loaded (`from_checkpoint`) -- so for `_gray` / `_gray_imread` the rollout
+and vision-goal scores used the COLOUR cache. Not affected: direct selection, counterfactual read-outs and shrink tables
+(`counterfactual_readout.py` loads the model first), physics loops (model loaded before the live camera). Fix: grayscale mode
+set from every checkpoint's config before any frame is touched; a colour + grayscale mix in one call is refused. Seed 0
+rerun (`results/eval/<name>/selection.txt`; old `selection_colourbug.txt`). Normalised score, w = 21, roll_live:
+| test | `_gray` old -> new | `_gray_imread` old -> new |
+|---|---|---|
+| B1 recorded goal (direct / rollout) | +0.95 / +0.76 -> +0.95 / +0.77 | +0.93 / +0.87 -> +0.93 / +0.87 |
+| B1 vision goal (direct / rollout) | +0.89 / +0.68 -> +0.88 / +0.71 | +0.84 / +0.72 -> +0.85 / +0.74 |
+| c08 zero-shot (direct / rollout) | +0.89 / +0.69 -> +0.89 / +0.70 | +0.89 / +0.81 -> +0.89 / +0.81 |
+| c10 (direct / rollout) | +0.92 / +0.69 -> +0.92 / +0.68 | +0.92 / +0.82 -> +0.92 / +0.82 |
+F333's imagination-term gain stands: rollout c10 +0.68 -> +0.82, c08 +0.70 -> +0.81, B1 +0.77 -> +0.87 (corrected).
+Shared latent on the grayscale models (first valid run; it had failed on a missing grayscale c08 cache): body-ID 0.56 /
+0.59, cross-body R2 c10 -> c08 +0.81 / +0.53 / +0.51 and +0.81 / +0.48 / +0.52, c10 -> B1 +0.66 / +0.01 / +0.23 and
++0.64 / +0.19 / -0.31, kNN mixing 0.44 / 0.48, retrieval c08 0.71 / 0.68, B1 0.51 / 0.38 (`_gray` / `_gray_imread`).
+Seed 1 (`round1_branches_s1_gray_imread`, other PC) rerun with the fix 2026-10-12 (grayscale mode confirmed in the log):
+direct / rollout B1 recorded +0.93 / +0.86, B1 vision +0.86 / +0.70, c08 +0.90 / +0.82, c10 +0.92 / +0.83 -- vs seed 0
+(corrected) +0.93 / +0.87, +0.85 / +0.74, +0.89 / +0.81, +0.92 / +0.82: the imagination-term result reproduces across
+seeds (largest gap 0.04, B1 vision rollout). Supersedes F342's seed-1 selection numbers.

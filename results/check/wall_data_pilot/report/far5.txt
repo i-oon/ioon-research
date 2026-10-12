@@ -1,0 +1,4 @@
+=== far5: 20 episodes, 20 room looks, 115 independent start states, 1610 branch files (rendered subset); approach speed median 0.44 m/s
+  0.4-0.8 m: {'head-on': 14, 'oblique': 20, 'corner': 12} | share of commands crossing 0.37, near only 0.05
+  0.8-1.2 m: {'head-on': 12, 'oblique': 26, 'corner': 9} | share of commands crossing 0.20, near only 0.05
+  1.2-2.0 m: {'head-on': 11, 'oblique': 11, 'corner': 0} | share of commands crossing 0.26, near only 0.06

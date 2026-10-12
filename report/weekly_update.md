@@ -329,21 +329,22 @@ Unless marked, the goal is the goal clip's recorded Froude. "Goal read from visi
 ---
 ---
 
-# Weekly Update: 2026-10-08 (draft)
+# Weekly Update: 2026-10-15 (draft)
 
-Period: 2026-10-01 to 2026-10-08. The section above (2026-09-30) is kept as it was; every number in it was measured on the
-earlier data and is superseded by the numbers below.
+Period: 2026-10-01 to 2026-10-15, one storyline. The section above (2026-09-30) is kept as it was; every number in it was
+measured on the earlier data and is superseded by the numbers below.
 
 ## Where last week ended, and this week's question
 
 - **Last week:** direct selection followed the goal; rollout did not. A model trained on one command per clip could not
   read the future of a different action from the same state (Pearson r 0.15–0.46).
 - **Hypothesis:** the training data never shows "same state, different action".
-- **This week:**
+- **These two weeks:**
   1. Rebuild the data so that it does, identically for both bodies.
   2. Check whether rollout now works, with the same tests as last week.
-  3. Check that the result does not depend on how the scenes were rendered.
-  4. Start the real test: a robot the model knows nothing about, adapted only from its own random motion.
+  3. Check that nothing in the images does the work instead of the motion; randomise the view.
+  4. Find why rollout still loses the turn, and train the imagination to carry the motion.
+  5. Build a task where the view decides the right command: walls.
 
 ![Last week: same start state, different actions; each model's prediction shown as the real future it is closest to](../results/deck/weekly/action_future_strip.png)
 
@@ -427,7 +428,6 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 |---|---|---|
 | joint, no branches | +0.97 / +0.72 | +0.35 / +0.24 |
 | joint, with branches | +0.94 / +0.75 | **+0.84 / +0.63** |
-| joint, with branches, random rooms | +0.94 / +0.71 | +0.58 / +0.41 |
 
 - Same setup, no branches vs with branches: rollout from the current frame c10 +0.59 → +0.71 / +0.68, c08 +0.58 → +0.68 / +0.64; B1 +0.72 → +0.75 / +0.73.
 - Reading the goal from video improves most (B1 +0.35 → +0.84).
@@ -438,323 +438,143 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 
 ---
 
-## Is anything in the data inflating these results?
+## Randomising the view and training the imagination
 
-Results 1 and 2 were measured in rooms scaled to each body's camera height (hexapods 8 m, B1 17.65 m), so every body saw a
-similar-looking world. Before testing a new robot, we checked whether this, or anything else in the data, does the work instead
-of the motion.
+Two changes, one at a time, same data and steps (joint pretraining with branches, original rooms):
 
-| check | result | consequence |
-|---|---|---|
-| **room size:** held-out data re-rendered with room size random in 8–26.5 m for every body, same physics, same models | hexapod and every command-driven read unchanged; reading B1's motion from real video drops (below) | all data re-rendered with random room size and start position; pretraining repeated |
-| **one frame shows the speed?** ridge probe on a single frame | R² up to 0.69 in rooms seen in training, ≤ 0.13 in new rooms | the room, not the image, carried it |
-| **do forward / lateral / yaw describe the camera's motion?** | with the fixed camera offset, R² ≥ 0.99 at 1 s; left out: gait sway | labels are complete for planar motion |
-| **wall distance as a speed cue?** | within-clip correlation −0.07 to +0.13 | no shortcut found |
+1. **View randomisation** (as Egocentric VSM): training frames in grayscale; random brightness ×1/3–3, contrast ±40 %,
+   blur and noise; crop kept small (85–100 %), since zoom changes the apparent speed. Reason: a single frame in a room
+   seen in training gives away the walking speed (R² up to 0.69; ≤ 0.13 in new rooms), so the room, not the motion,
+   can be read.
+2. **Imagination term.** Rollout lost the strong turn because the motion read from each command's imagined future was
+   shrunk: across the 24 commands of one state it spread only part of the true differences (slope, row below; yaw 0.17
+   of its size). New training term: roll the forward model 4 steps (1 s) from the real frame and require the motion read
+   from every imagined step to match the true motion of that step. Only the forward model learns from it (the reader is
+   held fixed), so the action latent keeps its meaning.
 
-Metric: normalised score from E (as in Result 2); Pearson r for the real-future read.
+Metrics: normalised score (0 = random candidate, 1 = best candidate in hindsight), direct / rollout from the robot's
+current frame; Pearson r and slope (1 = right size) of the read across the 24 commands of one state, forward / lateral /
+yaw, held-out branches.
 
-| room size (same models as Result 2) | original rooms | random size |
-|---|---|---|
-| hexapod selection, direct / rollout | +0.92 / +0.71 | +0.92 / +0.70 |
-| B1 selection, direct / rollout | +0.94 / +0.75 | +0.94 / +0.73 |
-| B1 goal read from video, direct / rollout | +0.84 / +0.63 | +0.77 / +0.51 |
-| B1 real-future read, forward | 0.87 | 0.39 |
+| | colour | grayscale + augmentation | + imagination term |
+|---|---|---|---|
+| six-legged hexapod, direct / rollout | +0.92 / +0.71 | +0.92 / +0.68 | +0.92 / **+0.82** |
+| shorter-legged hexapod (never trained), direct / rollout | +0.90 / +0.68 | +0.89 / +0.70 | +0.89 / **+0.81** |
+| B1, direct / rollout | +0.94 / +0.75 | +0.95 / +0.77 | +0.93 / **+0.87** |
+| B1 goal read from video, direct / rollout | +0.84 / +0.63 | +0.88 / +0.71 | +0.85 / +0.74 |
+| B1 real-future read, r | 0.86 / 0.73 / 0.64 | 0.90 / 0.80 / 0.68 | 0.87 / 0.75 / 0.61 |
+| six-legged imagined-future read, r | 0.85 / 0.80 / 0.41 | 0.82 / 0.79 / 0.31 | **0.93 / 0.83 / 0.52** |
+| six-legged imagined-future read, slope | 0.42 / 0.39 / 0.18 | 0.39 / 0.48 / 0.17 | **0.68 / 0.57 / 0.33** |
+| B1 imagined-future read, r | 0.83 / 0.85 / 0.42 | 0.91 / 0.84 / 0.23 | **0.95 / 0.92 / 0.37** |
 
-Result 2's selection does not depend on the room scaling; its B1 video-reading numbers partly do (B1 had seen one room size).
-Each table below names the rooms its model was trained and tested in.
-
-**Random-room setup.** Every clip is re-rendered with the same physics and labels; only the room changes:
-- room size drawn from 8–26.5 m (log-uniform) and the clip's start position drawn inside it;
-- room colours and floor texture as in the original rooms: one room per clip (a clip and all its branches share it), in both setups.
-
-**Room size and a new robot.** B1 absent from pretraining (hexapod only), adapted on 44 tuned clips, against B1 in joint pretraining.
-
-Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random, 1 = best in hindsight).
-
-| | pretraining (bodies, rooms) | B1 data in the model | test rooms | direct | rollout |
-|---|---|---|---|---|---|
-| 1 | hexapod + B1, original rooms | 40,704 B1 pairs (in pretraining) | original | +0.94 | +0.75 |
-| 2 | hexapod only, original rooms | 44 tuned clips (2.4 min), original room | original | +0.97 | +0.70 |
-| 3 | hexapod + B1, random rooms | 40,704 B1 pairs (in pretraining) | random | +0.94 | **+0.71** |
-| 4 | hexapod only, random rooms | 44 tuned clips (2.4 min), random rooms | random | +0.94 | +0.44 |
-
-(B1 adapted on 44 tuned clips, no babbling; tuned library; direct / rollout from the robot's current frame)
-
-- **1 vs 2:** in the original rooms, adapting on 2.4 min comes within 0.05 of having B1 in pretraining.
-- **3 vs 4:** in random rooms, pretraining keeps +0.71; adapting on 2.4 min reaches +0.44.
-- Rows 2 and 4 use the same 44 clips with the same room colours; they differ only in room size and start position. With
-  44 clips, each at one size, adaptation does not reach the level of B1 in pretraining.
-- Same 44 clips, each rendered in 3 random-size rooms (same motion, different size, colours and start position) for
-  adaptation: rollout +0.48 (1 room per clip: +0.44). Room variety in the adaptation clips alone does not close the gap to row 3.
-
-![The same moment of one held-out clip in its original room and in 8 / 14.6 / 26.5 m rooms, hexapod and B1](../results/deck/weekly_1008/room_sizes.png)
+- View randomisation: reading the real video improves (B1 goal from video +0.63 → +0.71); the imagined turning gets worse
+  (yaw r 0.41 → 0.31): the imagination, not the reading, then limits rollout.
+- Imagination term: rollout rises on every body (+0.68 → +0.82, +0.70 → +0.81, +0.77 → +0.87) and the imagined yaw roughly
+  doubles; direct is unchanged. A second seed reproduces it (rollout +0.83 / +0.82 / +0.86).
+- Yaw stays the weakest channel: its imagined read is about a third of its true size.
 
 ---
 
 ## Does z transfer across bodies?
 
-Same tests as last week, on held-out clips:
+Held-out clips, grayscale models (joint pretraining with branches):
 - body-ID probe: logistic regression z → body (chance 0.33, lower = more shared);
-- cross-body R²: a read-out fitted on the six-legged hexapod's z only, applied to another body without refitting (higher =
-  more shared);
+- cross-body R²: a read-out fitted on the six-legged hexapod's z only, applied to another body without refitting;
 - k-NN mixing: share of each point's 10 nearest neighbours from another body, relative to random mixing (1 = fully mixed);
-- retrieval: how similar in motion each hexapod transition's nearest neighbour from another body is (1 = identical motion).
+- retrieval: how similar in motion each hexapod transition's nearest neighbour from another body is (1 = identical).
 
-| pretraining | body-ID probe (chance 0.33, lower = more shared) | cross-body R² c10 → c08 (fwd / lat / yaw) | cross-body R² c10 → B1 (fwd / lat / yaw) | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
+| model | body-ID probe | cross-body R² c10 → c08 (fwd / lat / yaw) | cross-body R² c10 → B1 (fwd / lat / yaw) | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
 |---|---|---|---|---|---|---|
-| last week: hexapod only, B1 adapted | 0.68 | +0.70 / +0.34 / +0.17 | −0.73 / +0.11 / −0.04 | 0.47 | 0.38 | 0.25 |
-| joint, no branches | 0.48 | +0.59 / +0.43 / +0.34 | +0.09 / −0.28 / −0.90 | 0.50 | 0.52 | 0.04 |
-| joint, with branches (S0 / S1) | 0.55 / 0.53 | +0.76 / +0.52 / +0.47 · +0.77 / +0.43 / +0.49 | −0.63 / +0.14 / +0.04 · −0.27 / +0.53 / −0.34 | 0.46 / 0.46 | 0.63 / 0.66 | 0.25 / 0.30 |
-| hexapod only with branches, B1 adapted (44 tuned clips) | **0.40** | +0.74 / +0.42 / +0.53 | **+0.27 / +0.17 / +0.15** | **0.62** | 0.63 | 0.30 |
-| hexapod only, random rooms, B1 adapted from 88 babbling clips | 0.46 | +0.56 / +0.42 / +0.37 | −0.06 / −0.11 / +0.08 | 0.58 | 0.58 | 0.12 |
-| joint, random rooms | 0.50 | +0.65 / +0.34 / +0.39 | +0.15 / −1.54 / −0.47 | 0.49 | 0.57 | −0.05 |
+| grayscale | 0.56 | +0.81 / +0.53 / +0.51 | +0.66 / +0.01 / +0.23 | 0.44 | 0.71 | 0.51 |
+| grayscale + imagination term | 0.59 | +0.81 / +0.48 / +0.52 | +0.64 / +0.19 / −0.31 | 0.48 | 0.68 | 0.38 |
 
-- Between the two hexapods, branches make z more shared (retrieval 0.52 → 0.63–0.66; forward R² +0.59 → +0.76).
-- With B1, joint pretraining keeps the bodies more apart (body-ID 0.50–0.55). Pretraining on the hexapod alone and adapting
-  B1 gives the most shared z: body-ID 0.40, mixing 0.62, and the only positive cross-body R² on all three channels.
-
-![z of the three bodies, joint pretraining with branches: PCA and UMAP, coloured by body (top) and behaviour (bottom)](../results/deck/weekly_1008/latent_with_branches.png)
+- Between the two hexapods z is well shared (forward R² +0.81, retrieval ≈ 0.7).
+- With B1, forward transfers (+0.64–0.66); lateral and yaw do not; the bodies stay separable (body-ID 0.56–0.59).
 
 ---
 
 ## Physics closed loop
 
-Model: joint pretraining with branches, **original rooms** (the model of Results 1 and 2). Pretraining, goals and the live
-camera view all in the original rooms (sized to the body).
-
-Every 2 frames the planner picks one candidate, by direct or by rollout from the robot's live camera view; 33 decisions per run,
-6 goals = held-out hexapod clips, one episode per goal, no falls.
-- **B1:** walks under its own policy in MuJoCo; candidates = its 24 tuned held-out clips.
-- **Six-legged hexapod (c10):** CoppeliaSim, joint commands; candidates = its 48 training clips.
-- **Shorter-legged hexapod (c08, never trained, zero-shot):** candidates = its 24 held-out clips.
-- Hexapods: the chosen candidate's gait recipe runs on one continuous gait clock, with a 4-frame blend at every switch (as the
-  branches were recorded).
+Model: grayscale + imagination term, original rooms (the current model). Every 2 frames the planner picks one of the
+body's library clips, by direct or by rollout from the robot's live camera view; rollout compares its imagined read with
+the goal over the same time window it imagines. 33 decisions per run, goals = held-out hexapod clips, one episode per
+goal, no falls. B1 walks under its own policy in MuJoCo; the hexapods are driven by their gait generator on one continuous
+gait clock.
 
 Metric: error E, mean L2 between achieved and goal Froude over the decision steps (lower is better).
 
-| goal | B1 direct | B1 rollout | c10 direct | c10 rollout | c08 direct | c08 rollout |
+| goal | B1 direct | B1 rollout | six-legged direct | six-legged rollout | shorter-legged direct | shorter-legged rollout |
 |---|---|---|---|---|---|---|
-| turn 0.29 | **0.046** | 0.064 | **0.048** | 0.103 | **0.051** | 0.108 |
-| turn 0.56 | **0.035** | 0.090 | **0.039** | 0.165 | **0.028** | 0.168 |
-| sideways left 0 | **0.015** | 0.081 | **0.029** | 0.103 | **0.035** | 0.205 |
-| sideways right 1 | **0.021** | 0.059 | **0.028** | 0.035 | **0.036** | 0.044 |
-| speed 7.1 | **0.039** | 0.048 | **0.042** | 0.049 | — | — |
-| speed 8.8 | **0.071** | 0.103 | **0.077** | 0.125 | **0.067** | 0.113 |
-| **mean** | **0.038** | 0.074 | **0.044** | 0.097 | **0.043** | 0.128 |
+| mild turn | 0.053 | **0.042** | **0.047** | 0.048 | **0.054** | 0.109 |
+| strong turn | 0.035 | 0.035 | **0.042** | 0.108 | **0.028** | 0.152 |
+| sideways left | **0.014** | 0.027 | 0.029 | **0.028** | **0.037** | 0.037 |
+| sideways right | 0.031 | **0.026** | **0.036** | 0.046 | **0.030** | 0.039 |
+| speed 7.1 | **0.035** | 0.037 | **0.045** | 0.046 | — | — |
+| speed 8.8 | **0.058** | 0.098 | 0.100 | **0.073** | 0.095 | **0.073** |
+| **mean** | **0.038** | 0.044 | **0.050** | 0.058 | **0.049** | 0.082 |
 
-(c08 speed 7.1: not run, the start view did not pass the camera check.)
-
-Achieved motion on the turn 0.56 goal, Froude forward / lateral / yaw:
-
-| | goal | direct | rollout |
-|---|---|---|---|
-| c10 | 0.15 / −0.07 / 0.06 | 0.15 / −0.06 / 0.07 | 0.00 / −0.07 / 0.01 |
-| c08 | 0.15 / −0.07 / 0.06 | 0.15 / −0.07 / 0.07 | 0.00 / −0.05 / 0.01 |
-
-- Direct follows every goal on all three bodies (E 0.038–0.044).
-- Rollout follows the sideways-right and speed goals; on the turn and sideways-left goals it matches only the lateral part of
-  the goal: forward and turning are missing (B1 keeps forward but turns too little).
-- Offline, with the same model, candidates and goals, rollout has the same error on these goals (c10 turn 0.56: 0.176 offline,
-  0.165 in physics); the average over all 24 goals (+0.71) hides it.
-
----
-
-## B1 adapted from random commands: do random candidates still work?
-
-**Question.** So far B1's candidates were 24 clips tuned to the hexapod's behaviours: the library whose motion lies closest to
-every goal (lowest error of the best candidate in hindsight), i.e. an upper bound. A new robot has no such clips. If its candidates are random clips that only cover the motion
-(Froude) range, does selection still work?
-
-**Setup.** Pretrained on the hexapod only (clips + branches), B1 never seen. B1 adapted (LoRA on ITM + FTM, new projector) from
-random velocity commands to its trained walking policy (no task knowledge), 0.6 to 9.7 min, random rooms. Candidates: 24 of
-these random clips, picked by clustering B1's own motion (never by the goals). Goals: held-out hexapod clips.
-
-![Measured motion (CoM Froude) of the hexapod's pretraining data (grey), B1's random-command data (orange) and the tuned B1 clips (blue)](../results/deck/weekly_1008/b1_babbling_coverage_scatter.png)
-
-- The random-command data covers the hexapod's motion range and the combinations in between.
-
-Metric: normalised score from error E, mean L2 between achieved and goal Froude (0 = random candidate, 1 = best candidate in
-hindsight).
-
-| minutes of random commands (clips) | 0.6 (11) | 1.2 (22) | 2.4 (44) | 4.8 (88) | 9.7 (176) |
-|---|---|---|---|---|---|
-| random candidates: direct | +0.61 | **+0.72** | +0.56 | +0.50 | +0.47 |
-| random candidates: rollout | +0.01 | +0.08 | +0.12 | +0.16 | +0.16 |
-| tuned candidates (upper bound): direct | +0.86 | +0.87 | +0.86 | +0.88 | +0.87 |
-| tuned candidates (upper bound): rollout | +0.14 | +0.22 | +0.24 | +0.41 | +0.32 |
-
-![Score against minutes of random commands, tuned candidates (left) and random candidates (right); dotted = B1 in pretraining](../results/deck/weekly_1008/b1_babbling_budget.png)
-
-- **Direct works with random candidates** from about 1 min of data (+0.72); the best random candidate is further from the goals
-  than the best tuned clip (error 0.076 vs 0.023), so the scale is harder.
-- **Rollout fails with random candidates** (+0.01 to +0.16, close to random). Even with tuned candidates it reaches only +0.41;
-  tuned clips as adaptation data give the same +0.44 in random rooms (+0.70 in the original rooms), so the room setup limits
-  rollout first. Random candidates switch command inside the clip and lie close together in motion, which rollout must separate
-  through the predicted future.
-
----
-
-## Next: a test where the world model is needed, and the plan
-
-**1. Rollout on turning and sideways goals.** On flat open ground the outcome of a command does not depend on the view, so
-direct is optimal there; rollout still has to read forward and turning from the imagined future, and on the turn goals it
-does not (page above). Fitting the action projector through the forward model does not change it offline (c10 turn 0.56:
-0.176 → 0.172). Holding each decision longer (2 → 8 steps, 0.5 → 2 s) lowers rollout's mean error offline
-(0.094 → 0.077) and fixes the milder turn (0.123 → 0.077), but not the strongest turn (0.176 → 0.169).
-
-**2. Wall test: predictive vs reactive.** The robot walks toward a wall; a controller that does not use the view (direct) keeps
-walking, rollout can see the wall coming in the imagined future and turn early.
-
-| | now | planned |
-|---|---|---|
-| data | walking in open rooms, walls far | an automatic controller walks toward walls and turns when close (both bodies); several commands from the same state near a wall |
-| score | Froude only | Froude + distance to the wall read from the imagined view |
-| compared | direct, rollout | direct (no view), reactive rule (turn when close), current view without prediction, rollout |
-| metric | Froude error | collision rate, closest distance to the wall, progress |
-
-First check, B1 walking straight at a wall (24 clips, 1–6 m, original rooms): the distance to the wall is readable from one
-frozen-encoder frame (R² 0.96, error 0.30 m) and from the forward model's predicted frames up to 2 s ahead (R² 0.90–0.96). On
-straight walking the prediction is not better than the current frame (the distance changes by ≈ 0.5 m in 2 s), so the test
-needs states near a wall with several commands, as the branches.
-
-**3. Rooms and view.** Rooms stay as in the original setup (sized to the body, one room per clip); the view is randomised
-instead: brightness, texture and lighting.
-
-**4. Later:** a robot with no controller (four-legged hexapod, CPG babbling), random candidates.
-
-☐ rollout on the strongest turn: per-candidate read  ☐ wall data: design  ☐ view randomisation: planned  ☐ paper outline (IROS, 8 pages)
-
----
----
-
-# Weekly Update: 2026-10-15 (draft)
-
-Period: 2026-10-09 to 2026-10-15. Every model below: joint pretraining (six-legged hexapod + B1) with branches, original
-rooms, the same number of steps; one seed unless marked.
-
-## This week's question
-
-- Last week: rollout came close to direct on average, but in the physics loop it failed the turn goals.
-- This week: (1) why the imagined futures lose the turn, (2) make the model read the view less by room, (3) can a world model
-  avoid a wall that a blind controller hits?
-
----
-
-## Rollout failed because the imagined motion was shrunk
-
-From one state, the 24 commands lead to different motions. The motion read from each command's imagined future spread only
-part of the true differences.
-
-Metric: slope of the read against the true motion across the 24 commands of one state (1 = right size), held-out branches,
-six-legged hexapod.
-
-| read of | forward | lateral | yaw |
-|---|---|---|---|
-| the command (direct) | 1.13 | 1.14 | 0.80 |
-| the real future | 0.54 | 0.27 | 0.42 |
-| the imagined future (rollout) | 0.42 | 0.39 | 0.18 |
-
-- Goals at the edge of the range (strong turn) cannot be reached by shrunk reads; rollout then picks commands that match
-  another channel (fast forward walking).
-- Re-scaling the read, imagining further ahead or reading later imagined steps did not help.
-
----
-
-## View randomisation (grayscale + image augmentation, as Egocentric VSM)
-
-Training frames converted to grayscale; random brightness ×1/3–3, contrast ±40 %, blur and noise; crop kept small (85–100 %),
-since zoom changes the apparent speed. Same data, same steps.
-
-Metric: normalised score (0 = random candidate, 1 = best candidate in hindsight); Pearson r of the read across the 24 commands.
-
-| | colour | grayscale + augmentation |
-|---|---|---|
-| B1 goal read from video, direct / rollout | +0.84 / +0.63 | +0.89 / +0.68 |
-| B1 real-future read (forward / lateral / yaw) | 0.86 / 0.73 / 0.64 | 0.90 / 0.80 / 0.68 |
-| B1 imagined-future read, yaw | 0.42 | 0.23 |
-
-- Reading the real video improves and depends less on the room.
-- The imagined turning gets worse: the imagination, not the reading, now limits rollout.
-- Rendering every clip in 4 shared room looks instead of one room each (behaviour not tied to the room) was slightly worse
-  (fewer room looks): not pursued.
-
----
-
-## Training the imagination to carry the motion
-
-New training term: roll the forward model 4 steps (1 s) from the real frame and require the motion read from every imagined
-step to match the true motion of that step. Only the forward model learns from it (the reader is held fixed), so the action
-latent keeps its meaning.
-
-Metric: normalised score, rollout from the robot's current frame; Pearson r of the imagined-future read (forward / lateral / yaw).
-
-| | without | with the imagination term |
-|---|---|---|
-| six-legged hexapod, direct / rollout | +0.92 / +0.69 | +0.92 / **+0.82** |
-| shorter-legged hexapod (never trained), direct / rollout | +0.89 / +0.69 | +0.89 / **+0.81** |
-| B1, direct / rollout | +0.95 / +0.76 | +0.93 / **+0.87** |
-| imagined-future read, six-legged hexapod | 0.82 / 0.79 / 0.31 | 0.93 / 0.83 / 0.52 |
-| imagined-future read, B1 | 0.91 / 0.84 / 0.23 | 0.95 / 0.92 / 0.37 |
-
-Per goal, six-legged hexapod, rollout, error E (mean L2 between achieved and goal Froude, lower is better):
-
-| goal | without | with | direct |
-|---|---|---|---|
-| strong turn | 0.131 | **0.043** | 0.035 |
-| sideways left | 0.117 | **0.027** | 0.021 |
-| mild turn | 0.072 | 0.050 | 0.052 |
-
----
-
-## Physics closed loop
-
-Every 2 frames the planner picks one of the body's library clips; hexapods driven by their gait generator on one continuous
-gait clock. Metric: error E (lower is better), mean over the goals.
-
-| body | direct | rollout, without | rollout, with the imagination term |
-|---|---|---|---|
-| B1 | 0.038 | 0.062 | **0.048** |
-| six-legged hexapod | 0.050 | 0.065 | 0.062 |
-| shorter-legged hexapod | 0.049 | 0.066 | 0.088 |
+(shorter-legged speed 7.1: not run, the start view did not pass the camera check.)
 
 Strong-turn goal, six-legged hexapod, 5 starts each (error E):
 
 | start | direct | rollout |
 |---|---|---|
-| walking straight | 0.027 | 0.158 |
-| already turning | 0.024 | 0.102 |
-| mild turn goal, any start | 0.038–0.044 | 0.029–0.048 |
+| walking straight | 0.027 | 0.141 |
+| already turning | 0.024 | 0.107 |
+| mild turn goal, from walking straight / already turning | 0.038 / 0.044 | 0.030 / 0.062 |
 
-- Rollout follows the mild turn, sideways and speed goals in physics; the strong turn on the hexapods still fails.
-- Yaw read from the frames is about half its true size (about 0.3× right after a command change), so for the strong turn the
-  fast forward commands match the goal's forward speed better than the turn matches its yaw.
+![B1, forward goal, rollout: goal | B1 in physics | B1 camera view, with forward and yaw traces](../results/deck/weekly_1015/b1_physics_forward_rollout.png)
+
+Clips (direct / rollout), forward and strong-turn goals:
+B1 [forward](../results/deck/weekly_1015/b1_physics_forward.mp4) / [rollout](../results/deck/weekly_1015/b1_physics_forward_rollout.mp4), [turn](../results/deck/weekly_1015/b1_physics_turn.mp4) / [rollout](../results/deck/weekly_1015/b1_physics_turn_rollout.mp4);
+six-legged [forward](../results/deck/weekly_1015/physics_c10_forward.mp4) / [rollout](../results/deck/weekly_1015/physics_c10_forward_rollout.mp4), [turn](../results/deck/weekly_1015/physics_c10_turn.mp4) / [rollout](../results/deck/weekly_1015/physics_c10_turn_rollout.mp4);
+shorter-legged [forward](../results/deck/weekly_1015/physics_c08_forward.mp4) / [rollout](../results/deck/weekly_1015/physics_c08_forward_rollout.mp4), [turn](../results/deck/weekly_1015/physics_c08_turn.mp4) / [rollout](../results/deck/weekly_1015/physics_c08_turn_rollout.mp4).
+
+- Direct follows every goal on all three bodies (mean E 0.038–0.050).
+- Rollout matches direct on B1 (0.044) and on most goals of the six-legged hexapod; it fails the strong turn on both
+  hexapods and the mild turn on the never-trained one: the imagined yaw is still about a third of its true size.
+- On open flat ground the outcome of a command does not depend on the view, so direct is optimal here; the world model is
+  needed where it does: walls.
 
 ---
 
-## Wall avoidance: does the task need prediction?
+## Wall avoidance: a task where the view decides
 
-Feasibility in simulation, B1, 48 paired starts near a wall or a corner, the same 24 commands, decision every 0.1 s.
-Metric: crossing rate; progress = mean forward speed / goal speed (0 if crossed).
+**Task.** B1 walks toward a wall or corner; goal: keep walking forward without crossing the boundary. MuJoCo has no walls:
+a virtual boundary at the rendered walls' inner faces; clearance = signed distance of the robot's footprint (1.13 × 0.47 m)
+to it; each frame labelled SAFE (≥ 0.15 m = 0.13 body lengths), NEAR (0–0.15 m) or CROSSED.
 
-| controller | crossings | progress |
-|---|---|---|
-| direct (no view) | 0.96 | 0.04 |
-| distance + closing-speed rule (simulator distance) | 0.00 | 0.51 |
-| true-future oracle, 0.5 / 1 / 2 s look-ahead | 0.00 | 0.61 / 0.58 / 0.57 |
+**Commands.** The 24 tuned commands cannot turn away from a wall (their turns walk forward at 0.36 m/s), so 4 turn-on-the-spot
+commands are added (28); the hexapod matches them in Froude (yaw 0.075 / 0.11).
 
-- A blind controller crashes; a rule that knows the distance avoids every wall here. The true future keeps more progress,
-  mostly by stepping sideways along the wall.
-Prediction check, held-out starts where the safe side changes (wall, corner left / right, headings -45 / 0 / +45 deg).
-Metric: rank correlation across the 24 commands between the clearance read from each command's future and the true clearance.
+**Data (collected, B1).** Episodes: approach a wall or corner → back up / step aside → turn on the spot by a random amount →
+walk out into the room (complete escapes only). Branches: from states 0.4–2.0 m from the wall, every command held 3 s (5 s
+beyond 1.2 m), cut at the crossing. Splits differ in episode and room look.
 
-| clearance read from | 0.5 s | 1 s | 2 s |
+| split | episodes | start states (corner) | branch files |
 |---|---|---|---|
-| the real future frames | 0.43 | 0.58 | 0.71 |
-| knowing only which command it is + the current distance | 0.47 | 0.51 | 0.56 |
-| the imagined future | 0.30–0.32 | 0.41–0.44 | 0.50–0.55 |
+| train | 35 | 157 (29) | 2,198 (14 of 28 commands per state) |
+| validation | 7 | 30 (6) | 840 (all 28) |
+| test | 12 | 57 (12) | 1,596 (all 28) |
 
-- The real future carries information about the wall beyond the command; the imagined future does not reach it yet. The
-  training data never has the robot near a wall.
+**Does the task need prediction?** Test start states, true futures over 3 s (no model):
+
+| controller | forward speed | crossings |
+|---|---|---|
+| fastest command that does not cross (true future) | +0.36 m/s | 0 / 57 |
+| best single fixed command | +0.08 m/s | 0 / 57 |
+| always back up | −0.30 m/s | 1 / 57 |
+| blind forward (direct) | +0.51 m/s | 27 / 57 |
+
+- A blind controller crosses in half the states; a safe fixed command gives up progress; choosing per state keeps 0.36 m/s.
+- Within 1.25 s (what the model imagines), the true clearance already ranks which commands will cross (AUC 0.98): the signal
+  exists; whether the model's imagined future carries it is the next test.
+- Below about 0.6 m, facing a wall head-on, the grayscale frame is flat grey: those states are reported separately.
+
+One state, six commands (camera views + top-down paths; forward and the walking turn cross, back-up, side-step right and spin do not): [video](../results/check/wall_data_pilot/review_escape_var_r10/allocentric/branchgrid_head-on_close_allo.mp4).
+
+Review: [episodes from above](../results/check/wall_data_pilot/review_escape_var_r10/allocentric/episode_7100_allo.mp4),
+[one corner state, six commands](../results/check/wall_data_pilot/review_escape_var_r10/allocentric/branchgrid_corner_allo.mp4).
 
 ---
 
@@ -762,7 +582,7 @@ Metric: rank correlation across the 24 commands between the clearance read from 
 
 | | question |
 |---|---|
-| second seed of the imagination term | does the rollout gain hold? |
-| imagination over 2 s (8 steps) | does the strong turn's yaw reach its size? |
-| wall data in training (robot approaching walls, several commands per state) | does the imagination learn which side is free? |
-| wall closed loop | only after the prediction check passes |
+| hexapod wall data (same rules, distances in body lengths, Froude-matched commands) | B1 and hexapod on the same task |
+| retrain with the wall data (with and without a clearance term on the imagined future) | does the imagination carry the wall? |
+| prediction check on the held-out wall states (per horizon, per head-on / oblique / corner) | ranking of the 28 commands, unsafe detection |
+| closed loop at the wall: blind direct, current image only, direct risk prediction, rollout, true-future oracle | crossings, progress, complete escapes |

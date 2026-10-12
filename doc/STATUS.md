@@ -30,8 +30,11 @@ lighting, as Egocentric VSM).
 - Model `round1_branches_s0_gray_imread` (+ seed 1 on the other PC, reproduces within ~0.003): base model.
 - Physics loops (`scripts/run/physics_orig_*.sh`) with the documented rollout setting `GA=imagined` (F342: small gain on
   all bodies; strong-turn onset not fixed). `--calib` = rejected (F341), off by default.
-- B1 wall-data GENERATOR `scripts/dataset/collect_b1_wall_data.py` (physics, render, review, stats): the data DESIGN is
-  approved by the user (pilot `escape_var`, 20 episodes physics + 10 rendered). The full collection has NOT been run.
+- **B1 wall data COLLECTED 2026-10-12** (`data/wall_b1/{train,val,test}`, 9.3 GB; physics incl. all 28 commands per state
+  in `data/wall_b1/_physics/`), incl. CORNER episodes (`--corner`: 20 s, start 2.5-4 m from both walls facing in; branch
+  states only where both walls are close): train 35 episodes / 35 looks / 157 start states (29 corner = 18 %) / 2,198
+  branch files (stratified 14 of 28); val 7 / 7 / 30 (6 corner) / 840; test 12 / 12 / 57 (12 corner) / 1,596.
+  Report `results/check/wall_data_pilot/report/train_val_test.txt`. Not yet: a loader into training.
 - c10 spin recipes matched to B1's spins (pilot measurement only).
 
 **Planned, NOT built -- wall training / evaluation is NOT runnable end to end:**
@@ -57,9 +60,7 @@ adapted" on grayscale (~1 day GPU, other PC) or drop that z-transfer row.
 
 `selection_eval.py` read frames before loading the model, so OFFLINE SELECTION rollout / vision-goal scores of the
 grayscale models were computed on colour frames (fixed 2026-10-12; direct, read-outs, shrink tables, physics loops not
-affected). Seed 0 (`_gray`, `_gray_imread`) rerun with the fix (`results/eval/<name>/selection.txt`; old kept as
-`selection_colourbug.txt`). **Seed 1 (`round1_branches_s1_gray_imread`, other PC) NOT rerun -- skipped by the user
-2026-10-12; its selection numbers in F342 carry the bug and are not cited until rerun.**
+affected). Seed 0 (`_gray`, `_gray_imread`) rerun with the fix: changes <= 0.03, every conclusion holds (F343). Seed 1 rerun on the other PC 2026-10-12: matches corrected seed 0 (largest gap 0.04; F343). Issue closed.
 
 ## Running
 

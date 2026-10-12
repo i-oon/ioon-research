@@ -1,12 +1,13 @@
 --- selection B1, recorded goal
-round1_branches_s0_gray w=21   direct 0.0314 (gap +0.95)  roll_fixed 0.0858 (gap +0.66)  roll_live 0.0670 (gap +0.76)
+grayscale checkpoint(s): encoder and embedding caches in grayscale mode (VJEPA_GRAY=1)
+round1_branches_s0_gray w=21   direct 0.0314 (gap +0.95)  roll_fixed 0.0866 (gap +0.65)  roll_live 0.0658 (gap +0.77)
 library bounds (mean over conditions): oracle 0.0230  random 0.2071
 --- selection B1, vision-read goal
-round1_branches_s0_gray w=21   direct 0.0424 (gap +0.89)  roll_fixed 0.1022 (gap +0.57)  roll_live 0.0819 (gap +0.68)
+round1_branches_s0_gray w=21   direct 0.0443 (gap +0.88)  roll_fixed 0.1035 (gap +0.56)  roll_live 0.0756 (gap +0.71)
 library bounds (mean over conditions): oracle 0.0230  random 0.2071
 --- selection c08 zero-shot
-round1_branches_s0_gray w=21   direct 0.0480 (gap +0.89)  roll_fixed 0.0904 (gap +0.66)  roll_live 0.0845 (gap +0.69)
+round1_branches_s0_gray w=21   direct 0.0480 (gap +0.89)  roll_fixed 0.0928 (gap +0.65)  roll_live 0.0823 (gap +0.70)
 library bounds (mean over conditions): oracle 0.0269  random 0.2126
 --- selection c10 same body
-round1_branches_s0_gray w=21   direct 0.0564 (gap +0.92)  roll_fixed 0.0899 (gap +0.73)  roll_live 0.0964 (gap +0.69)
+round1_branches_s0_gray w=21   direct 0.0564 (gap +0.92)  roll_fixed 0.0877 (gap +0.74)  roll_live 0.0979 (gap +0.68)
 library bounds (mean over conditions): oracle 0.0415  random 0.2197

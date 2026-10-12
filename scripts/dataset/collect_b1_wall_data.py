@@ -272,7 +272,7 @@ def wall_dist(pos, w):
     return (F.H - pos[0], F.H + pos[0], F.H - pos[1], F.H + pos[1])[w]
 
 
-def episode_approach(seed, n_frames=600):
+def episode_approach(seed, n_frames=600, corner=False):
     """APPROACH-ESCAPE episodes (2026-10-11, agreed with the user): approach a wall, then a COMPLETE escape:
     back up / side-step to make room -> turn toward an open direction -> walk out into the room -> next wall.
     Phases:
@@ -296,6 +296,11 @@ def episode_approach(seed, n_frames=600):
     w0 = int(rng.integers(4)); nrm0 = np.array([(1, 0), (-1, 0), (0, 1), (0, -1)][w0])   # start 1.5-4 m from a wall
     pos0 = nrm0 * (F.H - rng.uniform(1.5, 4.0) - F.FOOT_L / 2) + nrm0[::-1] * rng.uniform(-F.H + 2.0, F.H - 2.0)
     yaw0 = np.arctan2(nrm0[1], nrm0[0]) + np.deg2rad(rng.uniform(-60, 60))   # facing that wall: first approach at once
+    if corner:                       # corner episodes: start 2.5-4 m from BOTH walls of a corner, facing into it +-15 deg
+        sgn = np.array([rng.choice([-1.0, 1.0]), rng.choice([-1.0, 1.0])])
+        pos0 = sgn * (F.H - rng.uniform(2.5, 4.0, 2))
+        tgt0 = sgn * (F.H - rng.uniform(0.3, 1.0))
+        yaw0 = float(np.arctan2(tgt0[1] - pos0[1], tgt0[0] - pos0[0]) + np.deg2rad(rng.uniform(-15, 15)))
     r, snap = F.start_state(None, cmds, int(rng.choice(F.FWD)), pos0[0], pos0[1], yaw0, int(rng.integers(0, 12)))
     r.restore(snap)
     rec, snaps, states, escapes = [], [], [], []
@@ -312,9 +317,11 @@ def episode_approach(seed, n_frames=600):
         nrm = [(1, 0), (-1, 0), (0, 1), (0, -1)][w]
         if first:
             st["des"] = yaw0
-        elif rng.random() < 0.3:                                 # a corner region next to that wall
+        elif corner or rng.random() < 0.3:                       # a corner region next to that wall
             sx = nrm[0] if nrm[0] else rng.choice([-1.0, 1.0]); sy = nrm[1] if nrm[1] else rng.choice([-1.0, 1.0])
-            tgt = np.array([sx, sy]) * (F.H - rng.uniform(0.5, 2.0))
+            # CORNER episodes (--corner, 2026-10-12: corners were 7 of 135 train states): aim deep into the corner,
+            # 0.3-1.0 m from BOTH walls, so the branch states have the second wall close too
+            tgt = np.array([sx, sy]) * (F.H - (rng.uniform(0.3, 1.0) if corner else rng.uniform(0.5, 2.0)))
             st["des"] = float(np.arctan2(tgt[1] - p_[1], tgt[0] - p_[0]))
         else:
             ang = rng.uniform(30, 85) if rng.random() < 0.75 else rng.uniform(0, 30)   # mostly angled approaches
@@ -375,14 +382,20 @@ def episode_approach(seed, n_frames=600):
                     start_escape(j, pos, yw, "orient"); ph = "room"
         if ph == "approach":
             choice = st["fwd"]
+            # corner episodes mark a branch state only where BOTH walls are close (second wall within 1.5 m + half the
+            # body length of the base = the report's corner rule); the approach / escape itself is unchanged
+            dws = sorted([F.H - pos[0], F.H + pos[0], F.H - pos[1], F.H + pos[1]])
+            ok_state = (not corner) or dws[1] < 1.5 + F.FOOT_L / 2
             if st["marked"] == -1 and c < st["d0"] and j >= PREFIX:
-                states.append(j); st["marked"] = 0                 # FAR branch state 1.2-2.0 m (early decisions)
+                if ok_state:
+                    states.append(j)                               # FAR branch state 1.2-2.0 m (early decisions)
+                st["marked"] = 0
             if st["marked"] == 0 and c < st["d1"] and j >= PREFIX:
-                if not states or states[-1] != j:
+                if ok_state and (not states or states[-1] != j):
                     states.append(j)                               # branch state: the state BEFORE frame j's step
                 st["marked"] = 1
             if st["marked"] == 1 and c < st["d2"] and j >= PREFIX and not st["straight"]:
-                if states[-1] != j:
+                if ok_state and (not states or states[-1] != j):
                     states.append(j)
                 st["marked"] = 2
                 start_escape(j, pos, yw, "approach"); ph = "room"
@@ -427,7 +440,9 @@ def episode_approach(seed, n_frames=600):
             elif (j - e["walk_start"]) * 0.05 >= e["walk_dur"]:
                 e["moved"] = wall_dist(pos, e["wall"]) - e["d_walk0"]
                 e["completed"] = bool(e["into_wall"] <= 0.17 and e["closer"] <= 0.10); e["end"] = j
-                st["last_wall"] = e["wall"]; new_approach(); st["des"] = yw     # keep walking into the wall ahead
+                st["last_wall"] = e["wall"]; new_approach()
+                if not corner:
+                    st["des"] = yw                                      # keep walking into the wall ahead
                 st.update(phase="orient", t=j)
         snaps.append(r.snapshot())
         tgt = int(round(2.5 * (j + 1)))
@@ -516,13 +531,14 @@ def snap_clear(r, snap):
 def physics_job(args):
     """one episode + its branches (no frames). Branch state j0: the episode frames before it are rec[j0-10:j0]
     (rec[j0-1] is exactly the snapshot snaps[j0] restored for the branch); branch frames = the command's 40 frames."""
-    ep, split, look = args
+    ep, split, look = args[:3]
+    corner = bool(args[3]) if len(args) > 3 else False
     out = os.path.join(DATA, "_physics", split)
     if os.path.exists(os.path.join(out, f"ep{ep:05d}.npz")):
         return f"ep{ep} exists"
     cmds, fam = commands28(); names = cmd_names()
-    r, rec, snaps, states, escapes = episode_approach(ep)
-    style = "approach"
+    r, rec, snaps, states, escapes = episode_approach(ep, n_frames=400 if corner else 600, corner=corner)
+    style = "corner" if corner else "approach"
     seg = np.cumsum(np.r_[0, np.diff([x["cmd"] for x in rec]) != 0])
     meta = dict(episode=np.int64(ep), split=np.array(split), room_seed=np.int64(look), style=np.array(style),
                 kind=np.array("episode"))
@@ -555,7 +571,7 @@ def physics_job(args):
 
 def do_physics(a):
     from multiprocessing import Pool
-    J = [(a.ep0 + i, a.split, a.look0 + i) for i in range(a.n)]
+    J = [(a.ep0 + i, a.split, a.look0 + i, a.corner) for i in range(a.n)]
     with Pool(a.workers) as p:
         for m in p.imap_unordered(physics_job, J):
             print(m, flush=True)
@@ -565,6 +581,10 @@ def do_render(a):
     import glob
     import render_shift_heldout as RS
     J = sorted(glob.glob(os.path.join(DATA, "_physics", a.split, "*.npz")))
+    sel_f = os.path.join(DATA, "_physics", a.split, "selection.json")
+    if os.path.exists(sel_f):                                  # train: only the stratified command subset (+ episodes)
+        keep = set(json.load(open(sel_f))["render"])
+        J = [p for p in J if "_b" not in os.path.basename(p) or os.path.basename(p) in keep]
     J = [p for p in J if not os.path.exists(os.path.join(DATA, a.split, os.path.basename(p)))]
     print(f"{len(J)} files to render", flush=True)
 
@@ -958,6 +978,104 @@ def do_allo(a):
         wr.close(); print("->", os.path.relpath(os.path.join(out, f"branchgrid_{lab}_allo.mp4"), ROOT), flush=True)
 
 
+FAMILY7 = ("fwd", "bwd", "turn_left", "turn_right", "side_L", "side_R", "spin")   # spin = spin_left + spin_right
+
+
+def do_select(a):
+    """TRAIN split: per branch state a STRATIFIED 14 of the 28 commands (DATA_PLAN 13): 2 per family (fwd / bwd /
+    turn L / turn R / side L / side R / spin), redrawn (up to 200 times, seeded per state) until the subset holds >= 3
+    crossing AND >= 3 non-crossing commands where the state has them (crossing = boundary crossed within the branch).
+    Physics of all 28 is kept in _physics/; only the selected files are rendered (`render` reads selection.json)."""
+    import glob
+    D = os.path.join(DATA, "_physics", a.split); _, fam = commands28()
+    fam7 = [("spin" if f.startswith("spin") else f) for f in fam]
+    groups = {}
+    for f in sorted(glob.glob(os.path.join(D, "ep*_b*_c*.npz"))):
+        groups.setdefault(os.path.basename(f).rsplit("_c", 1)[0], []).append(f)
+    render, lines, short = [], [], 0
+    for k, fs in sorted(groups.items()):
+        cr = {int(os.path.basename(f)[-6:-4]): bool(np.load(f)["crossed"]) for f in fs}
+        n_c = sum(cr.values()); need_c, need_s = min(3, n_c), min(3, len(cr) - n_c)
+        rng = np.random.default_rng(zlib_seed(k))
+        for _ in range(200):
+            pick = []
+            for fm in FAMILY7:
+                idx = [c for c in cr if fam7[c] == fm]
+                pick += list(rng.choice(idx, 2, replace=False))
+            c_ = sum(cr[c] for c in pick)
+            if c_ >= need_c and len(pick) - c_ >= need_s:
+                break
+        else:                                                   # guaranteed fallback: needed crossing / non-crossing
+            pick, want = [], {True: need_c, False: need_s}       # commands first (one per family per pass), then fill
+            for flag in (True, False):
+                for fm in rng.permutation(FAMILY7):
+                    if want[flag] <= 0:
+                        break
+                    idx = [c for c in cr if fam7[c] == fm and cr[c] == flag and c not in pick
+                           and sum(fam7[q] == fm for q in pick) < 2]
+                    if idx:
+                        pick.append(int(rng.choice(idx))); want[flag] -= 1
+            for fm in FAMILY7:
+                idx = [c for c in cr if fam7[c] == fm and c not in pick]
+                while sum(fam7[q] == fm for q in pick) < 2:
+                    c_new = int(rng.choice(idx)); idx.remove(c_new); pick.append(c_new)
+            c_ = sum(cr[c] for c in pick)
+            short += int(c_ < need_c or len(pick) - c_ < need_s)
+        render += [f"{k}_c{int(c):02d}.npz" for c in sorted(pick)]
+        lines.append(f"{k}: crossing in state {n_c}/{len(cr)}, in subset {c_}/{len(pick)}")
+    json.dump(dict(render=render, rule="2 per family x 7, >= 3 crossing and >= 3 non-crossing where available",
+                   states=len(groups), short_of_rule=short), open(os.path.join(D, "selection.json"), "w"), indent=0)
+    print("\n".join(lines[:5]) + f"\n... {len(groups)} states, {len(render)} branch files selected, "
+          f"{short} states could not meet the rule (impossible with 2 per family: their crossing / non-crossing commands sit in too few families)")
+
+
+def zlib_seed(key):
+    import zlib
+    return zlib.crc32(key.encode())
+
+
+def do_report(a):
+    """per split: episodes, room looks, independent start states (+ files), coverage by distance band x approach group
+    (head-on < 30 deg / oblique / corner) and approach speed; crossings and near per band. Uses the physics files (and
+    selection.json for what is rendered)."""
+    import glob
+    out = []
+    for split in a.splits:
+        D = os.path.join(DATA, "_physics", split)
+        eps = sorted(p for p in glob.glob(os.path.join(D, "ep*.npz")) if "_b" not in os.path.basename(p))
+        looks = {int(np.load(p)["room_seed"]) for p in eps}
+        sel_f = os.path.join(D, "selection.json")
+        keep = set(json.load(open(sel_f))["render"]) if os.path.exists(sel_f) else None
+        cov, cr_band, nr_band, nfiles = collections.Counter(), collections.defaultdict(list), collections.defaultdict(list), 0
+        speeds = []
+        for f in sorted(glob.glob(os.path.join(D, "ep*_b*_c00.npz"))):
+            x = np.load(f, allow_pickle=True); bp = x["base_pos"]; yw = F.yaw_of(x["base_quat"][PREFIX - 1]); p0 = bp[PREFIX - 1, :2]
+            dw = [F.H - p0[0], F.H + p0[0], F.H - p0[1], F.H + p0[1]]; w = int(np.argmin(dw))
+            ang = abs(np.degrees(np.angle(np.exp(1j * (yw - (0, np.pi, np.pi / 2, -np.pi / 2)[w])))))
+            grp = "corner" if sorted(dw)[1] < 1.5 + F.FOOT_L / 2 else ("head-on" if ang < 30 else "oblique")
+            sc = float(x["start_clearance"]); band = "0.4-0.8" if sc < 0.8 else "0.8-1.2" if sc < 1.2 else "1.2-2.0"
+            cov[(band, grp)] += 1; speeds.append(float(np.linalg.norm(bp[PREFIX - 1, :2] - bp[PREFIX - 6, :2]) / 0.25))
+            stem = f[:-8]; files = sorted(glob.glob(stem + "_c*.npz"))
+            if keep is not None:
+                files = [g for g in files if os.path.basename(g) in keep]
+            nfiles += len(files)
+            cr_band[band].append(np.mean([bool(np.load(g)["crossed"]) for g in files]))
+            nr_band[band].append(np.mean([bool((np.load(g)["status"][PREFIX:] == 1).any()) and not bool(np.load(g)["crossed"])
+                                          for g in files]) if "status" in np.load(files[0]).files else np.nan)
+        n_st = sum(cov.values())
+        out.append(f"=== {split}: {len(eps)} episodes, {len(looks)} room looks, {n_st} independent start states, {nfiles} "
+                   f"branch files{' (rendered subset)' if keep is not None else ''}; approach speed median "
+                   f"{np.median(speeds) if speeds else np.nan:.2f} m/s")
+        for band in ("0.4-0.8", "0.8-1.2", "1.2-2.0"):
+            row = {g: cov[(band, g)] for g in ("head-on", "oblique", "corner")}
+            if sum(row.values()):
+                out.append(f"  {band} m: {row} | share of commands crossing {np.mean(cr_band[band]):.2f}, near only "
+                           f"{np.nanmean(nr_band[band]):.2f}")
+    txt = "\n".join(out); print(txt)
+    os.makedirs(os.path.join(CHK, "report"), exist_ok=True)
+    open(os.path.join(CHK, "report", "_".join(a.splits) + ".txt"), "w").write(txt + "\n")
+
+
 def _tile(f, t, col):
     from PIL import Image, ImageDraw
     im = Image.fromarray(np.asarray(f)).resize((192, 192)); ImageDraw.Draw(im).text((3, 3), t, fill=col)
@@ -966,7 +1084,7 @@ def _tile(f, t, col):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=("pilot", "physics", "render", "review", "stats", "sep", "branchgrid", "allo"))
+    ap.add_argument("cmd", choices=("pilot", "physics", "render", "review", "stats", "sep", "branchgrid", "allo", "select", "report"))
     ap.add_argument("--port", type=int, default=25750)
     ap.add_argument("--ports", type=int, nargs="+", default=[25780])
     ap.add_argument("--split", default="pilot10")
@@ -975,5 +1093,7 @@ if __name__ == "__main__":
     ap.add_argument("--look0", type=int, default=7000)
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--h", type=float, default=1.25)
+    ap.add_argument("--corner", action="store_true", help="physics: CORNER episodes, 20 s: start 2.5-4 m from both walls of a corner facing into it (+-15 deg); branch states only where both walls are close")
+    ap.add_argument("--splits", nargs="+", default=["train", "val", "test"])
     a = ap.parse_args()
-    {"pilot": do_pilot, "physics": do_physics, "render": do_render, "review": do_review, "stats": do_stats, "sep": do_sep, "branchgrid": do_branchgrid, "allo": do_allo}[a.cmd](a)
+    {"pilot": do_pilot, "physics": do_physics, "render": do_render, "review": do_review, "stats": do_stats, "sep": do_sep, "branchgrid": do_branchgrid, "allo": do_allo, "select": do_select, "report": do_report}[a.cmd](a)
