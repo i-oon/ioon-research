@@ -1,0 +1,69 @@
+{
+ "body": "c10",
+ "cells": {
+  "train": {
+   "1.2-2.0|head-on": 16,
+   "0.8-1.2|head-on": 19,
+   "0.4-0.8|corner": 22,
+   "0.4-0.8|head-on": 18,
+   "1.2-2.0|oblique": 10,
+   "0.8-1.2|oblique": 9,
+   "0.4-0.8|oblique": 9,
+   "0.8-1.2|corner": 15,
+   "1.2-2.0|corner": 9
+  },
+  "val": {
+   "1.2-2.0|head-on": 4,
+   "0.8-1.2|head-on": 6,
+   "0.4-0.8|head-on": 8,
+   "1.2-2.0|oblique": 7,
+   "0.4-0.8|oblique": 8,
+   "0.8-1.2|oblique": 7,
+   "0.8-1.2|corner": 1,
+   "0.4-0.8|corner": 1
+  },
+  "test": {
+   "1.2-2.0|oblique": 13,
+   "0.8-1.2|oblique": 13,
+   "0.4-0.8|oblique": 14,
+   "1.2-2.0|head-on": 8,
+   "0.4-0.8|head-on": 8,
+   "0.4-0.8|corner": 10,
+   "0.8-1.2|corner": 6,
+   "0.8-1.2|head-on": 4,
+   "1.2-2.0|corner": 3
+  }
+ },
+ "fail": [
+  "ep10006.npz: stored episode differs from the live run at 46 decisions",
+  "ep10008.npz: stored episode differs from the live run at 35 decisions",
+  "ep10009.npz: stored episode differs from the live run at 33 decisions",
+  "ep10012.npz: stored episode differs from the live run at 30 decisions",
+  "ep10013.npz: stored episode differs from the live run at 26 decisions",
+  "ep10014.npz: stored episode differs from the live run at 37 decisions",
+  "ep10015.npz: stored episode differs from the live run at 27 decisions",
+  "ep10017.npz: stored episode differs from the live run at 45 decisions",
+  "ep10018.npz: stored episode differs from the live run at 22 decisions",
+  "ep10019.npz: stored episode differs from the live run at 30 decisions",
+  "ep10021.npz: stored episode differs from the live run at 50 decisions",
+  "ep10023.npz: stored episode differs from the live run at 43 decisions",
+  "ep10030.npz: stored episode differs from the live run at 27 decisions",
+  "ep10031.npz: stored episode differs from the live run at 36 decisions",
+  "ep10033.npz: stored episode differs from the live run at 29 decisions",
+  "ep10035.npz: stored episode differs from the live run at 27 decisions",
+  "ep10036.npz: stored episode differs from the live run at 19 decisions",
+  "ep10037.npz: stored episode differs from the live run at 22 decisions",
+  "ep10038.npz: stored episode differs from the live run at 52 decisions",
+  "ep10039.npz: stored episode differs from the live run at 23 decisions",
+  "ep10041.npz: stored episode differs from the live run at 22 decisions",
+  "ep10302.npz: stored episode differs from the live run at 39 decisions",
+  "ep10506.npz: stored episode differs from the live run at 32 decisions",
+  "ep10807.npz: stored episode differs from the live run at 20 decisions",
+  "ep10809.npz: stored episode differs from the live run at 40 decisions",
+  "ep10810.npz: stored episode differs from the live run at 31 decisions",
+  "ep10812.npz: stored episode differs from the live run at 42 decisions",
+  "ep10813.npz: stored episode differs from the live run at 50 decisions",
+  "ep11100.npz: stored episode differs from the live run at 35 decisions",
+  "ep11101.npz: stored episode differs from the live run at 48 decisions"
+ ]
+}

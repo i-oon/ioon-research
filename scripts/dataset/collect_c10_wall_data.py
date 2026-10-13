@@ -114,8 +114,12 @@ def pose(sim, H):
     return (h[:2] + a[:2]) / 2, float(np.arctan2(h[1] - a[1], h[0] - a[0]))
 
 
-def place_room(rng, p0, h0, corner):
-    """room centre / rotation so the start pose faces a wall (or a corner) as the B1 episodes do (distances x S)"""
+def place_room(rng, p0, h0, corner, group=None):
+    """room centre / rotation so the start pose faces a wall (or a corner) as the B1 episodes do (distances x S).
+    group (non-corner, 2026-10-13 top-up): "head-on" 0-25 deg / "oblique" 35-70 deg to the +x wall's normal, and the
+    start's y is chosen so the straight path HITS the +x wall >= 1.2 m from both side walls. Without it the start y
+    was uniform, so angled paths mostly met a side wall first, nearly head-on (full run: train oblique 28 of 127
+    states vs B1 89 of 157)."""
     if corner:
         d = rng.uniform(2.5, 4.0, 2) * S                                   # from both walls of corner (+H, +H)
         p_room = np.array([F.H - d[0], F.H - d[1]])
@@ -124,8 +128,18 @@ def place_room(rng, p0, h0, corner):
     else:
         dist = rng.uniform(1.5, 4.0) * S                                   # from wall +x (normal +x)
         p_room = np.array([F.H - dist - F.FOOT_L / 2, rng.uniform(-F.H + 1.5, F.H - 1.5)])
-        ang = rng.uniform(30, 85) if rng.random() < 0.75 else rng.uniform(0, 30)
-        head_room = float(np.deg2rad(ang) * rng.choice([-1, 1]))
+        if group is None:
+            ang = rng.uniform(30, 85) if rng.random() < 0.75 else rng.uniform(0, 30)
+            sg = rng.choice([-1, 1])
+        else:
+            for _ in range(200):
+                ang = rng.uniform(*{"head-on": (0, 25), "oblique": (35, 70)}[group]); sg = rng.choice([-1, 1])
+                dist = rng.uniform(1.5, 4.0) * S; p_room[0] = F.H - dist - F.FOOT_L / 2   # steep angles need short
+                y_hit = rng.uniform(-F.H + 1.2, F.H - 1.2)
+                y0 = y_hit - sg * (dist + F.FOOT_L / 2) * np.tan(np.deg2rad(ang))
+                if abs(y0) <= F.H - 1.0:
+                    p_room[1] = y0; break
+        head_room = float(np.deg2rad(ang) * sg)
     phi = h0 - head_room
     c = np.asarray(p0) - rot(phi) @ p_room
     rm = Room(c, phi)
@@ -133,7 +147,7 @@ def place_room(rng, p0, h0, corner):
     return rm
 
 
-def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
+def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600, group=None):
     """ONE live closed-loop episode (approach + complete escape), recipes chosen from the pose every 10 frames through
     `cpg_clock.Clock`. Returns (out, room, branch frames T, clock snapshots per frame, log)."""
     import collect_ik as CI
@@ -153,7 +167,7 @@ def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
         if t % 10 == 0:
             p_w, h_w = pose(sim, H)
             if st["room"] is None:
-                st["room"] = place_room(rng, p_w, h_w, corner)
+                st["room"] = place_room(rng, p_w, h_w, corner, group)
                 st["aim"] = float(st["room"].yaw(h_w))           # approach heading to hold (room frame)
             rm = st["room"]; pos = rm.p(p_w); yw = float(rm.yaw(h_w))
             c = F.clearance(pos, yw, None)
@@ -302,22 +316,34 @@ def worker(port, jobs, split, log):
         R.run(seed[:30])
     log(f"port {port}: {SHORT_WARM} warm-up runs in {time.time() - t0:.0f} s")
     out_dir = os.path.join(W.DATA, "_physics", split)
-    for ep, look, corner in jobs:
+    jobs, tries = list(jobs), {}
+    for ep, look, corner, group in jobs:
         if os.path.exists(os.path.join(out_dir, f"ep{ep:05d}.npz")):
             continue
-        rng = np.random.default_rng(ep)
         t0 = time.time()
-        live, st, states, snaps, elog = episode_live(sim, R, rng, seed, corner)
-        n_ep = (st["done_at"] + 1) if st["done_at"] is not None else len(live["actions"])
-        A = np.asarray(live["actions"][:n_ep], np.float32)
-        room = st["room"]
-        refs = {}                                            # class hash -> episode replay
+        # LIVE == REPLAY SYNC (2026-10-13): the live run and its command replay can sit in different determinism
+        # classes (F305), and then the STORED replay is not what the controller saw (full run: 8 of 68 episodes
+        # rejected, replay crossing where the live run kept 0.13-0.27 m). Replay twice; if neither replay is
+        # bit-identical to the live run, run the live episode again (same seed: the same decisions on the same
+        # physics; classes come in streaks, so the next live run usually lands in the replays' class).
+        for sync_try in range(4):
+            rng = np.random.default_rng(ep)
+            live, st, states, snaps, elog = episode_live(sim, R, rng, seed, corner, group=group)
+            n_ep = (st["done_at"] + 1) if st["done_at"] is not None else len(live["actions"])
+            A = np.asarray(live["actions"][:n_ep], np.float32)
+            room = st["room"]
+            refs = {}                                        # class hash -> episode replay
 
-        def new_ref():
-            o = R.run(A)
-            refs[state_hash(o)] = o
-            return o
-        new_ref(); new_ref()
+            def new_ref():
+                o = R.run(A)
+                refs[state_hash(o)] = o
+                return o
+            new_ref(); new_ref()
+            # every recorded per-frame field at exact equality (F305 lesson: one field with a tolerance missed a drift)
+            live_key = next((k for k, o in refs.items() if R.same_as(o, live, range(n_ep))), None)
+            if live_key is not None:
+                break
+            log(f"ep{ep}: live run differs from both replays (try {sync_try + 1}) -- live run again")
         if not states:                                       # no branch state: keep the episode + its log, say why
             save(os.path.join(out_dir, f"ep{ep:05d}.npz"), refs[next(iter(refs))], room,
                  dict(episode=np.int64(ep), split=np.array(split), room_seed=np.int64(look),
@@ -340,7 +366,8 @@ def worker(port, jobs, split, log):
                         bl.setdefault(hit[0], {})[(b, ci)] = (o, nf); break
                     new_ref()
         need = {(b, ci) for b in range(len(states)) for ci in range(28)}
-        win = next((k for k in refs if need <= set(bl.get(k, {}))), None)
+        done_k = [k for k in refs if need <= set(bl.get(k, {}))]
+        win = live_key if live_key in done_k else (done_k[0] if done_k else None)
         if win is None:                                    # complete the CURRENT class (F305 rule; an old class may not
             last = list(refs)[-1]                          # come back before the episode ends): re-run in it what is
             new_ref()                                      # missing, refreshing the reference first
@@ -367,6 +394,16 @@ def worker(port, jobs, split, log):
             win = next((k for k in refs if need <= set(bl.get(k, {}))), win)
             if not need <= set(bl.get(win, {})):
                 log(f"ep{ep}: could not complete one class -- episode skipped"); continue
+        if win != live_key:                               # STORED CLASS != LIVE CLASS (2026-10-13 top-up: the class
+            # switched during the ~170 branch runs, F305 run counts, and the episode was completed in the new class:
+            # 13 of 31 episodes, 3 of them crossing in the replay only). Nothing is stored; the whole episode goes to
+            # the end of this worker's queue and runs live again (classes come in long streaks, so the retry stays in
+            # one class). At most 3 tries, then skipped and logged.
+            tries[ep] = tries.get(ep, 0) + 1
+            if tries[ep] < 3:
+                jobs.append((ep, look, corner, group))
+                log(f"ep{ep}: stored class != live class (try {tries[ep]}) -- episode re-queued"); continue
+            log(f"ep{ep}: SKIPPED -- stored class != live class in 3 tries"); continue
         ref = refs[win]
         names = W.cmd_names()
         rep_clear = labels({"com_pos": ref["com_pos"][:n_ep], "head": ref["head"][:n_ep]}, room)[2]
@@ -375,6 +412,8 @@ def worker(port, jobs, split, log):
                 f"(live run min clearance {min(e['clear'] for e in elog):+.2f})"); continue
         meta = dict(episode=np.int64(ep), split=np.array(split), room_seed=np.int64(look),
                     style=np.array("corner" if corner else "approach"), det_class=np.array(win),
+                    approach_group=np.array("corner" if corner else (group or "mixed")),
+                    replay_equals_live=np.bool_(live_key is not None and win == live_key),
                     det_classes_seen=np.int64(len(refs)), det_runs=np.int64(R.n_runs))
         for (b, ci), (o, nf) in sorted(bl[win].items()):
             T = states[b]
@@ -392,16 +431,17 @@ def worker(port, jobs, split, log):
                           dict(meta, kind=np.array("episode"), log=np.array(json.dumps(elog)),
                                cmd_index_all=pf_cmd, phase_all=pf_ph,
                                turn_cat=np.array(st.get("turn_cat", "")), escape_done=np.int64(st["done_at"] or -1)))
-        log(f"ep{ep} ({'corner' if corner else 'approach'}): {n_ep} frames, {len(states)} branch states, classes "
+        log(f"ep{ep} ({'corner' if corner else (group or 'approach')}, replay == live {win == live_key}): {n_ep} frames, {len(states)} branch states, classes "
             f"{len(refs)}, crossed {crossed}, escape done at {st['done_at']}, {time.time() - t0:.0f} s, runs {R.n_runs}")
 
 
 def do_physics(a):
     import threading
-    jobs = [(a.ep0 + i, a.look0 + i, a.corner) for i in range(a.n)]
+    grp = None if a.group == "mixed" else a.group
+    jobs = [(a.ep0 + i, a.look0 + i, a.corner, None if a.corner else grp) for i in range(a.n)]
     # corner episodes in the same run, numbered ep0 + 200 + i (2026-10-13: +300 collided val corners 10800- with test
     # approach 10800-; keep every split's numbers within its own 300-block: train 10000-, val 10500-, test 10800-)
-    jobs += [(a.ep0 + 200 + i, a.look0 + 200 + i, True) for i in range(a.n_corner)]
+    jobs += [(a.ep0 + 200 + i, a.look0 + 200 + i, True, None) for i in range(a.n_corner)]
     per = [jobs[k::len(a.ports)] for k in range(len(a.ports))]
     lock = threading.Lock()
 
@@ -460,7 +500,9 @@ if __name__ == "__main__":
     ap.add_argument("--ep0", type=int, default=9000)
     ap.add_argument("--look0", type=int, default=9000)
     ap.add_argument("--corner", action="store_true")
-    ap.add_argument("--n_corner", type=int, default=0, help="physics: also this many CORNER episodes (numbers ep0 + 300 + i)")
+    ap.add_argument("--group", default="mixed", choices=("mixed", "head-on", "oblique"),
+                    help="physics, approach episodes: start angle to the wall (place_room); mixed = the original draw")
+    ap.add_argument("--n_corner", type=int, default=0, help="physics: also this many CORNER episodes (numbers ep0 + 200 + i)")
     ap.add_argument("--ports", type=int, nargs="+", default=[25780])
     ap.add_argument("--h", type=float, default=1.25)
     ap.add_argument("--workers", type=int, default=1)

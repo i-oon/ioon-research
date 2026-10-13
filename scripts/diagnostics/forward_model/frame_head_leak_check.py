@@ -27,6 +27,7 @@ for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
 from counterfactual_readout import groups_of, tokens  # noqa: E402
 from rollout_state_action_anova import Models  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
+from wm.evaluate import offset_as  # noqa: E402
 
 N_TOK = 16          # frames b .. b+15, the read-out cache's range (P_max 11 + K 5)
 J = 11              # pairs j = 0..10
@@ -91,7 +92,7 @@ def main():
             tgt = torch.as_tensor(np.stack([bm[b + j:b + j + K].mean(0) for j in range(J)]), dtype=torch.float32, device=dev)
             cache.append((e.half().cpu(), tgt))
             for r in models:
-                ee = e if r["off"] is None else e - r["off"].reshape(e.shape[1:])
+                ee = e if r["off"] is None else e - offset_as(r["off"], e.shape[1:])
                 z = r["m"].itm(ee[:J], ee[K:K + J])
                 allz[r["name"]].append(z)
         for r in models:
@@ -101,7 +102,7 @@ def main():
             i = 0
             for e, tgt in cache:
                 e = e.float().to(dev)
-                ee = e if r["off"] is None else e - r["off"].reshape(e.shape[1:])
+                ee = e if r["off"] is None else e - offset_as(r["off"], e.shape[1:])
                 x = ee[:J] if r["frame"] else None
                 y = (tgt - r["mean"]) / r["std"]
                 for kind, zz in (("true", Z[i:i + J]), ("shuf", Zs[i:i + J])):

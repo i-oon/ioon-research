@@ -305,6 +305,30 @@ def main():
     del encoder
     torch.cuda.empty_cache()
 
+    # CENTRED checkpoints (`center_embeddings`, 2026-10-14): the model was trained on embeddings minus a per-body mean.
+    # A body new to the model gets its offset here, from its own adaptation clips only (unlabelled frames: mean over
+    # all its adaptation frames and over patch positions, as `train.embedding_offsets`); a body
+    # already in the checkpoint keeps its pretraining offset. Every embedding is centred with its own body's offset
+    # (adapt / test clips: this body; anchor banks: the pretrained hexapod) and the offsets are saved with the
+    # adapted checkpoint. Before this, adaptation and evaluation of a new body ran on UNCENTRED embeddings.
+    offsets = {k: v.float().cpu() for k, v in (checkpoint.get("embedding_offsets") or {}).items()}
+    if offsets:
+        if args.embodiment not in offsets:
+            # every adaptation frame (not center_frames): a few minutes of video is small, and with 300 frames the
+            # estimate differed from the pretraining one by ~half the B1-hexapod offset gap (norm 2.1 vs 4.6)
+            n_fr = sum(len(e) for e in train_e)
+            offsets[args.embodiment] = sum(e.float().sum((0, 1)) for e in train_e) / (n_fr * train_e[0].shape[1])
+            print(f"new-body offset ({args.embodiment}): mean over all {n_fr} adaptation frames, norm "
+                  f"{offsets[args.embodiment].norm().item():.3f}")
+        own = offsets[args.embodiment]
+        train_e = [e - own.to(e.dtype) for e in train_e]
+        test_e = [e - own.to(e.dtype) for e in test_e]
+        hexo = offsets.get("hexapod")
+        if bank_e is not None and hexo is not None:
+            bank_e = ([e - hexo.to(e.dtype) for e in bank_e[0]], bank_e[1])
+        if align_e is not None and hexo is not None:
+            align_e = ([e - hexo.to(e.dtype) for e in align_e[0]], align_e[1])
+
     itm = InverseTransitionModel(cfg).to(device)
     ftm = ForwardTransitionModel(cfg).to(device)
     itm.load_state_dict(checkpoint["itm"])
@@ -378,6 +402,8 @@ def main():
     for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets", "align"):
         if key in checkpoint:
             saved[key] = checkpoint[key]
+    if offsets:                         # centred run: pretraining offsets + the adapted body's own
+        saved["embedding_offsets"] = offsets
     torch.save(saved, out)
     print(f"-> {os.path.relpath(out, ROOT)}")
 

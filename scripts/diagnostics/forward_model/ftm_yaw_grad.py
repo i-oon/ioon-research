@@ -18,7 +18,7 @@ for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
 from rollout_state_action_anova import Models, corr  # noqa: E402
 from counterfactual_readout import groups_of  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_as  # noqa: E402
 from wm.policy.planner import action_chunk_at  # noqa: E402
 
 
@@ -54,7 +54,7 @@ def main():
         truth = np.stack([np.asarray(c["body_motion"])[b:b + P - 1 + K, :3].mean(0) for c, b in zip(clips, bs)])
         for r in runs:
             m = r["m"]
-            fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - o.reshape(e.shape[-2:]))
+            fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - offset_as(o, e.shape[-2:]))
             sg_t, sg_p, sh_t, sh_p, cosgh = 0, 0, 0, 0, []
             hyb = {k: 0 for k in ("proj", "proj+yaw_dir", "proj+fwd_dir", "proj+rand_dir")}
             for j in range(P):

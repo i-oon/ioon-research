@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "control"))
 
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, offset_as  # noqa: E402
 from wm.models.action_projector import ActionProjector, action_dims_from  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
@@ -120,7 +120,7 @@ def main():
         for t in range(0, T - (rp.stride - 1), h):     # unchanged at stride 1
             e = torch.stack([emb[c["path"]][t].float() for c in cands])
             if off is not None:
-                e = e - off.float().reshape(e.shape[1:])
+                e = e - offset_as(off.float(), e.shape[1:])
             e = e.to(dev)
             k = rp.stride
             # at stride k: a k-command chunk, a pair k frames apart, truth over the k steps z spans
@@ -132,7 +132,7 @@ def main():
             else:
                 e1 = torch.stack([emb[c["path"]][t + k].float() for c in cands])
                 if off is not None:
-                    e1 = e1 - off.float().reshape(e1.shape[1:])
+                    e1 = e1 - offset_as(off.float(), e1.shape[1:])
                 z = rp.itm(e, e1.to(dev))
             # cycle: does ITM(e_s, FTM(e_s, z_a)) give back z_a? cosine, and share of z's variance recovered
             zc = torch.stack([rp.itm(e[s:s + 1].expand(n, -1, -1), rp.ftm_step(e[s:s + 1].expand(n, -1, -1), z))

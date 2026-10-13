@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts", "diagnostics", "objective_exper
 
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.data.emb_cache import load_cache, note, save_cache  # noqa: E402
-from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, offset_as  # noqa: E402
 from wm.policy.planner import RolloutFroudePlanner, load_candidates  # noqa: E402
 from final_2x2x2_test import build_planner  # noqa: E402
 
@@ -201,7 +201,7 @@ def main():
             for c, p in goal_paths.items():
                 e = gemb[p].float()
                 if goff is not None:
-                    e = e - goff.float().reshape(1, *e.shape[1:])
+                    e = e - offset_as(goff.float(), (1, *e.shape[1:]))
                 e = e.to(args.device)
                 with torch.no_grad():
                     z = rp.itm(e[:-k], e[k:])

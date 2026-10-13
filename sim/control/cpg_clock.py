@@ -14,6 +14,8 @@ it reports). `check_clip` rebuilds a stored clip from its recipe + cpg_cycles_to
 import os
 import sys
 
+import threading
+
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,6 +27,9 @@ KEYS = ("pace", "spin", "strafe", "lead", "a0", "a1", "a2", "ft_phase", "sym")
 CENTRE = {"c10f10t10": "data/counterfactual_walks/c10_walks/_work/centre_pose.npz",
           "c08f09t09": "data/counterfactual_walks/c08_walks/_work/centre_pose.npz"}
 CPG_KW = dict(mirror_joints=(0, 1, 2), spin_amp=0.25, symmetric=False, legtune=None)
+
+
+_SWAP_LOCK = threading.Lock()
 
 
 class _NoScene:
@@ -44,6 +49,14 @@ def recipe(clip, t=0):
 def commands_at(cycles, rec, centre, rec_new=None, w=0.0):
     """Joint commands at oscillator phase `cycles` (total cycles) for recipe `rec`, cross-faded with weight w to
     `rec_new` on the same phase (cpg_commands' xfade, one frame)."""
+    # the swap of the module-wide CI.leg_length is serialised: worker threads (collect_c10_wall_data, one per
+    # CoppeliaSim) call this at once, and an unlocked swap let one thread restore the real function under another's
+    # call (2026-10-13: AttributeError '_NoScene' ... getObject killed 3 of 6 workers at start-up)
+    with _SWAP_LOCK:
+        return _commands_at(cycles, rec, centre, rec_new, w)
+
+
+def _commands_at(cycles, rec, centre, rec_new=None, w=0.0):
     leg_length, CI.leg_length = CI.leg_length, (lambda *a, **k: 0.0)
     try:
         # frames=2, cycles=1, pace=[2*c, 0] -> ph[1] = 2*pi*1*(2c)/2 = 2*pi*c  (row 1 is the wanted frame)

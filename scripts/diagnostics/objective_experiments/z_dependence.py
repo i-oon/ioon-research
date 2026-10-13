@@ -28,7 +28,7 @@ from wm.config import from_checkpoint  # noqa: E402
 from wm.data.emb_cache import load_cache, note, save_cache  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.data.strided import first_pair_of, stride_of  # noqa: E402
-from wm.evaluate import encode_clip, offset_for  # noqa: E402
+from wm.evaluate import encode_clip, offset_for, offset_as  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
 
@@ -70,7 +70,7 @@ def main():
             note(emb, p); dirty = True
         e = emb[p].float()
         if off is not None:
-            e = e - off.float().reshape(1, *e.shape[1:])
+            e = e - offset_as(off.float(), (1, *e.shape[1:]))
         bm = np.asarray(clip["body_motion"], dtype=np.float32)[:, ch]
         s0 = first_pair_of(clip)
         n = min(len(e), len(bm)) - k - s0

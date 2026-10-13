@@ -1,0 +1,3 @@
+--- counterfactual read-out hexapod (physics branches, heldout)
+--- counterfactual read-out B1 (physics branches, heldout)
+--- counterfactual read-out c08 zero-shot (physics branches, held-out body, hexapod projector)

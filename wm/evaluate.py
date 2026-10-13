@@ -66,6 +66,15 @@ def offset_for(checkpoint, embodiment):
     return offsets[embodiment] if offsets else None
 
 
+def offset_as(offset, shape):
+    """`offset` shaped to subtract from embeddings of `shape`: a full per-token map [tokens, D], or (centre_embeddings
+    runs, 2026-10-13) one D-vector broadcast over the tokens, as `train.encode_batch` applies it."""
+    shape = tuple(shape)
+    if offset.numel() == int(torch.tensor(shape).prod()):
+        return offset.reshape(shape)
+    return offset.reshape(*([1] * (len(shape) - 1)), shape[-1])
+
+
 @torch.no_grad()
 def latents(itm, embeddings, chunk):
     total = len(embeddings) - 1

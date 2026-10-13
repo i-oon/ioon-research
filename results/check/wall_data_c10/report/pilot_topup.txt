@@ -1,0 +1,3 @@
+=== pilot_topup: 2 episodes, 2 room looks, 6 independent start states, 168 branch files; approach speed median 0.24 m/s
+  0.4-0.8 m: {'head-on': 2, 'oblique': 1, 'corner': 0} | share of commands crossing 0.42, near only 0.02
+  0.8-1.2 m: {'head-on': 1, 'oblique': 2, 'corner': 0} | share of commands crossing 0.12, near only 0.13

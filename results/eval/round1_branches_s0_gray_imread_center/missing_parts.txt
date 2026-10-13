@@ -1,0 +1,37 @@
+--- selection B1, vision-read goal
+round1_branches_s0_gray_imread_center w=21   direct 0.0479 (gap +0.86)  roll_fixed 0.0824 (gap +0.68)  roll_live 0.0762 (gap +0.71)
+library bounds (mean over conditions): oracle 0.0230  random 0.2071
+--- z-dependence
+z-dependence hexapod: head(z) error z-shuffled/true 3.361x (MSE 0.5515 -> 1.8539, 1464 pairs; ~1 = head ignores z)
+FileNotFoundError: [Errno 2] No such file or directory: '/home/fibo07/ioon/ioon-research/results/eval/round1_branches_s0_gray_imread_center/ckpt/adapted_b1.pt'
+--- counterfactual read-out c10_branches_heldout
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.50 / 0.19 / 0.32
+  FTM cf  0.58 / 0.52 / 0.15
+  direct  0.86 / 0.72 / 0.50
+--
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.92 / 0.72 / 0.85
+  FTM cf  0.92 / 0.84 / 0.45
+  direct  0.96 / 0.85 / 0.78
+--- counterfactual read-out b1_branches_heldout
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.41 / -0.00 / 0.38
+  FTM cf  0.82 / 0.82 / 0.15
+  direct  0.95 / 0.95 / 0.30
+--
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.89 / 0.75 / 0.68
+  FTM cf  0.97 / 0.93 / 0.23
+  direct  0.98 / 0.98 / 0.45
+--- counterfactual read-out c08_branches_heldout
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 1 (truth over 5 frames); r fwd / lat / yaw
+  real cf 0.54 / 0.20 / 0.31
+  FTM cf  0.58 / 0.51 / 0.19
+  direct  0.85 / 0.66 / 0.58
+--
+=== round1_branches_s0_gray_imread_center: 72 groups, pairs averaged 11 (truth over 15 frames); r fwd / lat / yaw
+  real cf 0.91 / 0.77 / 0.86
+  FTM cf  0.92 / 0.81 / 0.45
+  direct  0.96 / 0.82 / 0.77
+DONE

@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(ROOT, "sim", "control"))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "diagnostics", "objective_experiments"))
 
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import offset_for  # noqa: E402
+from wm.evaluate import offset_for, offset_as  # noqa: E402
 from wm.policy.planner import RolloutFroudePlanner, load_candidates  # noqa: E402
 from final_2x2x2_test import build_planner  # noqa: E402
 
@@ -68,7 +68,7 @@ def main():
         def fr(tt):
             e = torch.stack([emb[c["path"]][tt].float() for c in cands])
             if off is not None:
-                e = e - off.float().reshape(e.shape[1:])
+                e = e - offset_as(off.float(), e.shape[1:])
             return e.to(dev)
         std = torch.as_tensor(dp.std_s, dtype=torch.float32)
         mean = torch.as_tensor(dp.mean_s, dtype=torch.float32)

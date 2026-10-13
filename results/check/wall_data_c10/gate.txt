@@ -1,0 +1,59 @@
+=== c10 train: 46 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/train)
+  FAIL ep10006.npz: stored episode differs from the live run at 46 decisions
+  FAIL ep10008.npz: stored episode differs from the live run at 35 decisions
+  FAIL ep10009.npz: stored episode differs from the live run at 33 decisions
+  FAIL ep10012.npz: stored episode differs from the live run at 30 decisions
+  FAIL ep10013.npz: stored episode differs from the live run at 26 decisions
+  FAIL ep10014.npz: stored episode differs from the live run at 37 decisions
+  FAIL ep10015.npz: stored episode differs from the live run at 27 decisions
+  FAIL ep10017.npz: stored episode differs from the live run at 45 decisions
+  FAIL ep10018.npz: stored episode differs from the live run at 22 decisions
+  FAIL ep10019.npz: stored episode differs from the live run at 30 decisions
+  FAIL ep10021.npz: stored episode differs from the live run at 50 decisions
+  FAIL ep10023.npz: stored episode differs from the live run at 43 decisions
+  FAIL ep10030.npz: stored episode differs from the live run at 27 decisions
+  FAIL ep10031.npz: stored episode differs from the live run at 36 decisions
+  FAIL ep10033.npz: stored episode differs from the live run at 29 decisions
+  FAIL ep10035.npz: stored episode differs from the live run at 27 decisions
+  FAIL ep10036.npz: stored episode differs from the live run at 19 decisions
+  FAIL ep10037.npz: stored episode differs from the live run at 22 decisions
+  FAIL ep10038.npz: stored episode differs from the live run at 52 decisions
+  FAIL ep10039.npz: stored episode differs from the live run at 23 decisions
+  FAIL ep10041.npz: stored episode differs from the live run at 22 decisions
+  FAIL ep10302.npz: stored episode differs from the live run at 39 decisions
+  1-2 states 127; command sets complete: PASS (0 bad)
+  3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
+  4 stored == live run (every decision, 1 mm / 1 mrad): FAIL (22 of 46 episodes differ)
+  5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
+  6 CoM height min over files: p1 0.109 / min 0.105 m (median of minima 0.131); falls (< 0.5 x median): 0
+  8 cells (band x group): 0.4-0.8 head-on 18; 0.4-0.8 oblique 9; 0.4-0.8 corner 22; 0.8-1.2 head-on 19; 0.8-1.2 oblique 9; 0.8-1.2 corner 15; 1.2-2.0 head-on 16; 1.2-2.0 oblique 10; 1.2-2.0 corner 9
+    approach side left / right 37 / 44; corner second wall left / right 33 / 13; crossing share per band 0.4-0.8 0.43, 0.8-1.2 0.17, 1.2-2.0 0.16
+=== c10 val: 15 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/val)
+  FAIL ep10506.npz: stored episode differs from the live run at 32 decisions
+  1-2 states 42; command sets complete: PASS (0 bad)
+  3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
+  4 stored == live run (every decision, 1 mm / 1 mrad): FAIL (1 of 15 episodes differ)
+  5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
+  6 CoM height min over files: p1 0.109 / min 0.105 m (median of minima 0.131); falls (< 0.5 x median): 0
+  8 cells (band x group): 0.4-0.8 head-on 8; 0.4-0.8 oblique 8; 0.4-0.8 corner 1; 0.8-1.2 head-on 6; 0.8-1.2 oblique 7; 0.8-1.2 corner 1; 1.2-2.0 head-on 4; 1.2-2.0 oblique 7; 1.2-2.0 corner 0
+    approach side left / right 25 / 15; corner second wall left / right 0 / 2; crossing share per band 0.4-0.8 0.42, 0.8-1.2 0.20, 1.2-2.0 0.21
+=== c10 test: 28 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/test)
+  FAIL ep10807.npz: stored episode differs from the live run at 20 decisions
+  FAIL ep10809.npz: stored episode differs from the live run at 40 decisions
+  FAIL ep10810.npz: stored episode differs from the live run at 31 decisions
+  FAIL ep10812.npz: stored episode differs from the live run at 42 decisions
+  FAIL ep10813.npz: stored episode differs from the live run at 50 decisions
+  FAIL ep11100.npz: stored episode differs from the live run at 35 decisions
+  FAIL ep11101.npz: stored episode differs from the live run at 48 decisions
+  1-2 states 79; command sets complete: PASS (0 bad)
+  3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
+  4 stored == live run (every decision, 1 mm / 1 mrad): FAIL (7 of 28 episodes differ)
+  5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
+  6 CoM height min over files: p1 0.109 / min 0.104 m (median of minima 0.131); falls (< 0.5 x median): 0
+  8 cells (band x group): 0.4-0.8 head-on 8; 0.4-0.8 oblique 14; 0.4-0.8 corner 10; 0.8-1.2 head-on 4; 0.8-1.2 oblique 13; 0.8-1.2 corner 6; 1.2-2.0 head-on 8; 1.2-2.0 oblique 13; 1.2-2.0 corner 3
+    approach side left / right 26 / 34; corner second wall left / right 11 / 8; crossing share per band 0.4-0.8 0.43, 0.8-1.2 0.18, 1.2-2.0 0.15
+=== cell counts c10 vs b1 (must be equal after the trim)
+  train: 0.4-0.8|corner +6; 0.4-0.8|head-on +2; 0.4-0.8|oblique -24; 0.8-1.2|corner +4; 0.8-1.2|head-on +5; 0.8-1.2|oblique -31; 1.2-2.0|corner +7; 1.2-2.0|head-on +7; 1.2-2.0|oblique -6
+  val: 0.4-0.8|corner -1; 0.4-0.8|head-on +4; 0.4-0.8|oblique +2; 0.8-1.2|corner -3; 0.8-1.2|head-on +2; 0.8-1.2|oblique +1; 1.2-2.0|head-on +2; 1.2-2.0|oblique +5
+  test: 0.4-0.8|corner +5; 0.4-0.8|head-on +1; 0.4-0.8|oblique +1; 0.8-1.2|head-on -2; 0.8-1.2|oblique +3; 1.2-2.0|corner +2; 1.2-2.0|head-on +2; 1.2-2.0|oblique +10
+GATES 30 FAILURES

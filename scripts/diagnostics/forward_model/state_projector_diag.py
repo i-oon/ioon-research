@@ -29,7 +29,7 @@ from rollout_state_action_anova import corr  # noqa: E402
 from wm.config import from_checkpoint  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
 from wm.data.strided import action_chunks, first_pair_of, stride_of  # noqa: E402
-from wm.evaluate import offset_for  # noqa: E402
+from wm.evaluate import offset_for, offset_as  # noqa: E402
 from wm.models.ftm import ForwardTransitionModel  # noqa: E402
 from wm.models.itm import InverseTransitionModel  # noqa: E402
 from wm.models.motion_decoder import MotionDecoder  # noqa: E402
@@ -128,7 +128,7 @@ def main():
             nf = len(clip["body_motion"])
             e = tokens(path, clip, s0, nf - s0, encoder).float().to(dev)      # frames s0 ..
             if off is not None:
-                e = e - off.to(dev).reshape(e.shape[1:])
+                e = e - offset_as(off.to(dev), e.shape[1:])
             n = len(e) - K
             if n <= 0 or len(clip["actions"]) < s0 + n + lag + K - 1:
                 continue
@@ -271,7 +271,7 @@ def main():
                     for pp, c, bp, e in zip(paths, clips, bs, E):
                         e = e.float().to(dev)
                         if off is not None:
-                            e = e - off.to(dev).reshape(e.shape[1:])
+                            e = e - offset_as(off.to(dev), e.shape[1:])
                         truth.append(np.asarray(c["body_motion"])[bp:bp + P - 1 + K, :3].mean(0))
                         e0, e1 = e[:P], e[K:K + P]
                         ch = torch.as_tensor(np.stack([action_chunk_at(c["actions"], bp + j + lag, K) for j in range(P)]),

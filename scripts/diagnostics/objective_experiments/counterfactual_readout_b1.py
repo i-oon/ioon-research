@@ -38,7 +38,7 @@ from ego_camera import (WALK_PITCH, attach_ego, build_texture_box, check_ego_vie
 from render_b1_replay import JOINT_ALIASES_SDK, ROOT_ALIAS, SENSOR, capture, settle  # noqa: E402
 from rollout_state_action_anova import Models, corr  # noqa: E402
 from wm.data.embodiment import REGISTRY, heading, load  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_as  # noqa: E402
 from wm.policy.planner import action_chunk_at, load_candidates  # noqa: E402
 
 
@@ -174,7 +174,7 @@ def main():
         mean, std = [np.asarray(x).ravel()[:3] for x in ck["body_stats"]]
         rd = lambda z: m.md.body(None, z).cpu().numpy() * std + mean  # noqa: E731
         off = None if m.offset is None else m.offset.float().to(dev)
-        fix = (lambda e: e) if off is None else (lambda e: e - off.reshape(e.shape[1:]))  # noqa: E731
+        fix = (lambda e: e) if off is None else (lambda e: e - offset_as(off, e.shape[1:]))  # noqa: E731
         R = {k: [] for k in ("own", "real cf", "FTM cf", "direct")}
         for (t, s), rec in sorted(E["cf"].items()):
             truth = np.stack([b[t:t + K].mean(0) for b in bm])

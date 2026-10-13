@@ -31,7 +31,7 @@ for p in ("", "scripts", "scripts/diagnostics/objective_experiments"):
 
 from rollout_state_action_anova import Models, corr  # noqa: E402
 from wm.data.embodiment import REGISTRY, load  # noqa: E402
-from wm.evaluate import encode_clip  # noqa: E402
+from wm.evaluate import encode_clip, offset_as  # noqa: E402
 from wm.policy.planner import action_chunk_at  # noqa: E402
 
 CH = ("forward", "lateral", "yaw")
@@ -127,7 +127,7 @@ def main():
         for r in runs:
             m, K = r["m"], r["m"].stride
             rd = lambda x, z, r=r: r["m"].md.body(x, z).float().cpu().numpy() * r["std"] + r["mean"]  # noqa: E731
-            fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - o.reshape(e.shape[1:]))  # noqa: E731
+            fix = (lambda e: e) if r["off"] is None else (lambda e, o=r["off"]: e - offset_as(o, e.shape[1:]))  # noqa: E731
             for P in args.pairs:
                 truth, reads = [], {k: [] for k in r["R"][P]}
                 for c, bp, e in zip(clips, bs, E):
