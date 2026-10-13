@@ -61,7 +61,7 @@ def main():
                     pos = np.asarray(z["cam_pose"])[:, :2]
                 e = E[p].float().to(dev)
                 if m.offset is not None:
-                    e = e - m.offset.float().to(dev).reshape(e.shape[1:])
+                    e = e - m.offset.float().to(dev).reshape(-1 if m.offset.numel() == e.shape[-1] else e.shape[1:])
                 bm = np.asarray(c["body_motion"])[:, 0]
                 ts = np.arange(20, len(e) - K)
                 if len(ts) < 5:

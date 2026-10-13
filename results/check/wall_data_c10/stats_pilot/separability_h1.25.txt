@@ -1,0 +1,14 @@
+split pilot: 10 states, 280 branches, horizon 1.25 s, label = crosses within the branch (3 s; far band 5 s) (base rate 0.08)
+NOTE: features are the TRUE state at the horizon (physics) -- an upper bound on what an imagined future could carry, NOT evidence that the FTM predicts it
+  [0.2902654867256637-0.5805309734513274 m] branch length [3.0] s; UNSAFE (near < margin or crossed) per state mean 8.5; AUC of clearance at h for unsafe: 0.940 (min 0.87, 4 states)
+band 0.2902654867256637-0.5805309734513274 m: 4 states; crossings within 3 s per state mean 4.5/28 (states with none: 1); within-state AUC of clearance at h for crossing within 3 s: 0.938 (min 0.92, 3 states with both outcomes)
+  [0.5805309734513274-0.8707964601769912 m] branch length [3.0] s; UNSAFE (near < margin or crossed) per state mean 3.2; AUC of clearance at h for unsafe: 0.931 (min 0.85, 3 states)
+band 0.5805309734513274-0.8707964601769912 m: 4 states; crossings within 3 s per state mean 1.0/28 (states with none: 3); within-state AUC of clearance at h for crossing within 3 s: 0.802 (min 0.80, 1 states with both outcomes)
+  [0.8707964601769912-1.4513274336283186 m] branch length [5.0] s; UNSAFE (near < margin or crossed) per state mean 1.0; AUC of clearance at h for unsafe: 0.923 (min 0.92, 1 states)
+band 0.8707964601769912-1.4513274336283186 m: 2 states; crossings within 3 s per state mean 0.5/28 (states with none: 1); within-state AUC of clearance at h for crossing within 3 s: 0.926 (min 0.93, 1 states with both outcomes)
+within-state AUC, clearance at h      : 0.908 (min 0.80, 5 states)
+within-state AUC, closing rate at h   : 0.813 (min 0.63, 5 states)
+within-state AUC, front distance at h : 0.723 (min 0.52, 5 states)
+pick the command with the safest state at h (LOEO logistic on clearance, rate): truly safe for 3 s in 1.00 of states
+best fixed command (LOEO, by escape rate on other episodes): safe in 0.90 of states; over all data the best is bwd0 (escapes in 1.00 of states)
+escape rate per command over all states: bwd3 1.00, bwd2 1.00, bwd1 1.00, bwd0 1.00, turn_right3 1.00, side_R1 1.00, spin_right3 1.00, spin_right2 1.00, spin_left0 1.00, spin_left1 1.00, side_R3 1.00, side_R2 1.00, side_R0 1.00, side_L0 1.00, side_L1 1.00, fwd1 0.90, fwd0 0.90, turn_left0 0.90, turn_right2 0.90, turn_right1 0.90, turn_left1 0.90, turn_left2 0.90, turn_right0 0.90, turn_left3 0.90, side_L2 0.70, fwd2 0.70, side_L3 0.70, fwd3 0.50

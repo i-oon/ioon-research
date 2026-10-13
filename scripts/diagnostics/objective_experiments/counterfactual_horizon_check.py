@@ -148,7 +148,7 @@ def main():
                 tr_ = E[(t, s)]["traj"].float()
                 seq = torch.cat([E[(t, s)]["e_s"].float().expand(n, -1, -1)[:, None], tr_[:, :k]], 1).to(dev)
                 if m.offset is not None:
-                    seq = seq - m.offset.float().reshape(seq.shape[2:]).to(dev)
+                    seq = seq - m.offset.float().reshape(-1 if m.offset.numel() == seq.shape[-1] else seq.shape[2:]).to(dev)
                 zs = torch.stack([m.itm(seq[:, j], seq[:, j + 1]) for j in range(k)], 1)
                 f = m.md.body(None, zs.reshape(n * k, -1)).reshape(n, k, -1).mean(1).cpu().numpy() * std + mean
                 truth = np.stack([b[t:t + k].mean(0) for b in bm])

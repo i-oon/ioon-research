@@ -58,7 +58,7 @@ def transitions(paths, spec, cache, encoder_box, itm, k, lag, offset, device):
             cache[p] = encode_clip(encoder_box[0], clip["frames"], 2).cpu().half()
         e = cache[p].float()
         if offset is not None:
-            e = e - offset.float().reshape(e.shape[1:])
+            e = e - offset.float().reshape(-1 if offset.numel() == e.shape[-1] else e.shape[1:])
         # transitions start at the clip's `first_pair` (CF branches; 0 otherwise = unchanged), and
         # `e` is stored from there so `gather`'s e[t], e[t + k] index the same transition as a[t]
         s0 = first_pair_of(clip)

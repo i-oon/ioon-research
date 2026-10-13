@@ -155,7 +155,7 @@ def main():
         for (t, s), emb in E.items():
             e = emb.float().to(dev)
             if m.offset is not None:
-                e = e - m.offset.float().reshape(e.shape[1:]).to(dev)
+                e = e - m.offset.float().reshape(-1 if m.offset.numel() == e.shape[-1] else e.shape[1:]).to(dev)
             e_s, truth = e[:1], e[1:]                                             # truth: (n, tok, dim)
             a = torch.as_tensor(np.stack([c["actions"][t + m.action_lag] for c in cands]), device=dev)
             pred = m.ftm_step(e_s.expand(n, -1, -1), m.proj(a, "b1"))

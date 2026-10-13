@@ -1,0 +1,4 @@
+=== pilot: 10 episodes, 10 room looks, 25 independent start states, 700 branch files; approach speed median 0.21 m/s
+  0.4-0.8 m: {'head-on': 3, 'oblique': 0, 'corner': 6} | share of commands crossing 0.46, near only 0.19
+  0.8-1.2 m: {'head-on': 3, 'oblique': 1, 'corner': 6} | share of commands crossing 0.18, near only 0.12
+  1.2-2.0 m: {'head-on': 3, 'oblique': 1, 'corner': 2} | share of commands crossing 0.23, near only 0.08

@@ -75,7 +75,8 @@ def latents(model_path, dev):
         for ci, c in enumerate(cands):
             e = E[c["path"]].float()
             if m.offset is not None:
-                e = e - m.offset.float().reshape(e.shape[1:])
+                o = m.offset.float()   # per-token map [256, D] or one D-vector broadcast over tokens (as training)
+                e = e - (o.reshape(e.shape[1:]) if o.numel() == e[0].numel() else o.reshape(e.shape[-1]))
             bm = np.asarray(load(c["path"], REGISTRY[emb])["body_motion"])[:, :3]
             ts = list(range(0, min(len(e), len(bm)) - k, 2))
             z = torch.cat([m.itm(e[ts[i:i + 16]].to(dev), e[[t + k for t in ts[i:i + 16]]].to(dev)).cpu()

@@ -1,0 +1,37 @@
+ep9002 approach  10.1s min clear +0.15 crossed False (frame -1, before +nan)
+ep9003 approach  13.1s min clear +0.13 crossed False (frame -1, before +nan)
+ep9004 approach  28.6s min clear +0.21 crossed False (frame -1, before +nan)
+ep9005 approach  20.1s min clear +0.26 crossed False (frame -1, before +nan)
+ep9006 approach   9.6s min clear +0.13 crossed False (frame -1, before +nan)
+ep9102 corner  19.1s min clear +0.08 crossed False (frame -1, before +nan)
+ep9103 corner  20.6s min clear +0.30 crossed False (frame -1, before +nan)
+ep9104 corner  18.6s min clear +0.08 crossed False (frame -1, before +nan)
+ep9105 corner  19.6s min clear +0.11 crossed False (frame -1, before +nan)
+ep9106 corner  15.7s min clear -0.00 crossed True (frame 313, before +0.00)
+
+25 branch states, 700 branch files
+ep09002_b0: start clearance 0.72 m; crossing 9/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_right0, turn_right1, turn_right2); min clearance over 2 s safe ones +0.10
+ep09002_b1: start clearance 0.44 m; crossing 11/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_right0, turn_right1, turn_right2, turn_right3); min clearance over 2 s safe ones +0.11
+ep09002_b2: start clearance 0.33 m; crossing 11/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_right0, turn_right1, turn_right2, turn_right3); min clearance over 2 s safe ones +0.00
+ep09003_b0: start clearance 0.77 m; crossing 8/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_right0, turn_right1, turn_right2); min clearance over 2 s safe ones +0.05
+ep09003_b1: start clearance 0.52 m; crossing 6/28 (fwd1, fwd2, fwd3, turn_right0, turn_right1, turn_right2); min clearance over 2 s safe ones +0.02
+ep09003_b2: start clearance 0.20 m; crossing 14/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left3, turn_right0, turn_right1, turn_right2, turn_right3, side_R1, side_R2, side_R3); min clearance over 2 s safe ones +0.00
+ep09004_b0: start clearance 0.68 m; crossing 7/28 (fwd1, fwd2, fwd3, turn_left1, turn_left2, turn_right2, turn_right3); min clearance over 2 s safe ones +0.01
+ep09004_b1: start clearance 0.46 m; crossing 5/28 (fwd1, fwd2, fwd3, turn_right0, side_R3); min clearance over 2 s safe ones +0.00
+ep09004_b2: start clearance 0.39 m; crossing 12/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right0, side_L2, side_R2, side_R3); min clearance over 2 s safe ones +0.00
+ep09005_b0: start clearance 0.97 m; crossing 2/28 (side_L2, side_L3); min clearance over 2 s safe ones +0.33
+ep09005_b1: start clearance 0.63 m; crossing 2/28 (side_L2, side_L3); min clearance over 2 s safe ones +0.18
+ep09005_b2: start clearance 0.60 m; crossing 2/28 (side_L2, side_L3); min clearance over 2 s safe ones +0.03
+ep09006_b0: start clearance 0.75 m; crossing 9/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_right0, turn_right1); min clearance over 2 s safe ones +0.03
+ep09006_b1: start clearance 0.51 m; crossing 11/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right0, turn_right1, turn_right2); min clearance over 2 s safe ones +0.13
+ep09006_b2: start clearance 0.20 m; crossing 12/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right0, turn_right1, turn_right2, turn_right3); min clearance over 2 s safe ones +0.05
+ep09102_b0: start clearance 0.64 m; crossing 0/28 (); min clearance over 2 s safe ones +0.01
+ep09102_b1: start clearance 0.20 m; crossing 12/28 (fwd0, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right2, turn_right3, side_L1, side_L2, side_L3); min clearance over 2 s safe ones +0.00
+ep09103_b0: start clearance 0.47 m; crossing 5/28 (fwd2, fwd3, turn_right0, turn_right3, side_R3); min clearance over 2 s safe ones +0.00
+ep09103_b1: start clearance 0.34 m; crossing 8/28 (fwd1, fwd3, turn_right0, turn_right1, turn_right2, turn_right3, side_R2, side_R3); min clearance over 2 s safe ones +0.03
+ep09104_b0: start clearance 0.48 m; crossing 5/28 (fwd1, fwd2, fwd3, turn_right2, turn_right3); min clearance over 2 s safe ones +0.01
+ep09104_b1: start clearance 0.21 m; crossing 17/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right0, turn_right1, turn_right2, turn_right3, side_L2, side_L3, side_R1, side_R2, side_R3); min clearance over 2 s safe ones +0.00
+ep09105_b0: start clearance 0.18 m; crossing 13/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left3, turn_right0, turn_right1, turn_right2, turn_right3, side_R1, side_R2, side_R3); min clearance over 2 s safe ones +0.01
+ep09106_b0: start clearance 0.84 m; crossing 3/28 (fwd3, turn_left1, turn_left2); min clearance over 2 s safe ones +0.08
+ep09106_b1: start clearance 0.48 m; crossing 3/28 (fwd3, side_L2, side_L3); min clearance over 2 s safe ones +0.02
+ep09106_b2: start clearance 0.11 m; crossing 17/28 (fwd0, fwd1, fwd2, fwd3, turn_left0, turn_left1, turn_left2, turn_left3, turn_right0, turn_right1, turn_right2, turn_right3, side_L1, side_L2, side_L3, side_R2, side_R3); min clearance over 2 s safe ones +0.01

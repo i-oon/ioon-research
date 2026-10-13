@@ -111,7 +111,7 @@ def main():
         for t in range(0, T, args.step):
             e0 = torch.stack([ev_e[c["path"]][t].float() for c in ev_c])
             e1 = torch.stack([ev_e[c["path"]][t + 1].float() for c in ev_c])
-            off = md.offset.float().reshape(e0.shape[1:]) if md.offset is not None else 0
+            off = md.offset.float().reshape(-1 if md.offset.numel() == e0.shape[-1] else e0.shape[1:]) if md.offset is not None else 0
             e0d, e1d = (e0 - off).to(dev), (e1 - off).to(dev)
             z = md.itm(e0d, e1d)
             truth = np.stack([m[t] for m in ev_m])

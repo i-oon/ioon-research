@@ -25,7 +25,9 @@ recorded link poses into the room (exact: the floor is flat) and builds the 8 m 
 forward level; branch states at clearance < d0 ~ U(1.2, 2.0) S, < d1 ~ U(0.8, 1.2) S, < d2 ~ U(0.4, 0.8) S (corner
 episodes: only where the second wall is close too); at d2 the escape: back up / step aside until a spin on the spot is
 safe (centre further than the spin radius + margin from every wall) -> spin by a random amount (small / medium / sharp,
-along or away from the wall, > 4 S m free ahead) -> walk out 1-2.5 s. Decisions every 0.5 s from the hexapod's pose
+along or away from the wall, > 4 S m free ahead) -> walk out 1-2.5 s. Spin only with the centre > spin radius +
+0.15 m from every wall; re-checked during the spin (clearance < 2 x margin -> make room again, moving away from the
+nearest walls). An episode is accepted only if its STORED replay never crosses (replays differ from the live run by cm). Decisions every 0.5 s from the hexapod's pose
 (centre = mean of /head and /abdomen, heading = head - abdomen). No look-ahead (it would cost replays). The
 approach heading is HELD with the gentlest library turn (level 1) when > 8 deg off: the open-loop gait drifts.
 
@@ -51,14 +53,22 @@ import collect_b1_wall_data as W  # noqa: E402
 # ---- hexapod geometry, swapped into the shared (B1) code ----
 BL, BL_B1 = 0.82, 1.13
 S = BL / BL_B1                                   # B1 metres -> c10 metres at equal body lengths
+# BAND SPEED FACTOR (pilot 2026-10-13): at Froude-matched speed the hexapod covers fewer of its own body lengths per
+# second (approach 0.24 m/s = 0.29 BL/s vs B1 0.44 m/s = 0.39 BL/s -> 0.75), so with the same 3 / 5 s branches its
+# per-band crossing shares came out far lower than B1's (0.16 / 0.04 / 0.02 vs 0.39 / 0.19 / 0.25). The BRANCH-STATE
+# bands (and the far-band threshold) are therefore x K_SPEED closer; the NEAR margin and the corner rule stay in body
+# lengths (x S only). K measured from speeds, not tuned to the result.
+K_SPEED = 0.75
+SB = S * K_SPEED
 W.F.H, W.F.FOOT_L, W.F.FOOT_W = 3.975, 0.82, 0.46
 W.MARGIN = W.MARGIN_BODY_LENGTHS * BL            # 0.13 body lengths = 0.107 m
-W.DIST_SCALE = S                                 # report / stats bands and corner rule in body lengths
+W.DIST_SCALE = SB                                # report / stats bands (body lengths x speed factor)
+W.CORNER_M = 1.5 * S / SB                        # corner rule stays 1.5 B1-m in body lengths: CORNER_M x DIST_SCALE = 1.5 S
 W.DATA = os.path.join(ROOT, "data/wall_c10")
 W.CHK = os.path.join(ROOT, "results/check/wall_data_c10")
 F = W.F
 PREFIX = W.PREFIX
-BRANCH_F, BRANCH_F_FAR, FAR_FROM = W.BRANCH_F, W.BRANCH_F_FAR, W.FAR_FROM * S
+BRANCH_F, BRANCH_F_FAR, FAR_FROM = W.BRANCH_F, W.BRANCH_F_FAR, W.FAR_FROM * SB
 SCENE = "medauroidea_c10f10t10.ttt"
 DRIVE_KW = dict(travel=0.0, warmup=20, cam_dx=-0.6, cam_dy=0.0, spawn=(0.0, 0.0), ego=True, ego_euler=None,
                 ego_offset=None, ego_box=40.0, ego_seed=0, cam_fov=90.0, cmd_noise=0.0, capture_frames=False)
@@ -110,7 +120,7 @@ def place_room(rng, p0, h0, corner):
         d = rng.uniform(2.5, 4.0, 2) * S                                   # from both walls of corner (+H, +H)
         p_room = np.array([F.H - d[0], F.H - d[1]])
         tgt = np.array([F.H, F.H]) - rng.uniform(0.3, 1.0) * S
-        head_room = float(np.arctan2(tgt[1] - p_room[1], tgt[0] - p_room[0]) + np.deg2rad(rng.uniform(-15, 15)))
+        head_room = float(np.arctan2(tgt[1] - p_room[1], tgt[0] - p_room[0]) + np.deg2rad(rng.uniform(-5, 5)))
     else:
         dist = rng.uniform(1.5, 4.0) * S                                   # from wall +x (normal +x)
         p_room = np.array([F.H - dist - F.FOOT_L / 2, rng.uniform(-F.H + 1.5, F.H - 1.5)])
@@ -118,7 +128,9 @@ def place_room(rng, p0, h0, corner):
         head_room = float(np.deg2rad(ang) * rng.choice([-1, 1]))
     phi = h0 - head_room
     c = np.asarray(p0) - rot(phi) @ p_room
-    return Room(c, phi)
+    rm = Room(c, phi)
+    rm.corner_tgt = tgt if corner else None
+    return rm
 
 
 def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
@@ -129,8 +141,8 @@ def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
     recs = recipes28()
     centre = centre_of("c10f10t10")
     H = dict(head=sim.getObject("/head"), abd=sim.getObject("/abdomen"))
-    st = dict(phase="approach", t=0, fwd=int(rng.choice(FWD)), d0=rng.uniform(1.2, 2.0) * S,
-              d1=rng.uniform(0.8, 1.2) * S, d2=rng.uniform(0.4, 0.8) * S, marked=-1, room=None, target=None,
+    st = dict(phase="approach", t=0, fwd=int(rng.choice(FWD)), d0=rng.uniform(1.2, 2.0) * SB,
+              d1=rng.uniform(0.8, 1.2) * SB, d2=rng.uniform(0.4, 0.8) * SB, marked=-1, room=None, target=None,
               walk_dur=float(rng.uniform(1.0, 2.5)), choice=None, done_at=None)
     clk = Clock(0.0, recs[st["fwd"]], centre)
     st["choice"] = st["fwd"]
@@ -168,10 +180,24 @@ def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
                     st.update(phase="room", t=t, target=tgt, turn_cat=cat, wall=near)
             if st["phase"] == "room":
                 rel = float(np.angle(np.exp(1j * (st["target"] - yw))))
-                if min(dws) - 0.0 > spin_r + 0.05:                            # centre far enough: spin is safe
-                    st.update(phase="turnout", t=t)
-                else:                                                         # back up, or step to the open side
-                    st["choice"] = int(rng.choice(BWD if abs(rel) > np.deg2rad(100) else (SL if rel > 0 else SR) + BWD))
+                if min(dws) > spin_r + 0.15:                                  # centre clear of EVERY wall: spin is safe
+                    st.update(phase="turnout", t=t)                           # (0.15 m: the spin creeps a few cm, and
+                else:                                                         # replays differ from the live run by cm)
+                    # make room: back up / step left / step right, whichever moves the centre AWAY from the nearest
+                    # walls most (both walls count in a corner)
+                    def after(dirn):
+                        q = pos + 0.2 * np.array([np.cos(dirn), np.sin(dirn)])
+                        return min(F.H - q[0], F.H + q[0], F.H - q[1], F.H + q[1])
+                    opts = {"bwd": after(yw + np.pi), "L": after(yw + np.pi / 2), "R": after(yw - np.pi / 2)}
+                    best = max(opts, key=opts.get)
+                    st["choice"] = int(rng.choice({"bwd": BWD, "L": SL, "R": SR}[best]))
+            if st["phase"] == "turnout" and c < 2 * W.MARGIN:                # drifting toward a wall while spinning:
+                st.update(phase="room", t=t)                                  # stop, make room first, then spin again
+                def after(dirn):
+                    q = pos + 0.2 * np.array([np.cos(dirn), np.sin(dirn)])
+                    return min(F.H - q[0], F.H + q[0], F.H - q[1], F.H + q[1])
+                opts = {"bwd": after(yw + np.pi), "L": after(yw + np.pi / 2), "R": after(yw - np.pi / 2)}
+                st["choice"] = int(rng.choice({"bwd": BWD, "L": SL, "R": SR}[max(opts, key=opts.get)]))
             if st["phase"] == "turnout":
                 rel = float(np.angle(np.exp(1j * (st["target"] - yw))))
                 if abs(rel) < np.deg2rad(10) and F.front_dist(pos, yw) > 4.0 * S:
@@ -183,6 +209,8 @@ def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600):
             if st["phase"] == "approach":
                 # STEER: the hexapod's open-loop gait drifts in heading (F75; measured +32 -> +7 deg over a 10 s corner
                 # approach), so hold the approach heading with the gentlest library turn (level 1) when > 8 deg off
+                if getattr(rm, "corner_tgt", None) is not None:   # corner: home on the corner POINT every decision
+                    st["aim"] = float(np.arctan2(rm.corner_tgt[1] - pos[1], rm.corner_tgt[0] - pos[0]))
                 err = float(np.angle(np.exp(1j * (st["aim"] - yw))))
                 st["choice"] = (9 if err > 0 else 13) if abs(err) > np.deg2rad(8) else st["fwd"]
             clk.choose(recs[st["choice"]])
@@ -218,6 +246,15 @@ def labels(out, room, a_from=0):
     return np.c_[xy, com[:, 2]], quat, clear, front
 
 
+def per_frame_from_log(elog, n):
+    """per-frame command index / phase from the 0.5 s decision log (each decision holds until the next)"""
+    cmd, ph = np.zeros(n, np.int64), np.empty(n, object)
+    for k, e in enumerate(elog):
+        t1 = elog[k + 1]["t"] if k + 1 < len(elog) else n
+        cmd[e["t"]:t1], ph[e["t"]:t1] = e["cmd"], e["phase"]
+    return cmd, ph.astype(str)
+
+
 def save(path, out, room, meta, a_from=0, sl=None):
     """one file: hexapod physics fields (frames sl of the run) + room-frame labels (B1 field names) + room"""
     keep = ("actions", "forces", "head", "body_quat", "state_abdomen_pos", "state_abdomen_quat", "state_joint_pos",
@@ -236,6 +273,8 @@ def save(path, out, room, meta, a_from=0, sl=None):
     st = W.frame_status(cl[:n])
     tmp = path[:-4] + ".tmp.npz"
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    if "cmd_index_all" in meta:
+        meta = dict(meta); meta["cmd_index"] = meta.pop("cmd_index_all")[:n]; meta["phase"] = meta.pop("phase_all")[:n]
     np.savez_compressed(tmp, **d, base_pos=bp[:n], base_quat=bq[:n], clearance=cl[:n], front_dist=fr[:n], status=st,
                         crossed=np.bool_(crossed), cross_frame=np.int64(kx), clear_before_cross=np.float64(cb),
                         first_near_frame=np.int64(np.flatnonzero(st >= 1)[0] if (st >= 1).any() else -1),
@@ -302,18 +341,38 @@ def worker(port, jobs, split, log):
                     new_ref()
         need = {(b, ci) for b in range(len(states)) for ci in range(28)}
         win = next((k for k in refs if need <= set(bl.get(k, {}))), None)
-        if win is None:                                    # complete the best class (F305 rule)
-            win = max(refs, key=lambda k: len(bl.get(k, {})))
+        if win is None:                                    # complete the CURRENT class (F305 rule; an old class may not
+            last = list(refs)[-1]                          # come back before the episode ends): re-run in it what is
+            new_ref()                                      # missing, refreshing the reference first
+            win = list(refs)[-1] if list(refs)[-1] != last else last
+            win = max([win], key=lambda k: len(bl.get(k, {})))
             for (b, ci) in sorted(need - set(bl.get(win, {}))):
+                if need <= set(bl.get(win, {})):
+                    break
+                if (b, ci) in bl.get(win, {}):
+                    continue
                 T = states[b]; nf = nf_of[b]
                 for attempt in range(12):
                     o = R.run(branch_cmds(A, snaps, recs, T, ci, nf), state_from=T - PREFIX)
                     if R.same_as(o, refs[win], range(T - PREFIX, T), a_from=T - PREFIX):
                         bl.setdefault(win, {})[(b, ci)] = (o, nf); break
-            if not need <= set(bl[win]):
+                    hit = [k for k, ref in refs.items() if R.same_as(o, ref, range(T - PREFIX, T), a_from=T - PREFIX)]
+                    if hit:                                          # it matched another known class: keep it there
+                        bl.setdefault(hit[0], {})[(b, ci)] = (o, nf)
+                    else:                                            # a new class appeared: refresh the reference
+                        new_ref()
+                    done = next((k for k in refs if need <= set(bl.get(k, {}))), None)
+                    if done is not None:
+                        win = done; break
+            win = next((k for k in refs if need <= set(bl.get(k, {}))), win)
+            if not need <= set(bl.get(win, {})):
                 log(f"ep{ep}: could not complete one class -- episode skipped"); continue
         ref = refs[win]
         names = W.cmd_names()
+        rep_clear = labels({"com_pos": ref["com_pos"][:n_ep], "head": ref["head"][:n_ep]}, room)[2]
+        if (rep_clear < 0).any():                         # judged on the replay that is STORED, not on the live run
+            log(f"ep{ep}: REJECTED -- the stored replay crosses the boundary at frame {int(np.argmax(rep_clear < 0))} "
+                f"(live run min clearance {min(e['clear'] for e in elog):+.2f})"); continue
         meta = dict(episode=np.int64(ep), split=np.array(split), room_seed=np.int64(look),
                     style=np.array("corner" if corner else "approach"), det_class=np.array(win),
                     det_classes_seen=np.int64(len(refs)), det_runs=np.int64(R.n_runs))
@@ -328,8 +387,10 @@ def worker(port, jobs, split, log):
                       froude_height=np.float64(np.median(np.asarray(ref["com_pos"])[:, 2]))),
                  a_from=T - PREFIX, sl=slice(T - PREFIX, T + nf))
         seg = np.cumsum(np.r_[0, np.diff([e["cmd"] for e in elog]) != 0])
+        pf_cmd, pf_ph = per_frame_from_log(elog, len(ref["actions"]))
         crossed, n = save(os.path.join(out_dir, f"ep{ep:05d}.npz"), ref, room,
                           dict(meta, kind=np.array("episode"), log=np.array(json.dumps(elog)),
+                               cmd_index_all=pf_cmd, phase_all=pf_ph,
                                turn_cat=np.array(st.get("turn_cat", "")), escape_done=np.int64(st["done_at"] or -1)))
         log(f"ep{ep} ({'corner' if corner else 'approach'}): {n_ep} frames, {len(states)} branch states, classes "
             f"{len(refs)}, crossed {crossed}, escape done at {st['done_at']}, {time.time() - t0:.0f} s, runs {R.n_runs}")
@@ -338,6 +399,9 @@ def worker(port, jobs, split, log):
 def do_physics(a):
     import threading
     jobs = [(a.ep0 + i, a.look0 + i, a.corner) for i in range(a.n)]
+    # corner episodes in the same run, numbered ep0 + 200 + i (2026-10-13: +300 collided val corners 10800- with test
+    # approach 10800-; keep every split's numbers within its own 300-block: train 10000-, val 10500-, test 10800-)
+    jobs += [(a.ep0 + 200 + i, a.look0 + 200 + i, True) for i in range(a.n_corner)]
     per = [jobs[k::len(a.ports)] for k in range(len(a.ports))]
     lock = threading.Lock()
 
@@ -396,6 +460,7 @@ if __name__ == "__main__":
     ap.add_argument("--ep0", type=int, default=9000)
     ap.add_argument("--look0", type=int, default=9000)
     ap.add_argument("--corner", action="store_true")
+    ap.add_argument("--n_corner", type=int, default=0, help="physics: also this many CORNER episodes (numbers ep0 + 300 + i)")
     ap.add_argument("--ports", type=int, nargs="+", default=[25780])
     ap.add_argument("--h", type=float, default=1.25)
     ap.add_argument("--workers", type=int, default=1)

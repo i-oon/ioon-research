@@ -67,7 +67,7 @@ def main():
             e_s = rec["e_s"].float().to(dev)
             real = rec["traj"][:, K - 1].float().to(dev)                     # (n, tok, dim)
             if m.offset is not None:
-                off = m.offset.float().reshape(e_s.shape[1:]).to(dev)
+                off = m.offset.float().reshape(-1 if m.offset.numel() == e_s.shape[-1] else e_s.shape[1:]).to(dev)
                 e_s, real = e_s - off, real - off
             e = e_s.expand(n, -1, -1)
             for j in range(K // s_):
