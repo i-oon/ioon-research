@@ -22,7 +22,7 @@ for c in turn_s0.29 turn_s0.56 side_L_lvl0 side_R_lvl1 speed_c7.1 speed_c8.8; do
     o=$OUT/$BODY; [ $mech = random ] && o=$OUT/random/$BODY
     r=$(nice -n 10 $PY sim/control/close_loop_hexapod_froude.py --mechanism $mech --window 21 --ckpt $CK \
         --goal $goal --candidates_dir $CAND --morph $MORPH --orig_room $room --cpg_clock --replan_every ${REPLAN:-2} \
-        --port $PORT --device ${DEVICE:-cuda} ${CALIB:+--calib $CALIB} ${GA:+--goal_align $GA} --out $o 2>&1 | tee -a $OUT/loop_$BODY.log \
+        --port $PORT --device ${DEVICE:-cuda} ${CALIB:+--calib $CALIB} ${GA:+--goal_align $GA} ${GS:+--goal_source $GS} --out $o 2>&1 | tee -a $OUT/loop_$BODY.log \
         | grep -E "closed loop|Error|FELL|MAE|corr|cpg clock|original room" | tr '\n' ' ')
     echo "$BODY joint_branches_orig $mech $c | $r" | tee -a $OUT/summary_$BODY.txt
   done

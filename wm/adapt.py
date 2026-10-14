@@ -250,6 +250,11 @@ def main():
     # predict the new body's next frame, so the new body settles wherever that works, and Stage 4
     # then moves the Froude head to it: usable, not shared (F272). Both anchors use the new body's
     # own Froude, standardised with the checkpoint's body statistics, and act on z only.
+    ap.add_argument("--lambda_imread", type=float, default=0.0,
+                    help="imagined-read term during adaptation (2026-10-15; the pretraining's lambda_imread): FTM rolled "
+                         "--imread_k steps from the real frame, each imagined transition read by the FROZEN ITM + Froude "
+                         "head vs the step's Froude label; only the FTM learns. 0 = every earlier adaptation")
+    ap.add_argument("--imread_k", type=int, default=4)
     ap.add_argument("--anchor_froude", type=float, default=0.0,
                     help="weight of MSE(frozen pretrained Froude head(z_new), Froude_new): the OLD head "
                          "must read the new body's z correctly, so z moves into the head's coordinates")
@@ -366,10 +371,22 @@ def main():
     if args.anchor_froude > 0 or args.anchor_sim > 0 or args.anchor_align > 0:
         froude, anchor, extra = build_anchor(args, cfg, checkpoint, train, train_e, bank_e, k, device,
                                              align_bank=align_e)
+    imread_head = None
+    if args.lambda_imread > 0:
+        if froude is None:                                # labels come from the anchor's Froude (same standardisation)
+            froude = [_froude_std(p, args.embodiment, k, len(e) - k, checkpoint["body_stats"])
+                      for p, e in zip(train, train_e)]
+        from wm.models.motion_decoder import MotionDecoder
+        _md = MotionDecoder(cfg, {}).to(device); _md.load_state_dict(checkpoint["md"], strict=False); _md.eval()
+        for p_ in _md.parameters():
+            p_.requires_grad_(False)
+        imread_head = _md.body
+        print(f"imagined-read term on: lambda {args.lambda_imread}, k {args.imread_k} (frozen ITM weights + Froude head)")
     before, _ = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
     loss = adapt(itm, ftm, train_e, args.steps, args.lr, args.seed, device,
                 lambda_hinge=args.lambda_hinge, hinge_margin=args.hinge_margin, stride=k,
-                froude=froude, anchor=anchor, extra_params=extra)
+                froude=froude, anchor=anchor, extra_params=extra,
+                lambda_imread=args.lambda_imread, imread_k=args.imread_k, head=imread_head)
     after, moved = rollout(itm, ftm, test_e, args.horizons, device, stride=k)
 
     if args.lora:
@@ -399,6 +416,8 @@ def main():
                          "train_paths": [os.path.basename(p) for p in train]}}
     if args.anchor_align > 0:          # recorded only when on, so an anchor-free checkpoint is unchanged
         saved["adapted"]["anchor_align"] = args.anchor_align
+    if args.lambda_imread > 0:
+        saved["adapted"]["lambda_imread"] = args.lambda_imread
     for key in ("action_stats", "body_stats", "action_mean", "action_std", "offsets", "align"):
         if key in checkpoint:
             saved[key] = checkpoint[key]

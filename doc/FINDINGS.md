@@ -9679,3 +9679,100 @@ GAIT-SHAKE REMOVAL, the F155 method (the user's early egocentric-era idea: per c
 0.45 -> 0.47, lat 0.38 -> 0.46, yaw 0.57 -> 0.61 then), but no channel is hurt -- unlike 1 s averaging, which removes real
 changes too and makes B1 lateral negative. Best balanced: gait-shake removal + per-body centring (B1 +0.64 / +0.19 / -0.31
 -> +0.72 / +0.42 / +0.48). No training. Not yet tested: either inside training or in the shared head.
+
+---
+
+### F345. Per-body centring of the input embeddings IN TRAINING (B1 in pretraining): the shared read-out improves, selection does not, imagined yaw gets worse; a NEW body needs its own offset at adaptation (added to `wm.adapt`)
+
+2026-10-13, run `round1_branches_s0_gray_imread_center` (trained on the other PC; = `round1_branches_s0_gray_imread`
+with `--center_embeddings True`, `center_frames` 300: each body's mean frame embedding, over frames and patch positions,
+subtracted from every embedding; offsets stored in the checkpoint, `embedding_offsets`). Evaluated with
+`scripts/run/eval_suite.sh NAME joint` on this PC; z-dependence and counterfactual read-outs in
+`results/eval/round1_branches_s0_gray_imread_center/missing_parts.txt`, per-channel transfer in `z_channel_transfer.txt`.
+Centred vs uncentred (same seed, same everything else):
+| | centred | uncentred |
+|---|---|---|
+| selection B1 recorded goal, direct / rollout fixed / live | 0.0371 / 0.0566 / 0.0499 | 0.0354 / 0.0577 / 0.0462 |
+| selection B1 vision-read goal | 0.0479 / 0.0824 / 0.0762 | 0.0519 / 0.0832 / 0.0743 |
+| selection c08 zero-shot | 0.0467 / 0.0764 / 0.0696 | 0.0479 / 0.0632 / 0.0625 |
+| selection c10 | 0.0559 / 0.0680 / 0.0748 | 0.0561 / 0.0662 / 0.0729 |
+| c10 read-out on B1, R2 fwd / lat / yaw | +0.69 / +0.45 / +0.18 | +0.64 / +0.19 / -0.31 |
+| c10 read-out on c08, R2 | +0.79 / +0.53 / +0.57 | +0.81 / +0.48 / +0.52 |
+| gait-shake removed + per-body centred z, c10 read-out on B1 | +0.83 / +0.61 / +0.35 | +0.72 / +0.42 / +0.48 |
+| cosine c10 vs B1 read-out direction | +0.25 / +0.31 / -0.05 | +0.28 / +0.21 / +0.20 |
+| FTM read-out r, 11 pairs, c10 / B1 / c08 (fwd / lat / yaw) | 0.92/0.84/**0.45**; 0.97/0.93/**0.23**; 0.92/0.81/**0.45** | 0.93/0.83/0.52; 0.95/0.92/0.37; 0.93/0.80/0.50 |
+| z-dependence (head error z-shuffled / true), hexapod / B1 | 3.36x / 3.58x | 3.31x / 2.98x |
+(Selection = absolute Froude error, lower is better. Re-running the same centred checkpoint here vs on the other PC moved
+the numbers by up to ~0.002.)
+Reading: (1) centring in training removes most of the per-body offset that F344 found in z (B1 lateral / yaw transfer
++0.19 / -0.31 -> +0.45 / +0.18) without any post-hoc step; the read-out DIRECTIONS still differ (cosine 0.25-0.31), so
+what is removed is the shift, not a misalignment. (2) Selection is unchanged within ~0.01 on every body (c08 rollout ~0.01
+worse): as F344 argued, selection compares candidates of one body and a per-body constant does not change the ranking.
+(3) The forward model's imagined yaw is worse on every body (B1 0.37 -> 0.23); rollout near a wall depends on imagined
+turning, so the centred model is NOT the base for the wall runs. (4) Here B1 was in pretraining: this run does not test
+whether centring helps a body the model has never seen.
+**New-body test set up** (`scripts/run/hexonly_center_pair.sh`, running on the other PC from 2026-10-14): c10-only
+pretrains on the current recipe with / without centring (`round1_hexonly_s0_gray_imread[_center]`), B1 then adapted as a
+new body (`eval_suite.sh hexonly`: LoRA r8, 3000 steps, 44 `b1_clips_train`). Before this, `wm.adapt` ignored centring: it
+neither computed an offset for a body absent from the checkpoint nor copied `embedding_offsets` into the adapted
+checkpoint, so a centred model would have been adapted and evaluated on UNCENTRED new-body embeddings. Now (only when the
+checkpoint has `embedding_offsets`; uncentred runs unchanged) a new body's offset = mean over ALL its adaptation frames
+and patch positions (unlabelled), every embedding is centred with its own body's offset (anchor banks: the hexapod's), and
+the offsets are saved. Check on a faked new-body checkpoint (the centred joint checkpoint with B1's offset removed): the
+B1 offset estimated from the 44 adaptation clips differs from the pretraining estimate by norm 2.08 (B1 vs hexapod offset
+difference 4.58; cosine 0.9995), the same with 300 or all 2,904 frames -- not sampling noise: the mean depends on which
+clips / rooms it is taken over. A real new body has the same limitation; it is part of the test.
+Code fix found on the way: centring checkpoints store ONE `token_dim` vector per body (broadcast over the patch tokens,
+as `train.encode_batch` applies it), while 22 lines in 19 evaluation / diagnostic scripts reshaped the offset to the full
+[tokens, token_dim] map and crashed (z-dependence, counterfactual read-outs, vision-read goal selection, shared-latent
+loader, ...). All now accept both forms: `wm.evaluate.offset_as(offset, shape)` (15 lines) or the same rule inline (7).
+
+---
+
+### F346. c10 wall data (B1-matched): Froude-matched approach speed, start placement by approach type, stored episode == live run, and gates for both bodies
+
+2026-10-13/14, `scripts/dataset/collect_c10_wall_data.py` (imports the B1 collector's settings and re-sets them for c10),
+gates `scripts/dataset/check_wall_data.py --body {b1,c10}` (`results/check/wall_data_{b1,c10}/gate.txt`).
+**Matching to B1 (DATA_PLAN 13).** Distances in body lengths (S = 0.82 / 1.13 m); branch-state bands additionally x 0.75
+(K_SPEED): at matched Froude the hexapod covers fewer body lengths per second (approach median 0.23 m/s vs B1 0.45 m/s),
+and without it the per-band crossing shares were far below B1's; with it 0.43 / 0.17 / 0.16 (near / middle / far band,
+c10 train) vs B1 0.37 / 0.15 / 0.25. Margin 0.13 body lengths (0.107 m), 28 commands (24 + 4 Froude-matched spins), same
+14-of-28 train selection. Approach speed is matched in Froude, not in m/s (user decision 2026-10-13).
+**Start placement by approach type.** The first full run drew the start angle as B1 does (75 % 30-85 deg) but the start
+position uniformly along the wall; in the 8 m hexapod room an angled path then usually met a SIDE wall first, nearly head-
+on: train oblique 28 of 127 start states vs B1 89 of 157. `place_room(..., group)`: head-on 0-25 deg / oblique 35-70 deg,
+start distance and lateral position drawn so the straight path hits the intended wall >= 1.2 m from both side walls
+(offline check 500 / 500 per type). Pilot: head-on 3 / 3 states head-on; oblique 2 oblique + 1 head-on (the angle flattens
+close to the wall; handled by the trim).
+**Stored episode == live run.** CoppeliaSim runs (scene loaded once) fall into bit-identical classes that switch with the
+run count (F305). The stored episode is a REPLAY of the live run's commands; branches are matched to its class. In the
+first full run the class sometimes switched during the ~170 branch runs and the episode was completed and stored in the
+new class: the stored trajectory differs from what the controller saw (8 of 68 episodes rejected because the stored
+replay crossed while the live run kept 0.13-0.27 m). Fix: replay twice after the live run; if neither replay equals the
+live run on EVERY recorded per-frame field (F305 rule), run the live episode again (same seed, up to 4 times); store only
+when the completed class is the live run's class, else re-queue the episode (up to 3 tries). Gate 4 checks it after the
+fact from the episode log (controller pose at every decision; the decision at step t sees the state recorded on row t-1,
+1 mm / 1 mrad = the log's rounding): episodes collected with the fix pass; 30 episodes of the first full run fail
+(train 22, val 1, test 7) -> to be moved to `_moved_replay_mismatch/` and replaced (not yet done 2026-10-14 00:00).
+**Worker start-up crash.** `cpg_clock.commands_at` swaps the module-wide `collect_ik.leg_length` for a dummy and back; six
+worker threads did this at once, so one thread restored the real function under another's call (`'_NoScene' object has
+no attribute 'getObject'`, 3 of 6 workers lost at start-up with all their queued episodes). Fixed with a lock. The dummy
+only feeds a diagnostic field, never joint commands, so collected data was not affected.
+**Gates, both bodies** (B1 all splits; c10 as of 2026-10-14 00:00):
+| check | B1 | c10 |
+|---|---|---|
+| 28 commands per state | pass | pass |
+| branch prefix == episode rows T-10..T-1, every field, exact | pass (0 differences) | pass (0) |
+| labels recomputed == stored; crossing terminal | pass (max 5e-7 = float32) | pass (0) |
+| falls | none | none |
+| stored == live run | n/a (MuJoCo restore is exact, F305) | 30 old episodes fail -> to replace |
+| camera yaw vs body heading (spread) | 0.04 deg | 1.1-2.1 deg (head sways with the gait) |
+| approach side left / right (train / val / test) | 83/45, 8/16, 32/13 | 37/44, 25/15, 26/34 |
+| corner: second wall left / right (train) | 16 / 13 | 33 / 13 (every corner start aims at the same corner) |
+Near-uniform frames: 16 B1 clips from 3 start states (ep08013 b5, ep08015 b5, ep08806 b4) have frame std 1-9 grey levels:
+0.4-0.8 m from the wall and facing it, the wall fills the 90 deg view (as F328 below 1 m). Real views, kept; the current
+frame cannot tell which side is free there.
+**Fairness rule (user 2026-10-13): equal amounts across bodies.** Per split, start-state counts per distance band x
+approach group (head-on / oblique / corner) must be equal for B1 and c10; left / right must be balanced (F338: which side
+is free has to flip). Over-full cells are trimmed by WHOLE episodes (states of one episode are not independent); short
+cells are collected. Still open: side balance for B1 and c10, c10 corner side.

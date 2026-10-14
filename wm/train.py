@@ -449,17 +449,24 @@ def forward_step(models, encoder, batch, cfg, device, scale=1.0, offsets=None):
 
 
 def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None, scale=1.0,
-              offsets=None):
+              offsets=None, writer=None, step0=0, val_fn=None):
+    """One pass. Training with `writer`: every `cfg.log_every` steps the window mean of each term ->
+    `train_step/<term>` at global step `step0 + count`; every `cfg.val_every` steps `val_fn(global_step)` (the full
+    validation pass, logged by the caller as `val_step/<term>`), then back to training mode."""
     training = optimizer is not None
     for model in models.values():
         model.train(training)
 
     totals, counts, count, smoke_times = {}, {}, 0, []
+    win, win_n = {}, {}                                   # step-level logging window (training only)
     # profiling only: WM_SMOKE_STEPS=N stops the process after N training steps and prints the
     # step times and peak RSS (unset in every real run)
     smoke = int(os.environ.get("WM_SMOKE_STEPS", "0") or 0) if training else 0
     tick = time.perf_counter()
+    cap = int(getattr(cfg, "batches_per_epoch", 0) or 0) if training else 0
     for batch in loader:
+        if cap and count >= cap:
+            break
         with torch.set_grad_enabled(training):
             with torch.amp.autocast("cuda", dtype=torch.float16):
                 loss, parts = forward_step(models, encoder, batch, cfg, device, scale, offsets)
@@ -477,6 +484,18 @@ def run_epoch(models, encoder, loader, cfg, device, optimizer=None, scaler=None,
             totals[key] = totals.get(key, 0.0) + value
             counts[key] = counts.get(key, 0) + 1
         count += 1
+        if training and writer is not None:
+            for key, value in parts.items():
+                win[key] = win.get(key, 0.0) + value; win_n[key] = win_n.get(key, 0) + 1
+            g = step0 + count
+            if getattr(cfg, "log_every", 0) and g % cfg.log_every == 0:
+                for key in win:
+                    writer.add_scalar(f"train_step/{key}", win[key] / max(win_n[key], 1), g)
+                win.clear(); win_n.clear()
+            if val_fn is not None and getattr(cfg, "val_every", 0) and g % cfg.val_every == 0:
+                val_fn(g)
+                for model in models.values():
+                    model.train(True)
         if smoke:
             now = time.perf_counter()
             smoke_times.append(now - tick)
@@ -930,8 +949,16 @@ def main():
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
         scale = adv_scale(cfg, epoch)
+        per_epoch = min(len(train_loader), cfg.batches_per_epoch) if cfg.batches_per_epoch else len(train_loader)
+        step0 = (epoch - 1) * per_epoch                     # global step at the start of this epoch (resume-safe)
+
+        def val_step(g, _scale=scale):
+            vm = run_epoch(models, encoder, val_loader, cfg, device, scale=_scale, offsets=offsets)
+            for key, value in vm.items():
+                writer.add_scalar(f"val_step/{key}", value, g)
+            writer.flush()
         train_metrics = run_epoch(models, encoder, train_loader, cfg, device, optimizer, scaler,
-                                  scale, offsets)
+                                  scale, offsets, writer=writer, step0=step0, val_fn=val_step)
         val_metrics = run_epoch(models, encoder, val_loader, cfg, device, scale=scale,
                                 offsets=offsets)
         heldout = heldout_no_z = heldout_no_x = float("nan")

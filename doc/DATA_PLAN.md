@@ -409,8 +409,25 @@ Episodes and room looks disjoint across splits (train 8000-, val 8500-, test 880
 
 **c10 before retraining.** Same design in the hexapod room (geometry-rule controller: no MuJoCo look-ahead; branches
 with the deterministic scene-reuse procedure), sized to `c10_branches_train`; pilot + review first. c08: test set only.
+Built 2026-10-13: `scripts/dataset/collect_c10_wall_data.py` (FINDINGS F346): distances in body lengths, branch bands x
+0.75 (Froude-matched speed covers fewer body lengths / s), start placement by approach type (`--group head-on|oblique`,
+corners `--n_corner`), episode numbers in disjoint blocks per split and run (first run: train 10000-, val 10500-, test
+10800-, corners + 200 [+300 in that run]; top-up: train 12000-, val 12500-, test 12800-, corners + 200).
 
-**Training (two runs, same everything else as `round1_branches_s0_gray_imread`):**
+**FAIRNESS RULE (user 2026-10-13): the data must be equal across bodies.** Per split, the number of start states in
+every cell distance band (0.4-0.8 / 0.8-1.2 / 1.2-2.0 body-length-scaled) x approach group (head-on < 30 deg / oblique /
+corner) is the SAME for B1 and c10 (c08 test set: same cells as B1 test). Left / right balanced within each split (approach
+side and, for corners, the side of the second wall; F338: which side is free must flip). Over-full cells are trimmed by
+whole episodes (never single states); short cells are collected with targeted episodes. Approach speed is matched in
+Froude, not m/s.
+
+**GATES before any wall training (both bodies, every split): `scripts/dataset/check_wall_data.py --body {b1,c10}
+[--render] [--ref_body b1]`** -- 28 commands per state; branch prefix == stored episode rows T-10..T-1 on every recorded
+field at exact equality (F305 rule); c10: stored episode == the live run the controller saw (episode log, every decision);
+labels recomputed == stored, crossing terminal; no falls; splits disjoint in episodes and room looks; rendered set complete,
+not blank, camera following the body; cell table equal to B1, sides balanced. ALL must pass.
+
+**Training (two runs, same everything else as `round1_branches_s0_gray_imread`):** -- run 2 SUPERSEDED 2026-10-14 by `doc/WALL_SELECTION_PLAN.md` (user: no safety / clearance loss into FTM, ITM, encoder or projector; a separate evaluator on the frozen model's embeddings; FTM trained on wall data only with its original objectives, as its own experiment).
 1. data only: + B1 and c10 wall train sets;
 2. data + clearance supervision: a clearance head on the frame embedding, trained on real frames, and an imagined-
    clearance term like `lambda_imread`, each target aligned with the predicted time: k = 1-5 imagined steps = 0.25 /
@@ -440,4 +457,6 @@ privileged reference). Planner objective must be checked for allowing a temporar
 adding measured approach speed to a physics classifier (does not show one camera frame contains speed).
 
 **Order:** user reviews the 10 B1 videos (`review_escape_var_r10`) -> far-band pilot -> c10 procedure pilot + review ->
-collect B1 + c10 -> two training runs -> prediction check -> closed loop.
+collect B1 + c10 -> balance (cells equal across bodies, sides) -> gates pass on both bodies -> loader + clearance head ->
+training runs (data only; data + clearance; episodes-only ablation) -> prediction check -> closed loop.
+Status 2026-10-14: B1 collected (gates pass except side balance); c10 first run + top-up being completed; balance next.

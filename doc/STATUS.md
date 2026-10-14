@@ -2,7 +2,7 @@
 
 > Living document: rewritten as work moves, not appended. History goes to `PROGRESS.md` (the previous version of this
 > file is archived there under 2026-10-09), conclusions to `FINDINGS.md`, data map in `doc/DATA.md`, fixed conventions in
-> memory. Last update: 2026-10-12 (wall-data DESIGN approved; exists-vs-planned split below).
+> memory. Last update: 2026-10-14 00:00 (c10 wall data being completed; gates; fairness rule; centring tests).
 
 ## Goal (advisor, week 19; memory `project_week19_direction`)
 
@@ -24,26 +24,40 @@ lighting, as Egocentric VSM).
 | hexapod physics loop | gait broke at every switch; fixed (`--cpg_clock`) | F323, F327 |
 | wall pilot (B1) | wall distance readable from the frozen embedding (R2 0.96) and from FTM outputs; on straight walking not better than "copy the current frame" | F328 |
 
-## Exists now vs planned (2026-10-12)
+## Exists now vs planned (2026-10-14)
 
 **Exists and runs:**
-- Model `round1_branches_s0_gray_imread` (+ seed 1 on the other PC, reproduces within ~0.003): base model.
-- Physics loops (`scripts/run/physics_orig_*.sh`) with the documented rollout setting `GA=imagined` (F342: small gain on
-  all bodies; strong-turn onset not fixed). `--calib` = rejected (F341), off by default.
-- **B1 wall data COLLECTED 2026-10-12** (`data/wall_b1/{train,val,test}`, 9.3 GB; physics incl. all 28 commands per state
-  in `data/wall_b1/_physics/`), incl. CORNER episodes (`--corner`: 20 s, start 2.5-4 m from both walls facing in; branch
-  states only where both walls are close): train 35 episodes / 35 looks / 157 start states (29 corner = 18 %) / 2,198
-  branch files (stratified 14 of 28); val 7 / 7 / 30 (6 corner) / 840; test 12 / 12 / 57 (12 corner) / 1,596.
-  Report `results/check/wall_data_pilot/report/train_val_test.txt`. Not yet: a loader into training.
-- c10 spin recipes matched to B1's spins (pilot measurement only).
+- Model `round1_branches_s0_gray_imread` (+ seed 1, reproduces within ~0.003): BASE model, also for the wall runs.
+- Physics loops (`scripts/run/physics_orig_*.sh`) with rollout setting `GA=imagined` (F342). `--calib` rejected (F341).
+- **B1 wall data** (`data/wall_b1`, 9.4 GB): train 35 episodes / 157 start states, val 7 / 30, test 12 / 57; all gates
+  pass (`scripts/dataset/check_wall_data.py --body b1`) EXCEPT left / right balance (approach side train 83 / 45, test
+  32 / 13). 16 near-uniform clips = facing the wall at 0.4-0.8 m (real, kept; F346).
+- **c10 wall data** (`data/wall_c10`, `scripts/dataset/collect_c10_wall_data.py`, F346): first full run (68 episodes) +
+  top-up running. Collector fixes 2026-10-13: start placement by approach type, stored episode == live run (re-queue),
+  thread lock in `cpg_clock`. 30 first-run episodes fail the stored == live gate -> to replace.
+- Centring in training evaluated (`round1_branches_s0_gray_imread_center`, F345): shared read-out better, selection
+  unchanged, imagined yaw worse -> not the wall base. `wm.adapt` now gives a NEW body its own centring offset.
+- Gate script `scripts/dataset/check_wall_data.py` (DATA_PLAN 13: exactness, stored == live, labels, falls, splits,
+  renders, cells vs B1, sides).
 
 **Planned, NOT built -- wall training / evaluation is NOT runnable end to end:**
+- balance both bodies (cells equal across bodies per split, sides balanced; trim by whole episodes, collect short cells);
+  c10 corner starts from both sides (now always the same corner); gates pass on both;
 - wall-data loader into training (28 commands); clearance head + imagined-clearance loss (targets 0.25-1.25 s);
-- c10 wall collector (geometry-rule controller, scene-reuse branches); far-band pilot; stratified 14-of-28 train
-  selection + per-split start-state / episode / look report;
+- runs: data only; data + clearance; episodes-only ablation (no branches);
 - baselines: current-image selector, direct risk predictor; planner score with wall risk (must allow a temporary
-  retreat); prediction check on the new data; closed loop.
+  retreat); prediction check (F338 protocol) on the new data; closed loop. c08 wall test set.
 - UNTESTED: whether the model predicts wall clearance / crossings at all, and any closed-loop wall result.
+
+## Running (2026-10-14 00:40)
+
+- THIS PC: `results/wm/logs/queue_c10_topup3.sh` (6 own CoppeliaSim, ports 25780-25790): c10 top-up -- val / test redo of
+  the moved + rejected episodes, then 42 train oblique episodes; expected done ~05:00-06:00. Then: move the 30 failing
+  first-run episodes, gate c10, balance plan to the user.
+- OTHER PC: `scripts/run/hexonly_center_pair.sh` (started 2026-10-14 ~00:40): `round1_hexonly_s0_gray_imread` and
+  `..._center` (c10-only pretrains on the current recipe, with / without centring), then `eval_suite.sh hexonly` (B1
+  adapted as a NEW body) + `z_channel_transfer` for both; ~20 h training + ~2 h eval. Answers: does centring help a new
+  body, and the current-recipe "adapted ~ joint" number (F310 was on the old colour recipe).
 
 ## To revisit later (parked 2026-10-12 by the user; wall data + retraining first)
 
@@ -54,17 +68,14 @@ wall. Reusable now: `results/eval/round1_branches_s0_gray(_imread)`, physics `_g
 + seed 1. To run then: (1) single-frame speed probe on grayscale frames, seen vs new rooms
 (`scripts/diagnostics/egocentric_view/single_frame_speed_probe.py`, ~30 min GPU); (2) shrink table (real vs imagined
 slopes) on the grayscale model before / after the imagination term (~1 h GPU); (3) decide: retrain "hexapod-only + B1
-adapted" on grayscale (~1 day GPU, other PC) or drop that z-transfer row.
+adapted" on grayscale (~1 day GPU, other PC) or drop that z-transfer row. -> RUNNING 2026-10-14 on the other PC
+(`hexonly_center_pair.sh`, see Running).
 
 ## Known issue to correct (2026-10-12)
 
 `selection_eval.py` read frames before loading the model, so OFFLINE SELECTION rollout / vision-goal scores of the
 grayscale models were computed on colour frames (fixed 2026-10-12; direct, read-outs, shrink tables, physics loops not
 affected). Seed 0 (`_gray`, `_gray_imread`) rerun with the fix: changes <= 0.03, every conclusion holds (F343). Seed 1 rerun on the other PC 2026-10-12: matches corrected seed 0 (largest gap 0.04; F343). Issue closed.
-
-## Running
-
-Nothing (2026-10-11 ~05:00). All own CoppeliaSim instances stopped.
 
 ## Results 2026-10-11
 
@@ -111,14 +122,21 @@ Nothing (2026-10-11 ~05:00). All own CoppeliaSim instances stopped.
   mirror, so the commands' safe ordering hardly depended on the state. Needs a state set where the best command depends on
   the state before any wall claim.
 
-## Next, in order
+## Next, in order (2026-10-14)
 
-1. **Timing step 2 (Codex; separate ablation, needs training -- plan to the user first):** z sees a 0.25 s frame pair but
-   is trained toward a 1 s stride-smoothed label (mean over 1.2 s). Caveat: the 1 s window exists to remove gait sway (F295,
-   `body_motion` docstring: 5-frame window -> sway dominates), so simply narrowing the label is expected to hurt. Options: (a)
-   widen what z sees (pair span 0.5-1 s) and keep the label; (b) keep both and add onset-weighted loss. Same checks as F341/F342.
-2. Wall: user reviews the pilot; then full collection; then prediction check v2 on the new model (F338 protocol).
-3. Paper (IROS 8 pages) once a rollout-beats-direct result exists.
+1. c10 top-up done -> move the 30 stored != live first-run episodes -> c10 gate.
+2. Balance plan (numbers per split, B1 + c10, cells + sides) -> user approves -> collect short cells / trim -> render ->
+   gates pass on both bodies.
+3. Wall loader + clearance head (can be written while 1-2 run) -> wall training runs on the other PC (after the
+   hexonly pair) -> prediction check -> closed loop -> c08 wall test set.
+4. Read the hexonly pair: centring on a new body; current-recipe adapted vs joint.
+5. Paper (IROS 8 pages) once a rollout-beats-direct wall result exists.
+Parked: timing step 2 (z's 0.25 s pair vs 1 s label, Codex), weekly-update storyline redo, gait-shake removal in training.
+Later, if there is time (user 2026-10-14): move EVERYTHING to MuJoCo (physics + rendering, no CoppeliaSim) with the
+`red_mirror` hexapod (`brain-web-mujoco/public/assets/red_mirror/`, 18 joints, has a controller). Gains: exact
+save / restore (no determinism classes, no live-vs-replay re-queue, F305 / F346), minutes per episode. Pilot first (~1 week):
+Froude-matched 24 + 4 commands, egocentric render (FOV 90, textured rooms), exact branches; two leg-scale variants for the
+seen / unseen body test. Then recollect all data and retrain; until then c10 / c08 (CoppeliaSim) stay the paper's bodies.
 
 ## Older plan (2026-10-09, kept for reference)
 

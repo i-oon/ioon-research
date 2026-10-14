@@ -114,7 +114,7 @@ def pose(sim, H):
     return (h[:2] + a[:2]) / 2, float(np.arctan2(h[1] - a[1], h[0] - a[0]))
 
 
-def place_room(rng, p0, h0, corner, group=None):
+def place_room(rng, p0, h0, corner, group=None, side=None):
     """room centre / rotation so the start pose faces a wall (or a corner) as the B1 episodes do (distances x S).
     group (non-corner, 2026-10-13 top-up): "head-on" 0-25 deg / "oblique" 35-70 deg to the +x wall's normal, and the
     start's y is chosen so the straight path HITS the +x wall >= 1.2 m from both side walls. Without it the start y
@@ -122,8 +122,18 @@ def place_room(rng, p0, h0, corner, group=None):
     states vs B1 89 of 157)."""
     if corner:
         d = rng.uniform(2.5, 4.0, 2) * S                                   # from both walls of corner (+H, +H)
-        p_room = np.array([F.H - d[0], F.H - d[1]])
-        tgt = np.array([F.H, F.H]) - rng.uniform(0.3, 1.0) * S
+        sy = 1.0
+        if side is not None:
+            # BALANCE (2026-10-14): the corner's second wall on the requested side. Corner (+H, +H) puts the +y wall
+            # LEFT of a heading into it, (+H, -H) puts the -y wall RIGHT; the start is closer to the +x wall so
+            # that wall is the nearest and the y wall the second (all corners were (+H, +H): train 21 L / 9 R)
+            sy = 1.0 if side == "L" else -1.0
+            d = np.sort(d)
+        p_room = np.array([F.H - d[0], sy * (F.H - d[1])])
+        u = rng.uniform(0.3, 1.0) * S                                      # one draw, as before (same stream)
+        tgt = np.array([F.H - u, sy * (F.H - u)])
+        if side is not None:                                               # aim nearer the +x wall: it stays the
+            tgt = np.array([F.H - rng.uniform(0.2, 0.45) * S, sy * (F.H - rng.uniform(0.8, 1.1) * S)])  # nearest
         head_room = float(np.arctan2(tgt[1] - p_room[1], tgt[0] - p_room[0]) + np.deg2rad(rng.uniform(-5, 5)))
     else:
         dist = rng.uniform(1.5, 4.0) * S                                   # from wall +x (normal +x)
@@ -134,6 +144,10 @@ def place_room(rng, p0, h0, corner, group=None):
         else:
             for _ in range(200):
                 ang = rng.uniform(*{"head-on": (0, 25), "oblique": (35, 70)}[group]); sg = rng.choice([-1, 1])
+                if side is not None:
+                    sg = 1 if side == "L" else -1                  # heading left (+) / right of the wall normal
+                    if group == "head-on":                         # near 0 deg the gait sway flips the measured side
+                        ang = rng.uniform(8, 25)                   # (balance round 3: asked L, got 3 L / 6 R in a band)
                 dist = rng.uniform(1.5, 4.0) * S; p_room[0] = F.H - dist - F.FOOT_L / 2   # steep angles need short
                 y_hit = rng.uniform(-F.H + 1.2, F.H - 1.2)
                 y0 = y_hit - sg * (dist + F.FOOT_L / 2) * np.tan(np.deg2rad(ang))
@@ -147,7 +161,7 @@ def place_room(rng, p0, h0, corner, group=None):
     return rm
 
 
-def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600, group=None):
+def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600, group=None, side=None):
     """ONE live closed-loop episode (approach + complete escape), recipes chosen from the pose every 10 frames through
     `cpg_clock.Clock`. Returns (out, room, branch frames T, clock snapshots per frame, log)."""
     import collect_ik as CI
@@ -167,7 +181,7 @@ def episode_live(sim, R, rng, cmds_seed, corner, n_frames=600, group=None):
         if t % 10 == 0:
             p_w, h_w = pose(sim, H)
             if st["room"] is None:
-                st["room"] = place_room(rng, p_w, h_w, corner, group)
+                st["room"] = place_room(rng, p_w, h_w, corner, group, side)
                 st["aim"] = float(st["room"].yaw(h_w))           # approach heading to hold (room frame)
             rm = st["room"]; pos = rm.p(p_w); yw = float(rm.yaw(h_w))
             c = F.clearance(pos, yw, None)
@@ -317,7 +331,7 @@ def worker(port, jobs, split, log):
     log(f"port {port}: {SHORT_WARM} warm-up runs in {time.time() - t0:.0f} s")
     out_dir = os.path.join(W.DATA, "_physics", split)
     jobs, tries = list(jobs), {}
-    for ep, look, corner, group in jobs:
+    for ep, look, corner, group, side in jobs:
         if os.path.exists(os.path.join(out_dir, f"ep{ep:05d}.npz")):
             continue
         t0 = time.time()
@@ -328,7 +342,7 @@ def worker(port, jobs, split, log):
         # physics; classes come in streaks, so the next live run usually lands in the replays' class).
         for sync_try in range(4):
             rng = np.random.default_rng(ep)
-            live, st, states, snaps, elog = episode_live(sim, R, rng, seed, corner, group=group)
+            live, st, states, snaps, elog = episode_live(sim, R, rng, seed, corner, group=group, side=side)
             n_ep = (st["done_at"] + 1) if st["done_at"] is not None else len(live["actions"])
             A = np.asarray(live["actions"][:n_ep], np.float32)
             room = st["room"]
@@ -401,7 +415,7 @@ def worker(port, jobs, split, log):
             # one class). At most 3 tries, then skipped and logged.
             tries[ep] = tries.get(ep, 0) + 1
             if tries[ep] < 3:
-                jobs.append((ep, look, corner, group))
+                jobs.append((ep, look, corner, group, side))
                 log(f"ep{ep}: stored class != live class (try {tries[ep]}) -- episode re-queued"); continue
             log(f"ep{ep}: SKIPPED -- stored class != live class in 3 tries"); continue
         ref = refs[win]
@@ -438,10 +452,11 @@ def worker(port, jobs, split, log):
 def do_physics(a):
     import threading
     grp = None if a.group == "mixed" else a.group
-    jobs = [(a.ep0 + i, a.look0 + i, a.corner, None if a.corner else grp) for i in range(a.n)]
+    sd = None if a.side == "mixed" else a.side
+    jobs = [(a.ep0 + i, a.look0 + i, a.corner, None if a.corner else grp, sd) for i in range(a.n)]
     # corner episodes in the same run, numbered ep0 + 200 + i (2026-10-13: +300 collided val corners 10800- with test
     # approach 10800-; keep every split's numbers within its own 300-block: train 10000-, val 10500-, test 10800-)
-    jobs += [(a.ep0 + 200 + i, a.look0 + 200 + i, True, None) for i in range(a.n_corner)]
+    jobs += [(a.ep0 + 200 + i, a.look0 + 200 + i, True, None, sd) for i in range(a.n_corner)]
     per = [jobs[k::len(a.ports)] for k in range(len(a.ports))]
     lock = threading.Lock()
 
@@ -500,6 +515,8 @@ if __name__ == "__main__":
     ap.add_argument("--ep0", type=int, default=9000)
     ap.add_argument("--look0", type=int, default=9000)
     ap.add_argument("--corner", action="store_true")
+    ap.add_argument("--side", default="mixed", choices=("mixed", "L", "R"),
+                    help="physics: approach side (heading left / right of the wall normal; corners: side of the 2nd wall)")
     ap.add_argument("--group", default="mixed", choices=("mixed", "head-on", "oblique"),
                     help="physics, approach episodes: start angle to the wall (place_room); mixed = the original draw")
     ap.add_argument("--n_corner", type=int, default=0, help="physics: also this many CORNER episodes (numbers ep0 + 200 + i)")

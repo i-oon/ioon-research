@@ -420,6 +420,28 @@ class DirectFroudePlanner:
         return cand["actions"][min(t, len(cand["actions"]) - 1)], i, scores, t
 
 
+@torch.no_grad()
+def vision_goal_froude(rp, goal_emb, window=21, goal_offset=None):
+    """The goal READ FROM VIDEO (no recorded number): the goal clip's frame embeddings `goal_emb` (T, tokens, dim)
+    through the model's own ITM + Froude head, pairs (t, t+stride), raw Froude per pair, averaged over a centred
+    `window`; returns (T, 3) raw Froude (last value repeated at the end). Exactly `selection_eval.py --goal_source
+    vision` (2026-10-14: shared with the physics loops so offline and closed-loop read the goal identically).
+    `rp` = a RolloutFroudePlanner of the controlled body's checkpoint (its ITM, Froude head and standardisation)."""
+    from wm.evaluate import offset_as
+    k = rp.stride
+    e = goal_emb.float()
+    if goal_offset is not None:
+        e = e - offset_as(goal_offset.float(), (1, *e.shape[1:]))
+    e = e.to(rp.device)
+    z = rp.itm(e[:-k], e[k:])
+    f = rp.md.body(e[:-k], z).float().cpu().numpy() * rp.std_s + rp.mean_s
+    half, n = window // 2, len(goal_emb)
+    vg = np.stack([f[max(0, t - half):min(len(f), t + half + 1)].mean(0) for t in range(min(n, len(f)))])
+    if len(vg) < n:
+        vg = np.concatenate([vg, np.repeat(vg[-1:], n - len(vg), 0)])
+    return vg
+
+
 class RolloutFroudePlanner:
     """`score_by_body_motion.py`'s mode C, live: the goal is read from the SOURCE robot's frames
     via the ITM (never a recorded number), and each candidate is scored by rolling the FTM forward

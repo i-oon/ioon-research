@@ -21,10 +21,11 @@
 #   bash scripts/run/round1_counterfactual.sh J        # round 2: arm B + shared-z soft InfoNCE (wm/align.py,
 #                                                      # --lambda_align ${LAMBDA_ALIGN:-0.1}); run round2_align_s$SEED$RUN_TAG.
 #                                                      # Same data dirs as B; e.g. PFX=rr_ RUN_TAG=_rr ... J
+#   RUN_TAG=_gray_imread EXTRA="<the current recipe flags, see hexonly_center_pair.sh>" bash ... W   # WALL run
 #   a longer arm B is a NEW run (new --name, fresh cosine schedule); --resume only continues an unfinished run
 set -uo pipefail
 cd "$(dirname "$0")/../.."
-ARM=${1:?usage: round1_counterfactual.sh A|B|H|F|J|M|S}
+ARM=${1:?usage: round1_counterfactual.sh A|B|H|F|J|M|S|W}
 SEED=${SEED:-0}
 PFX=${PFX:-}              # data prefix: "" = current renders; rr_ = random room size + start (rendering only)
 RUN_TAG=${RUN_TAG:-}      # appended to the run name, e.g. _rr
@@ -72,10 +73,25 @@ case $ARM in
      ARGS="--sources hexapod=$CW/srbal_c10_clips_train hexapod=$CW/srbal_c10_branches_train b1=$CW/srbal_b1_clips_train
            b1=$CW/srbal_b1_branches_train --epochs 3 --checkpoint_every 1"
      VAL="--val_sources hexapod=$CW/c10_clips_val b1=$CW/b1_clips_val" ;;
+  W) NAME=round3_wall_s$SEED$RUN_TAG             # = arm B + the B1 and c10 WALL BRANCHES (train), doc/WALL_SELECTION_PLAN.md:
+                                                 # original world-model objectives only, no safety loss. Wall data =
+                                                 # BRANCHES ONLY (balanced across bodies by start state; the long escape
+                                                 # episodes differ in frames per body -> only in the episodes-only
+                                                 # ablation, trimmed to equal frames). Same budget and schedule as arm B:
+                                                 # 3 epochs x 10,176 batches (--batches_per_epoch; random subset each epoch).
+     for b in b1 c10; do
+       d=data/wall_$b/train; L=data/wall_$b/train_branches
+       [ -s "$(ls $d/*_b*_c*.npz 2>/dev/null | head -1)" ] || { echo "MISSING/EMPTY $d"; exit 1; }
+       rm -rf $L; mkdir -p $L; for f in $d/ep*_b*_c*.npz; do ln -s "$(realpath $f)" $L/; done
+       echo "$L: $(ls $L | wc -l) branch files"
+     done
+     ARGS="--sources hexapod=$CW/c10_clips_train hexapod=$CW/c10_branches_train b1=$CW/b1_clips_train
+           b1=$CW/b1_branches_train hexapod=data/wall_c10/train_branches b1=data/wall_b1/train_branches
+           --epochs 3 --batches_per_epoch 10176 --checkpoint_every 1" ;;
   H) NAME=round1_hexonly_s$SEED$RUN_TAG          # hexapod only (B1 never seen); B1 is adapted afterwards
      ARGS="--sources hexapod=$CW/${PFX}c10_clips_train hexapod=$CW/${PFX}c10_branches_train --epochs 6 --checkpoint_every 1"
      VAL="--val_sources hexapod=$CW/${PFX}c10_clips_val" ;;
-  *) echo "arm must be A, B, H, F, J, M or S"; exit 1 ;;
+  *) echo "arm must be A, B, H, F, J, M, S or W"; exit 1 ;;
 esac
 setsid nohup $PY -m wm.train $COMMON $VAL $ARGS ${EXTRA:-} --name $NAME >> results/wm/logs/$NAME.log 2>&1 &
 TRAIN_PID=$!

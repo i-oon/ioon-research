@@ -400,6 +400,15 @@ class Config:
     weight_decay: float = 0.01
     epochs: int = 50
     grad_clip: float = 1.0
+    # STEP-LEVEL tensorboard (2026-10-14, Ajan Blink week 20: loss curves, not 3 per-epoch points): every
+    # `log_every` training steps the mean of each loss term over those steps -> `train_step/<term>` at the global step;
+    # every `val_every` steps the FULL validation pass -> `val_step/<term>`. 0 = off (every earlier run).
+    log_every: int = 500
+    # cap on TRAINING batches per epoch (0 = the whole epoch, every earlier run). A run with more data keeps another
+    # run's steps AND its per-epoch cosine schedule (e.g. the wall run: 3 epochs x arm B's 10,176 batches); the
+    # sampler reshuffles every epoch, so each epoch is a fresh random subset.
+    batches_per_epoch: int = 0
+    val_every: int = 2000
     num_workers: int = 4
     # Frames are read on demand from an uncompressed per-clip cache (wm/data/frame_store.py)
     # instead of being held in RAM; identical samples either way. False loads them eagerly, and

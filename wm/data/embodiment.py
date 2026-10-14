@@ -72,7 +72,15 @@ def gradient(x, dt, segment=None):
 
 
 def _segment_of(data):
-    return data["segment"] if "segment" in data.files else None
+    """Command segments (labels never smoothed / differenced across a switch, F303). `segment` when stored; else, for
+    files that log the commanded index per frame (wall-data episodes, `cmd_index`, 2026-10-14), a new segment at every
+    change of it; else None (clips with one command)."""
+    if "segment" in data.files:
+        return data["segment"]
+    if "cmd_index" in data.files:
+        c = np.asarray(data["cmd_index"])
+        return np.concatenate([[0], np.cumsum(c[1:] != c[:-1])]).astype(np.int64)
+    return None
 
 
 def body_motion(position, dt, segment=None):
@@ -155,7 +163,7 @@ def _hexapod(data):
         "actions": data["actions"].astype(np.float32),
         "contact": (data["forces"].astype(np.float32) > CONTACT_THRESHOLD).astype(np.int64),
         "body_motion": motion,
-        "group": int(data["expert_episode"]),
+        "group": int(data["expert_episode"]) if "expert_episode" in data.files else 0,   # wall data has none
         "body": str(data["morph"]),
     }
 

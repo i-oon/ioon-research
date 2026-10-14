@@ -84,7 +84,7 @@ def build(ckpt, pretrained, device):
 
 
 def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, hinge_margin=0.1,
-          stride=1, froude=None, anchor=None, extra_params=()):
+          stride=1, froude=None, anchor=None, extra_params=(), lambda_imread=0.0, imread_k=4, head=None):
     """One-step prediction loss on the target clips, ITM and FTM both trainable.
 
     One randomly drawn batch of transitions per optimiser step. Only that batch is moved to the
@@ -141,6 +141,28 @@ def adapt(itm, ftm, clips, steps, lr, seed, device, batch=8, lambda_hinge=0.0, h
             del z_null, null, sep, hinge
         if anchor is not None and froude is not None:
             loss = loss + anchor(z, froude[ci][s:t].to(device), e_t=e_t)
+        if lambda_imread > 0 and froude is not None and head is not None:
+            # IMAGINED-READ term (2026-10-15), the pretraining's `wm.train` lambda_imread at adaptation: roll the FTM
+            # `imread_k` steps from the real frame with the real transitions' z (detached), read every imagined
+            # transition through the ITM and the Froude head with their weights DETACHED (only the FTM learns), match
+            # the step's standardised Froude label; steps past the clip end are masked. Off by default.
+            fr = froude[ci]; n_e, n_f = len(e_cpu), len(fr)
+            idx = np.arange(s, t)
+            itm_w = {**{k_: v.detach() for k_, v in itm.named_parameters()}, **dict(itm.named_buffers())}
+            e_prev, e_nx, terms = e_t, pred, []
+            for k_ in range(imread_k):
+                a_i, b_i, f_i = idx + k_ * gap, idx + (k_ + 1) * gap, idx + k_ * gap
+                m = torch.as_tensor((b_i < n_e) & (f_i < n_f), dtype=torch.float32, device=device)
+                if k_ > 0:
+                    with torch.no_grad():
+                        zk = itm(e_cpu[np.minimum(a_i, n_e - 1)].to(device).float(),
+                                 e_cpu[np.minimum(b_i, n_e - 1)].to(device).float())
+                    e_nx = ftm(e_prev, zk)
+                r = head(None, torch.func.functional_call(itm, itm_w, (e_prev, e_nx)))
+                y = fr[np.minimum(f_i, n_f - 1)].to(device)
+                terms.append((((r.float() - y) ** 2).mean(-1) * m).sum() / m.sum().clamp(min=1))
+                e_prev = e_nx
+            loss = loss + lambda_imread * torch.stack(terms).mean()
         loss.backward()
         opt.step()
         last = loss.item()

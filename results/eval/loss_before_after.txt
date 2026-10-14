@@ -1,0 +1,26 @@
+World-model loss terms on the same evaluation sets (training code's validation pass; lower is better).
+Each checkpoint with its own training sources' normalisation; no branches; with branches
+=== clips_val (2688 pairs)
+term                               no branches           with branches
+body                                    1.0668                  0.5716
+hinge                                   0.0093                  0.0072
+motion                                  1.0407                  1.0319
+motion_first                            1.0395                  1.0185
+readout                                 0.6878                  0.4985
+recon                                   3.9557                  3.8086
+rollout                                 4.0999                  3.8632
+selection                               3.9557                  3.8086
+separation                              0.4375                  0.2956
+total                                   9.2815                  8.4596
+=== branches_heldout (10 %) (3806 pairs)
+term                               no branches           with branches
+body                                    0.9678                  0.5391
+hinge                                   0.0070                  0.0061
+motion                                  1.0501                  1.0275
+motion_first                            1.0526                  1.0143
+readout                                 0.9519                  0.6124
+recon                                   3.9997                  3.8115
+rollout                                 4.2007                  3.8880
+selection                               3.9997                  3.8115
+separation                              0.4539                  0.3069
+total                                   9.6397                  8.5845

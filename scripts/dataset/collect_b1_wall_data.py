@@ -272,7 +272,7 @@ def wall_dist(pos, w):
     return (F.H - pos[0], F.H + pos[0], F.H - pos[1], F.H + pos[1])[w]
 
 
-def episode_approach(seed, n_frames=600, corner=False):
+def episode_approach(seed, n_frames=600, corner=False, group=None, side=None):
     """APPROACH-ESCAPE episodes (2026-10-11, agreed with the user): approach a wall, then a COMPLETE escape:
     back up / side-step to make room -> turn toward an open direction -> walk out into the room -> next wall.
     Phases:
@@ -317,7 +317,7 @@ def episode_approach(seed, n_frames=600, corner=False):
         nrm = [(1, 0), (-1, 0), (0, 1), (0, -1)][w]
         if first:
             st["des"] = yaw0
-        elif corner or rng.random() < 0.3:                       # a corner region next to that wall
+        elif corner or (group is None and rng.random() < 0.3):   # a corner region next to that wall
             sx = nrm[0] if nrm[0] else rng.choice([-1.0, 1.0]); sy = nrm[1] if nrm[1] else rng.choice([-1.0, 1.0])
             # CORNER episodes (--corner, 2026-10-12: corners were 7 of 135 train states): aim deep into the corner,
             # 0.3-1.0 m from BOTH walls, so the branch states have the second wall close too
@@ -325,7 +325,14 @@ def episode_approach(seed, n_frames=600, corner=False):
             st["des"] = float(np.arctan2(tgt[1] - p_[1], tgt[0] - p_[0]))
         else:
             ang = rng.uniform(30, 85) if rng.random() < 0.75 else rng.uniform(0, 30)   # mostly angled approaches
-            st["des"] = np.arctan2(nrm[1], nrm[0]) + np.deg2rad(ang) * rng.choice([-1, 1])
+            sg = rng.choice([-1, 1])
+            # BALANCE top-up (2026-10-14, DATA_PLAN 13 fairness rule): --group head-on 0-25 / oblique 35-70 deg,
+            # --side L (+, heading left of the wall normal) / R; no random corner approaches then
+            if group is not None:
+                ang = rng.uniform(*{"head-on": (0, 25), "oblique": (35, 70)}[group])
+            if side is not None:
+                sg = 1 if side == "L" else -1
+            st["des"] = np.arctan2(nrm[1], nrm[0]) + np.deg2rad(ang) * sg
         st.update(d0=rng.uniform(1.2, 2.0), d1=rng.uniform(0.8, 1.2), d2=rng.uniform(0.4, 0.8), marked=-1,
                   straight=False, fwd=int(rng.choice(F.FWD)), n_app=st["n_app"] + 1)   # episodes = successful escapes only
 
@@ -547,11 +554,14 @@ def physics_job(args):
     (rec[j0-1] is exactly the snapshot snaps[j0] restored for the branch); branch frames = the command's 40 frames."""
     ep, split, look = args[:3]
     corner = bool(args[3]) if len(args) > 3 else False
+    group = args[4] if len(args) > 4 else None
+    side = args[5] if len(args) > 5 else None
     out = os.path.join(DATA, "_physics", split)
     if os.path.exists(os.path.join(out, f"ep{ep:05d}.npz")):
         return f"ep{ep} exists"
     cmds, fam = commands28(); names = cmd_names()
-    r, rec, snaps, states, escapes = episode_approach(ep, n_frames=400 if corner else 600, corner=corner)
+    r, rec, snaps, states, escapes = episode_approach(ep, n_frames=400 if corner else 600, corner=corner,
+                                                      group=group, side=side)
     style = "corner" if corner else "approach"
     seg = np.cumsum(np.r_[0, np.diff([x["cmd"] for x in rec]) != 0])
     meta = dict(episode=np.int64(ep), split=np.array(split), room_seed=np.int64(look), style=np.array(style),
@@ -585,7 +595,8 @@ def physics_job(args):
 
 def do_physics(a):
     from multiprocessing import Pool
-    J = [(a.ep0 + i, a.split, a.look0 + i, a.corner) for i in range(a.n)]
+    J = [(a.ep0 + i, a.split, a.look0 + i, a.corner, None if a.group == "mixed" else a.group,
+          None if a.side == "mixed" else a.side) for i in range(a.n)]
     with Pool(a.workers) as p:
         for m in p.imap_unordered(physics_job, J):
             print(m, flush=True)
@@ -1107,6 +1118,10 @@ if __name__ == "__main__":
     ap.add_argument("--look0", type=int, default=7000)
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--h", type=float, default=1.25)
+    ap.add_argument("--group", default="mixed", choices=("mixed", "head-on", "oblique"),
+                    help="physics: approach angle of every non-first approach (balance top-up); mixed = original draw")
+    ap.add_argument("--side", default="mixed", choices=("mixed", "L", "R"),
+                    help="physics: approach side (heading left / right of the wall normal); mixed = random")
     ap.add_argument("--corner", action="store_true", help="physics: CORNER episodes, 20 s: start 2.5-4 m from both walls of a corner facing into it (+-15 deg); branch states only where both walls are close")
     ap.add_argument("--splits", nargs="+", default=["train", "val", "test"])
     a = ap.parse_args()

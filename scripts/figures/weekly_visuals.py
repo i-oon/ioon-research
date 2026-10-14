@@ -163,12 +163,17 @@ YLIM = {0: (-0.05, 0.30), 2: (-0.05, 0.12)}   # same axes in every physics clip 
 def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/c08", window=11,
                  goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz",
                  goal_ego="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{ep}.npz", out=None,
-                 morph="c08f09t09", body="c08"):
+                 morph="c08f09t09", body="c08", vision_base=None):
     """Hexapod goal (third-person) | c08 in physics, current pipeline (ego), with Froude traces.
     base / window / goal_tp / goal_ego ({ep} = goal_ep) / out: defaults = the original figure. morph / body: the run's
-    file prefix and label (default c08; c10 = "c10f10t10" / "c10", 2026-10-12)."""
+    file prefix and label (default c08; c10 = "c10f10t10" / "c10", 2026-10-12).
+    vision_base (2026-10-14, Ajan Blink week 20): a run dir of the SAME goal / mechanism with `--goal_source vision`;
+    then the traces are: recorded goal black, robot aiming at it gray, goal read from the goal video blue, robot
+    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure."""
     base = os.path.join(ROOT, base)
     run = np.load(f"{base}/{mech}_w{window}/{morph}_hexapod_{goal_ep}.npz", allow_pickle=True)
+    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{window}", f"{morph}_hexapod_{goal_ep}.npz"), allow_pickle=True)
+            if vision_base else None)
     goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
     goal_ego = np.load(os.path.join(ROOT, goal_ego.format(ep=goal_ep)), allow_pickle=True)["frames"]
     n = min(len(run["frames"]), len(goal), len(run["achieved_froude"]))
@@ -177,6 +182,13 @@ def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physi
     for t in range(n):
         fig, axes = plt.subplots(1, 2, figsize=(7.68, 2.2), dpi=100)
         for ax, ch, nm in zip(axes, (0, 2), ("forward", "yaw")):
+            if vrun is not None:
+                ax.plot(g[:, ch], color="black", lw=2, label="goal, recorded (sim)")
+                ax.plot(run["achieved_froude"][:t + 1, ch], color="0.55", lw=2, label=f"{body}, recorded goal")
+                ax.plot(vrun["goal_plan_t"][:n, ch], color="#1f5fd1", lw=2, label="goal, read from video")
+                ax.plot(vrun["achieved_froude"][:t + 1, ch], color="#7fb8f0", lw=2, label=f"{body}, video goal")
+                ax.set_xlim(0, 65); ax.set_ylim(*YLIM[ch]); ax.set_title(f"{nm} Froude", fontsize=9)
+                continue
             ax.plot(g[:, ch], color="black", lw=2, label="goal (hexapod c10)")
             ax.plot(run["achieved_froude"][:t + 1, ch], color=SHAPES, lw=2, label=f"{body} in physics")
             ax.set_xlim(0, 65); ax.set_ylim(*YLIM[ch]); ax.set_title(f"{nm} Froude", fontsize=9)
@@ -194,12 +206,17 @@ def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physi
 
 
 def b1_physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/b1", window=11,
-                    goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz", out=None):
+                    goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz", out=None, vision_base=None):
     """Hexapod goal (third-person) | B1 walking under its own policy in physics (third-person, re-rendered
     from the saved MuJoCo states) | the B1's ego view the planner read, with Froude traces.
-    base / window / goal_tp (goal third-person clip, {ep} = goal_ep) / out: defaults = the original figure."""
+    base / window / goal_tp (goal third-person clip, {ep} = goal_ep) / out: defaults = the original figure.
+    vision_base (2026-10-14, Ajan Blink week 20): a run dir of the SAME goal / mechanism with `--goal_source vision`;
+    then the traces are: recorded goal black, robot aiming at it gray, goal read from the goal video blue, robot
+    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure."""
     base = os.path.join(ROOT, base)
     run = np.load(f"{base}/{mech}_w{window}/b1_hexapod_{goal_ep}.npz", allow_pickle=True)
+    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{window}", f"b1_hexapod_{goal_ep}.npz"), allow_pickle=True)
+            if vision_base else None)
     tp = "thirdperson" if mech == "direct" else f"thirdperson_{mech}"
     third = np.load(f"{base}/{tp}_b1_hexapod_{goal_ep}.npz", allow_pickle=True)["frames"]
     goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
@@ -209,6 +226,13 @@ def b1_physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/ph
     for t in range(n):
         fig, axes = plt.subplots(1, 2, figsize=(7.68, 2.2), dpi=100)
         for ax, ch, nm in zip(axes, (0, 2), ("forward", "yaw")):
+            if vrun is not None:
+                ax.plot(g[:, ch], color="black", lw=2, label="goal, recorded (sim)")
+                ax.plot(run["achieved_froude"][:t + 1, ch], color="0.55", lw=2, label=f"B1, recorded goal")
+                ax.plot(vrun["goal_plan_t"][:n, ch], color="#1f5fd1", lw=2, label="goal, read from video")
+                ax.plot(vrun["achieved_froude"][:t + 1, ch], color="#7fb8f0", lw=2, label=f"B1, video goal")
+                ax.set_xlim(0, 65); ax.set_ylim(*YLIM[ch]); ax.set_title(f"{nm} Froude", fontsize=9)
+                continue
             ax.plot(g[:, ch], color="black", lw=2, label="goal (hexapod c10)")
             ax.plot(run["achieved_froude"][:t + 1, ch], color=SHAPES, lw=2, label="B1 in physics")
             ax.set_xlim(0, 65); ax.set_ylim(*YLIM[ch]); ax.set_title(f"{nm} Froude", fontsize=9)

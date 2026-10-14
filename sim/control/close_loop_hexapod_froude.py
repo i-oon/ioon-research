@@ -70,6 +70,12 @@ def main():
     ap.add_argument("--grade_every", type=int, default=2, help="frames between graded steps, independent of "
                     "--replan_every (2026-10-10), so changing how often the planner decides does not change the grading")
     ap.add_argument("--window", type=int, default=21)
+    ap.add_argument("--goal_source", default="recorded", choices=("recorded", "vision"),
+                    help="recorded (default, every run before 2026-10-14): the planner sees the goal clip's recorded "
+                         "Froude (privileged). vision: the goal READ from the goal clip's frames through the model's own "
+                         "ITM + Froude head (wm.policy.planner.vision_goal_froude, = selection_eval --goal_source vision); "
+                         "grading stays against the recorded goal")
+    ap.add_argument("--goal_window", type=int, default=21, help="vision goal: centred averaging window (frames)")
     ap.add_argument("--phase_match", action="store_true",
                     help="execution only: on a switch, continue the new candidate from the frame whose "
                          "joint command is nearest the last one sent (its gait phase), not from index t. "
@@ -121,6 +127,23 @@ def main():
     cands = planner.candidates
     goal_path = os.path.join(ROOT, args.goal)
     goal_bm = np.asarray(load(goal_path, REGISTRY[emb])["body_motion"])[:, :3]
+    goal_plan = goal_bm                                  # what the planner aims at; grading always uses goal_bm
+    if args.goal_source == "vision":
+        from wm.policy.planner import vision_goal_froude
+        gp = rp                                          # goal reader; a SEPARATE object for direct, because
+        if gp is None:                                   # `rp is None` is what selects the direct mechanism below
+            gp = RolloutFroudePlanner.from_checkpoint(ckpt, cdir, embodiment=emb, horizon=args.horizon,
+                                                      per_condition=999, device=dev)
+        if encoder is None:
+            from vjepa2_encoder import VJEPA2FrameEncoder
+            encoder = VJEPA2FrameEncoder(dtype=torch.float32)
+        gfr = np.load(goal_path, allow_pickle=True)["frames"]
+        gemb = encode_clip(encoder, np.asarray(gfr), 8).float()
+        goal_plan = vision_goal_froude(gp, gemb, args.goal_window,
+                                       offset_for(torch.load(ckpt, map_location="cpu", weights_only=False), "hexapod"))
+        rr = [np.corrcoef(goal_plan[:, j], goal_bm[:len(goal_plan), j])[0, 1] for j in range(3)]
+        print(f"  vision goal: L2 to recorded {np.linalg.norm(goal_plan[:len(goal_bm)] - goal_bm[:len(goal_plan)], axis=1).mean():.4f}, "
+              f"r {rr[0]:+.2f} / {rr[1]:+.2f} / {rr[2]:+.2f}", flush=True)
     ref_frames = [np.load(c["path"], allow_pickle=True)["frames"][0] for c in cands[:12]]
     sim = RemoteAPIClient("localhost", port=args.port).getObject("sim")
     name, scene = args.morph.split("=", 1)
@@ -210,7 +233,7 @@ def main():
             chosen.append("prewalk")
             return clock["k"].step()
         if t % args.replan_every == 0:
-            g = torch.as_tensor(planner.standardize(goal_for(goal_bm, t, args)), dtype=torch.float32)
+            g = torch.as_tensor(planner.standardize(goal_for(goal_plan, t, args)), dtype=torch.float32)
             with torch.no_grad():
                 if args.mechanism == "random":
                     i = int(rnd.integers(len(cands)))
@@ -302,7 +325,7 @@ def main():
     with np.load(out, allow_pickle=True) as d:
         saved = {k: d[k] for k in d.files}
     np.savez_compressed(out[:-4] + ".tmp.npz", **saved, achieved_froude=achieved[:n].astype(np.float32),
-                        goal_froude_t=goal_bm[:n].astype(np.float32))
+                        goal_froude_t=goal_bm[:n].astype(np.float32), goal_source=np.array(args.goal_source), goal_plan_t=np.asarray(goal_plan)[:n].astype(np.float32))
     os.replace(out[:-4] + ".tmp.npz", out)
     if clock["k"] is not None:
         print(f"  cpg clock: {clock['k'].switches} recipe switches (4-frame cross-fade each)")
