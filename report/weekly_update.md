@@ -468,7 +468,10 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 | pretraining | recorded goal: direct / rollout | goal read from video: direct / rollout |
 |---|---|---|
 | joint, no branches | +0.97 / +0.72 | +0.35 / +0.24 |
-| joint, with branches | +0.94 / +0.75 | **+0.84 / +0.63** |
+| joint, with branches | +0.94 / +0.75 | +0.84 / +0.63 |
+| hexapod-only, B1 adapted, with branches | +0.97 / +0.70 | +0.83 / +0.57 |
+| **joint, branches + grayscale + imagination term (current)** | **+0.93 / +0.87** | **+0.85 / +0.74** |
+| **hexapod-only, B1 adapted, current recipe (term also in adaptation)** | **+0.96 / +0.76** | **+0.84 / +0.63** |
 
 - Same setup, no branches vs with branches: rollout from the current frame c10 +0.59 → +0.71 / +0.68, c08 +0.58 → +0.68 / +0.64; B1 +0.72 → +0.75 / +0.73.
 - Reading the goal from video improves most (B1 +0.35 → +0.84).
@@ -494,8 +497,6 @@ whether the wider 64-D space is shared. Held-out clips, current recipe (grayscal
 | hexapod-only, B1 adapted (imagination term in pretraining and adaptation) | **0.42** | +0.83 / +0.46 / +0.58 | +0.63 / **+0.56 / +0.38** | **0.60** | 0.64 | 0.44 |
 
 ![z of the three bodies, hexapod-only pretraining + B1 adapted (imagination term in pretraining and adaptation): coloured by body and by behaviour](../results/eval/round1_hexonly_s0_gray_imread_adaptimread/shared_latent/latent_round1_hexonly_s0_gray_imread_adaptimread.png)
-
-Joint model for comparison (B1 separate): [figure](../results/eval/round1_branches_s0_gray_imread/shared_latent/latent_round1_branches_s0_gray_imread.png)
 
 - Between the two hexapods z is well shared (forward R² +0.81–0.83, retrieval ≈ 0.65–0.7).
 - With B1 in joint pretraining, forward transfers but lateral / yaw do not, and the bodies stay separable (body-ID 0.56–0.59).
