@@ -1,6 +1,6 @@
 # Data — what is current, which split, made by which script
 
-> Updated 2026-10-14 (wall data `data/wall_b1`, `data/wall_c10` added below). 2026-10-09: random-size-room data `rr_*`, `rrv2_*`, `rrv3_*` deleted; dropped direction). Plan and design: `doc/DATA_PLAN.md`. Facts and checks: FINDINGS F293-F306. Label conventions:
+> Updated 2026-10-15 (wall data balanced; see the wall section). 2026-10-09: random-size-room data `rr_*`, `rrv2_*`, `rrv3_*` deleted; dropped direction). Plan and design: `doc/DATA_PLAN.md`. Facts and checks: FINDINGS F293-F306. Label conventions:
 > memory `project_timescale_conventions` (0.05 s frames; 1 s Froude at the centre of mass; smoothing and differencing never
 > cross a command switch; read-out window 21). Everything under `data/` is git-ignored; copy to the server with `rsync -aL`.
 
@@ -37,7 +37,7 @@ number = `*_heldout` and `c08_*` via `scripts/run/eval_suite.sh`.
 | dir | what | made by |
 |---|---|---|
 | ~~`srbal_{c10,b1}_{clips,branches}_train`~~ | DELETED 2026-10-12 (shared-room-look variant, not pursued, F331 note). Also deleted then: `rs_*` / `orig24_*` (room-size / shifted-room held-out test), `b1_babble_*`, `b1_sbabble_*` (babbling), `data/wall_predcheck` v1. Their numbers stay in FINDINGS; scripts in `scripts/_archive/`. | -- |
-| `data/wall_pilot/b1/` | 24 windows of B1's own forward walks, rotated to face +x, front wall 1-6 m ahead at the last frame; rooms 400-423, original recipe; `wall_dist` per frame | `scripts/diagnostics/wall_pilot/b1_wall_pilot.py` |
+| ~~`data/wall_pilot/b1/`~~ | DELETED 2026-10-15 (F328 pilot; numbers stay in FINDINGS; `scripts/diagnostics/wall_pilot/b1_wall_pilot.py` regenerates it) | -- |
 
 Grayscale models (`cfg.grayscale`, e.g. `round1_branches_s0_gray`): the frozen encoder converts frames to luminance
 (`scripts/vjepa2_encoder.py`, env `VJEPA_GRAY`, switched on automatically when such a checkpoint is loaded); embedding caches
@@ -47,7 +47,7 @@ Deleted 2026-10-09: `rr_*` (random room size 8-26.5 m + random start, F314-F319)
 training clip). Room draws kept in `rr_rooms.json`, `rr_v2_rooms.json`, `rr_v3_rooms.json`; re-render with
 `scripts/dataset/render_random_room.py` / `render_multiversion.py` if ever needed.
 
-## Wall data (2026-10-12 / 14): `data/wall_b1/`, `data/wall_c10/` -- NOT yet for training (gates + balance pending)
+## Wall data (2026-10-12 / 15): `data/wall_b1/`, `data/wall_c10/` -- balanced; final gates run overnight 2026-10-15
 
 Design: `doc/DATA_PLAN.md` section 13 (fairness rule, gates). Facts: FINDINGS F332-F334, F338, F346.
 
@@ -57,14 +57,21 @@ Design: `doc/DATA_PLAN.md` section 13 (fairness rule, gates). Facts: FINDINGS F3
 | `wall_b1/{train,val,test}` | B1 | rendered branch files (frames 256 px, `cam_pose`); train = selected 14/28, val / test = all 28 | same, `render` |
 | `wall_c10/_physics/{train,val,test}` | hexapod c10 | same layout; episodes = the live closed-loop run's replay (stored only when identical to the live run, F346); fields `room_c`, `room_phi` (virtual room per episode), `log` (controller decisions), `replay_equals_live`, `approach_group` (top-up) | `scripts/dataset/collect_c10_wall_data.py` (CoppeliaSim scene reuse) |
 | `wall_c10/{train,val,test}` | c10 | rendered branch files | same, `render` |
-| `wall_c10/_physics/_moved_val_number_collision/` | c10 | 2 val corner episodes whose numbers collided with test (F346); kept, not used | -- |
-| `wall_c10/_physics/_moved_replay_mismatch/` | c10 | 11 top-up episodes stored in another determinism class than their live run (F346); kept, not used | -- |
-| `wall_c10/_physics/{pilot,_pilot_v1,cornerfix,pilot_topup}`, `wall_c10/pilot` | c10 | pilots (controller, corner homing, approach-type placement); not used | -- |
+| `wall_{b1,c10}/_physics/_unused_balance/{train,val,test}` (+ `rendered_*`) | both | start states left out by the balance step (cells equal across bodies); kept, not used | `scripts/dataset/balance_wall_data.py` |
+| `wall_{b1,c10}/train_branches/` | both | symlinks to the rendered TRAIN branch files only (the wall run's source; rebuilt at launch by arm W) | `scripts/run/round1_counterfactual.sh W` |
 
+Balanced 2026-10-14 (user option B): per body train 153 / val 30 / test 57 start states, the same in every distance band x
+approach group x side for B1 and c10 (targets `results/check/wall_balance_targets.json`; one train cell 5 + 5, the far
+corner cell 2 + 0, both for both bodies); train renders 14 of 28 commands per state (2,142 files per body).
 Splits: episodes and room looks disjoint (B1 train 8000-, val 8500-, test 8800-; c10 numbers in DATA_PLAN 13). Checks:
 `scripts/dataset/check_wall_data.py --body {b1,c10} [--render] [--ref_body b1]` (`results/check/wall_data_{b1,c10}/gate.txt`).
 Accounting is by independent START STATES per distance band x approach group (not files); per-split reports
 `collect_*_wall_data.py report`.
+
+Deleted 2026-10-15 (user, cleanup): `wall_c10/_physics/_moved_replay_mismatch` (41 episodes whose stored replay differed
+from the live run, F346), `_moved_val_number_collision`, the c10 controller pilots (`wall_c10/pilot`, `_physics/{pilot,
+_pilot_v1,cornerfix,pilot_topup}`), `data/wall_predcheck_v2` (F338 set; `b1_wall_predcheck_data_v2.py` regenerates it),
+`data/gecko` (unused gecko babbling), `data/wall_pilot`; `data/README_LAYOUT.md` -> `doc/_archive/`.
 
 ## Superseded (kept, do not use)
 

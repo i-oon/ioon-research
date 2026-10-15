@@ -1,6 +1,6 @@
 # LAC-WM: Latent Action Robot Foundation World Models for Cross-Embodiment Adaptation
 
-Source: "Latent Action Robot Foundation World Models for Cross-Embodiment Adaptation" — anonymous, under double-blind review at ICLR 2026. PDF: `doc/ref/LATENT ACTION ROBOT FOUNDATION WORLD MODELS FOR CROSS-EMBODIMENT ADAPTATION.pdf` (19 pages incl. appendix/refs).
+Source: "Latent Action Robot Foundation World Models for Cross-Embodiment Adaptation" — anonymous, under double-blind review at ICLR 2026. **Published version (cite this):** "Cross-Embodiment Robot Foundation World Models with Latent Actions", Huang Huang, Sriram Yenamandra, Franziska Meier et al., ICML 2026, PMLR vol. 306, pp. 48175-48191 (https://proceedings.mlr.press/v306/huang26bv.html). PDF: `doc/ref/LATENT ACTION ROBOT FOUNDATION WORLD MODELS FOR CROSS-EMBODIMENT ADAPTATION.pdf` (19 pages incl. appendix/refs).
 
 ## 1. Core Claim / Research Question
 

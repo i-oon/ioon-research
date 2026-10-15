@@ -8,14 +8,17 @@ decoder needs an embodiment-specific output head, because 18-D hexapod joint tar
 from dataclasses import dataclass
 from typing import Callable
 
+import os
+
 import numpy as np
 
 from ..bodies import CONTACT_THRESHOLD  # noqa: F401  single source of truth, do not redefine
 
 G = 9.81
-# One second, which is about one stride on either robot: the insect's is 0.95 s and the B1's is
-# close to it. The window is given in seconds and converted per embodiment because they are
-# recorded at different rates -- 20 Hz for the insect, 50 Hz for the B1.
+# One second. Chosen as "about one stride on either robot" (insect 0.95 s assumed); measured 2026-10-14 (F348) the c10 CPG
+# stride in the current data is ~0.55 s, so 1 s spans ~1.8 strides and leaves part of the yaw sway (stride-matched labels:
+# a separate experiment). Given in seconds and converted with each clip's dt (every current dataset: 0.05 s; older B1 data
+# was 50 Hz).
 BODY_WINDOW_S = 1.0
 
 
@@ -35,12 +38,15 @@ def smooth(x, window, segment=None):
     """
     x = np.asarray(x, dtype=np.float64)
     seg = np.zeros(len(x), dtype=np.int64) if segment is None else np.asarray(segment).astype(np.int64)
-    k = np.ones(int(window))
+    # `window`: one int (every earlier use), or a per-frame array (stride-matched labels, 2026-10-15): each segment uses
+    # the window of its first frame
+    win = np.asarray(window)
     out = np.empty_like(x)
     starts = np.flatnonzero(np.r_[True, seg[1:] != seg[:-1]])
     ends = np.r_[starts[1:], len(x)]
-    off = (len(k) - 1) // 2          # numpy's "same" centring, also for segments shorter than k
     for a, b in zip(starts, ends):
+        k = np.ones(int(win if win.ndim == 0 else win[a]))
+        off = (len(k) - 1) // 2      # numpy's "same" centring, also for segments shorter than k
         n = b - a
         num = np.convolve(x[a:b], k)[off:off + n]
         den = np.convolve(np.ones(n), k)[off:off + n]
@@ -144,6 +150,33 @@ def _com_reference(data, position):
     return position, None, False
 
 
+_STRIDES = None
+
+
+def stride_window(data, dt, n):
+    """STRIDE-MATCHED label window per frame (2026-10-15, F348; Ajan Blink week 20). Opt-in: env WM_STRIDE_LABELS=1 (set
+    by `wm.train` from `--stride_labels True`). Per command segment: the whole number of strides N closest to 1 s
+    (N = max(1, round(1 / T)), T = that behaviour's stride period from `wm/data/stride_periods_hexapod.json`), window =
+    round(N * T / dt) frames, so the gait sway averages out instead of leaving a partial cycle. Segment 0 of a branch uses
+    `cf_source_condition`, later segments `condition`; an unknown condition keeps the 1 s window."""
+    global _STRIDES
+    if _STRIDES is None:
+        import json
+        _STRIDES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "stride_periods_hexapod.json")))["period_s"]
+    default = max(3, int(round(BODY_WINDOW_S / dt)))
+    seg = _segment_of(data)
+    seg = np.zeros(n, np.int64) if seg is None else np.asarray(seg).astype(np.int64)[:n]
+    cond = str(data["condition"]) if "condition" in data.files else None
+    src = str(data["cf_source_condition"]) if "cf_source_condition" in data.files else cond
+    out = np.full(n, default, np.int64)
+    for a in np.flatnonzero(np.r_[True, seg[1:] != seg[:-1]]):
+        c = src if (seg[a] == seg[0] and "cf_source_condition" in data.files) else cond
+        T = _STRIDES.get(c)
+        if T:
+            out[seg == seg[a]] = max(3, int(round(max(1, round(BODY_WINDOW_S / T)) * T / dt)))
+    return out
+
+
 def _hexapod(data):
     """Labels at `com_pos` when present (F301); otherwise, unchanged for old clips, at `head` with the
     median head height (and `froude_height` ignored, as before)."""
@@ -153,9 +186,10 @@ def _hexapod(data):
     if not used_com:
         h = float(np.median(position[:, 2]))
     if "body_quat" in data.files:
+        win = stride_window(data, dt, len(position)) if os.environ.get("WM_STRIDE_LABELS") == "1" else None
         motion = np.concatenate(
-            [body_velocity(position, data["body_quat"], dt, "hexapod", height=h, segment=_segment_of(data)),
-             yaw_rate(data["body_quat"], dt, "hexapod", h, segment=_segment_of(data))], axis=1)
+            [body_velocity(position, data["body_quat"], dt, "hexapod", height=h, segment=_segment_of(data), window=win),
+             yaw_rate(data["body_quat"], dt, "hexapod", h, segment=_segment_of(data), window=win)], axis=1)
     else:
         motion = body_motion(position, dt, _segment_of(data))   # pre-2026-08-22 clips carry no orientation
     return {
@@ -317,7 +351,7 @@ def forward_axis(quat, embodiment):
     return v / np.maximum(np.linalg.norm(v, axis=1, keepdims=True), 1e-9)
 
 
-def body_velocity(position, quat, dt, embodiment, height=None, segment=None):
+def body_velocity(position, quat, dt, embodiment, height=None, segment=None, window=None):
     """Forward and lateral speed **in the robot's own frame**, dimensionless, stride-averaged.
 
     **The world frame is the wrong frame and it is not a small error.** `body_motion` differenced
@@ -336,7 +370,8 @@ def body_velocity(position, quat, dt, embodiment, height=None, segment=None):
     f = forward_axis(quat, embodiment)
     left = np.stack([-f[:, 1], f[:, 0]], axis=1)
     out = np.stack([(v * f).sum(1), (v * left).sum(1)], axis=1) / scale
-    window = max(3, int(round(BODY_WINDOW_S / dt)))
+    if window is None:
+        window = max(3, int(round(BODY_WINDOW_S / dt)))
     return np.stack([smooth(out[:, c], window, segment) for c in (0, 1)], axis=1).astype(np.float32)
 
 
@@ -368,7 +403,7 @@ def heading(quat, embodiment):
     return np.arctan2(fy, fx)
 
 
-def yaw_rate(quat, dt, embodiment, height, segment=None):
+def yaw_rate(quat, dt, embodiment, height, segment=None, window=None):
     """Dimensionless turn rate, smoothed over the same window as `body_motion`.
 
     **The two robots store orientation differently and neither convention is guessable.** The
@@ -381,7 +416,8 @@ def yaw_rate(quat, dt, embodiment, height, segment=None):
     AUC 0.871, the exact failure the embodiment gate exists to catch.
     """
     omega = gradient(np.unwrap(heading(quat, embodiment)), dt, segment)
-    window = max(3, int(round(BODY_WINDOW_S / dt)))
+    if window is None:
+        window = max(3, int(round(BODY_WINDOW_S / dt)))
     omega = smooth(omega, window, segment)
     return (omega * np.sqrt(max(height, 1e-6) / G)).astype(np.float32)[:, None]
 

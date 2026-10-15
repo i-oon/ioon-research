@@ -9,7 +9,7 @@ Closest work (PDFs / notes in this folder; check every citation against the PDF 
 | LAPO, Learning to Act without Actions (ICLR 2024) | latent actions, inverse + forward model from action-free video, then a policy | the transition -> z -> future idea; no legged cross-body locomotion, no visual hazard selection |
 | QWM, hardware-agnostic quadrupedal world model (arXiv 2604.08780) | one world model over many quadruped morphologies, morphology spec as input, zero-shot within quadrupeds | quadruped template only, needs a morphology spec, blind flat-ground velocity tracking (no exteroception) |
 | WMP, World Model-based Perception (arXiv 2409.16784) | depth + proprioception recurrent world model feeding a locomotion policy | world-model state as policy input; no per-candidate future simulation at run time; one body |
-| LAC-WM, latent action robot foundation world models (notes_lac_wm.md) | shared latent action across embodiments, adaptation to new bodies | closest: novelty cannot be "a shared z across bodies" |
+| LAC-WM = "Cross-Embodiment Robot Foundation World Models with Latent Actions", Huang, Yenamandra, Meier et al., ICML 2026, PMLR 306 pp. 48175-48191 (published version; `notes_lac_wm.md` / the PDF here are the earlier ICLR-review version) | shared latent action across embodiments, adaptation to new bodies | closest: novelty cannot be "a shared z across bodies" |
 
 Our gap: whether a jointly trained, visually grounded latent-action world model works across legged bodies with
 different action spaces and gaits (hexapod c10 / c08 / quadruped B1), and whether imagined visual consequences of

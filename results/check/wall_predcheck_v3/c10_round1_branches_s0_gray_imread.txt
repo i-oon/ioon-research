@@ -1,0 +1,88 @@
+c10 wall prediction check D1-D3 (LOCKED protocol, WALL_SELECTION_PLAN 9); model round1_branches_s0_gray_imread frozen; common 24 commands; clearance in body lengths (BL 0.82); fit on train only
+states: train 153 | val 30 | test 57; R_real alpha 3.16 on 25970 train real frames
+=== test (57 states, 35 episodes)
+--- step 1 = 0.25 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..1)
+  real-future                | +0.137 | 0.106 | 0.746 / 0.550
+  D2 imagined, R_real        | -0.021 | 0.605 | 0.625 / 0.576
+  D3 imagined, R_imag        | +0.105 | 0.113 | 0.725 / 0.550
+  copy                       | +nan | 0.090 | 0.739 / 0.500
+  command-only               | +0.284 | 0.090 | 0.749 / 0.770
+  command-only, true start   | +0.284 | 0.024 | 0.762 / 0.770
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.612 BL, std 0.364
+--- step 2 = 0.50 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..2)
+  real-future                | +0.416 | 0.106 | 0.778 / 0.664
+  D2 imagined, R_real        | +0.218 | 0.634 | 0.668 / 0.551
+  D3 imagined, R_imag        | +0.182 | 0.117 | 0.735 / 0.501
+  copy                       | +nan | 0.103 | 0.739 / 0.500
+  command-only               | +0.660 | 0.094 | 0.767 / 0.861
+  command-only, true start   | +0.660 | 0.036 | 0.786 / 0.861
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.625 BL, std 0.382
+--- step 3 = 0.75 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..3)
+  real-future                | +0.621 | 0.099 | 0.810 / 0.775
+  D2 imagined, R_real        | +0.240 | 0.784 | 0.663 / 0.589
+  D3 imagined, R_imag        | +0.484 | 0.132 | 0.779 / 0.658
+  copy                       | +nan | 0.125 | 0.739 / 0.500
+  command-only               | +0.758 | 0.098 | 0.790 / 0.883
+  command-only, true start   | +0.758 | 0.050 | 0.813 / 0.883
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.784 BL, std 0.429
+--- step 4 = 1.00 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..4)
+  real-future                | +0.710 | 0.099 | 0.841 / 0.858
+  D2 imagined, R_real        | +0.293 | 0.826 | 0.653 / 0.583
+  D3 imagined, R_imag        | +0.613 | 0.148 | 0.807 / 0.729
+  copy                       | +nan | 0.158 | 0.739 / 0.500
+  command-only               | +0.788 | 0.104 | 0.811 / 0.887
+  command-only, true start   | +0.788 | 0.064 | 0.834 / 0.887
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.820 BL, std 0.427
+--- step 5 = 1.25 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..5)
+  real-future                | +0.774 | 0.100 | 0.869 / 0.898
+  D2 imagined, R_real        | +0.219 | 0.837 | 0.644 / 0.563
+  D3 imagined, R_imag        | +0.690 | 0.157 | 0.839 / 0.796
+  copy                       | +nan | 0.192 | 0.739 / 0.500
+  command-only               | +0.776 | 0.117 | 0.827 / 0.884
+  command-only, true start   | +0.776 | 0.084 | 0.848 / 0.884
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.819 BL, std 0.447
+=== PASS rules (test, 1.25 s; 95 % episode bootstrap)
+D1 Spearman real-future - command-only: -0.002 [-0.054, +0.069] -> FAIL
+D3 Spearman imagined - command-only: -0.086 [-0.134, -0.037]; within-state detection AUC imagined - command-only: -0.088 [-0.146, -0.030]
+D3 pooled detection AUC imagined 0.839 vs copy 0.739 -> D3 FAIL (needs: Spearman lower bound > 0, within-AUC gain > 0, pooled > copy)
+=== val (30 states, 21 episodes)
+--- step 1 = 0.25 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..1)
+  real-future                | +0.165 | 0.087 | 0.701 / 0.489
+  D2 imagined, R_real        | +0.184 | 0.681 | 0.600 / 0.572
+  D3 imagined, R_imag        | +0.094 | 0.103 | 0.697 / 0.488
+  copy                       | +nan | 0.099 | 0.701 / 0.500
+  command-only               | +0.235 | 0.093 | 0.712 / 0.748
+  command-only, true start   | +0.235 | 0.025 | 0.724 / 0.748
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.682 BL, std 0.332
+--- step 2 = 0.50 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..2)
+  real-future                | +0.432 | 0.082 | 0.742 / 0.613
+  D2 imagined, R_real        | +0.214 | 0.689 | 0.603 / 0.540
+  D3 imagined, R_imag        | +0.258 | 0.107 | 0.709 / 0.615
+  copy                       | +nan | 0.109 | 0.701 / 0.500
+  command-only               | +0.719 | 0.092 | 0.737 / 0.874
+  command-only, true start   | +0.719 | 0.032 | 0.746 / 0.874
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.679 BL, std 0.380
+--- step 3 = 0.75 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..3)
+  real-future                | +0.657 | 0.090 | 0.793 / 0.776
+  D2 imagined, R_real        | +0.196 | 0.896 | 0.590 / 0.515
+  D3 imagined, R_imag        | +0.580 | 0.114 | 0.747 / 0.709
+  copy                       | +nan | 0.133 | 0.701 / 0.500
+  command-only               | +0.799 | 0.099 | 0.765 / 0.899
+  command-only, true start   | +0.799 | 0.047 | 0.775 / 0.899
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.877 BL, std 0.417
+--- step 4 = 1.00 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..4)
+  real-future                | +0.774 | 0.085 | 0.835 / 0.860
+  D2 imagined, R_real        | +0.250 | 0.901 | 0.580 / 0.498
+  D3 imagined, R_imag        | +0.634 | 0.124 | 0.784 / 0.769
+  copy                       | +nan | 0.161 | 0.701 / 0.500
+  command-only               | +0.807 | 0.106 | 0.789 / 0.906
+  command-only, true start   | +0.807 | 0.059 | 0.805 / 0.906
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.890 BL, std 0.412
+--- step 5 = 1.25 s | Spearman within state | MAE BL | detection AUC pooled / within (NEAR-or-cross within 3 s, score = min predicted over steps 1..5)
+  real-future                | +0.820 | 0.090 | 0.879 / 0.918
+  D2 imagined, R_real        | +0.165 | 0.886 | 0.576 / 0.478
+  D3 imagined, R_imag        | +0.685 | 0.135 | 0.800 / 0.789
+  copy                       | +nan | 0.198 | 0.701 / 0.500
+  command-only               | +0.817 | 0.116 | 0.804 / 0.901
+  command-only, true start   | +0.817 | 0.077 | 0.823 / 0.901
+  real-vs-imagined shift (R_real(imag) - R_real(real)): mean +0.871 BL, std 0.415

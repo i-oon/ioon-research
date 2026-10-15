@@ -63,6 +63,12 @@ else
   ITM_B1=$CK/adapted_b1.pt
 fi
 
+# 1b. keep every checkpoint this eval made WITH ITS RUN (user rule 2026-10-15): projectors, the adapted B1 and the merged
+#     ckpts are copied to wm/runs/<run>/eval_ckpt_<NAME>/ (NAME tells which eval: e.g. ..._adaptimread = adapted with the
+#     imagined-read term), so a run folder copied to another PC carries its adapted models
+RUNDIR=$(dirname "$PT"); mkdir -p "$RUNDIR/eval_ckpt_$NAME" && cp -f $CK/*.pt "$RUNDIR/eval_ckpt_$NAME/" \
+  && echo "checkpoints kept in $RUNDIR/eval_ckpt_$NAME/" | tee -a $OUT/summary.txt
+
 # 2. selection
 {
 echo "--- selection B1, recorded goal"

@@ -403,6 +403,9 @@ class Config:
     # STEP-LEVEL tensorboard (2026-10-14, Ajan Blink week 20: loss curves, not 3 per-epoch points): every
     # `log_every` training steps the mean of each loss term over those steps -> `train_step/<term>` at the global step;
     # every `val_every` steps the FULL validation pass -> `val_step/<term>`. 0 = off (every earlier run).
+    # STRIDE-MATCHED Froude labels for the hexapod (2026-10-15, F348): label window = whole strides per command segment
+    # (`wm.data.embodiment.stride_window`); sets env WM_STRIDE_LABELS=1 for the loaders. False = 1 s window (every earlier run).
+    stride_labels: bool = False
     log_every: int = 500
     # cap on TRAINING batches per epoch (0 = the whole epoch, every earlier run). A run with more data keeps another
     # run's steps AND its per-epoch cosine schedule (e.g. the wall run: 3 epochs x arm B's 10,176 batches); the

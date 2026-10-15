@@ -1,0 +1,29 @@
+{
+ "_source": "c10_clips_train, dominant joint-command frequency, median per condition (seconds per stride)",
+ "period_s": {
+  "side_L_lvl0": 0.55,
+  "side_L_lvl1": 0.55,
+  "side_L_lvl2": 0.55,
+  "side_L_lvl3": 0.55,
+  "side_R_lvl0": 0.55,
+  "side_R_lvl1": 0.55,
+  "side_R_lvl2": 0.55,
+  "side_R_lvl3": 0.55,
+  "speed_c5.8": 0.5739,
+  "speed_c5.8_bwd": 0.9429,
+  "speed_c7.1": 0.4632,
+  "speed_c7.1_bwd": 0.8516,
+  "speed_c8.15": 0.4062,
+  "speed_c8.15_bwd": 0.66,
+  "speed_c8.8": 0.3771,
+  "speed_c8.8_bwd": 0.66,
+  "turn_s0.05": 0.55,
+  "turn_s0.05_neg": 0.55,
+  "turn_s0.15": 0.55,
+  "turn_s0.15_neg": 0.55,
+  "turn_s0.29": 0.55,
+  "turn_s0.29_neg": 0.55,
+  "turn_s0.56": 0.55,
+  "turn_s0.56_neg": 0.55
+ }
+}

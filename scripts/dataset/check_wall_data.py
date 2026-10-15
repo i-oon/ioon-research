@@ -186,13 +186,18 @@ def main():
             R = os.path.join(W.DATA, split)
             want = sel if sel is not None else {os.path.basename(g) for g in glob.glob(os.path.join(D, "ep*_b*_c*.npz"))}
             miss = [w for w in want if not os.path.exists(os.path.join(R, w))]
-            bad_n = blank = 0; spread = []
+            bad_n = blank = near_uniform = 0; spread = []
             for w in sorted(want - set(miss)):
                 z = np.load(os.path.join(R, w), allow_pickle=True); fr = z["frames"]
                 if len(fr) != len(z["clearance"]):
                     bad_n += 1
-                if float(fr.std()) < 3:
+                # BROKEN render = black or completely constant (a renderer failure); near-UNIFORM (std < 3 grey levels)
+                # = the robot facing a wall 0.4-0.8 m away, the wall filling the 90 deg view: real data, reported only
+                # (F346; the first version failed on these, 2026-10-15)
+                if float(fr.mean()) < 10 or float(fr.reshape(len(fr), -1).std(1).max()) < 0.5:
                     blank += 1
+                elif float(fr.std()) < 3:
+                    near_uniform += 1
                 if "cam_pose" in z.files:
                     q = np.asarray(z["cam_pose"], float)[:, 3:]                 # qx qy qz qw; camera looks along +z
                     x_, y_, z_, w_ = q.T
@@ -201,7 +206,8 @@ def main():
                     by = np.array([F.yaw_of(v) for v in np.asarray(z["base_quat"], float)])
                     dd = wrap(cy - by); spread.append(float(np.abs(wrap(dd - np.median(dd))).max()))
             sp = np.degrees(np.array(spread)) if spread else np.zeros(1)
-            say(f"  7 rendered: {len(want)} wanted, missing {len(miss)}, frame count wrong {bad_n}, blank {blank}: "
+            say(f"  7 rendered: {len(want)} wanted, missing {len(miss)}, frame count wrong {bad_n}, broken (black / constant) "
+                f"{blank}, near-uniform wall views (info) {near_uniform}: "
                 f"{ok(not miss and not bad_n and not blank)}; camera-vs-body yaw spread median {np.median(sp):.2f} / max "
                 f"{sp.max():.2f} deg")
             if miss or bad_n or blank:

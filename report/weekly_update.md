@@ -387,11 +387,14 @@ Two changes, one at a time, same data and steps (joint pretraining with branches
    blur and noise; crop kept small (85–100 %), since zoom changes the apparent speed. Reason: a single frame in a room
    seen in training gives away the walking speed (R² up to 0.69; ≤ 0.13 in new rooms), so the room, not the motion,
    can be read.
-2. **Imagination term.** Rollout lost the strong turn because the motion read from each command's imagined future was
-   shrunk: across the 24 commands of one state it spread only part of the true differences (slope, row below; yaw 0.17
-   of its size). New training term: roll the forward model 4 steps (1 s) from the real frame and require the motion read
-   from every imagined step to match the true motion of that step. Only the forward model learns from it (the reader is
-   held fixed), so the action latent keeps its meaning.
+2. **Imagination term.** The motion read from imagined futures was shrunk (yaw at 0.17 of its true spread), so train the
+   forward model to imagine futures whose motion reads right:
+
+   $$\hat e_0 = e_t,\quad \hat e_{k+1} = \mathrm{FTM}(\hat e_k, z_k),\quad z_k = \mathrm{sg}[\mathrm{ITM}(e_{t+k}, e_{t+k+1})]$$
+
+   $$\mathcal{L}_{\text{imread}} = \frac{1}{K}\sum_{k=0}^{K-1}\big\|H_{\text{sg}}\big(\mathrm{ITM}_{\text{sg}}(\hat e_k, \hat e_{k+1})\big) - y_{t+k}\big\|^2,\qquad K = 4\ (1\ \text{s})$$
+
+   $H$ = Froude prediction head, $y$ = true Froude of each step, sg = gradient stopped: only the FTM learns from it.
 
 Metrics: normalised score (0 = random candidate, 1 = best candidate in hindsight), direct / rollout from the robot's
 current frame; Pearson r and slope (1 = right size) of the read across the 24 commands of one state, forward / lateral /
@@ -441,23 +444,24 @@ per channel forward / lateral / yaw (higher is better, 1 = perfect ranking).
 
 ## Result 2: rollout now comes close to direct
 
-Columns: joint pretraining without / with branches (two seeds); the current model (with branches + grayscale + imagination
-term, two seeds agree) for reference.
+Columns: joint pretraining (hexapod + B1) without / with branches (two seeds); hexapod-only pretraining with branches, B1
+adapted afterwards as a new body (LoRA, 44 clips = 2.4 min); each in colour and with the current recipe (branches +
+grayscale + imagination term). Same steps everywhere.
 
 Metric: normalised score from error E, the mean L2 between achieved and goal Froude over the decision steps:
 (E_random − E) / (E_random − E_oracle); 0 = random candidate, 1 = best candidate in hindsight (higher is better). The
 decision span is now 21 frames (1 s, the length of the label) instead of last week's 11.
 
-| test | no branches | branches, S0 / S1 | current model |
-|---|---|---|---|
-| c10 direct | +0.94 | +0.92 / +0.92 | +0.92 |
-| c10 rollout (robot's current frame) | +0.59 | +0.71 / +0.68 | **+0.82** |
-| c08 direct (zero-shot) | +0.91 | +0.90 / +0.90 | +0.89 |
-| c08 rollout (current frame) | +0.58 | +0.68 / +0.64 | **+0.81** |
-| B1 direct | +0.97 | +0.94 / +0.94 | +0.93 |
-| B1 rollout (current frame) | +0.72 | +0.75 / +0.73 | **+0.87** |
-| B1 direct, goal read from video | +0.35 | +0.84 / +0.83 | +0.85 |
-| B1 rollout, goal read from video | +0.24 | +0.63 / +0.62 | +0.74 |
+| test | joint: no branches | joint: branches, S0 / S1 | hexapod-only, B1 adapted: branches | joint: branches + grayscale + imagination term (2 seeds agree) | hexapod-only, B1 adapted: branches + grayscale + imagination term, also in B1's adaptation (1 seed) |
+|---|---|---|---|---|---|
+| c10 direct | +0.94 | +0.92 / +0.92 | +0.93 | +0.92 | +0.92 |
+| c10 rollout (robot's current frame) | +0.59 | +0.71 / +0.68 | +0.69 | **+0.82** | +0.79 |
+| c08 direct (zero-shot) | +0.91 | +0.90 / +0.90 | +0.91 | +0.89 | +0.90 |
+| c08 rollout (current frame) | +0.58 | +0.68 / +0.64 | +0.67 | **+0.81** | +0.75 |
+| B1 direct | +0.97 | +0.94 / +0.94 | +0.97 | +0.93 | +0.96 |
+| B1 rollout (current frame) | +0.72 | +0.75 / +0.73 | +0.70 | **+0.87** | +0.76 |
+| B1 direct, goal read from video | +0.35 | +0.84 / +0.83 | +0.83 | +0.85 | +0.84 |
+| B1 rollout, goal read from video | +0.24 | +0.63 / +0.62 | +0.57 | +0.74 | +0.63 |
 
 **Goal from the recorded motion (proprioceptive) vs goal read from the goal video**, B1, same metric:
 
@@ -468,10 +472,41 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 
 - Same setup, no branches vs with branches: rollout from the current frame c10 +0.59 → +0.71 / +0.68, c08 +0.58 → +0.68 / +0.64; B1 +0.72 → +0.75 / +0.73.
 - Reading the goal from video improves most (B1 +0.35 → +0.84).
-- Current model (last column): rollout +0.81–0.87 on all three bodies; direct unchanged.
+- B1 as a new body (hexapod-only pretraining + 2.4 min of B1): **direct transfers fully** (+0.97 colour, +0.96 current).
+  Rollout: +0.70 (colour, vs +0.75 joint); with the current recipe +0.76 vs +0.87 joint -- the imagination term must also
+  be used while adapting B1 (without it in adaptation: +0.63). The remaining gap is turning (imagined yaw r 0.26 vs 0.37).
+- Current model, joint: rollout +0.81–0.87 on all three bodies; direct unchanged.
 - Rollout is not expected to beat direct on this test: goals and candidates are steady walking, where one command has one
   outcome.
 
+
+---
+
+## Does z transfer across bodies?
+
+A read-out of z fitted on c10 only, applied to the other bodies **without refitting**; body-ID, mixing and retrieval ask
+whether the wider 64-D space is shared. Held-out clips, current recipe (grayscale; imagination term where noted).
+
+| model | body-ID probe (chance 0.33) | cross-body R² c10 → c08 (fwd / lat / yaw) | cross-body R² c10 → B1 (fwd / lat / yaw) | k-NN mixing | retrieval c10 → c08 | retrieval c10 → B1 |
+|---|---|---|---|---|---|---|
+| joint, grayscale | 0.56 | +0.81 / +0.53 / +0.51 | +0.66 / +0.01 / +0.23 | 0.44 | 0.71 | 0.51 |
+| joint, grayscale + imagination term | 0.59 | +0.81 / +0.48 / +0.52 | +0.64 / +0.19 / −0.31 | 0.48 | 0.68 | 0.38 |
+| hexapod-only, B1 adapted (imagination term in pretraining and adaptation) | **0.42** | +0.83 / +0.46 / +0.58 | +0.63 / **+0.56 / +0.38** | **0.60** | 0.64 | 0.44 |
+
+![z of the three bodies, hexapod-only pretraining + B1 adapted (imagination term in pretraining and adaptation): coloured by body and by behaviour](../results/eval/round1_hexonly_s0_gray_imread_adaptimread/shared_latent/latent_round1_hexonly_s0_gray_imread_adaptimread.png)
+
+Joint model for comparison (B1 separate): [figure](../results/eval/round1_branches_s0_gray_imread/shared_latent/latent_round1_branches_s0_gray_imread.png)
+
+- Between the two hexapods z is well shared (forward R² +0.81–0.83, retrieval ≈ 0.65–0.7).
+- With B1 in joint pretraining, forward transfers but lateral / yaw do not, and the bodies stay separable (body-ID 0.56–0.59).
+- With B1 **adapted** onto a hexapod-only model, z is more shared: body-ID 0.42, lateral / yaw transfer positive.
+- This is a shared **task interface** (Froude), not proof that all 64 dimensions align (retrieval c10 → B1 ≤ 0.51).
+
+> **Notes.** body-ID = logistic regression z -> body (lower = more shared); k-NN mixing = share of each point's 10 nearest
+> neighbours from another body, relative to random mixing (1 = fully mixed); retrieval = how similar in motion each hexapod
+> transition's nearest other-body neighbour is (1 = identical). One seed each. Why lateral / yaw fail with joint
+> pretraining: a per-body constant offset in z (F344); centring each body's embeddings in training removes most of it but
+> does not improve selection (F345, F347, backup).
 
 ---
 
@@ -497,62 +532,66 @@ decision span is now 21 frames (1 s, the length of the label) instead of last we
 > the current camera view (5 steps x 0.25 s = 1.25 s) and scores the imagined motion. Offline score: 0 = random candidate,
 > 1 = best candidate in hindsight; seeds 0 and 1 agree within ~0.03. Physics error E = mean L2 between achieved and goal
 > Froude over 33 decisions, one episode per goal (6 held-out hexapod goals), seed 0 only; lower is better. Per-goal table
-> in backup. B1 here is in joint pretraining; **B1 as a new body adapted on 2.4 min of clips is running** on the current
-> recipe (earlier recipe, F310: rollout +0.70 adapted vs +0.75 joint). Timing: frames 0.05 s (20 Hz), model step 5 frames.
+> in backup. B1 here is in joint pretraining. **B1 as a new body** (hexapod-only pretraining, adapted on 2.4 min), current
+> recipe: offline direct +0.96 / rollout +0.76 adapted vs +0.93 / +0.87 joint (Result 2); its physics loop is not run.
+> Timing: frames 0.05 s (20 Hz), model step 5 frames.
 
 ---
 
-## 2. Why the research question expands
+## 2. The same command becomes wrong when the scene changes
 
-- Same goal ("walk forward"), same candidate library, two scenes: on open floor forward is right; facing a wall the same
-  command crosses the boundary. **Only the view tells the two situations apart.**
-- **Question:** *Can a visual world model predict the consequences of candidate commands so robots with different bodies
-  can select motion that fits both a shared goal and the scene?*
-- **Wall = a visible virtual boundary.** We measure when the robot's footprint crosses it, not a physical collision.
-- Beating blind direct alone would show that **scene information** helps, not necessarily that **prediction** helps.
+![Goal: walk forward. Same goal, same command (forward), two scenes: open floor (the footprint path goes on) vs approaching a wall (the footprint crosses the red boundary). B1 camera, grayscale as the model sees it; inset = footprint path from above over the next ~3 s](../results/deck/weekly_1015/wall_question_paths.png)
 
-> **Notes.** The physics has no walls (B1 runs in MuJoCo): the boundary sits at the rendered walls' inner faces. Clearance =
-> signed distance from the robot's footprint (rotated rectangle; B1 1.13 x 0.47 m, hexapod 0.82 x 0.46 m) to the boundary;
-> per frame SAFE (>= 0.13 body lengths), NEAR (0-0.13) or CROSSED (< 0, last stored frame). The boundary test is the
-> scene-dependent test; **it is not yet a demonstrated result**.
+> **Same robot goal. Same command. Different consequence.**
+> Can we use the *predicted consequence* to choose a better command?
 
----
-
-## 3. Related work: mechanisms
-
-| work | what it learns | how it acts | relation to ours |
-|---|---|---|---|
-| LAC-WM | latent actions shared across embodiments, frozen V-JEPA2 features; adaptation to new embodiments (manipulation) | world model used for planning / adaptation | our ITM / FTM structure; we add a body-size-free motion goal (Froude) and legged bodies |
-| Egocentric VSM | robot self-model from one onboard camera + commands; adapts to a changed body | locomotion from the visual self-model | our view randomisation (grayscale, brightness, blur) |
-| QWM | DreamerV3 world model conditioned on a morphology description (from the robot's USD); proprioceptive | actor-critic trained in imagination; zero-shot within the quadruped family | morphology given as input; ours learns from video, each body has its own command projector |
-| WMP | recurrent world model (RSSM) on depth + proprioception | PPO policy on simulator data; the world-model state is a policy input | world model as perception; ours compares the predicted futures of a finite candidate library |
-
-**Ours:** shared visual model + **body-specific command projector** + **explicit selection by comparing predicted futures**
-of a finite library of recorded commands.
-
-> **Notes.** Checked against the papers: QWM (arXiv 2604.08780) is a DreamerV3 / RSSM model with a physical morphology encoder,
-> policy learned in imagination, described by its authors as a distribution-bounded interpolator within quadrupeds. WMP
-> (arXiv 2409.16784): "we do not utilize the world model to generate rollout data for policy training"; actor input =
-> proprioception + stop-gradient recurrent state. LAC-WM: anonymous ICLR 2026 submission (dexterous manipulation).
-> Egocentric VSM: Hu, Chen, Lipson, npj Robotics 2025. We do not claim to be first; QWM and WMP could also be used to
-> predict actions -- the difference is how a decision is made, not what is possible.
+> **Notes.** Direct does well on the motion-only task because it never has to ask what is in front of the robot. Here the
+> view changes which command is right. The next question splits in two: is *seeing the current image* enough, or do we
+> need to *predict each command's consequence*? (Beating blind direct alone would only show that scene information helps.)
+> Wall = a visible **virtual** boundary at the rendered walls' inner faces (the physics has no walls): clearance = signed
+> distance from the robot's footprint (rotated rectangle; B1 1.13 x 0.47 m, hexapod 0.82 x 0.46 m) to it; per frame SAFE
+> (>= 0.13 body lengths), NEAR (0-0.13) or CROSSED (< 0, the last stored frame). "Crossing", never "collision". Not yet a
+> demonstrated result. Left: held-out B1 clip `b1_ep50012` (vx 0.38); right: wall test state `ep08805_b1`, command fwd1,
+> crosses after 2.65 s.
 
 ---
 
-## 4. Two claims, two tests
+## 3. Two ideas we bring together -- and the two gates we must clear
 
-| claim | evidence needed | status |
-|---|---|---|
-| **1. Cross-body motion interface** -- c10 trained, c08 zero-shot *within hexapods*, B1 *adapted* with little data; a shared Froude task interface | selection error per body (offline + physics); adaptation data size | measured (slide 1); B1-adapted on the current recipe **running** |
-| **2. Predictive visual selection** -- from the same start image, the model tells candidate futures apart and chooses better near a boundary than current-image and direct-risk baselines | prediction check per horizon, then closed loop with crossings **and** progress | **proposed** -- data being finalised |
+| **Across bodies** | **Vision for decisions** |
+|---|---|
+| **LAC-WM** -- latent actions make different action spaces fit one world model | **Egocentric VSM** -- learns a robot's dynamics from its own onboard camera |
+| **QWM** -- one world model for many quadrupeds through morphology conditioning | **WMP** -- a predictive visual state helps a locomotion policy |
 
-- Claim 1 is a shared *task interface*, **not** proof that the whole 64-D latent space is aligned across bodies.
-- A wall result on **B1 alone** supports a B1 visual-selection claim; the combined cross-body, scene-dependent claim needs a
-  wall result on another body (c10; c08 test only).
+> **Ours: predict each candidate's visual future -> compare the outcomes -> select a command for this body.**
+
+| **Gate 1 -- Does motion transfer?** | **Gate 2 -- Does foresight change the decision?** |
+|---|---|
+| `c10 -> c08 zero-shot / B1 few-shot adaptation` | `same start image -> 28 candidate futures -> safe progress` |
+| *Can different command spaces serve the same Froude goal?* | *Does rollout outperform current-image and direct-risk selection?* |
+| **measured offline**: direct transfers to c08 and adapted B1 (+0.96); adapted-B1 rollout +0.76 vs +0.87 joint; physics for adapted B1 **not run** | **pending**: prediction check, then closed loop |
+
+> **Passing Gate 1 + Gate 2 on multiple bodies supports the combined claim.**
+
+> **Notes (20-30 s).** LAC-WM / QWM give the cross-body question its footing; VSM / WMP give the vision-for-locomotion
+> question its footing. We test whether *comparing each command's future from the current view* works across different
+> bodies. Details, checked against the papers: **LAC-WM** = "Cross-Embodiment Robot Foundation World Models with Latent
+> Actions", Huang, Yenamandra, Meier et al., ICML 2026, PMLR 306 (frozen V-JEPA2 features, inverse + forward dynamics,
+> per-embodiment action projector; manipulation). **Egocentric VSM** = Hu, Chen, Lipson, npj Robotics 2025 (camera +
+> commands, adapts to a changed body). **QWM** (arXiv 2604.08780) = DreamerV3 / RSSM conditioned on a morphology encoding
+> from the robot's USD; proprioceptive; actor-critic trained in imagination; zero-shot within the quadruped family,
+> described by its authors as a distribution-bounded interpolator. **WMP** (arXiv 2409.16784) = RSSM on depth +
+> proprioception; the policy (PPO on simulator data, "we do not utilize the world model to generate rollout data for
+> policy training") takes the recurrent state as input; no comparison of candidate futures at decision time. We do not
+> claim to be first; QWM / WMP could also be used to predict actions.
+>
+> **Gates.** Gate 1 is a shared Froude task interface, not proof that the whole 64-D latent space aligns across bodies.
+> Gate 2 on B1 alone supports a B1 visual-selection claim; the combined cross-body, scene-dependent claim needs Gate 2 on
+> another body (c10; c08 as a test body).
 
 ---
 
-## 5. Why counterfactual wall data
+## 4. Why counterfactual wall data
 
 **How the data is collected** (B1, top-down + camera): approach a wall -> back up / step aside -> turn on the spot -> walk
 out -> next wall; branch states are saved on the way in.
@@ -583,7 +622,7 @@ commands stay clear, some come near, some cross.
 
 ---
 
-## 6. Tests and baselines  `[proposed; protocol locked before any result]`
+## 5. Tests and baselines  `[proposed; protocol locked before any result]`
 
 1. **Offline, frozen model** (held-out start states, 24 common commands):
    - D1: clearance read from **real** future embeddings;
@@ -612,7 +651,7 @@ Audit: the 4 spin commands were outside the earlier projector training.
 
 ---
 
-## 7. How to read the outcomes (before any result)
+## 6. How to read the outcomes (before any result)
 
 | outcome | supports | does not support |
 |---|---|---|
@@ -650,8 +689,22 @@ embedding, z) -> next embedding.
 | speed 7.1 | **0.035** / 0.037 | **0.045** / 0.046 | -- |
 | speed 8.8 | **0.058** / 0.098 | 0.100 / **0.073** | 0.095 / **0.073** |
 
-Goal read from the goal video instead of the recorded goal (end-to-end): code done, physics runs **pending**. Offline the
-video-read goals are smaller than the recorded ones (strong-turn yaw 0.019 vs 0.063).
+**End to end: the goal read from the goal video** instead of the recorded goal (same model, rooms and goals; graded
+against the recorded goal; seed 0). Mean error to the goal, recorded goal -> video goal:
+
+| body | direct | rollout |
+|---|---|---|
+| B1 | 0.038 -> 0.052 | 0.044 -> 0.064 |
+| six-legged | 0.050 -> 0.057 | 0.058 -> 0.068 |
+| shorter-legged (5 goals) | 0.049 -> 0.053 | 0.082 -> 0.093 |
+
+![B1, strong-turn goal, rollout: recorded goal black, B1 aiming at it gray, goal read from the goal video blue, B1 aiming at that light blue](../results/deck/weekly_1015/vision_goal/b1_physics_turn_rollout.png)
+
+The cost comes from goals whose video read is smaller than the recorded motion (strong-turn yaw 0.019 vs 0.063, speed 8.8
+forward). Clips: [B1 turn](../results/deck/weekly_1015/vision_goal/b1_physics_turn_rollout.mp4),
+[six-legged turn](../results/deck/weekly_1015/vision_goal/physics_c10_turn_rollout.mp4),
+[shorter-legged turn](../results/deck/weekly_1015/vision_goal/physics_c08_turn_rollout.mp4); direct and forward versions
+in `results/deck/weekly_1015/vision_goal/`.
 
 ## B3. Same state, 24 commands: imagined vs true outcome  `[measured, one state]`
 

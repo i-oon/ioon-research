@@ -9753,7 +9753,7 @@ live run on EVERY recorded per-frame field (F305 rule), run the live episode aga
 when the completed class is the live run's class, else re-queue the episode (up to 3 tries). Gate 4 checks it after the
 fact from the episode log (controller pose at every decision; the decision at step t sees the state recorded on row t-1,
 1 mm / 1 mrad = the log's rounding): episodes collected with the fix pass; 30 episodes of the first full run fail
-(train 22, val 1, test 7) -> to be moved to `_moved_replay_mismatch/` and replaced (not yet done 2026-10-14 00:00).
+(train 22, val 1, test 7) -> moved to `_moved_replay_mismatch/` (physics + renders) and replaced by later episodes (2026-10-14).
 **Worker start-up crash.** `cpg_clock.commands_at` swaps the module-wide `collect_ik.leg_length` for a dummy and back; six
 worker threads did this at once, so one thread restored the real function under another's call (`'_NoScene' object has
 no attribute 'getObject'`, 3 of 6 workers lost at start-up with all their queued episodes). Fixed with a lock. The dummy
@@ -9765,7 +9765,7 @@ only feeds a diagnostic field, never joint commands, so collected data was not a
 | branch prefix == episode rows T-10..T-1, every field, exact | pass (0 differences) | pass (0) |
 | labels recomputed == stored; crossing terminal | pass (max 5e-7 = float32) | pass (0) |
 | falls | none | none |
-| stored == live run | n/a (MuJoCo restore is exact, F305) | 30 old episodes fail -> to replace |
+| stored == live run | n/a (MuJoCo restore is exact, F305) | 30 old episodes fail -> moved out; all 112 kept episodes pass |
 | camera yaw vs body heading (spread) | 0.04 deg | 1.1-2.1 deg (head sways with the gait) |
 | approach side left / right (train / val / test) | 83/45, 8/16, 32/13 | 37/44, 25/15, 26/34 |
 | corner: second wall left / right (train) | 16 / 13 | 33 / 13 (every corner start aims at the same corner) |
@@ -9775,4 +9775,109 @@ frame cannot tell which side is free there.
 **Fairness rule (user 2026-10-13): equal amounts across bodies.** Per split, start-state counts per distance band x
 approach group (head-on / oblique / corner) must be equal for B1 and c10; left / right must be balanced (F338: which side
 is free has to flip). Over-full cells are trimmed by WHOLE episodes (states of one episode are not independent); short
-cells are collected. Still open: side balance for B1 and c10, c10 corner side.
+cells are collected. **Done 2026-10-14** (`scripts/dataset/balance_wall_data.py`): states, not whole episodes, are chosen
+(dropping a state only removes data; exact equality per cell needs it), preferring states from different episodes. Targets =
+B1's pre-top-up cell counts split evenly left / right; B1 oversampled (cheap physics; its side / approach request is only
+partly honoured because its episodes re-aim); c10 aimed (`--group`, `--side`: exact; head-on side requests start 8-25 deg,
+near 0 deg the gait sway flips the measured side; corners aim nearer the +x wall). Two exceptions, applied to BOTH bodies:
+train far-band corner 2 L / 0 R (B1 had 2 such states in 244, both left), train middle-band head-on 5 + 5 instead of 7 + 7
+(c10 reached 5 left after four aimed rounds; episodes skipped by class switches). Result per body: train 153 / val 30 /
+test 57 start states, train 2,142 rendered branch files. A CoppeliaSim instance hung during the final render (2026-10-14
+23:55): long render / physics jobs now run with a timeout and retry with fresh instances.
+
+---
+
+### F347. B1 as a NEW body on the current recipe: direct transfers fully; rollout needs the imagined-read term during adaptation too (+0.63 -> +0.76 vs +0.87 joint); per-body centring gives no clear gain
+
+2026-10-14/15, other PC. `scripts/run/hexonly_center_pair.sh`: c10-only pretraining, current recipe (grayscale + augmentation +
+imagined-read term, 30.5k steps), without / with `--center_embeddings` (`round1_hexonly_s0_gray_imread[_center]`); B1 then
+adapted as a new body by `eval_suite.sh ... hexonly` (LoRA r8, 3000 steps, 44 `b1_clips_train` = 2.4 min, Froude anchor).
+Third arm: the same uncentred checkpoint, B1 adapted with the imagined-read term added to adaptation
+(`ADAPT_EXTRA="--lambda_imread 1.0"`, `wm.adapt` / `finetune_ftm.adapt`, k 4, ITM weights and Froude head frozen, FTM learns;
+eval `round1_hexonly_s0_gray_imread_adaptimread`). Normalised selection score (direct / rollout live frame), one seed each:
+| | B1 rec. goal | B1 rollout fixed frame | B1 video goal | c08 zero-shot | c10 |
+|---|---|---|---|---|---|
+| joint pretraining (`round1_branches_s0_gray_imread`, ref) | +0.93 / +0.87 | +0.81 | +0.85 / +0.74 | +0.89 / +0.81 | +0.92 / +0.82 |
+| c10-only, B1 adapted (no term in adaptation) | +0.96 / +0.63 | +0.47 | +0.84 / +0.48 | +0.90 / +0.76 | +0.92 / +0.79 |
+| c10-only centred, B1 adapted with its own offset | +0.96 / +0.67 | +0.59 | +0.82 / +0.50 | +0.90 / +0.73 | +0.92 / +0.77 |
+| **c10-only, B1 adapted WITH the imagined-read term** | +0.96 / **+0.76** | **+0.64** | +0.84 / **+0.63** | +0.90 / +0.75 | +0.92 / +0.79 |
+B1 imagined-future read r (11 pairs, fwd / lat / yaw): joint 0.95 / 0.92 / 0.37; adapted 0.80 / 0.91 / 0.26; centred 0.87 /
+0.87 / 0.16; adapted with term 0.86 / 0.90 / 0.26. c10 read-out on B1 R2: joint +0.64 / +0.19 / -0.31; adapted +0.64 / +0.59 /
++0.38; centred +0.64 / +0.62 / +0.49. Shared latent (adapted with term): body-ID 0.42 (joint 0.59), kNN mixing 0.60.
+Reading: (1) a new body's DIRECT selection transfers fully (+0.96, better than joint) from 2.4 min of its own clips. (2) The
+current recipe's rollout gain lives in the imagined-read term; without it in adaptation, the adapted FTM loses it (+0.63);
+with it, +0.76 -- half the gap to joint closed; what remains is turning (imagined yaw 0.26 vs 0.37). (3) Centring: B1
+rollout slightly up (+0.63 -> +0.67, within one-seed noise), hexapods slightly down, imagined yaw down -- not adopted
+(as F345). (4) Without B1 in pretraining z is more shared (body-ID 0.42, lat / yaw transfer positive), as F310. Physics
+for the adapted B1 not run. Adaptation default unchanged (`--lambda_imread 0`); use 1.0 for the current recipe.
+
+---
+
+### F348. Checks for Ajan Blink's week-20 points: frames and labels are aligned; the hexapod's yaw labels keep gait sway (stride 0.55 s vs the 1 s window); branches lower every world-model loss; a numeric same-state outcome check replaces the eye-test figure
+
+2026-10-14. (1) **Time alignment** (`scripts/diagnostics/dataset/check_frame_label_alignment.py`): camera speed (`cam_pose`)
+vs the speed of the body part it is mounted on, from the same pose rows the labels use (hexapod head, B1 base), lags -3..+3:
+best lag 0 in 94-100 % of files for both bodies, wall and locomotion data (the few +-1 / -3 are B1 `side_L_lvl0`, whose
+speed barely varies: correlation <= 0.35 at every lag). A first version against the hexapod CoM spread lags 1-3 -- the head
+sways with every step; a test artefact. No timing bug. (2) **Gait sway in labels**: in the hexapod physics runs the yaw trace
+keeps a 1.82 Hz oscillation; the c10 joint commands in the same runs cycle at 1.82 Hz (stride 0.55 s), while
+`wm/data/embodiment.BODY_WINDOW_S` = 1 s assumes the insect's stride is 0.95 s -> the window spans ~1.8 strides and leaves a
+partial sway cycle in the label; forward is smooth (std 0.009 on 0.165); B1's traces peak at 0.31 Hz (no gait sway).
+The same labels train the model (yaw = weakest channel). Fix proposed as its own experiment: average over whole strides
+per body. (3) **Loss before / after branches** (`scripts/diagnostics/objective_experiments/loss_before_after.py`, final
+checkpoints `round1_clips_s0` vs `round1_branches_s0`, the training code's own validation pass, same evaluation pairs):
+clips_val total 9.28 -> 8.46, Froude head 1.07 -> 0.57, read-out 0.69 -> 0.50, next-embedding 3.96 -> 3.81; 10 % of held-out
+branches: total 9.64 -> 8.58, Froude head 0.97 -> 0.54, read-out 0.95 -> 0.61. Each model's Froude terms are in its own
+normalisation; embedding terms share units. Per-epoch tensorboard had only 3 points per branch run (1 point per epoch) and the
+no-branch run's summary was gone -> step-level logging added (`train_step/` every 500 steps, full `val_step/` every 2,000).
+(4) **Outcome check** (`scripts/figures/action_outcome_check.py`, replaces the eye-test `action_future_strip.png`): one
+held-out B1 state, 24 commands in physics; PASS = imagined Froude (4-step rollout read) within 1 SD (spread of the true values
+across the 24 commands) of the true Froude on every channel: no branches 7 / 24, current model 23 / 24 (fails the strong left
+turn: yaw). One state; the old strip's rule (nearest real future out of 24 in embedding space) counted near-identical
+futures as wrong. (5) **Timing** for the record: every current dataset is 0.05 s per frame (20 Hz, `dt` / `fps` fields);
+one model step = 5 frames = 0.25 s; rollout 5 steps = 1.25 s; the "50 Hz" in the label code's comment and in the week-20
+discussion is the old B1 data.
+
+---
+
+### F349. D1-D3 control on the frozen current model (locked protocol): B1 real futures carry state-dependent wall information and the frozen imagination already detects unsafe commands better than the command alone, but D3 fails; c10 fails D1 -- at 1.25 s the hexapod's outcome order is set by the command. End-to-end video goals cost +0.004 to +0.020 in physics
+
+2026-10-15 overnight (`results/wm/logs/queue_overnight2.sh`). (1) D1-D3, `scripts/diagnostics/wall_pilot/wall_predcheck.py`,
+protocol `doc/WALL_SELECTION_PLAN.md` section 9 (common 24 commands, read-outs fit on train only, test 57 states per body,
+1.25 s, 95 % episode bootstrap); `results/check/wall_predcheck_v3/{b1,c10}_round1_branches_s0_gray_imread.txt`:
+| test, 1.25 s | B1 | c10 |
+|---|---|---|
+| Spearman across 24 commands: real future / D3 imagined / command-only | 0.71 / 0.61 / 0.58 | 0.77 / 0.69 / 0.78 |
+| within-state unsafe AUC: real / D3 / command-only | 0.83 / 0.87 / 0.77 | 0.90 / 0.80 / 0.88 |
+| D1 real - command-only (Spearman) | +0.14 [+0.07, +0.21] PASS | -0.00 [-0.05, +0.07] FAIL |
+| D3 imagined - command-only: Spearman / within AUC | +0.04 [-0.08, +0.18] / +0.10 [+0.02, +0.20] -> FAIL | -0.09 [-0.13, -0.04] / -0.09 -> FAIL |
+| D2: R_real on imagined, shift | +0.95 body lengths (MAE 1.0) | +0.82 |
+Reading: (a) B1: the real future embedding ranks the commands' clearance better than knowing the command plus the current
+distance (D1); the never-wall-trained imagination ranks no better (D3 fails) but already flags the unsafe commands better
+than the command-only control -- the "before" row for the wall retrain. (b) c10: the command alone ranks the 1.25 s clearance
+as well as the real future (0.78 vs 0.77): at ~0.23 m/s the hexapod moves ~0.35 body lengths in 1.25 s and the order of the
+commands' outcomes hardly depends on the start state within that horizon (as F334 for the old B1 set). D1 uses only real
+frames (FROZEN encoder + ridge on train), so the retrain cannot change it. Reported as a negative c10 result at 1.25 s
+(review 2026-10-15, WALL_SELECTION_PLAN 10): a longer horizon only as a new, labelled experiment with fresh held-out data;
+mirrored corners as explanation, not as a replacement subset. (c) Imagined embeddings sit far
+from real ones (as F328): a read-out has to be fitted on imagined embeddings (D3), not reused from real frames (D2).
+(2) Vision goal in physics (`GS=vision`, `wm.policy.planner.vision_goal_froude`; model `round1_branches_s0_gray_imread`,
+rollout `GA=imagined`, 6 held-out goals, graded vs the recorded goal), mean error recorded -> video goal: B1 direct 0.038 ->
+0.052, rollout 0.044 -> 0.064; c10 0.050 -> 0.057, 0.058 -> 0.068; c08 (5 goals) 0.049 -> 0.053, 0.082 -> 0.093. The cost
+comes from the shrunk video reads (B1 strong-turn yaw 0.019 vs 0.063); clips `results/deck/weekly_1015/vision_goal/`.
+
+---
+
+### F350. Calibrating the video-read goal brings it 15 % closer to the true goal (every physics goal better, none worse) -- below the 20 % bar fixed beforehand; whole-stride averaging of the read changes nothing
+
+2026-10-15, `scripts/diagnostics/objective_experiments/goal_read_calibration.py` (`results/check/goal_read_calibration.txt`;
+cached grayscale embeddings, CPU). The physics loops' goal read (`vision_goal_froude`, model `round1_branches_s0_gray_imread`),
+per-channel linear calibration true ~ a * read + b fitted on the 48 c10 TRAINING clips (a = 1.24 / 1.36 / 1.37 fwd / lat /
+yaw), tested on the 24 held-out goal clips: mean per-frame L2 to the recorded goal 0.0755 -> 0.0641 (15 % lower); slope of
+read vs true 0.69 / 0.35 / 0.42 -> 0.86 / 0.48 / 0.57; the 6 physics goals all equal or better (strong turn 0.095 -> 0.072,
+speed 7.1 0.049 -> 0.032, speed 8.8 0.130 -> 0.118). Window 22 frames (2 c10 strides) vs 21: identical -- the read is
+already smooth; the gait wobble is in the recorded LABELS (F348), so Ajan Blink's whole-stride averaging belongs in the
+training labels (stride-matched label experiment), not in the read. B1 and hexapod checkpoints give identical numbers (both
+read through the same shared ITM + Froude head). Pass rule (>= 20 % and no physics goal worse by > 0.01) NOT met -> no
+physics rerun. Reading: scaling recovers only part of the size (yaw slope 0.57 after calibration): the read lacks
+information, not only scale; next lever = cleaner (stride-matched) labels / a longer view for z (F339).

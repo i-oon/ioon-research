@@ -1,4 +1,8 @@
-# Wall selection: dynamics vs evaluation, staged diagnostic plan (2026-10-14, draft for review)
+# Wall selection: dynamics vs evaluation, staged diagnostic plan (2026-10-14; protocol locked, section 9)
+
+> Status 2026-10-15: data balanced (F346); D1-D3 control on the frozen model, the wall retrain
+> (`round3_wall_s0_gray_imread`, original objectives only) and D1-D3 on it run in `results/wm/logs/queue_overnight.sh`.
+> Train split for the readouts = 153 start states per body (not 157).
 
 Request (user, 2026-10-14): separate DYNAMICS (projector + FTM predict the consequence of a command) from EVALUATION
 (a separate readout / cost judges that consequence against the motion goal and the wall). No safety or clearance loss into
@@ -178,3 +182,23 @@ Metrics: boundary crossings, NEAR time, closest clearance, forward progress, Fro
       the current distance give.
 - Script: `scripts/diagnostics/wall_pilot/wall_predcheck.py` (new data layout; `b1_wall_predcheck.py` stays for the
   F334 / F338 sets). Output `results/check/wall_predcheck_v3/<body>_<model>.txt` + cached embeddings.
+
+## 10. Review decisions (Codex, 2026-10-15, after the frozen D1-D3 control; before the retrain result)
+
+- Locked pass rules UNCHANGED. B1 frozen result reads: "better unsafe-command detection (within-state AUC 0.77 -> 0.87),
+  insufficient evidence of better overall ranking (Spearman 0.58 -> 0.61, n.s.)".
+- c10: reported as a NEGATIVE result at 1.25 s (D1 fails: real-future read-out = command-only). Note: D1 depends only on the
+  FROZEN encoder's real-future embeddings + a ridge fit on train, so the retrain cannot change D1; it can change D2 / D3.
+  A longer horizon is a NEW, labelled experiment with a fresh held-out evaluation; a mirrored-corner analysis may explain
+  where scene information matters but never replaces the full test.
+- The cross-body MOTION-interface claim (Gate 1) stays separate from the wall claim (Gate 2).
+- Main wall run trains on single-command branches only: it has NOT seen retreat -> spin -> walk-out sequences. Episodes =
+  a matched-budget ablation, not an addition.
+- Train subset coverage checked (2026-10-15): every band x approach cell, both bodies, contains spin, safe, NEAR-only and
+  crossing examples; files per cell identical across bodies; thinnest: far-band corner (28 files), 4 NEAR-only examples in
+  B1 near head-on and c10 far head-on.
+- Added diagnostic (NOT a pass criterion): DECISION REGRET per start state -- among commands D3 predicts safe, the forward
+  progress lost vs the true-future safe choice, and how often the chosen command is actually unsafe. Any new criterion is
+  specified on validation and tested on fresh data.
+- Order: locked before / after -> B1 and c10 stated separately -> only then decide a horizon experiment or closed-loop
+  diagnostic.

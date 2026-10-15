@@ -18,3 +18,5 @@ direction AND no active script in `scripts/`, `wm/` or `sim/` imports or calls i
 **To run one again:** move it back to its original folder first -- scripts locate the repo root by their folder depth
 (`os.path.dirname` chains), which is one level off inside `_archive/`. Their FINDINGS entries stay valid.
 Older dropped run scripts are in `scripts/run/_archive/` (2026-10-09).
+
+- `dataset/{collect_intent,collect_offrhythm,confirm_counterfactual,ego_derisk,noise_sweep}.sh` (moved 2026-10-15): September launchers for the intent / off-rhythm / egocentric de-risk / noise-sweep collections; their data is deleted (doc/DATA.md).

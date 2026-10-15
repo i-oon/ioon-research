@@ -3,7 +3,10 @@ Top: B1 on open floor (held-out clip `b1_ep50012`, speed vx 0.38). Bottom: B1 fa
 `ep08805_b1_c01`, command fwd1, the same forward command held from a state ~0.9 m from the wall) until it crosses the
 boundary. Frames at 0 / 1.25 / 2.5 s after the decision, grayscale (what the current model sees), clearance printed.
 
-    .venv/bin/python3 scripts/figures/wall_question_pair.py   # -> results/deck/weekly_1015/wall_question_pair.png
+    .venv/bin/python3 scripts/figures/wall_question_pair.py           # -> results/deck/weekly_1015/wall_question_pair.png
+    .venv/bin/python3 scripts/figures/wall_question_pair.py --paths   # -> results/deck/weekly_1015/wall_question_paths.png
+       (slide 2, 2026-10-15: the two START views large, side by side, same goal / same command, each with a top-down inset
+        of the footprint's path over the next ~3 s only with --inset -- open floor: the path goes on; wall: it crosses the red boundary)
 """
 import os
 
@@ -45,5 +48,64 @@ def main():
     im.save(os.path.join(ROOT, OUT)); print("->", OUT)
 
 
+INSET = False                                                       # --inset: the top-down footprint-path inset
+
+
+def _yaw(q):
+    w, x, y, z = q
+    return np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
+
+
+def paths():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Polygon
+    o = np.load(os.path.join(ROOT, OPEN), allow_pickle=True)
+    w = np.load(os.path.join(ROOT, WALL), allow_pickle=True)
+    T = int(w["first_pair"]) - 1
+    L_, W_ = np.asarray(w["foot_lw"], float); H = float(w["boundary_half"])
+    cases = [("Open floor", gray(o["frames"][0]), np.asarray(o["base_pos"], float)[:60, :2],
+              np.asarray(o["base_quat"], float)[:60], None),
+             ("Approaching a wall", gray(w["frames"][T]), np.asarray(w["base_pos"], float)[T:, :2],
+              np.asarray(w["base_quat"], float)[T:], H)]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6.6))
+    for ax, (title, img, xy, q, half) in zip(axes, cases):
+        ax.imshow(img); ax.set_xticks([]); ax.set_yticks([]); ax.set_title(title, fontsize=15)
+        crossed = half is not None and bool((np.asarray(w["clearance"])[T:] < 0).any())
+        if not INSET:                                               # 2026-10-15: inset off on the slide (user)
+            ax.text(0.5, -0.06, "command: forward" + ("  ->  crosses the boundary" if crossed else "  ->  keeps walking"),
+                    transform=ax.transAxes, ha="center", fontsize=13, color="red" if crossed else "green")
+            continue
+        ins = ax.inset_axes([0.62, 0.02, 0.36, 0.36]); ins.set_facecolor("white")
+        y0 = _yaw(q[0]); R = np.array([[np.cos(-y0 + np.pi / 2), -np.sin(-y0 + np.pi / 2)],
+                                       [np.sin(-y0 + np.pi / 2), np.cos(-y0 + np.pi / 2)]])
+        loc = (xy - xy[0]) @ R.T                                   # robot frame at the start, heading = up
+        crossed = False
+        if half is not None:                                       # the wall the robot heads for, in the same frame
+            p0 = xy[0]; dw = [half - p0[0], half + p0[0], half - p0[1], half + p0[1]]; k = int(np.argmin(dw))
+            a, b = {0: ((half, -20), (half, 20)), 1: ((-half, -20), (-half, 20)),
+                    2: ((-20, half), (20, half)), 3: ((-20, -half), (20, -half))}[k]
+            seg = (np.array([a, b]) - p0) @ R.T
+            ins.plot(seg[:, 0], seg[:, 1], color="red", lw=3, label="boundary")
+            crossed = bool((np.asarray(w["clearance"])[T:] < 0).any())
+        ins.plot(loc[:, 0], loc[:, 1], color="red" if crossed else "green", lw=2.5)
+        for j, c_ in ((0, "0.5"), (len(loc) - 1, "red" if crossed else "green")):
+            yj = _yaw(q[j]) - y0 + np.pi / 2
+            corners = np.array([[L_ / 2, W_ / 2], [L_ / 2, -W_ / 2], [-L_ / 2, -W_ / 2], [-L_ / 2, W_ / 2]])
+            rr = np.array([[np.cos(yj), -np.sin(yj)], [np.sin(yj), np.cos(yj)]])
+            ins.add_patch(Polygon(corners @ rr.T + loc[j], closed=True, fill=False, ec=c_, lw=1.5))
+        ins.set_xlim(-1.6, 1.6); ins.set_ylim(-0.8, 2.4); ins.set_aspect("equal"); ins.set_xticks([]); ins.set_yticks([])
+        ins.set_title("footprint path, next %.1f s" % ((len(loc) - 1) * 0.05), fontsize=8)
+        ax.text(0.5, -0.06, "command: forward" + ("  ->  crosses the boundary" if crossed else "  ->  keeps walking"),
+                transform=ax.transAxes, ha="center", fontsize=13, color="red" if crossed else "green")
+    fig.suptitle("Goal: walk forward  (same goal, same command, different consequence)", fontsize=16)
+    fig.tight_layout(rect=(0, 0.06, 1, 0.95))
+    out = os.path.join(ROOT, "results/deck/weekly_1015/wall_question_paths.png"); fig.savefig(out, dpi=130)
+    print("->", os.path.relpath(out, ROOT))
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    INSET = "--inset" in sys.argv
+    paths() if "--paths" in sys.argv else main()

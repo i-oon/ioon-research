@@ -725,6 +725,9 @@ def main():
     np.random.seed(cfg.seed)
     from wm.data import augment as _augment          # training-view augmentation strength (cfg.aug_*)
     _augment.configure(cfg)
+    if getattr(cfg, "stride_labels", False):        # stride-matched hexapod Froude labels (F348), read by the loaders
+        os.environ["WM_STRIDE_LABELS"] = "1"
+        print("stride-matched Froude labels: WM_STRIDE_LABELS=1")
     if cfg.grayscale:                                # Egocentric VSM grayscale: the frozen encoder sees luminance only
         os.environ["VJEPA_GRAY"] = "1"
         print("grayscale input: VJEPA_GRAY=1")

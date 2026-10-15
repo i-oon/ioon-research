@@ -1,27 +1,25 @@
-=== b1 train: 35 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/train)
-  1-2 states 157; command sets complete: PASS (0 bad)
+=== b1 train: 58 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/train)
+  1-2 states 153; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
-  5 labels recomputed == stored: PASS (max clearance diff 5.19e-07); crossing terminal: PASS
+  5 labels recomputed == stored: PASS (max clearance diff 5.17e-07); crossing terminal: PASS
   6 CoM height min over files: p1 0.518 / min 0.516 m (median of minima 0.522); falls (< 0.5 x median): 0
-  8 cells (band x group): 0.4-0.8 head-on 16; 0.4-0.8 oblique 33; 0.4-0.8 corner 16; 0.8-1.2 head-on 14; 0.8-1.2 oblique 40; 0.8-1.2 corner 11; 1.2-2.0 head-on 9; 1.2-2.0 oblique 16; 1.2-2.0 corner 2
-    approach side left / right 83 / 45; corner second wall left / right 16 / 13; crossing share per band 0.4-0.8 0.37, 0.8-1.2 0.15, 1.2-2.0 0.25
-  7 rendered: 4396 wanted, missing 2198, frame count wrong 0, blank 13: FAIL; camera-vs-body yaw spread median 0.04 / max 0.11 deg
-  FAIL train: rendered set incomplete
-=== b1 val: 7 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/val)
+  8 cells (band x group): 0.4-0.8 head-on 16; 0.4-0.8 oblique 33; 0.4-0.8 corner 16; 0.8-1.2 head-on 10; 0.8-1.2 oblique 40; 0.8-1.2 corner 11; 1.2-2.0 head-on 9; 1.2-2.0 oblique 16; 1.2-2.0 corner 2
+    approach side left / right 63 / 61; corner second wall left / right 16 / 13; crossing share per band 0.4-0.8 0.38, 0.8-1.2 0.14, 1.2-2.0 0.26
+  7 rendered: 2142 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 8: PASS; camera-vs-body yaw spread median 0.04 / max 0.11 deg
+=== b1 val: 17 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/val)
   1-2 states 30; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
   5 labels recomputed == stored: PASS (max clearance diff 5.14e-07); crossing terminal: PASS
-  6 CoM height min over files: p1 0.518 / min 0.516 m (median of minima 0.522); falls (< 0.5 x median): 0
+  6 CoM height min over files: p1 0.519 / min 0.517 m (median of minima 0.522); falls (< 0.5 x median): 0
   8 cells (band x group): 0.4-0.8 head-on 4; 0.4-0.8 oblique 6; 0.4-0.8 corner 2; 0.8-1.2 head-on 4; 0.8-1.2 oblique 6; 0.8-1.2 corner 4; 1.2-2.0 head-on 2; 1.2-2.0 oblique 2; 1.2-2.0 corner 0
-    approach side left / right 8 / 16; corner second wall left / right 3 / 3; crossing share per band 0.4-0.8 0.38, 0.8-1.2 0.12, 1.2-2.0 0.19
-  7 rendered: 840 wanted, missing 0, frame count wrong 0, blank 0: PASS; camera-vs-body yaw spread median 0.04 / max 0.11 deg
-=== b1 test: 12 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/test)
+    approach side left / right 12 / 12; corner second wall left / right 3 / 3; crossing share per band 0.4-0.8 0.46, 0.8-1.2 0.13, 1.2-2.0 0.17
+  7 rendered: 840 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 0: PASS; camera-vs-body yaw spread median 0.04 / max 0.11 deg
+=== b1 test: 23 episodes (/home/fibo07/ioon/ioon-research/data/wall_b1/_physics/test)
   1-2 states 57; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
-  5 labels recomputed == stored: PASS (max clearance diff 5.16e-07); crossing terminal: PASS
+  5 labels recomputed == stored: PASS (max clearance diff 5.17e-07); crossing terminal: PASS
   6 CoM height min over files: p1 0.518 / min 0.516 m (median of minima 0.522); falls (< 0.5 x median): 0
   8 cells (band x group): 0.4-0.8 head-on 7; 0.4-0.8 oblique 13; 0.4-0.8 corner 5; 0.8-1.2 head-on 6; 0.8-1.2 oblique 10; 0.8-1.2 corner 6; 1.2-2.0 head-on 6; 1.2-2.0 oblique 3; 1.2-2.0 corner 1
-    approach side left / right 32 / 13; corner second wall left / right 7 / 5; crossing share per band 0.4-0.8 0.36, 0.8-1.2 0.17, 1.2-2.0 0.25
-  7 rendered: 1596 wanted, missing 0, frame count wrong 0, blank 3: FAIL; camera-vs-body yaw spread median 0.04 / max 0.12 deg
-  FAIL test: rendered set incomplete
-GATES 2 FAILURES
+    approach side left / right 24 / 21; corner second wall left / right 7 / 5; crossing share per band 0.4-0.8 0.44, 0.8-1.2 0.15, 1.2-2.0 0.29
+  7 rendered: 1596 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 3: PASS; camera-vs-body yaw spread median 0.04 / max 0.12 deg
+GATES ALL PASS

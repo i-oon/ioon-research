@@ -1,0 +1,18 @@
+Goal read from video vs recorded goal; calibration fitted on 48 c10 training clips, tested on 24 held-out goals; per-frame L2 (as graded in physics); slope = read vs true per channel (1 = right size)
+--- B1 planner (b1.pt), window 21: calibration a (fwd / lat / yaw) 1.24 / 1.36 / 1.37
+  raw        mean L2 0.0755 | slope 0.69 / 0.35 / 0.42 | physics goals 40101:0.040 40110:0.095 40163:0.059 40212:0.045 40012:0.049 40030:0.130
+  calibrated mean L2 0.0641 | slope 0.86 / 0.48 / 0.57 | physics goals 40101:0.035 40110:0.072 40163:0.058 40212:0.032 40012:0.032 40030:0.118
+  -> mean L2 +15 % change; worst physics-goal change -0.001
+--- B1 planner (b1.pt), window 22: calibration a (fwd / lat / yaw) 1.24 / 1.36 / 1.37
+  raw        mean L2 0.0754 | slope 0.69 / 0.35 / 0.41 | physics goals 40101:0.040 40110:0.095 40163:0.058 40212:0.045 40012:0.048 40030:0.131
+  calibrated mean L2 0.0639 | slope 0.86 / 0.48 / 0.57 | physics goals 40101:0.035 40110:0.072 40163:0.057 40212:0.032 40012:0.032 40030:0.118
+  -> mean L2 +15 % change; worst physics-goal change -0.001
+--- hexapod planner (hex.pt), window 21: calibration a (fwd / lat / yaw) 1.24 / 1.36 / 1.37
+  raw        mean L2 0.0755 | slope 0.69 / 0.35 / 0.42 | physics goals 40101:0.040 40110:0.095 40163:0.059 40212:0.045 40012:0.049 40030:0.130
+  calibrated mean L2 0.0641 | slope 0.86 / 0.48 / 0.57 | physics goals 40101:0.035 40110:0.072 40163:0.058 40212:0.032 40012:0.032 40030:0.118
+  -> mean L2 +15 % change; worst physics-goal change -0.001
+--- hexapod planner (hex.pt), window 22: calibration a (fwd / lat / yaw) 1.24 / 1.36 / 1.37
+  raw        mean L2 0.0754 | slope 0.69 / 0.35 / 0.41 | physics goals 40101:0.040 40110:0.095 40163:0.058 40212:0.045 40012:0.048 40030:0.131
+  calibrated mean L2 0.0639 | slope 0.86 / 0.48 / 0.57 | physics goals 40101:0.035 40110:0.072 40163:0.057 40212:0.032 40012:0.032 40030:0.118
+  -> mean L2 +15 % change; worst physics-goal change -0.001
+PASS (both checkpoints, window 21: >= 20 % lower and no physics goal worse by > 0.01): NO

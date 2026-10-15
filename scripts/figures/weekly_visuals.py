@@ -163,16 +163,17 @@ YLIM = {0: (-0.05, 0.30), 2: (-0.05, 0.12)}   # same axes in every physics clip 
 def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/c08", window=11,
                  goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz",
                  goal_ego="data/egocentric/beh12_c10f10t10_ego_flat_cleanheldout/hexapod_{ep}.npz", out=None,
-                 morph="c08f09t09", body="c08", vision_base=None):
+                 morph="c08f09t09", body="c08", vision_base=None, vision_window=None):
     """Hexapod goal (third-person) | c08 in physics, current pipeline (ego), with Froude traces.
     base / window / goal_tp / goal_ego ({ep} = goal_ep) / out: defaults = the original figure. morph / body: the run's
     file prefix and label (default c08; c10 = "c10f10t10" / "c10", 2026-10-12).
     vision_base (2026-10-14, Ajan Blink week 20): a run dir of the SAME goal / mechanism with `--goal_source vision`;
     then the traces are: recorded goal black, robot aiming at it gray, goal read from the goal video blue, robot
-    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure."""
+    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure.
+    vision_window: the vision run's folder suffix if it differs (`--goal_source vision` runs: direct_w21_ga / _cpg_ga)."""
     base = os.path.join(ROOT, base)
     run = np.load(f"{base}/{mech}_w{window}/{morph}_hexapod_{goal_ep}.npz", allow_pickle=True)
-    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{window}", f"{morph}_hexapod_{goal_ep}.npz"), allow_pickle=True)
+    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{vision_window or window}", f"{morph}_hexapod_{goal_ep}.npz"), allow_pickle=True)
             if vision_base else None)
     goal = np.load(os.path.join(ROOT, goal_tp.format(ep=goal_ep)), allow_pickle=True)["frames"]
     goal_ego = np.load(os.path.join(ROOT, goal_ego.format(ep=goal_ep)), allow_pickle=True)["frames"]
@@ -206,16 +207,17 @@ def physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physi
 
 
 def b1_physics_clip(goal_ep, tag, mech="direct", base="results/wm/closed_loop/physics/FM0/b1", window=11,
-                    goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz", out=None, vision_base=None):
+                    goal_tp="data/allocentric/beh12_c10f10t10_flat/hexapod_{ep}.npz", out=None, vision_base=None, vision_window=None):
     """Hexapod goal (third-person) | B1 walking under its own policy in physics (third-person, re-rendered
     from the saved MuJoCo states) | the B1's ego view the planner read, with Froude traces.
     base / window / goal_tp (goal third-person clip, {ep} = goal_ep) / out: defaults = the original figure.
     vision_base (2026-10-14, Ajan Blink week 20): a run dir of the SAME goal / mechanism with `--goal_source vision`;
     then the traces are: recorded goal black, robot aiming at it gray, goal read from the goal video blue, robot
-    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure."""
+    aiming at that light blue (the frames shown stay the recorded-goal run's). None = the original figure.
+    vision_window: the vision run's folder suffix if it differs (`--goal_source vision` runs: direct_w21_ga / _cpg_ga)."""
     base = os.path.join(ROOT, base)
     run = np.load(f"{base}/{mech}_w{window}/b1_hexapod_{goal_ep}.npz", allow_pickle=True)
-    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{window}", f"b1_hexapod_{goal_ep}.npz"), allow_pickle=True)
+    vrun = (np.load(os.path.join(ROOT, vision_base, f"{mech}_w{vision_window or window}", f"b1_hexapod_{goal_ep}.npz"), allow_pickle=True)
             if vision_base else None)
     tp = "thirdperson" if mech == "direct" else f"thirdperson_{mech}"
     third = np.load(f"{base}/{tp}_b1_hexapod_{goal_ep}.npz", allow_pickle=True)["frames"]

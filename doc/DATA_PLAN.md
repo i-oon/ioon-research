@@ -459,4 +459,4 @@ adding measured approach speed to a physics classifier (does not show one camera
 **Order:** user reviews the 10 B1 videos (`review_escape_var_r10`) -> far-band pilot -> c10 procedure pilot + review ->
 collect B1 + c10 -> balance (cells equal across bodies, sides) -> gates pass on both bodies -> loader + clearance head ->
 training runs (data only; data + clearance; episodes-only ablation) -> prediction check -> closed loop.
-Status 2026-10-14: B1 collected (gates pass except side balance); c10 first run + top-up being completed; balance next.
+Status 2026-10-15: both bodies collected and balanced (153 / 30 / 57 start states per body, equal per cell and side; F346); final render + gates overnight; then D1-D3 and the wall retrain (`doc/WALL_SELECTION_PLAN.md`).

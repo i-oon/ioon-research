@@ -1,29 +1,32 @@
-=== c10 train: 65 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/train)
-  1-2 states 183; command sets complete: PASS (0 bad)
+=== c10 train: 84 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/train)
+  1-2 states 153; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
-  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 65 episodes differ)
+  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 84 episodes differ)
   5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
   6 CoM height min over files: p1 0.109 / min 0.102 m (median of minima 0.131); falls (< 0.5 x median): 0
-  8 cells (band x group): 0.4-0.8 head-on 10; 0.4-0.8 oblique 49; 0.4-0.8 corner 17; 0.8-1.2 head-on 12; 0.8-1.2 oblique 40; 0.8-1.2 corner 9; 1.2-2.0 head-on 9; 1.2-2.0 oblique 33; 1.2-2.0 corner 4
-    approach side left / right 63 / 90; corner second wall left / right 21 / 9; crossing share per band 0.4-0.8 0.39, 0.8-1.2 0.11, 1.2-2.0 0.12
-=== c10 val: 20 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/val)
-  1-2 states 54; command sets complete: PASS (0 bad)
+  8 cells (band x group): 0.4-0.8 head-on 16; 0.4-0.8 oblique 33; 0.4-0.8 corner 16; 0.8-1.2 head-on 10; 0.8-1.2 oblique 40; 0.8-1.2 corner 11; 1.2-2.0 head-on 9; 1.2-2.0 oblique 16; 1.2-2.0 corner 2
+    approach side left / right 63 / 61; corner second wall left / right 16 / 13; crossing share per band 0.4-0.8 0.39, 0.8-1.2 0.12, 1.2-2.0 0.15
+  7 rendered: 2142 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 0: PASS; camera-vs-body yaw spread median 1.15 / max 2.08 deg
+=== c10 val: 24 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/val)
+  1-2 states 30; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
-  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 20 episodes differ)
+  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 24 episodes differ)
   5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
   6 CoM height min over files: p1 0.109 / min 0.105 m (median of minima 0.131); falls (< 0.5 x median): 0
-  8 cells (band x group): 0.4-0.8 head-on 8; 0.4-0.8 oblique 9; 0.4-0.8 corner 6; 0.8-1.2 head-on 6; 0.8-1.2 oblique 8; 0.8-1.2 corner 4; 1.2-2.0 head-on 4; 1.2-2.0 oblique 8; 1.2-2.0 corner 1
-    approach side left / right 28 / 15; corner second wall left / right 4 / 7; crossing share per band 0.4-0.8 0.43, 0.8-1.2 0.18, 1.2-2.0 0.24
-=== c10 test: 27 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/test)
-  1-2 states 76; command sets complete: PASS (0 bad)
+  8 cells (band x group): 0.4-0.8 head-on 4; 0.4-0.8 oblique 6; 0.4-0.8 corner 2; 0.8-1.2 head-on 4; 0.8-1.2 oblique 6; 0.8-1.2 corner 4; 1.2-2.0 head-on 2; 1.2-2.0 oblique 2; 1.2-2.0 corner 0
+    approach side left / right 12 / 12; corner second wall left / right 3 / 3; crossing share per band 0.4-0.8 0.41, 0.8-1.2 0.20, 1.2-2.0 0.23
+  7 rendered: 840 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 0: PASS; camera-vs-body yaw spread median 1.11 / max 2.06 deg
+=== c10 test: 35 episodes (/home/fibo07/ioon/ioon-research/data/wall_c10/_physics/test)
+  1-2 states 57; command sets complete: PASS (0 bad)
   3 exact prefix (all fields, branch rows 0..9 == episode rows T-10..T-1): PASS (0 files differ, max 0.00e+00)
-  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 27 episodes differ)
+  4 stored == live run (every decision, 1 mm / 1 mrad): PASS (0 of 35 episodes differ)
   5 labels recomputed == stored: PASS (max clearance diff 0.00e+00); crossing terminal: PASS
   6 CoM height min over files: p1 0.109 / min 0.104 m (median of minima 0.131); falls (< 0.5 x median): 0
-  8 cells (band x group): 0.4-0.8 head-on 5; 0.4-0.8 oblique 18; 0.4-0.8 corner 8; 0.8-1.2 head-on 2; 0.8-1.2 oblique 15; 0.8-1.2 corner 7; 1.2-2.0 head-on 7; 1.2-2.0 oblique 12; 1.2-2.0 corner 2
-    approach side left / right 22 / 37; corner second wall left / right 10 / 7; crossing share per band 0.4-0.8 0.42, 0.8-1.2 0.14, 1.2-2.0 0.14
+  8 cells (band x group): 0.4-0.8 head-on 7; 0.4-0.8 oblique 13; 0.4-0.8 corner 5; 0.8-1.2 head-on 6; 0.8-1.2 oblique 10; 0.8-1.2 corner 6; 1.2-2.0 head-on 6; 1.2-2.0 oblique 3; 1.2-2.0 corner 1
+    approach side left / right 24 / 21; corner second wall left / right 7 / 5; crossing share per band 0.4-0.8 0.42, 0.8-1.2 0.18, 1.2-2.0 0.15
+  7 rendered: 1596 wanted, missing 0, frame count wrong 0, broken (black / constant) 0, near-uniform wall views (info) 15: PASS; camera-vs-body yaw spread median 1.15 / max 2.06 deg
 === cell counts c10 vs b1 (must be equal after the trim)
-  train: 0.4-0.8|corner +1; 0.4-0.8|head-on -6; 0.4-0.8|oblique +16; 0.8-1.2|corner -2; 0.8-1.2|head-on -2; 1.2-2.0|corner +2; 1.2-2.0|oblique +17
-  val: 0.4-0.8|corner +4; 0.4-0.8|head-on +4; 0.4-0.8|oblique +3; 0.8-1.2|head-on +2; 0.8-1.2|oblique +2; 1.2-2.0|corner +1; 1.2-2.0|head-on +2; 1.2-2.0|oblique +6
-  test: 0.4-0.8|corner +3; 0.4-0.8|head-on -2; 0.4-0.8|oblique +5; 0.8-1.2|corner +1; 0.8-1.2|head-on -4; 0.8-1.2|oblique +5; 1.2-2.0|corner +1; 1.2-2.0|head-on +1; 1.2-2.0|oblique +9
+  train: equal
+  val: equal
+  test: equal
 GATES ALL PASS

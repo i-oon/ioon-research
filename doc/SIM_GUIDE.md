@@ -7,7 +7,9 @@ Related documents:
 
 | Document | Contents |
 |---|---|
-| [PROGRESS.md](PROGRESS.md) | Full chronological research log, findings, dated sections |
+| [START_HERE.md](START_HERE.md) | Where to begin, current state |
+| [FINDINGS.md](FINDINGS.md) | Numbered evidence |
+| [PROGRESS.md](PROGRESS.md) | Chronological log (history) |
 | [STATUS.md](STATUS.md) | Current state, what runs now, what is next |
 | [DATA.md](DATA.md) | Current data, splits, and the scripts that made them |
 | [sim/SOURCES.md](sim/SOURCES.md) | File origins and attribution for migrated simulator assets |
@@ -73,7 +75,7 @@ Start CoppeliaSim (section 3), then:
 ```bash
 cd $REPO && .venv/bin/python3 -c "
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
-sim = RemoteAPIClient('localhost', port=23000).require('sim')
+sim = RemoteAPIClient('localhost', port=25780).require('sim')
 print('connected, objects:', len(sim.getObjectsInTree(sim.handle_scene, sim.handle_all)))"
 ```
 
@@ -84,286 +86,128 @@ not start.
 
 ## 3. Running CoppeliaSim
 
-Headless, one instance per port:
+Headless, one instance per port. Use ports in the 25xxx range; **never 23000** (reserved), at most 6 own instances:
 
 ```bash
-cd $SIM && ./coppeliaSim.sh -h -GzmqRemoteApi.rpcPort=23000
+cd $SIM && setsid bash -c "tail -f /dev/null | ./coppeliaSim.sh -h -GzmqRemoteApi.rpcPort=25780 -GzmqRemoteApi.cntPort=25781" &
 ```
 
-No scene argument is needed. Every script calls `sim.loadScene()` itself over ZMQ. Pass
-`-f <scene.ttt>` only to inspect a scene manually in the GUI (omit `-h` for that).
+Several instances run from the one install on different ports (the queue scripts in `results/wm/logs/queue_*.sh` start
+them this way, 8 s apart, and wait until each answers `getSimulationState`). No scene argument: every script calls
+`sim.loadScene()` itself. After killing a script mid-run, restart its instances (otherwise "simulation is not stopped").
 
-Run all other commands from a second terminal.
+### Scenes in use
 
-### Multiple instances
-
-Each instance needs its own install directory and port, because instances share state through
-their install path. Copy the directory to run several:
-
-```bash
-cp -r $SIM ${SIM}_b
-cd ${SIM}_b && ./coppeliaSim.sh -h -GzmqRemoteApi.rpcPort=23001
-```
-
-Apply section 2.3 to each copy.
-
-### Scenes
-
-| Scene | Morphology |
+| scene | body |
 |---|---|
-| `sim/env/medauroidea_stick_insect.ttt` | long, 1.0x leg length (base) |
-| `sim/env/medauroidea_stick_insect_medium.ttt` | medium, 0.75x |
-| `sim/env/medauroidea_stick_insect_short.ttt` | short, 0.5x |
+| `sim/env/medauroidea_c10f10t10.ttt` | hexapod c10 (pretraining) |
+| `sim/env/medauroidea_c08f09t09.ttt` | hexapod c08 (test only) |
+| `sim/env/b1_flat.ttt` | B1 rendering (physics in MuJoCo) |
 
-Camera, lighting and floor must remain identical across all three. That render lock is what
-makes the morphology comparison valid; see PROGRESS.md section 15.2 for its current limits.
+Other `medauroidea_c*f*t*.ttt` files are leg-length variants not used by the current data.
 
 ---
 
-## 4. Data collection
+## 4. Data collection (current pipeline, 2026-10-15)
 
-### 4.1 Stick insect, IK-retargeted forward walk
+Rewritten 2026-10-15; the earlier IK-retarget / expert-CSV / allocentric / AMP instructions are history (git, PROGRESS).
+Never use the expert CSV (memory). Everything below writes 0.05 s frames (20 Hz) for every body; data map in `doc/DATA.md`,
+design in `doc/DATA_PLAN.md`. Own CoppeliaSim instances on ports 25xxx (never 23000), at most 6.
 
-The primary Stage 1 dataset. One expert foot trajectory is retargeted per morphology with
-`simIK`, so behaviour is held fixed while joint commands differ per body.
+### 4.1 Locomotion clips and branches (`data/counterfactual_walks/`)
 
-```bash
-cd $REPO && .venv/bin/python3 sim/collect/collect_ik.py \
-    --port 23000 \
-    --episodes 6,20,22,28 \
-    --repeats 1 \
-    --scale 0.5 \
-    --travel 0.8 \
-    --out data/ik_walk_100
-```
-
-- `--episodes` selects rows from the expert CSV (`sim/env/expert_66k_aug3c_fcontact.csv`,
-  1000 episodes of 66 frames). All three morphologies are collected in one call.
-- `--repeats 1` is intended. Repeats of one episode share a bit-identical action sequence and
-  near-identical frames, so they add no information.
-- Throughput is about 33 s per episode for all three bodies.
-
-Output: one `.npz` per body per episode containing `frames (66,256,256,3)`, `actions (66,18)`,
-`forces`, `head`, and metadata.
-
-### 4.2 Unitree B1 quadruped
-
-Rolled out in MuJoCo, then replayed kinematically in CoppeliaSim. **MuJoCo is never re-run to
-change how a clip looks** -- every clip stores `base_pos`, `base_quat` and `joint_pos`, so the
-physics is replayed from the file and only the camera changes.
-
-```bash
-# speed and sideways: re-render the stored states
-cd $REPO && .venv/bin/python3 scripts/dataset/rerender_b1_framing.py --out data/allocentric/beh12_b1_flat
-
-# turning: re-roll, because the commands themselves change
-cd $REPO && .venv/bin/python3 scripts/dataset/recollect_b1_turns.py --out data/allocentric/beh12_b1_turns
-```
-
-The current set is **`data/allocentric/beh12_b1_flat`**; `data/allocentric/beh12_b1_flat` is the superseded one and the two
-must not be mixed. Its README lists what changed.
-
-#### The configuration that has to stay fixed
-
-**Every item below was wrong at some point, and none of the errors announced itself.** They are
-defaults now (§4.2.1); this table is here so a future change is a decision rather than a drift.
-
-| | value | what goes wrong otherwise |
+| body | script | physics |
 |---|---|---|
-| perspective angle | **24 deg** | the scene ships 15, at which the B1 touches an image edge in 61% of frames and 100% of every sideways clip, while the insect never does. The two scenes ship identical cameras and that is **not** the same as an identical view: the field is 2.11 m at the robot, the insect needs 1.75 m and the B1 needs 2.85 m |
-| spawn | **`--spawn 0 0`** | without it the camera is pinned to wherever that rollout happened to start, so every clip carries its own background -- 2.79 grey levels of spread against the insect's 0.00 |
-| floor | **`--floor_scale 3`** | a 24-deg view reaches the far edge of the scene's 15 m floor and draws a band across the upper third of every frame. `sim.scaleObjects` grows a box **without moving its centre**, so the surface must be translated back to z=0 or the robot stands 20 cm underground with its feet cut off -- the renderer prints `surface +0.000 -> +0.000` to show it did |
-| policies | **both**, two clips each | `base_gait3` at 2.0 Hz and `base_1.7hz_sym` at 1.7. Four clips of one policy are one limit cycle at four phases; the pair gives a condition genuine spread. `gait3`'s lateral drift and its lean into turns are the *controller*, not the robot |
-| turn commands | **per policy** | the same `--wz` gives different rates on the two policies -- at the weakest level `sym` needs -0.023 and `gait3` -0.081. Conditions are named for the **achieved** rate, never for a command |
-| turn direction | **negative**, matching the insect | the two robots turned opposite ways for six days after it was diagnosed, which made every cross-embodiment turning result meaningless |
-| clip windows | **non-overlapping**, rotated to a common heading | MuJoCo starts every run identically and is deterministic, so four runs of one command are one clip four times; windows of a longer rollout are the only source of variety, and each is rotated about its own first pose so it starts facing where the first one did |
+| hexapod c10 (pretraining) | `scripts/dataset/collect_c10_walks_and_branches.py` | CoppeliaSim, CPG gait, scene reuse (§8) |
+| B1 | `scripts/dataset/collect_b1_walks.py`, then `scripts/dataset/build_branches.py` | MuJoCo (walking policy), CoppeliaSim render |
+| hexapod c08 (test only) | `scripts/dataset/collect_c08_test_set.py` | CoppeliaSim, the c10 walk plans |
 
-Camera and floor are **part of the data**, not of the viewing. A loop that plans on frames
-differing from its adaptation set in any static way measures that difference:
-`close_loop_b1_physics.py` carries the same three defaults and they have to agree.
+24 behaviours per body; main clips = windows of one long walk per behaviour; branches = 3 branch points per main clip x 24
+commands from the identical state (10 frames before the switch, 20 after). Labels: Froude (forward / lateral / yaw) at the
+centre of mass, 1 s average, never across a command switch (`wm/data/embodiment.py`).
 
-#### 4.2.1 Checking a collected set
+### 4.2 Wall data (`data/wall_b1/`, `data/wall_c10/`)
 
-Numbers, not eyes -- but **look at the video too**: five defects this project found in its B1 data
-were caught by watching and none by the tables that were passing at the time.
+| step | script |
+|---|---|
+| B1 episodes + branches (physics, MuJoCo) / render | `scripts/dataset/collect_b1_wall_data.py physics|render ...` (`--group`, `--side`, `--corner`) |
+| c10 live episodes + branches (CoppeliaSim) / render | `scripts/dataset/collect_c10_wall_data.py physics|render ...` (`--group`, `--side`, `--n_corner`) |
+| equal cells across bodies | `scripts/dataset/balance_wall_data.py --body {b1,c10} [--apply]` |
+| train subset (14 of 28 commands per state) | `collect_*_wall_data.py select --split train` |
+| gates (must all pass) | `scripts/dataset/check_wall_data.py --body {b1,c10} --render [--ref_body b1]` |
 
-| check | pass | how it failed before |
-|---|---|---|
-| frames touching an image edge | 0% on all 48 | 61%, and the metric that catches a *static* band is `worst background edge`, not this one |
-| background spread between clips | < 0.5 grey levels | 2.79 |
-| worst background edge | < 5 | 21.3 with the floor edge in shot |
-| feet visible | bright pixels > 0 per frame | 0, with the robot buried under a lifted floor |
-| turn sign | negative on all four levels | positive, i.e. opposite the insect |
-| weakest turn | distinct from `speed_vx0.30` | identical in both channels |
-| conditions x clips | 12 x 4, two per policy | -- |
-
-Output per clip: `frames (66,256,256,3)`, `action (66,12)`, `foot_contact`, `base_pos`,
-`base_quat`, `joint_pos`, `condition`, `behaviour`, `level`, `expert_episode`, **`policy`**.
-
-### 4.3 Generating a new morphology
-
-Scales each leg segment and repositions downstream joints. Requires a running CoppeliaSim,
-since it edits the model over ZMQ and then saves.
-
-```bash
-cd $REPO && .venv/bin/python3 sim/scene/make_leg_morphology.py \
-    --factor 0.625 --out sim/env/medauroidea_stick_insect_0625.ttt
-```
+Episode = approach a wall -> back up / step aside -> spin -> walk out; branch = every one of the 28 commands held from a
+saved state (3 s, 5 s from far states), cut at the boundary crossing. Per-frame `clearance` / `status`; design in
+`doc/DATA_PLAN.md` section 13, findings F332-F334, F338, F346.
 
 ---
 
 ## 5. Data checks
 
-Run before trusting any dataset.
+Run after any data change; every reported number assumes they pass.
 
-```bash
-cd $REPO && .venv/bin/python3 scripts/dataset/render_lock_check.py \
-    --data data/ik_walk_100 --out results/ik/render_lock
-```
+| check | command |
+|---|---|
+| branch exactness, c10 / B1 / c08 | `scripts/dataset/check_branches.py` (`--c08`) |
+| splits disjoint (files, frames, rooms) | `scripts/diagnostics/dataset/check_splits.py` |
+| Froude labels | `tests/test_froude_labels.py` (`FROUDE_TEST_HEX=c08` for c08) |
+| frames vs labels aligned in time | `scripts/diagnostics/dataset/check_frame_label_alignment.py` |
+| wall data | `scripts/dataset/check_wall_data.py` (above) |
 
-Reports whether morphology is present in the frozen encoder's embeddings (expected), and
-whether repeated recordings of the same clip are distinguishable (should be near chance).
-Read PROGRESS.md section 15.2 before interpreting the repeat test.
-
-```bash
-cd $REPO && .venv/bin/python3 scripts/dataset/audit_ik_dataset.py --data data/ik_walk_100
-```
+Look at the frames too (memory: verify rendered frames): sample sheets / videos before collecting at scale.
 
 ---
 
 ## 6. World model
 
-Implementation lives in `wm/`. Architecture follows LAC-WM; optimisation is scaled down for a
-single GPU. See `wm/config.py` for all hyperparameters.
-
-| Module | Role |
-|---|---|
-| `wm/models/itm.py` | Inverse Transition Model: two frames to latent action `z` |
-| `wm/models/ftm.py` | Forward Transition Model: predicts the next visual embedding |
-| `wm/models/motion_decoder.py` | Decodes `z` to joint commands; shared backbone, per-embodiment head |
-| `wm/data/` | Datasets, augmentation, embodiment adapters |
-| `wm/train.py` | Training entry point |
-| `wm/evaluate.py` | Latent validation and transfer evaluation |
+`wm/` -- frozen V-JEPA2 encoder (grayscale for the current models), inverse transition model (ITM, two embeddings -> latent
+action z), forward transition model (FTM, embedding + z -> next embedding), Froude prediction head (z -> forward / lateral /
+yaw), one action projector per body (command chunk -> z). `ARCHITECTURE.md` explains the design.
 
 ### 6.1 Train
 
-Run from the repository root so `-m wm.train` resolves.
-
 ```bash
-cd $REPO && .venv/bin/python3 -m wm.train \
-    --data_dir data/ik_walk_100 \
-    --epochs 20 \
-    --batch_size 8 \
-    --val_episodes 5 \
-    --train_morphs long short \
-    --heldout_morph medium \
-    --name run_name
+# arm B = joint c10 + B1, clips + branches; the current recipe adds grayscale, augmentation and the imagined-read term
+RUN_TAG=_gray_imread EXTRA="<recipe flags, see scripts/run/hexonly_center_pair.sh>" bash scripts/run/round1_counterfactual.sh B
+# H = hexapod only (B1 adapted later), W = arm B + the wall branches
 ```
 
-Key options:
+30.5k gradient steps per run (batch 8, balanced bodies); `--batches_per_epoch` keeps that budget when data is added.
+Outputs `wm/runs/<name>/` (`best.pt`, `summary/` tensorboard: per epoch `train/`, `val/`; every 500 steps `train_step/`,
+every 2,000 steps the full validation `val_step/`). A temperature guard pauses training above 83 C.
 
-| Option | Meaning |
-|---|---|
-| `--train_morphs` | Bodies used for gradient updates |
-| `--heldout_morph` | Body never trained on; reported each epoch as `heldout/motion` |
-| `--val_episodes` | Episodes held out from the training bodies, used to select `best.pt` |
-| `--frame_start`, `--frame_stop` | Restrict the frame range within each clip |
-| `--lambda_recon`, `--lambda_motion` | Loss weights; the source paper reports no values |
-| `--z_dim` | Latent action dimensionality, default 64 |
-
-Splitting is by expert episode, never by repeat. Repeats of one episode share identical
-actions, so holding one out measures nothing.
-
-Outputs in `wm/runs/<name>/`: `best.pt`, `best_motion.pt`, periodic `epoch###.pt`, and
-TensorBoard logs under `summary/`.
-
-Approximate cost: 1543 steps per epoch on 100 episodes and two bodies, about 23 minutes per
-epoch on an RTX 2080 Ti, 4.8 GB of GPU memory at batch size 8.
-
-### 6.2 Monitor
+### 6.2 Evaluate
 
 ```bash
-python3 -m tensorboard.main --logdir $REPO/wm/runs --port 6006
+bash scripts/run/eval_suite.sh NAME joint   wm/runs/NAME/best.pt    # B1 in pretraining
+bash scripts/run/eval_suite.sh NAME hexonly wm/runs/NAME/best.pt    # B1 adapted (ADAPT_EXTRA="--lambda_imread 1.0")
 ```
 
-`val/*` measures unseen episodes of the training bodies. `heldout/*` measures the held-out
-body. These can diverge: a run reached `val/motion` 0.0016 while the held-out body degraded to
-0.42. Treat `val/*` alone as insufficient evidence of generalisation.
-
-`heldout/*` is for reporting only. Selecting checkpoints on it would leak the test body.
-
-### 6.3 Evaluate
-
-```bash
-cd $REPO && .venv/bin/python3 -m wm.evaluate \
-    --ckpt wm/runs/run_name/best.pt --out results/wm/run_name
-```
-
-Writes `evaluation.json` with:
-
-- `motion_mse` per body, including `zero_z` and `shuffled_z` ablations and a `predict_mean`
-  reference. Actions are standardised, so 1.0 corresponds to no skill.
-- `morphology_structure`: decode accuracy, silhouette, and between-class variance for raw
-  embeddings and for `z`. Report all three; decode measures whether a signal is present,
-  silhouette whether it dominates, and they can disagree.
-- `behaviour_transfer_macro_f1`: foot-contact transfer across bodies, from raw embeddings and
-  from `z`.
-
-Contact labels are used only for evaluation, never for training.
+Every reported number comes from here: projectors, selection (B1 recorded / video goal, c08 zero-shot, c10), shared latent,
+z-dependence, counterfactual read-outs -> `results/eval/NAME/summary.txt`. Physics closed loop:
+`scripts/run/physics_orig_b1.sh`, `scripts/run/physics_orig_hex.sh` (env `CK`, `OUT`, `MECHS`, `GA=imagined`,
+`GS=vision`). Wall prediction check: `scripts/diagnostics/wall_pilot/wall_predcheck.py --body {b1,c10} --ckpt NAME`.
 
 ---
 
-## 7. Rendering and gait diagnostics
+## 7. Rendering
 
-Use a separate CoppeliaSim instance so training instances are not disturbed.
-
-```bash
-cd $REPO && .venv/bin/python3 scripts/amp/render_rollout.py \
-    --port 23063 \
-    --scene sim/env/medauroidea_stick_insect.ttt \
-    --ckpt amp/logs/<run>/model/step<N> \
-    --out results/rollouts/name.mp4
-```
-
-```bash
-cd $REPO && .venv/bin/python3 scripts/amp/gait_report.py \
-    --port 23063 \
-    --scene sim/env/medauroidea_stick_insect.ttt \
-    --ckpt amp/logs/<run>/model/step<N> \
-    --tag name
-```
-
-`gait_report.py` compares duty factor, inter-leg phase and stride rate against the expert
-without assuming a gait template. Aggregate returns and video alone are not sufficient to
-judge gait quality.
+Replays render the recorded link / body poses in a separate CoppeliaSim instance: `sim/render/render_hex_replay.py`,
+`sim/render/render_b1_replay.py`; deck figures and videos in `scripts/figures/` (`weekly_visuals.py` for the physics
+clips). Same render path as the data, so a figure shows exactly what the model saw.
 
 ---
 
-## 8. Determinism and episode length
+## 8. Determinism
 
-Contact-rich legged dynamics amplify floating-point differences.
+| | behaviour | how the data uses it |
+|---|---|---|
+| B1 (MuJoCo) | exact save / restore; a rerun repeats bit for bit | branches = restore the state, run each command |
+| hexapod (CoppeliaSim) | reruns after `loadScene` are NOT identical; with the scene loaded once, runs fall into bit-identical **classes** that switch with the run count (F305) | `sim/collect/scene_reuse.py`: load once, warm up, match each branch to the class of the walk it continues; wall data: store an episode only if its replay equals the live run (F346) |
 
-| Condition | Spread across identical runs |
-|---|---|
-| Scene loaded once, stop and start only | 0.0000 m |
-| Scene reloaded per run | about 1.8 m |
-
-Consequences:
-
-- For reproducibility, load the scene once and run many episodes from it.
-- Any single-episode measurement needs error bars. Report mean and standard deviation over
-  several episodes.
-- The floor is 10 m across, the robot walks about 0.46 m/s, and the timestep is 50 ms (20 Hz).
-  About 300 steps stays on the floor; 1000 steps walks off the edge.
-
-Engine settings: Bullet 2.78, 20 Hz, 10 substeps, 100 solver iterations, realtime off.
-
-**The two robots differ here and it decides where spread comes from.** The B1's physics is MuJoCo,
-seeded explicitly, and **repeats bit for bit** -- choices, frames and body track. Rerunning one B1
-configuration returns the identical number and carries no information; its spread has to come from
-**different goal clips**. The insect runs in CoppeliaSim with the scene reloaded per run and
-spreads 37-71% on one configuration, so its spread comes from **repeats**. Applying either recipe
-to the other robot produces error bars that mean nothing.
+Consequences: hexapod collection replays the episode for every branch (15-30 min per wall episode vs minutes for B1); a
+CoppeliaSim instance can hang (seen 2026-10-14): long jobs need a timeout and a retry with fresh instances. Spread in a
+result has to come from different start states / goals for B1 and from different episodes for the hexapod.
 
 ---
 
@@ -410,23 +254,12 @@ because of GitHub's 100 MB limit, and must be copied across manually.
 
 | Path | Size | Needed for |
 |---|---|---|
-| `sim/env/expert_66k_aug3c_fcontact.csv` | 132 MB | all IK collection; `sim/collect/collect_ik.py` reads it directly |
-| `data/` | varies | training and evaluation. `data/ik_walk_100_framed` is 379 MB |
-| `wm/runs/` | 366 MB per checkpoint | only if continuing from existing checkpoints |
+| `data/counterfactual_walks/` | ~23 GB | locomotion training / evaluation |
+| `data/wall_b1/`, `data/wall_c10/` | ~14 / ~20 GB | wall training / evaluation (incl. `_physics/`) |
+| `wm/runs/<name>/best.pt` | ~400 MB each | continuing from or evaluating existing checkpoints |
+| `results/wm/cache/` | varies | evaluation embedding caches (rebuilt if missing) |
 
-Copy them directly, for example:
-
-```bash
-rsync -av --progress \
-    aria@source-host:/home/aria/ioon-research/sim/env/expert_66k_aug3c_fcontact.csv \
-    aria@source-host:/home/aria/ioon-research/data/ik_walk_100_framed \
-    aria@source-host:/home/aria/ioon-research/data/b1 \
-    aria@source-host:/home/aria/ioon-research/data/b1_traj \
-    $REPO/
-```
-
-Datasets can also be regenerated from the expert CSV with section 4, which is slower (about
-55 minutes for 100 episodes) but needs only the CSV.
+Copy with `rsync -aL` (follows the symlinked dirs, e.g. the wall `train_branches` folders). The expert CSV is NOT used.
 
 ### In git and portable
 
@@ -438,8 +271,8 @@ derived from the file's own location, so the repository can live anywhere.
 Some scripts still hold absolute paths to assets outside this repository:
 
 - `sim/collect/rollout_b1_mujoco.py` and `sim/scene/build_b1_scene.py` point at `~/Sim2Real-B1` and
-  `sim/assets/b1_description`. Only needed to regenerate B1 trajectories or rebuild the B1 scene;
-  the existing `sim/env/b1_flat.ttt` and `data/b1_traj` avoid this.
+  `sim/assets/b1_description` (the B1 walking policy and model): needed for any new B1 physics (walks, branches, wall
+  data, the B1 physics loop).
 - Anything under `sim/_archive/` or `scripts/_archive/`.
 
 ### Checklist
@@ -447,8 +280,8 @@ Some scripts still hold absolute paths to assets outside this repository:
 ```bash
 cd $REPO
 python3 -c "import torch, transformers; print(torch.cuda.is_available())"   # expect True
-ls sim/env/expert_66k_aug3c_fcontact.csv          # expect it to exist
-ls data/ik_walk_100_framed | wc -l                 # expect 301 (300 clips + manifest)
+ls data/counterfactual_walks/c10_clips_train | wc -l   # expect 48
+.venv/bin/python3 tests/test_froude_labels.py          # expect 0 failed
 ```
 
 Then start CoppeliaSim (section 3) and run the verification in section 2.4.

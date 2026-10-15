@@ -7,26 +7,29 @@ before running anything.
    update it when something changes.
 2. **Your memories** — locked conventions (timescale, Froude labels, resource limits, slide style). They
    override anything older.
-3. **`doc/DATA.md`** — the only current data (`data/counterfactual_walks/`), its train / val / heldout
-   splits and the scripts that made it. Anything under `_superseded/` or `_archive*` is not used.
+3. **`doc/DATA.md`** — the current data (`data/counterfactual_walks/`, wall data `data/wall_b1`, `data/wall_c10`), splits
+   and the scripts that made them. Anything under `_superseded/`, `_archive*`, `_moved_*`, `_unused_*` is not used.
 4. **`ARCHITECTURE.md`** — the model next to LAC-WM and Egocentric VSM.
 5. **`doc/FINDINGS.md`** — the evidence, numbered. Not append-only: read corrections and withdrawals.
    Results before 2026-10-01 are pre-fix (F293 / F295 / F297 / F300 / F301) and not quotable.
-6. `doc/DATA_PLAN.md` (how the data was designed), `doc/PROGRESS.md` (dated log, Thai + English),
-   `doc/SIM_GUIDE.md` (install and simulators).
+6. `doc/WALL_SELECTION_PLAN.md` (the wall test, locked protocol), `doc/DATA_PLAN.md` (how the data was designed),
+   `doc/SIM_GUIDE.md` (install, simulators, current pipeline), `doc/PROGRESS.md` (dated log until 2026-10-09, history),
+   `doc/ref/paper_positioning.md` (related work, verified citations).
 
-**Current state (2026-10-09). Read this before anything else.**
+**Current state (2026-10-15). Read this before anything else.**
 - The user is the researcher; they commit / push. Answer in Thai when they write Thai. Read STATUS, the memories and the
-  relevant FINDINGS BEFORE acting; change one variable per experiment; never compare across weeks when the setup changed; name
-  every run / data dir together with what it is (bodies, branches, rooms).
-- Direction (advisor, week 19; memory `project_week19_direction`): prove the world model where it is needed -- predictive wall
-  avoidance (rollout must beat direct / reactive), then maze; IROS paper. Babbling / no-controller bodies paused; candidates =
-  tuned libraries. Original rooms (sized to the body), no random size; randomise the view (grayscale, brightness, texture,
-  lighting) as Egocentric VSM.
-- What stands: branches (F308); direct selection everywhere (F327); hexapod physics loop fixed (F323, `--cpg_clock`).
-- Rollout's weak point: Froude reads shrunk toward the middle on every channel, worst in unseen rooms (z carries the room,
-  F329 / F330); gait-phase mismatch at selection fixed for the hexapod (F330).
-- Running / next: STATUS (grayscale + augmentation retrain; shared-room re-render `srbal_*`; then the wall test).
+  relevant FINDINGS BEFORE acting; change one variable per experiment; name every run / data dir with what it is; reuse
+  existing scripts / figures before writing new ones; never delete without a per-folder yes (memories).
+- Direction (advisor, week 19): show where the world model is needed -- scene-dependent command selection near a wall
+  (virtual boundary), for every body; IROS paper. Plan and locked test protocol: `doc/WALL_SELECTION_PLAN.md`.
+- Base model: `round1_branches_s0_gray_imread` (joint c10 + B1, branches, grayscale + view randomisation + imagined-read
+  term; F331, F333, F343). B1 as a new body: direct transfers fully, rollout needs the imagined-read term in adaptation
+  too (F347). Centring: not adopted (F345, F347).
+- Wall data: `data/wall_b1`, `data/wall_c10`, equal start states per cell and side (153 / 30 / 57), gates in
+  `scripts/dataset/check_wall_data.py` (F346). D1-D3 (frozen model, control) and the wall retrain
+  (`round3_wall_s0_gray_imread`) are the current experiments -- see STATUS "Running".
+- Known weak spots: imagined yaw (turning) on every body; hexapod yaw labels keep gait sway (stride ~0.55 s vs the 1 s
+  window) -- separate experiment.
 - Selection is judged only by achieved Froude per channel, never by which clip was picked (memory).
 
 **The project.** Cross-embodiment locomotion from egocentric video: a latent action world model (frozen
